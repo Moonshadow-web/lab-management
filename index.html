@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>生化免疫专业组速查工具</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- 登录态预检：未登录时在页面渲染前就隐藏主体 -->
+    <script>
+        if (sessionStorage.getItem('lab_logged_in') !== '1') {
+            document.addEventListener('DOMContentLoaded', function () {
+                var c = document.querySelector('.container');
+                if (c) c.style.display = 'none';
+            });
+        }
+    </script>
 </head>
 <body>
 

@@ -12,10 +12,12 @@ const SESSION_KEY  = 'lab_logged_in';
 (function initLogin() {
     const mask = document.getElementById('login-mask');
 
-    // 已在本次会话登录过 → 直接隐藏遮罩
+    // 已在本次会话登录过 → 直接隐藏遮罩，显示主体
     if (sessionStorage.getItem(SESSION_KEY) === '1') {
         mask.classList.add('hidden');
         setTimeout(() => mask.style.display = 'none', 400);
+        var c = document.querySelector('.container');
+        if (c) c.style.display = '';
         return;
     }
 
@@ -50,6 +52,10 @@ function doLogin() {
     } else {
         localStorage.removeItem(REMEMBER_KEY);
     }
+
+    // 显示主体内容
+    var c = document.querySelector('.container');
+    if (c) c.style.display = '';
 
     const mask = document.getElementById('login-mask');
     mask.classList.add('hidden');
