@@ -2277,7 +2277,7 @@ const manualData = [
         method: "肌氨酸氧化酶法",
         category: "肾功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/2, OSR61204-肌酐测定试剂盒(肌氨酸氧化酶法)中文说明书-REV4.1.pdf",
+        pdfPath: "files/2, OSR61204-肌酐测定试剂盒(肌氨酸氧化酶法)中文说明书-REV4.1.pdf",
         aliases: "CR CREA Creatinine SCr Creat",
         uploadDate: "2026-03-15"
     },
@@ -2290,7 +2290,7 @@ const manualData = [
         method: "酶法",
         category: "电解质",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/2,OSR6190,OSR6290-二氧化碳结合力测定试剂盒（酶法）说明书-REV5.0.pdf",
+        pdfPath: "files/2,OSR6190,OSR6290-二氧化碳结合力测定试剂盒（酶法）说明书-REV5.0.pdf",
         aliases: "CO2 TCO2 Bicarbonate tCO2",
         uploadDate: "2026-03-15"
     },
@@ -2303,7 +2303,7 @@ const manualData = [
         method: "—",
         category: "耗材",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/66318-AU生化分析系统专用试剂-电解质参比液_产品说明书--投放版本.pdf",
+        pdfPath: "files/66318-AU生化分析系统专用试剂-电解质参比液_产品说明书--投放版本.pdf",
         aliases: "Reference electrolyte solution ISE calibrator",
         uploadDate: "2026-03-15"
     },
@@ -2316,7 +2316,7 @@ const manualData = [
         method: "—",
         category: "耗材",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/66319-AU生化分析系统专用试剂-电解质内标液-产品说明书--投放版本.pdf",
+        pdfPath: "files/66319-AU生化分析系统专用试剂-电解质内标液-产品说明书--投放版本.pdf",
         aliases: "Internal standard electrolyte ISE internal",
         uploadDate: "2026-03-15"
     },
@@ -2329,7 +2329,7 @@ const manualData = [
         method: "—",
         category: "耗材",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/66320 缓冲液产品说明书-投放版本.pdf",
+        pdfPath: "files/66320 缓冲液产品说明书-投放版本.pdf",
         aliases: "Buffer solution wash buffer",
         uploadDate: "2026-03-15"
     },
@@ -2342,7 +2342,7 @@ const manualData = [
         method: "酶循环法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/B36975-总胆汁酸测定试剂盒（酶循环法）产品说明书-投放版本.pdf",
+        pdfPath: "files/B36975-总胆汁酸测定试剂盒（酶循环法）产品说明书-投放版本.pdf",
         aliases: "TBA Total Bile Acid",
         uploadDate: "2026-03-15"
     },
@@ -2355,7 +2355,7 @@ const manualData = [
         method: "免疫比浊法",
         category: "肾功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/B38145 胱抑素C测定试剂盒（免疫比浊法）产品说明书  - 投放版本.pdf",
+        pdfPath: "files/B38145 胱抑素C测定试剂盒（免疫比浊法）产品说明书  - 投放版本.pdf",
         aliases: "CysC Cystatin C Cys-C",
         uploadDate: "2026-03-15"
     },
@@ -2368,7 +2368,7 @@ const manualData = [
         method: "酶循环法",
         category: "心血管",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/B38157 同型半胱氨酸检测试剂盒（酶循环法）产品说明书---投放版本.pdf",
+        pdfPath: "files/B38157 同型半胱氨酸检测试剂盒（酶循环法）产品说明书---投放版本.pdf",
         aliases: "HCY Hcy Homocysteine",
         uploadDate: "2026-03-15"
     },
@@ -2381,7 +2381,7 @@ const manualData = [
         method: "—",
         category: "耗材",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/BLOSR000110 Wash Solution.pdf",
+        pdfPath: "files/BLOSR000110 Wash Solution.pdf",
         aliases: "Wash solution wash buffer cleaning",
         uploadDate: "2026-03-15"
     },
@@ -2394,7 +2394,7 @@ const manualData = [
         method: "NNP底物-AMP缓冲液法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6004,OSR6104,OSR6204-碱性磷酸酶测定试剂盒（NPP底物-AMP缓冲液法）产品说明书--投放版本.pdf",
+        pdfPath: "files/OSR6004,OSR6104,OSR6204-碱性磷酸酶测定试剂盒（NPP底物-AMP缓冲液法）产品说明书--投放版本.pdf",
         aliases: "ALP Alkaline Phosphatase Buffer solution wash buffer PHOS Phosphorus Inorganic Phosphate IP",
         uploadDate: "2026-03-15"
     },
@@ -2407,7 +2407,7 @@ const manualData = [
         method: "乳酸脱氢酶法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6007,OSR6107,OSR6607-丙氨酸氨基转移酶测定试剂盒（乳酸脱氢酶法）产品说明书----投放版本.pdf",
+        pdfPath: "files/OSR6007,OSR6107,OSR6607-丙氨酸氨基转移酶测定试剂盒（乳酸脱氢酶法）产品说明书----投放版本.pdf",
         aliases: "ALT GPT Alanine Aminotransferase LDH Lactate Dehydrogenase LAC Lactic Acid",
         uploadDate: "2026-03-15"
     },
@@ -2420,7 +2420,7 @@ const manualData = [
         method: "速率法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6020,OSR6120,OSR6520 γ-谷氨酰基转移酶测定试剂盒（速率法）-投放版本.pdf",
+        pdfPath: "files/OSR6020,OSR6120,OSR6520 γ-谷氨酰基转移酶测定试剂盒（速率法）-投放版本.pdf",
         aliases: "GGT γ-GT Gamma-GT Glutamyltransferase",
         uploadDate: "2026-03-15"
     },
@@ -2433,7 +2433,7 @@ const manualData = [
         method: "尿酸酶过氧化物酶法",
         category: "肾功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6098,OSR6198,OSR6298,OSR6698-尿酸测定试剂盒（尿酸酶-过氧化物酶法）产品说明书----投放版本.pdf",
+        pdfPath: "files/OSR6098,OSR6198,OSR6298,OSR6698-尿酸测定试剂盒（尿酸酶-过氧化物酶法）产品说明书----投放版本.pdf",
         aliases: "UA Uric Acid",
         uploadDate: "2026-03-15"
     },
@@ -2446,7 +2446,7 @@ const manualData = [
         method: "溴甲酚绿法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6102、OSR6202白蛋白测定试剂盒（溴甲酚绿法）产品说明书——投放版本.pdf",
+        pdfPath: "files/OSR6102、OSR6202白蛋白测定试剂盒（溴甲酚绿法）产品说明书——投放版本.pdf",
         aliases: "ALB Albumin",
         uploadDate: "2026-03-15"
     },
@@ -2459,7 +2459,7 @@ const manualData = [
         method: "重氮盐法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6111 OSR6211 OSR6511 直接胆红素测定试剂盒（重氮盐法）产品说明书---投放版本.pdf",
+        pdfPath: "files/OSR6111 OSR6211 OSR6511 直接胆红素测定试剂盒（重氮盐法）产品说明书---投放版本.pdf",
         aliases: "DBIL Direct Bilirubin",
         uploadDate: "2026-03-15"
     },
@@ -2472,7 +2472,7 @@ const manualData = [
         method: "重氮盐法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6112,OSR6212-总胆红素测定试剂盒（重氮盐法）产品说明书--投放版本.pdf",
+        pdfPath: "files/OSR6112,OSR6212-总胆红素测定试剂盒（重氮盐法）产品说明书--投放版本.pdf",
         aliases: "TBIL Total Bilirubin",
         uploadDate: "2026-03-15"
     },
@@ -2485,7 +2485,7 @@ const manualData = [
         method: "丁酰硫代胆碱底物法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6114-胆碱酯酶测定试剂盒（丁酰硫代胆碱底物法）产品说明书.pdf",
+        pdfPath: "files/OSR6114-胆碱酯酶测定试剂盒（丁酰硫代胆碱底物法）产品说明书.pdf",
         aliases: "CHE Cholinesterase PChE",
         uploadDate: "2026-03-15"
     },
@@ -2498,7 +2498,7 @@ const manualData = [
         method: "酶法",
         category: "血脂",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6116,OSR6216总胆固醇测定试剂盒（酶法）产品说明书——投放版本.pdf",
+        pdfPath: "files/OSR6116,OSR6216总胆固醇测定试剂盒（酶法）产品说明书——投放版本.pdf",
         aliases: "TC CHOL Total Cholesterol",
         uploadDate: "2026-03-15"
     },
@@ -2511,7 +2511,7 @@ const manualData = [
         method: "己糖激酶法",
         category: "糖代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6121、OSR6122葡萄糖测定试剂盒（己糖激酶法）产品说明书——投放版本.pdf",
+        pdfPath: "files/OSR6121、OSR6122葡萄糖测定试剂盒（己糖激酶法）产品说明书——投放版本.pdf",
         aliases: "GLU Glucose Blood Sugar FBG",
         uploadDate: "2026-03-15"
     },
@@ -2524,7 +2524,7 @@ const manualData = [
         method: "磷钼酸盐法",
         category: "电解质",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6122、OSR6222磷测定试剂盒（磷钼酸盐法）产品说明书——投放版本.pdf",
+        pdfPath: "files/OSR6122、OSR6222磷测定试剂盒（磷钼酸盐法）产品说明书——投放版本.pdf",
         aliases: "PHOS Phosphorus Inorganic Phosphate IP",
         uploadDate: "2026-03-15"
     },
@@ -2537,7 +2537,7 @@ const manualData = [
         method: "乳酸底物法",
         category: "心肌酶",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6128 乳酸脱氢酶测定试剂盒（乳酸底物法） 产品说明书2024.06.05 - 投放版本.pdf",
+        pdfPath: "files/OSR6128 乳酸脱氢酶测定试剂盒（乳酸底物法） 产品说明书2024.06.05 - 投放版本.pdf",
         aliases: "LDH Lactate Dehydrogenase LAC Lactic Acid",
         uploadDate: "2026-03-15"
     },
@@ -2550,7 +2550,7 @@ const manualData = [
         method: "色原底物法",
         category: "胰腺功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6130,OSR6230-脂肪酶测定试剂盒（色原底物法）中文说明书-REV3.1.pdf",
+        pdfPath: "files/OSR6130,OSR6230-脂肪酶测定试剂盒（色原底物法）中文说明书-REV3.1.pdf",
         aliases: "LPS Lipase",
         uploadDate: "2026-03-15"
     },
@@ -2563,7 +2563,7 @@ const manualData = [
         method: "双缩脲法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6132,OSR6232-总蛋白测定试剂盒（双缩脲法）产品说明书-投放版本.pdf",
+        pdfPath: "files/OSR6132,OSR6232-总蛋白测定试剂盒（双缩脲法）产品说明书-投放版本.pdf",
         aliases: "TP Total Protein",
         uploadDate: "2026-03-15"
     },
@@ -2576,7 +2576,7 @@ const manualData = [
         method: "尿素酶谷氨酸脱氢酶法",
         category: "肾功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6134、OSR6234尿素测定试剂盒（尿素酶-谷氨酸脱氢酶法）产品说明书——投放版本.pdf",
+        pdfPath: "files/OSR6134、OSR6234尿素测定试剂盒（尿素酶-谷氨酸脱氢酶法）产品说明书——投放版本.pdf",
         aliases: "UREA BUN Blood Urea Nitrogen",
         uploadDate: "2026-03-15"
     },
@@ -2589,7 +2589,7 @@ const manualData = [
         method: "免疫比浊法",
         category: "特种蛋白",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6165-触珠蛋白测定试剂盒（免疫比浊法）说明书-REV3.1.pdf",
+        pdfPath: "files/OSR6165-触珠蛋白测定试剂盒（免疫比浊法）说明书-REV3.1.pdf",
         aliases: "HP Haptoglobin",
         uploadDate: "2026-03-15"
     },
@@ -2602,7 +2602,7 @@ const manualData = [
         method: "免疫比浊法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6175-前白蛋白测定试剂盒（免疫比浊法）说明书-REV3.1.pdf",
+        pdfPath: "files/OSR6175-前白蛋白测定试剂盒（免疫比浊法）说明书-REV3.1.pdf",
         aliases: "PA Prealbumin Transthyretin TTR ALB Albumin",
         uploadDate: "2026-03-15"
     },
@@ -2615,7 +2615,7 @@ const manualData = [
         method: "酶法",
         category: "心肌酶",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6179,OSR6279-肌酸激酶检测试剂盒（酶偶联法）产品说明书.pdf",
+        pdfPath: "files/OSR6179,OSR6279-肌酸激酶检测试剂盒（酶偶联法）产品说明书.pdf",
         aliases: "CK CPK Creatine Kinase",
         uploadDate: "2026-03-15"
     },
@@ -2628,7 +2628,7 @@ const manualData = [
         method: "PNP-G7底物法",
         category: "胰腺功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6182 α-淀粉酶测定试剂盒（PNP-G7底物法）产品说明书-投放版本.pdf",
+        pdfPath: "files/OSR6182 α-淀粉酶测定试剂盒（PNP-G7底物法）产品说明书-投放版本.pdf",
         aliases: "AMY AMS Amylase α-Amylase",
         uploadDate: "2026-03-15"
     },
@@ -2641,7 +2641,7 @@ const manualData = [
         method: "直接法",
         category: "血脂",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6183,OSR6283-低密度脂蛋白胆固醇测定试剂盒（直接法）产品说明书--投放版本.pdf",
+        pdfPath: "files/OSR6183,OSR6283-低密度脂蛋白胆固醇测定试剂盒（直接法）产品说明书--投放版本.pdf",
         aliases: "LDL LDL-C Low Density Lipoprotein",
         uploadDate: "2026-03-15"
     },
@@ -2654,7 +2654,7 @@ const manualData = [
         method: "TPTZ法",
         category: "微量元素",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6186,OSR6286-铁测定试剂盒（TPTZ法）产品说明书-投放版本.pdf",
+        pdfPath: "files/OSR6186,OSR6286-铁测定试剂盒（TPTZ法）产品说明书-投放版本.pdf",
         aliases: "FE Iron Serum",
         uploadDate: "2026-03-15"
     },
@@ -2667,7 +2667,7 @@ const manualData = [
         method: "直接法",
         category: "血脂",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6187,OSR6287- 高密度脂蛋白胆固醇测定试剂盒（直接法）产品说明书--投放版本.pdf",
+        pdfPath: "files/OSR6187,OSR6287- 高密度脂蛋白胆固醇测定试剂盒（直接法）产品说明书--投放版本.pdf",
         aliases: "HDL HDL-C High Density Lipoprotein",
         uploadDate: "2026-03-15"
     },
@@ -2680,7 +2680,7 @@ const manualData = [
         method: "二甲苯胺蓝法",
         category: "电解质",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6189-镁测定试剂盒（二甲苯胺蓝法）产品说明书——投放版本.pdf",
+        pdfPath: "files/OSR6189-镁测定试剂盒（二甲苯胺蓝法）产品说明书——投放版本.pdf",
         aliases: "MG Magnesium",
         uploadDate: "2026-03-15"
     },
@@ -2693,7 +2693,7 @@ const manualData = [
         method: "酶法",
         category: "代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6193-乳酸测定试剂盒（酶法）说明书-REV3.1.pdf",
+        pdfPath: "files/OSR6193-乳酸测定试剂盒（酶法）说明书-REV3.1.pdf",
         aliases: "LAC Lactic Acid Lactate",
         uploadDate: "2026-03-15"
     },
@@ -2706,7 +2706,7 @@ const manualData = [
         method: "免疫比浊法",
         category: "炎症",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR6199-C-反应蛋白测定试剂盒(免疫比浊法)-REV5.1.pdf",
+        pdfPath: "files/OSR6199-C-反应蛋白测定试剂盒(免疫比浊法)-REV5.1.pdf",
         aliases: "CRP hsCRP C-Reactive Protein",
         uploadDate: "2026-03-15"
     },
@@ -2719,7 +2719,7 @@ const manualData = [
         method: "偶氮砷III法",
         category: "电解质",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR60117、OSR61117钙测定试剂盒（偶氮砷III法）产品说明书——投放版本.pdf",
+        pdfPath: "files/OSR60117、OSR61117钙测定试剂盒（偶氮砷III法）产品说明书——投放版本.pdf",
         aliases: "CA Calcium",
         uploadDate: "2026-03-15"
     },
@@ -2732,7 +2732,7 @@ const manualData = [
         method: "GPO-POD法",
         category: "血脂",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR60118,OSR61118-甘油三酯测定试剂盒（GPO-POD法）产品说明书---投放版本.pdf",
+        pdfPath: "files/OSR60118,OSR61118-甘油三酯测定试剂盒（GPO-POD法）产品说明书---投放版本.pdf",
         aliases: "TG Triglyceride Triacylglycerol",
         uploadDate: "2026-03-15"
     },
@@ -2745,7 +2745,7 @@ const manualData = [
         method: "Nitroso-PSAP法",
         category: "微量元素",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/OSR61205不饱和铁结合力测定试剂盒（Nitroso-PSAP法）产品说明书——投放版本.pdf",
+        pdfPath: "files/OSR61205不饱和铁结合力测定试剂盒（Nitroso-PSAP法）产品说明书——投放版本.pdf",
         aliases: "UIBC Unsaturated Iron Binding Capacity FE Serum",
         uploadDate: "2026-03-15"
     },
@@ -2758,7 +2758,7 @@ const manualData = [
         method: "MDH法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼AU系列/天门冬氨酸氨基转移酶测定试剂盒（MDH法）说明书.pdf",
+        pdfPath: "files/天门冬氨酸氨基转移酶测定试剂盒（MDH法）说明书.pdf",
         aliases: "AST GOT Aspartate Aminotransferase",
         uploadDate: "2026-03-15"
     },
@@ -2771,7 +2771,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/EPO/2,A16364-中文说明书-REV4.0.pdf",
+        pdfPath: "files/2,A16364-中文说明书-REV4.0.pdf",
         aliases: "EPO Erythropoietin",
         uploadDate: "2026-03-15"
     },
@@ -2784,7 +2784,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/EPO/2,A16365-中文说明书-REV4.0.pdf",
+        pdfPath: "files/2,A16365-中文说明书-REV4.0.pdf",
         aliases: "EPO Erythropoietin",
         uploadDate: "2026-03-15"
     },
@@ -2797,7 +2797,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/FER/2,33020-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,33020-中文说明书-REV4.1.pdf",
         aliases: "FER Ferritin FE Iron Serum",
         uploadDate: "2026-03-15"
     },
@@ -2810,7 +2810,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/FER/2,33025-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,33025-中文说明书-REV4.2.pdf",
         aliases: "FER Ferritin FE Iron Serum",
         uploadDate: "2026-03-15"
     },
@@ -2823,7 +2823,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/FOL/2,A14206-Red Blood Cell Folate Lysing Agent-中文说明书-REV3.2.pdf",
+        pdfPath: "files/2,A14206-Red Blood Cell Folate Lysing Agent-中文说明书-REV3.2.pdf",
         aliases: "FA Folic Acid Folate",
         uploadDate: "2026-03-15"
     },
@@ -2836,7 +2836,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/FOL/2,A98033-中文说明书-REV2.1.pdf",
+        pdfPath: "files/2,A98033-中文说明书-REV2.1.pdf",
         aliases: "FA Folic Acid Folate",
         uploadDate: "2026-03-15"
     },
@@ -2849,7 +2849,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/FOL/A98032-中文说明书-REV3.1.pdf",
+        pdfPath: "files/A98032-中文说明书-REV3.1.pdf",
         aliases: "FA Folic Acid Folate",
         uploadDate: "2026-03-15"
     },
@@ -2862,7 +2862,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/FOL/A99250-中文说明书-REV1.3.pdf",
+        pdfPath: "files/A99250-中文说明书-REV1.3.pdf",
         aliases: "FA Folic Acid Folate",
         uploadDate: "2026-03-15"
     },
@@ -2875,7 +2875,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/FOL/叶酸试剂盒 说明书（为-未）情况说明.pdf",
+        pdfPath: "files/叶酸试剂盒 说明书（为-未）情况说明.pdf",
         aliases: "FA Folic Acid Folate",
         uploadDate: "2026-03-15"
     },
@@ -2888,7 +2888,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/IFAB/2,387992-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,387992-中文说明书-REV4.1.pdf",
         aliases: "387992",
         uploadDate: "2026-03-15"
     },
@@ -2901,7 +2901,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/IFAB/2,387993-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,387993-中文说明书-REV4.1.pdf",
         aliases: "387993",
         uploadDate: "2026-03-15"
     },
@@ -2914,7 +2914,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/IFAB/2,387999-中文说明书-REV5.0.pdf",
+        pdfPath: "files/2,387999-中文说明书-REV5.0.pdf",
         aliases: "387999",
         uploadDate: "2026-03-15"
     },
@@ -2927,7 +2927,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/sTfR/2,A32493-中文说明书-REV2.1.pdf",
+        pdfPath: "files/2,A32493-中文说明书-REV2.1.pdf",
         aliases: "sTfR Soluble Transferrin Receptor TRF FER Ferritin FE Iron Serum",
         uploadDate: "2026-03-15"
     },
@@ -2940,7 +2940,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/sTfR/2,A32494-中文说明书-REV2.0.pdf",
+        pdfPath: "files/2,A32494-中文说明书-REV2.0.pdf",
         aliases: "sTfR Soluble Transferrin Receptor TRF FER Ferritin FE Iron Serum",
         uploadDate: "2026-03-15"
     },
@@ -2953,7 +2953,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/sTfR/B11056,B11057-中文说明书-REV3.1.pdf",
+        pdfPath: "files/B11056,B11057-中文说明书-REV3.1.pdf",
         aliases: "sTfR Soluble Transferrin Receptor TRF FER Ferritin FE Iron Serum",
         uploadDate: "2026-03-15"
     },
@@ -2966,7 +2966,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/VB12/2,33000-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,33000-中文说明书-REV4.1.pdf",
         aliases: "VitB12 Vitamin B12 Cobalamin",
         uploadDate: "2026-03-15"
     },
@@ -2979,7 +2979,7 @@ const manualData = [
         method: "化学发光法",
         category: "贫血",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Anemia/VB12/2,33005-中文说明书-REV5.2.pdf",
+        pdfPath: "files/2,33005-中文说明书-REV5.2.pdf",
         aliases: "VitB12 Vitamin B12 Cobalamin",
         uploadDate: "2026-03-15"
     },
@@ -2992,7 +2992,7 @@ const manualData = [
         method: "化学发光法",
         category: "骨代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Bone Metabolism/GH/2,33580-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,33580-中文说明书-REV4.1.pdf",
         aliases: "GH Growth Hormone",
         uploadDate: "2026-03-15"
     },
@@ -3005,7 +3005,7 @@ const manualData = [
         method: "化学发光法",
         category: "骨代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Bone Metabolism/GH/2,33585-中文说明书-REV4.0.pdf",
+        pdfPath: "files/2,33585-中文说明书-REV4.0.pdf",
         aliases: "GH Growth Hormone",
         uploadDate: "2026-03-15"
     },
@@ -3018,7 +3018,7 @@ const manualData = [
         method: "化学发光法",
         category: "骨代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Bone Metabolism/Ostase/2,37300-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,37300-中文说明书-REV4.1.pdf",
         aliases: "OC Osteocalcin BGP CA Calcium",
         uploadDate: "2026-03-15"
     },
@@ -3031,7 +3031,7 @@ const manualData = [
         method: "化学发光法",
         category: "骨代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Bone Metabolism/Ostase/2,37305-中文说明书-REV4.0.pdf",
+        pdfPath: "files/2,37305-中文说明书-REV4.0.pdf",
         aliases: "OC Osteocalcin BGP CA Calcium",
         uploadDate: "2026-03-15"
     },
@@ -3044,7 +3044,7 @@ const manualData = [
         method: "化学发光法",
         category: "骨代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Bone Metabolism/PTH/2,A16953-中文说明书-REV5.0.pdf",
+        pdfPath: "files/2,A16953-中文说明书-REV5.0.pdf",
         aliases: "PTH Parathyroid Hormone iPTH",
         uploadDate: "2026-03-15"
     },
@@ -3057,7 +3057,7 @@ const manualData = [
         method: "化学发光法",
         category: "骨代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Bone Metabolism/PTH/2,A16972-中文说明书REV4.1.pdf",
+        pdfPath: "files/2,A16972-中文说明书REV4.1.pdf",
         aliases: "PTH Parathyroid Hormone iPTH",
         uploadDate: "2026-03-15"
     },
@@ -3070,7 +3070,7 @@ const manualData = [
         method: "化学发光法",
         category: "骨代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Bone Metabolism/VD/2,A98857-中文说明书-REV1.2.pdf",
+        pdfPath: "files/2,A98857-中文说明书-REV1.2.pdf",
         aliases: "VitD Vitamin D 25-OH-VitD 25-hydroxyvitamin",
         uploadDate: "2026-03-15"
     },
@@ -3083,7 +3083,7 @@ const manualData = [
         method: "化学发光法",
         category: "骨代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Bone Metabolism/VD/2,B24839-中文说明书-REV1.2.pdf",
+        pdfPath: "files/2,B24839-中文说明书-REV1.2.pdf",
         aliases: "VitD Vitamin D 25-OH-VitD 25-hydroxyvitamin",
         uploadDate: "2026-03-15"
     },
@@ -3096,7 +3096,7 @@ const manualData = [
         method: "化学发光法",
         category: "骨代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Bone Metabolism/VD/A98856--REV1.0-中文说明书.pdf",
+        pdfPath: "files/A98856--REV1.0-中文说明书.pdf",
         aliases: "VitD Vitamin D 25-OH-VitD 25-hydroxyvitamin",
         uploadDate: "2026-03-15"
     },
@@ -3109,7 +3109,7 @@ const manualData = [
         method: "化学发光法",
         category: "骨代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Bone Metabolism/VD/B24838--REV1.0-中文说明书.pdf",
+        pdfPath: "files/B24838--REV1.0-中文说明书.pdf",
         aliases: "VitD Vitamin D 25-OH-VitD 25-hydroxyvitamin",
         uploadDate: "2026-03-15"
     },
@@ -3122,7 +3122,7 @@ const manualData = [
         method: "化学发光法",
         category: "心血管",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Cardivascular/BNP/2.98200-中文说明书-REV1.1.pdf",
+        pdfPath: "files/2.98200-中文说明书-REV1.1.pdf",
         aliases: "98200",
         uploadDate: "2026-03-15"
     },
@@ -3135,7 +3135,7 @@ const manualData = [
         method: "化学发光法",
         category: "心血管",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Cardivascular/BNP/2.98201-中文说明书-REV1.1.pdf",
+        pdfPath: "files/2.98201-中文说明书-REV1.1.pdf",
         aliases: "98201",
         uploadDate: "2026-03-15"
     },
@@ -3148,7 +3148,7 @@ const manualData = [
         method: "化学发光法",
         category: "心血管",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Cardivascular/BNP/2.98202-中文说明书-REV1.1.pdf",
+        pdfPath: "files/2.98202-中文说明书-REV1.1.pdf",
         aliases: "98202",
         uploadDate: "2026-03-15"
     },
@@ -3161,7 +3161,7 @@ const manualData = [
         method: "化学发光法",
         category: "心血管",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Cardivascular/CKMB/2,386371-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,386371-中文说明书-REV4.2.pdf",
         aliases: "386371",
         uploadDate: "2026-03-15"
     },
@@ -3174,7 +3174,7 @@ const manualData = [
         method: "化学发光法",
         category: "心血管",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Cardivascular/CKMB/2,386372-中文说明书-REV4.3.pdf",
+        pdfPath: "files/2,386372-中文说明书-REV4.3.pdf",
         aliases: "386372",
         uploadDate: "2026-03-15"
     },
@@ -3187,7 +3187,7 @@ const manualData = [
         method: "化学发光法",
         category: "心血管",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Cardivascular/hsTnI/2,B52699-中文说明书-REV1.2-水印.pdf",
+        pdfPath: "files/2,B52699-中文说明书-REV1.2-水印.pdf",
         aliases: "CA Calcium",
         uploadDate: "2026-03-15"
     },
@@ -3200,7 +3200,7 @@ const manualData = [
         method: "化学发光法",
         category: "心血管",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Cardivascular/hsTnI/2,B52700-中文说明书-REV2.0.pdf",
+        pdfPath: "files/2,B52700-中文说明书-REV2.0.pdf",
         aliases: "CA Calcium",
         uploadDate: "2026-03-15"
     },
@@ -3213,7 +3213,7 @@ const manualData = [
         method: "化学发光法",
         category: "心血管",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Cardivascular/MYO/2,973243-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,973243-中文说明书-REV4.2.pdf",
         aliases: "MYO Myoglobin Myo",
         uploadDate: "2026-03-15"
     },
@@ -3226,7 +3226,7 @@ const manualData = [
         method: "化学发光法",
         category: "心血管",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Cardivascular/MYO/2,973244-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,973244-中文说明书-REV4.2.pdf",
         aliases: "MYO Myoglobin Myo",
         uploadDate: "2026-03-15"
     },
@@ -3239,7 +3239,7 @@ const manualData = [
         method: "化学发光法",
         category: "耗材",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Consumables/Sample DiluteA/2,81908,A79783-中文说明书-REV3.2.pdf",
+        pdfPath: "files/2,81908,A79783-中文说明书-REV3.2.pdf",
         aliases: "81908",
         uploadDate: "2026-03-15"
     },
@@ -3252,7 +3252,7 @@ const manualData = [
         method: "化学发光法",
         category: "耗材",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Consumables/Substrate/2,81906-中文说明书-REV4.3.pdf",
+        pdfPath: "files/2,81906-中文说明书-REV4.3.pdf",
         aliases: "81906",
         uploadDate: "2026-03-15"
     },
@@ -3265,7 +3265,7 @@ const manualData = [
         method: "化学发光法",
         category: "耗材",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Consumables/Wsah Buffer/2.A16792,A16793-Access 免疫分析系统专用试剂-清洗缓冲液II中文说明书-2014.pdf",
+        pdfPath: "files/2.A16792,A16793-Access 免疫分析系统专用试剂-清洗缓冲液II中文说明书-2014.pdf",
         aliases: "Buffer solution wash buffer",
         uploadDate: "2026-03-15"
     },
@@ -3278,7 +3278,7 @@ const manualData = [
         method: "化学发光法",
         category: "耗材",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Consumables/Wsah Buffer/Wash buffer稀释盒/2,A79784-中文说明书-REV3.3.pdf",
+        pdfPath: "files/2,A79784-中文说明书-REV3.3.pdf",
         aliases: "Buffer solution wash buffer",
         uploadDate: "2026-03-15"
     },
@@ -3291,7 +3291,7 @@ const manualData = [
         method: "化学发光法",
         category: "炎症",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Inflammation/2,A16369-中文说明书-REV3.3.pdf",
+        pdfPath: "files/2,A16369-中文说明书-REV3.3.pdf",
         aliases: "A16369",
         uploadDate: "2026-03-15"
     },
@@ -3304,7 +3304,7 @@ const manualData = [
         method: "化学发光法",
         category: "炎症",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Inflammation/2,A16370-中文说明书-REV3.2.pdf",
+        pdfPath: "files/2,A16370-中文说明书-REV3.2.pdf",
         aliases: "A16370",
         uploadDate: "2026-03-15"
     },
@@ -3317,7 +3317,7 @@ const manualData = [
         method: "化学发光法",
         category: "炎症",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Inflammation/2,A16371-中文说明书-REV3.2.pdf",
+        pdfPath: "files/2,A16371-中文说明书-REV3.2.pdf",
         aliases: "A16371",
         uploadDate: "2026-03-15"
     },
@@ -3330,7 +3330,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/AMH/2,B13127-中文说明书-REV1.3.pdf",
+        pdfPath: "files/2,B13127-中文说明书-REV1.3.pdf",
         aliases: "B13127",
         uploadDate: "2026-03-15"
     },
@@ -3343,7 +3343,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/AMH/2,B13128-中文说明书-REV1.2.pdf",
+        pdfPath: "files/2,B13128-中文说明书-REV1.2.pdf",
         aliases: "B13128",
         uploadDate: "2026-03-15"
     },
@@ -3356,7 +3356,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/AMH/B13129-中文说明书-REV2.1.pdf",
+        pdfPath: "files/B13129-中文说明书-REV2.1.pdf",
         aliases: "—",
         uploadDate: "2026-03-15"
     },
@@ -3369,7 +3369,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/E2/2,33540-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,33540-中文说明书-REV4.2.pdf",
         aliases: "E2 Estradiol",
         uploadDate: "2026-03-15"
     },
@@ -3382,7 +3382,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/E2/2,33545-中文说明书-REV5.2.pdf",
+        pdfPath: "files/2,33545-中文说明书-REV5.2.pdf",
         aliases: "E2 Estradiol",
         uploadDate: "2026-03-15"
     },
@@ -3395,7 +3395,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/E2/33546-中文说明书REV4.4.pdf",
+        pdfPath: "files/33546-中文说明书REV4.4.pdf",
         aliases: "E2 Estradiol",
         uploadDate: "2026-03-15"
     },
@@ -3408,7 +3408,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/FSH/2,33520-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,33520-中文说明书-REV4.2.pdf",
         aliases: "33520",
         uploadDate: "2026-03-15"
     },
@@ -3421,7 +3421,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/FSH/2,33525-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,33525-中文说明书-REV4.2.pdf",
         aliases: "33525",
         uploadDate: "2026-03-15"
     },
@@ -3434,7 +3434,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/LH/2,33510-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,33510-中文说明书-REV4.1.pdf",
         aliases: "33510",
         uploadDate: "2026-03-15"
     },
@@ -3447,7 +3447,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/LH/2,33515-中文说明书-REV4.3.pdf",
+        pdfPath: "files/2,33515-中文说明书-REV4.3.pdf",
         aliases: "33515",
         uploadDate: "2026-03-15"
     },
@@ -3460,7 +3460,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/PRL/2,33530-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,33530-中文说明书-REV4.1.pdf",
         aliases: "33530",
         uploadDate: "2026-03-15"
     },
@@ -3473,7 +3473,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/PRL/2,33535-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,33535-中文说明书-REV4.1.pdf",
         aliases: "33535",
         uploadDate: "2026-03-15"
     },
@@ -3486,7 +3486,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/Prog/2,33550-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,33550-中文说明书-REV4.1.pdf",
         aliases: "PROG Progesterone P4",
         uploadDate: "2026-03-15"
     },
@@ -3499,7 +3499,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/Prog/2,33555-中文说明书-REV5.2.pdf",
+        pdfPath: "files/2,33555-中文说明书-REV5.2.pdf",
         aliases: "PROG Progesterone P4",
         uploadDate: "2026-03-15"
     },
@@ -3512,7 +3512,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/Prog/33556-中文说明书-REV1.4.pdf",
+        pdfPath: "files/33556-中文说明书-REV1.4.pdf",
         aliases: "PROG Progesterone P4",
         uploadDate: "2026-03-15"
     },
@@ -3525,7 +3525,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/Testo/2,33560-中文说明书-REV4.3.pdf",
+        pdfPath: "files/2,33560-中文说明书-REV4.3.pdf",
         aliases: "TEST Testosterone T",
         uploadDate: "2026-03-15"
     },
@@ -3538,7 +3538,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/Testo/33565-中文说明书-REV4.0.pdf",
+        pdfPath: "files/33565-中文说明书-REV4.0.pdf",
         aliases: "TEST Testosterone T",
         uploadDate: "2026-03-15"
     },
@@ -3551,7 +3551,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/UE3/2,33570-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,33570-中文说明书-REV4.1.pdf",
         aliases: "33570",
         uploadDate: "2026-03-15"
     },
@@ -3564,7 +3564,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/UE3/33575-中文说明书-REV5.2.pdf",
+        pdfPath: "files/33575-中文说明书-REV5.2.pdf",
         aliases: "—",
         uploadDate: "2026-03-15"
     },
@@ -3577,7 +3577,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/βhCG 5th IS/2,A85264-中文说明书-REV1.2.pdf",
+        pdfPath: "files/2,A85264-中文说明书-REV1.2.pdf",
         aliases: "A85264",
         uploadDate: "2026-03-15"
     },
@@ -3590,7 +3590,7 @@ const manualData = [
         method: "化学发光法",
         category: "生殖",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Reproductive/βhCG 5th IS/2,B11754-中文说明书-REV1.2.pdf",
+        pdfPath: "files/2,B11754-中文说明书-REV1.2.pdf",
         aliases: "B11754",
         uploadDate: "2026-03-15"
     },
@@ -3603,7 +3603,7 @@ const manualData = [
         method: "化学发光法",
         category: "脓毒症",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Sepsis/PCT C22593-中文说明书-REV1.0.pdf",
+        pdfPath: "files/PCT C22593-中文说明书-REV1.0.pdf",
         aliases: "—",
         uploadDate: "2026-03-15"
     },
@@ -3616,7 +3616,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/FT3/2,A13422-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,A13422-中文说明书-REV4.1.pdf",
         aliases: "A13422",
         uploadDate: "2026-03-15"
     },
@@ -3629,7 +3629,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/FT3/2,A13430-中文说明书-REV4.0.pdf",
+        pdfPath: "files/2,A13430-中文说明书-REV4.0.pdf",
         aliases: "A13430",
         uploadDate: "2026-03-15"
     },
@@ -3642,7 +3642,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/FT4/2,33880-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,33880-中文说明书-REV4.2.pdf",
         aliases: "FT4 Free Thyroxine T4 Total",
         uploadDate: "2026-03-15"
     },
@@ -3655,7 +3655,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/FT4/33885-中文说明书-REV5.2.pdf",
+        pdfPath: "files/33885-中文说明书-REV5.2.pdf",
         aliases: "FT4 Free Thyroxine T4 Total",
         uploadDate: "2026-03-15"
     },
@@ -3668,7 +3668,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/TGAB/2,A32898-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,A32898-中文说明书-REV4.2.pdf",
         aliases: "TgAb Anti-Tg Anti-Thyroglobulin Tg Thyroglobulin",
         uploadDate: "2026-03-15"
     },
@@ -3681,7 +3681,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/TGAB/2,A36920-中文说明书-REV5.2.pdf",
+        pdfPath: "files/2,A36920-中文说明书-REV5.2.pdf",
         aliases: "TgAb Anti-Tg Anti-Thyroglobulin Tg Thyroglobulin",
         uploadDate: "2026-03-15"
     },
@@ -3694,7 +3694,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/TPO/2,A12985-中文说明书-REV3.2.pdf",
+        pdfPath: "files/2,A12985-中文说明书-REV3.2.pdf",
         aliases: "TPOAb Anti-TPO Anti-Thyroid Peroxidase",
         uploadDate: "2026-03-15"
     },
@@ -3707,7 +3707,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/TPO/2,A18227-中文说明书-REV3.1.pdf",
+        pdfPath: "files/2,A18227-中文说明书-REV3.1.pdf",
         aliases: "TPOAb Anti-TPO Anti-Thyroid Peroxidase",
         uploadDate: "2026-03-15"
     },
@@ -3720,7 +3720,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/TSH3/2,B63284-中文说明书-REV2.3.pdf",
+        pdfPath: "files/2,B63284-中文说明书-REV2.3.pdf",
         aliases: "TSH Thyroid Stimulating Hormone Thyrotropin T4 Thyroxine Total",
         uploadDate: "2026-03-15"
     },
@@ -3733,7 +3733,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/TSH3/2,B63285-中文说明书-REV2.0.pdf",
+        pdfPath: "files/2,B63285-中文说明书-REV2.0.pdf",
         aliases: "TSH Thyroid Stimulating Hormone Thyrotropin T4 Thyroxine Total",
         uploadDate: "2026-03-15"
     },
@@ -3746,7 +3746,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/TT3/2,33830-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,33830-中文说明书-REV4.2.pdf",
         aliases: "33830",
         uploadDate: "2026-03-15"
     },
@@ -3759,7 +3759,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/TT3/2,33835-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,33835-中文说明书-REV4.2.pdf",
         aliases: "33835",
         uploadDate: "2026-03-15"
     },
@@ -3772,7 +3772,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/TT4/2,33800-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,33800-中文说明书-REV4.2.pdf",
         aliases: "T4 Thyroxine Total",
         uploadDate: "2026-03-15"
     },
@@ -3785,7 +3785,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/TT4/2,33805-中文说明书-REV5.2.pdf",
+        pdfPath: "files/2,33805-中文说明书-REV5.2.pdf",
         aliases: "T4 Thyroxine Total",
         uploadDate: "2026-03-15"
     },
@@ -3798,7 +3798,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/未用TG/2,33860-中文说明书-REV4.2.pdf",
+        pdfPath: "files/2,33860-中文说明书-REV4.2.pdf",
         aliases: "Tg Thyroglobulin",
         uploadDate: "2026-03-15"
     },
@@ -3811,7 +3811,7 @@ const manualData = [
         method: "化学发光法",
         category: "甲状腺",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/Thyroid/未用TG/2,33865-中文说明书-REV4.1.pdf",
+        pdfPath: "files/2,33865-中文说明书-REV4.1.pdf",
         aliases: "Tg Thyroglobulin",
         uploadDate: "2026-03-15"
     },
@@ -3824,7 +3824,7 @@ const manualData = [
         method: "化学发光法",
         category: "肾早损",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/肾早损/a1微球蛋白-中文说明书-REV3.0.pdf",
+        pdfPath: "files/a1微球蛋白-中文说明书-REV3.0.pdf",
         aliases: "—",
         uploadDate: "2026-03-15"
     },
@@ -3837,7 +3837,7 @@ const manualData = [
         method: "化学发光法",
         category: "肾早损",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/肾早损/尿免疫球蛋白G-中文说明书-REV3.0.pdf",
+        pdfPath: "files/尿免疫球蛋白G-中文说明书-REV3.0.pdf",
         aliases: "—",
         uploadDate: "2026-03-15"
     },
@@ -3850,7 +3850,7 @@ const manualData = [
         method: "化学发光法",
         category: "肾早损",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/肾早损/尿转铁蛋白-中文说明书-REV3.0.pdf",
+        pdfPath: "files/尿转铁蛋白-中文说明书-REV3.0.pdf",
         aliases: "TRF Transferrin FER Ferritin FE Iron Serum",
         uploadDate: "2026-03-15"
     },
@@ -3863,7 +3863,7 @@ const manualData = [
         method: "化学发光法",
         category: "肾早损",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/贝克曼说明书/贝克曼发光系列/肾早损/微量白蛋白-中文说明书-REV3.0.pdf",
+        pdfPath: "files/微量白蛋白-中文说明书-REV3.0.pdf",
         aliases: "mAlb Microalbumin Microalbuminuria ALB Albumin",
         uploadDate: "2026-03-15"
     },
@@ -3876,7 +3876,7 @@ const manualData = [
         method: "FAPGG底物法",
         category: "其他生化",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/柏定说明书/ACE 说明书-京械注准20162401178.pdf",
+        pdfPath: "files/ACE 说明书-京械注准20162401178.pdf",
         aliases: "ACE Angiotensin Converting Enzyme ANG",
         uploadDate: "2026-03-15"
     },
@@ -3889,7 +3889,7 @@ const manualData = [
         method: "过氧化物酶法",
         category: "肝功能",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/柏定说明书/ADA'C 说明书-京械注准20172400693修改格式-V3.0.pdf",
+        pdfPath: "files/ADA'C 说明书-京械注准20172400693修改格式-V3.0.pdf",
         aliases: "ADA Adenosine Deaminase",
         uploadDate: "2026-03-15"
     },
@@ -3902,7 +3902,7 @@ const manualData = [
         method: "β-羟丁酸脱氢酶法",
         category: "代谢",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/柏定说明书/B-Hb 说明书-京械注准20162400646-2021-V2.0.pdf",
+        pdfPath: "files/B-Hb 说明书-京械注准20162400646-2021-V2.0.pdf",
         aliases: "京械注准20162400646",
         uploadDate: "2026-03-15"
     },
@@ -3915,7 +3915,7 @@ const manualData = [
         method: "胶乳免疫比浊法",
         category: "炎症",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/柏定说明书/SAA 说明书-京械注准20162401183.pdf",
+        pdfPath: "files/SAA 说明书-京械注准20162401183.pdf",
         aliases: "SAA Serum Amyloid A",
         uploadDate: "2026-03-15"
     },
@@ -3928,7 +3928,7 @@ const manualData = [
         method: "过氧化氢酶法",
         category: "血脂",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/柏定说明书/sd-LDL过氧化氢酶法 说明书-京械注准20202400164-V3.0.pdf",
+        pdfPath: "files/sd-LDL过氧化氢酶法 说明书-京械注准20202400164-V3.0.pdf",
         aliases: "sd-LDL Small Dense LDL LDL3 LDL-C Low Density Lipoprotein",
         uploadDate: "2026-03-15"
     },
@@ -3941,7 +3941,7 @@ const manualData = [
         method: "PAPS显色法",
         category: "微量元素",
         fileFormat: "PDF",
-        pdfPath: "D:/民航总医院/工作部门/生免组/项目档案/生免试剂说明书/柏定说明书/Zn 说明书-京械注准20162401174.pdf",
+        pdfPath: "files/Zn 说明书-京械注准20162401174.pdf",
         aliases: "ZN Zinc",
         uploadDate: "2026-03-15"
     }

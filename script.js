@@ -738,16 +738,14 @@ function viewManual(id) {
     const item = manualData.find(r => r.id === id);
     if (!item || !item.pdfPath) { alert('未找到该说明书文件'); return; }
     // 将本地路径转为 file:// URL（Windows路径含盘符）
-    const url = 'file:///' + item.pdfPath.replace(/\\/g, '/');
-    window.open(url, '_blank');
+    window.open(item.pdfPath, '_blank');
 }
 
 function downloadManual(id) {
     const item = manualData.find(r => r.id === id);
     if (!item || !item.pdfPath) { alert('未找到该说明书文件'); return; }
-    const url = 'file:///' + item.pdfPath.replace(/\\/g, '/');
     const a = document.createElement('a');
-    a.href = url;
+    a.href = item.pdfPath;
     a.download = item.pdfPath.split('/').pop();
     a.click();
 }
