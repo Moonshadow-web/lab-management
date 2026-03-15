@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生化免疫专业组速查工具</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>生化免疫专业组速查工具</h1>
+            <p class="subtitle">生免组自制-高效、便捷的组内信息查询平台</p>
+        </header>
+
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="performance">项目性能查询</button>
+            <button class="tab-btn" data-tab="reagent">试剂存放查询</button>
+            <button class="tab-btn" data-tab="manual">试剂说明书查询</button>
+            <button class="tab-btn" data-tab="files">文件检索</button>
+            <button class="tab-btn" data-tab="instrument">仪器设备查询</button>
+            <button class="tab-btn" data-tab="specimen">标本采集手册（收费查询）</button>
+        </nav>
+
+        <main>
+            <!-- 项目性能查询模块 -->
+            <section id="performance" class="tab-content active">
+                <div class="search-section">
+                    <div class="search-box">
+                        <input type="text" id="performance-search" placeholder="输入项目名称...">
+                        <button class="search-btn" onclick="searchPerformance()">搜索</button>
+                    </div>
+                    <div class="filter-options">
+                        <select id="performance-category">
+                            <option value="">全部分类</option>
+                        </select>
+                        <select id="performance-instrument" onchange="onInstrumentChange()">
+                            <option value="">全部仪器</option>
+                        </select>
+                        <select id="performance-group">
+                            <option value="">全部机台</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="results-section">
+                    <div class="results-header">
+                        <span>查询结果</span>
+                        <span id="performance-count">共 0 条记录</span>
+                    </div>
+                    <div id="performance-results" class="results-list">
+                        <div class="no-data">暂无数据，请输入查询条件</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 试剂存放查询模块（含发光定标品信息） -->
+            <section id="reagent" class="tab-content">
+                <div class="search-section">
+                    <div class="search-box">
+                        <input type="text" id="reagent-search" placeholder="输入项目名称...">
+                        <button class="search-btn" onclick="searchReagent()">搜索</button>
+                    </div>
+                    <div class="filter-options">
+                        <select id="reagent-location">
+                            <option value="">全部位置</option>
+                        </select>
+                        <select id="reagent-status">
+                            <option value="">全部状态</option>
+                            <option value="正常">正常</option>
+                            <option value="临期">临期</option>
+                            <option value="过期">过期</option>
+                        </select>
+                        <button class="calib-all-btn" onclick="calibShowAll()">📡 显示全部定标品</button>
+                    </div>
+                </div>
+
+                <!-- 试剂存放结果区 -->
+                <div class="results-section">
+                    <div class="results-header">
+                        <span>试剂存放</span>
+                        <span id="reagent-count">共 0 条记录</span>
+                    </div>
+                    <div id="reagent-results" class="results-list">
+                        <div class="no-data">暂无数据，请输入查询条件</div>
+                    </div>
+                </div>
+
+                <!-- 发光定标品结果区 -->
+                <div id="calib-section" style="display:none;">
+                    <div class="results-section" style="margin-top:16px;">
+                        <div id="calib-empty" class="calib-empty" style="display:none;">未找到相关定标项目</div>
+                        <div id="calib-results-wrap">
+                            <div class="results-header">
+                                <span>定标品信息</span>
+                                <span id="calib-count">共 0 条记录</span>
+                            </div>
+                            <div id="calib-results" class="calib-table-wrap"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 试剂说明书查询模块 -->
+            <section id="manual" class="tab-content">
+                <div class="search-section">
+                    <div class="search-box">
+                        <input type="text" id="manual-search" placeholder="输入试剂名称、货号、方法或分类..." oninput="searchManual()">
+                        <button class="search-btn" onclick="searchManual()">搜索</button>
+                    </div>
+                    <div class="filter-options">
+                        <select id="manual-brand" onchange="searchManual()">
+                            <option value="">全部品牌</option>
+                            <option value="贝克曼">贝克曼</option>
+                            <option value="柏定生物">柏定生物</option>
+                        </select>
+                        <select id="manual-category" onchange="searchManual()">
+                            <option value="">全部分类</option>
+                            <option value="肝功能">肝功能</option>
+                            <option value="肾功能">肾功能</option>
+                            <option value="血脂">血脂</option>
+                            <option value="电解质">电解质</option>
+                            <option value="心肌酶">心肌酶</option>
+                            <option value="心血管">心血管</option>
+                            <option value="炎症">炎症</option>
+                            <option value="甲状腺">甲状腺</option>
+                            <option value="生殖">生殖</option>
+                            <option value="骨代谢">骨代谢</option>
+                            <option value="贫血">贫血</option>
+                            <option value="糖代谢">糖代谢</option>
+                            <option value="胰腺功能">胰腺功能</option>
+                            <option value="微量元素">微量元素</option>
+                            <option value="特种蛋白">特种蛋白</option>
+                            <option value="代谢">代谢</option>
+                            <option value="脓毒症">脓毒症</option>
+                            <option value="肾早损">肾早损</option>
+                            <option value="其他生化">其他生化</option>
+                            <option value="耗材">耗材</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="results-section">
+                    <div class="results-header">
+                        <span>查询结果</span>
+                        <span id="manual-count">共 0 条记录</span>
+                    </div>
+                    <div id="manual-results" class="results-list">
+                        <div class="no-data">暂无数据，请输入查询条件</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 文件检索模块 -->
+            <section id="files" class="tab-content">
+                <div class="search-section">
+                    <div class="search-box">
+                        <input type="text" id="file-search" placeholder="输入文件名称、编号或关键词..." oninput="searchFiles()">
+                        <button class="search-btn" onclick="searchFiles()">搜索</button>
+                    </div>
+                    <div class="filter-options">
+                        <select id="file-type" onchange="searchFiles()">
+                            <option value="">全部类型</option>
+                            <option value="SOP">SOP作业指导书</option>
+                            <option value="记录表格">记录表格</option>
+                            <option value="质控">质控文件</option>
+                            <option value="培训">培训资料</option>
+                            <option value="其他">其他文件</option>
+                        </select>
+                        <select id="file-category" onchange="searchFiles()">
+                            <option value="">全部分类</option>
+                            <option value="通用作业指导书">通用作业指导书</option>
+                            <option value="项目作业指导书">项目作业指导书</option>
+                            <option value="仪器作业指导书">仪器作业指导书</option>
+                            <option value="质量管理">质量管理</option>
+                            <option value="记录表格">记录表格</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="results-section">
+                    <div class="results-header">
+                        <span>查询结果</span>
+                        <span id="file-count">共 0 条记录</span>
+                    </div>
+                    <div id="file-results" class="results-list">
+                        <div class="no-data">暂无数据，请输入查询条件</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 仪器设备查询模块 -->
+            <section id="instrument" class="tab-content">
+                <div class="search-section">
+                    <div class="search-box">
+                        <input type="text" id="instrument-search" placeholder="输入仪器名称、型号或品牌..." oninput="searchInstruments()">
+                        <button class="search-btn" onclick="searchInstruments()">搜索</button>
+                    </div>
+                    <div class="filter-options">
+                        <select id="instrument-category" onchange="searchInstruments()">
+                            <option value="">全部分类</option>
+                            <option value="生化分析">生化分析</option>
+                            <option value="化学发光">化学发光</option>
+                            <option value="凝血分析">凝血分析</option>
+                            <option value="血气分析">血气分析</option>
+                            <option value="特殊检测">特殊检测</option>
+                            <option value="质谱系统">质谱系统</option>
+                            <option value="离心机">离心机</option>
+                            <option value="冰箱冷冻">冰箱冷冻</option>
+                            <option value="辅助设备">辅助设备</option>
+                        </select>
+                        <select id="instrument-status" onchange="searchInstruments()">
+                            <option value="">全部状态</option>
+                            <option value="在用" selected>在用</option>
+                            <option value="已停用">已停用</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="results-section">
+                    <div class="results-header">
+                        <span>查询结果</span>
+                        <span id="instrument-count">共 0 台设备</span>
+                    </div>
+                    <div id="instrument-results" class="results-list">
+                        <div class="no-data">暂无数据，请输入查询条件</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 标本采集手册模块 -->
+            <section id="specimen" class="tab-content">
+                <div class="search-section">
+                    <div class="search-box">
+                        <div class="specimen-search-wrapper">
+                            <input type="text" id="specimen-search" placeholder="输入项目名称或简码搜索...">
+                            <svg class="specimen-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                        </div>
+                        <button class="search-btn" onclick="searchSpecimen()">搜索</button>
+                    </div>
+                    <div class="specimen-quick-actions">
+                        <div class="specimen-action-item" onclick="specimenShowAll()">
+                            <div class="specimen-emoji-icon">📋</div>
+                            <span class="specimen-action-text">全部项目</span>
+                        </div>
+                        <div class="specimen-action-item" onclick="specimenShowCombos()">
+                            <div class="specimen-emoji-icon">📦</div>
+                            <span class="specimen-action-text">组合项目</span>
+                        </div>
+                        <div class="specimen-action-item" onclick="specimenShowSingles()">
+                            <div class="specimen-emoji-icon">📝</div>
+                            <span class="specimen-action-text">单项项目</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="results-section">
+                    <div id="specimen-tips" class="specimen-tips">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#07c160" stroke-width="2" width="40" height="40">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 16v-4"></path>
+                            <path d="M12 8h.01"></path>
+                        </svg>
+                        <span>输入项目名称或简码进行搜索</span>
+                    </div>
+                    <div id="specimen-empty" class="specimen-empty" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2" width="50" height="50">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 8v4"></path>
+                            <path d="M12 16h.01"></path>
+                        </svg>
+                        <span>未找到相关项目</span>
+                    </div>
+                    <div id="specimen-results-wrap" style="display:none;">
+                        <div class="results-header">
+                            <span>查询结果</span>
+                            <span id="specimen-count">共 0 条记录</span>
+                        </div>
+                        <div id="specimen-results" class="specimen-result-list"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 标本采集手册详情弹窗 -->
+        <div id="specimenModal" class="specimen-modal" style="display:none;">
+            <div class="specimen-modal-content">
+                <div class="specimen-modal-header">
+                    <h2 class="specimen-modal-title" id="specimenModalTitle">项目详情</h2>
+                    <button class="specimen-close-btn" onclick="specimenCloseModal()">✕</button>
+                </div>
+                <div class="specimen-modal-body" id="specimenModalBody"></div>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2026 生化免疫专业组速查工具 | 系统版本 v1.0</p>
+        </footer>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
