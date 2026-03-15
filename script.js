@@ -1,6 +1,64 @@
 // 生化免疫专业组速查工具 JavaScript 逻辑
 
 // ============================================================
+// 登录模块
+// ============================================================
+
+const LOGIN_USER = 'mhzyy';
+const LOGIN_PASS = '123456';
+const REMEMBER_KEY = 'lab_remember';
+const SESSION_KEY  = 'lab_logged_in';
+
+(function initLogin() {
+    const mask = document.getElementById('login-mask');
+
+    // 已在本次会话登录过 → 直接隐藏遮罩
+    if (sessionStorage.getItem(SESSION_KEY) === '1') {
+        mask.classList.add('hidden');
+        setTimeout(() => mask.style.display = 'none', 400);
+        return;
+    }
+
+    // 读取记住的账号密码
+    const remembered = JSON.parse(localStorage.getItem(REMEMBER_KEY) || 'null');
+    if (remembered) {
+        document.getElementById('login-username').value = remembered.u || '';
+        document.getElementById('login-password').value = remembered.p || '';
+        document.getElementById('login-remember').checked = true;
+    }
+})();
+
+function doLogin() {
+    const u   = document.getElementById('login-username').value.trim();
+    const p   = document.getElementById('login-password').value;
+    const rem = document.getElementById('login-remember').checked;
+    const err = document.getElementById('login-error');
+
+    if (!u || !p) { err.textContent = '请输入账号和密码'; return; }
+    if (u !== LOGIN_USER || p !== LOGIN_PASS) {
+        err.textContent = '账号或密码错误，请重新输入';
+        document.getElementById('login-password').value = '';
+        return;
+    }
+
+    // 登录成功
+    err.textContent = '';
+    sessionStorage.setItem(SESSION_KEY, '1');
+
+    if (rem) {
+        localStorage.setItem(REMEMBER_KEY, JSON.stringify({ u, p }));
+    } else {
+        localStorage.removeItem(REMEMBER_KEY);
+    }
+
+    const mask = document.getElementById('login-mask');
+    mask.classList.add('hidden');
+    setTimeout(() => mask.style.display = 'none', 400);
+}
+
+
+
+// ============================================================
 // 模糊搜索工具函数
 // ============================================================
 
@@ -737,17 +795,41 @@ function viewReagentDetails(id) {
 function viewManual(id) {
     const item = manualData.find(r => r.id === id);
     if (!item || !item.pdfPath) { alert('未找到该说明书文件'); return; }
-    // 将本地路径转为 file:// URL（Windows路径含盘符）
-    window.open(item.pdfPath, '_blank');
+    // 先用 fetch 检测文件是否存在，再决定是否打开
+    fetch(item.pdfPath, { method: 'HEAD' })
+        .then(res => {
+            if (res.ok) {
+                window.open(item.pdfPath, '_blank');
+            } else {
+                alert('该说明书文件暂未上传，请联系管理员补充。\n\n文件名：' + item.pdfPath.split('/').pop());
+            }
+        })
+        .catch(() => {
+            // 网络无法 HEAD 请求时直接尝试打开
+            window.open(item.pdfPath, '_blank');
+        });
 }
 
 function downloadManual(id) {
     const item = manualData.find(r => r.id === id);
     if (!item || !item.pdfPath) { alert('未找到该说明书文件'); return; }
-    const a = document.createElement('a');
-    a.href = item.pdfPath;
-    a.download = item.pdfPath.split('/').pop();
-    a.click();
+    fetch(item.pdfPath, { method: 'HEAD' })
+        .then(res => {
+            if (res.ok) {
+                const a = document.createElement('a');
+                a.href = item.pdfPath;
+                a.download = item.pdfPath.split('/').pop();
+                a.click();
+            } else {
+                alert('该说明书文件暂未上传，请联系管理员补充。\n\n文件名：' + item.pdfPath.split('/').pop());
+            }
+        })
+        .catch(() => {
+            const a = document.createElement('a');
+            a.href = item.pdfPath;
+            a.download = item.pdfPath.split('/').pop();
+            a.click();
+        });
 }
 
 
