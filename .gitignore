@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+env/
+
+# Node / frontend
+node_modules/
+dist/
+*.local
+
+# Local data (sqlite db + uploaded files)
+data/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# WorkBuddy internal
+.workbuddy/
+
+# Scratch / temp scripts from data-cleanup tasks
+_tmp_*.py
+_tmp_*.txt
+_tmp_*.ps1
+_read_interference.py
+check_*.py
+compare_*.py
+export_*.py
+extract_*.py
+age_units_output.txt
+audit_out.txt
+detailed_ref_output.txt
+compare_full_result.txt
+compare_result.txt
+docx_unpacked/
+proj_unpacked/
