@@ -2,7 +2,9 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import or_
+from functools import reduce
+
+from sqlalchemy import or_, case
 from sqlalchemy.orm import Session
 
 from .database import get_db
@@ -59,11 +61,29 @@ def make_router(
             conds = [getattr(Model, f).ilike(f"%{q}%") for f in search_fields if hasattr(Model, f)]
             if conds:
                 query = query.filter(or_(*conds))
+                # 相关性排序：精确匹配(3) > 前缀匹配(2) > 模糊包含(1)
+                # 避免缩写搜索（如 PA）被英文名里恰好含该子串的项目淹没
+                weights = []
+                for f in search_fields:
+                    if not hasattr(Model, f):
+                        continue
+                    col = getattr(Model, f)
+                    weights.append(
+                        case(
+                            (col.ilike(q), 3),
+                            (col.ilike(f"{q}%"), 2),
+                            (col.ilike(f"%{q}%"), 1),
+                            else_=0,
+                        )
+                    )
+                relevance = reduce(lambda a, b: a + b, weights) if len(weights) > 1 else weights[0]
+                query = query.order_by(relevance.desc(), Model.id.desc())
         for f in filter_fields or []:
             val = params.get(f)
             if val is not None and hasattr(Model, f):
                 query = query.filter(getattr(Model, f) == val)
-        query = query.order_by(Model.id.desc())
+        if not (q and search_fields):
+            query = query.order_by(Model.id.desc())
         return paginate(query, page, page_size)
 
     @router.get("/{item_id}", response_model=ReadSchema)
