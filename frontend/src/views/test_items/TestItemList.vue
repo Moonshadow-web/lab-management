@@ -236,7 +236,7 @@ async function onSearch() {
       page: query.page,
       page_size: query.page_size,
     }
-    if (query.keyword.trim()) params.search = query.keyword.trim()
+    if (query.keyword.trim()) params.q = query.keyword.trim()
     if (query.category) params.category = query.category
     const res = await listTestItems(params)
     items.value = res.items || []
