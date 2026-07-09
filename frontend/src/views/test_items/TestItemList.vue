@@ -52,14 +52,14 @@
       >
         <div class="card-header">
           <div class="title-group">
-            <h3 class="item-name">{{ row.name || '—' }}</h3>
+            <h3 class="item-name" v-html="highlight(row.name) || '—'"></h3>
             <el-tag v-if="extractCode(row)" type="warning" effect="light" class="code-tag">
-              {{ extractCode(row) }}
+              <span v-html="highlight(extractCode(row))"></span>
             </el-tag>
           </div>
           <div class="header-actions">
             <el-tag v-if="row.category" :type="categoryType(row.category)" effect="plain" class="category-tag">
-              {{ row.category }}
+              <span v-html="highlight(row.category)"></span>
             </el-tag>
             <el-button text :icon="Edit" @click="onEdit(row)">编辑</el-button>
             <el-button text type="danger" :icon="Delete" @click="onDelete(row)">删除</el-button>
@@ -67,49 +67,49 @@
         </div>
 
         <div class="tag-row">
-          <el-tag v-if="row.aliases" size="small" type="info" effect="plain" class="alias-tag">{{ row.aliases }}</el-tag>
-          <el-tag v-if="row.instrument" size="small" effect="plain">{{ row.instrument }}</el-tag>
-          <el-tag v-if="row.instrument_group" size="small" type="success" effect="plain">{{ row.instrument_group }}</el-tag>
+          <el-tag v-if="row.aliases" size="small" type="info" effect="plain" class="alias-tag"><span v-html="highlight(row.aliases)"></span></el-tag>
+          <el-tag v-if="row.instrument" size="small" effect="plain"><span v-html="highlight(row.instrument)"></span></el-tag>
+          <el-tag v-if="row.instrument_group" size="small" type="success" effect="plain"><span v-html="highlight(row.instrument_group)"></span></el-tag>
           <el-tag v-if="row.method" size="small" type="primary" effect="plain">
-            <span class="tag-label">方法</span>{{ row.method }}
+            <span class="tag-label">方法</span><span v-html="highlight(row.method)"></span>
           </el-tag>
         </div>
 
         <div class="metric-grid">
           <div class="metric">
             <div class="metric-label">单位</div>
-            <div class="metric-value">{{ row.unit || '—' }}</div>
+            <div class="metric-value" v-html="highlight(row.unit) || '—'"></div>
           </div>
           <div class="metric">
             <div class="metric-label">稀释倍数</div>
-            <div class="metric-value">{{ row.dilution_fold || '—' }}</div>
+            <div class="metric-value" v-html="highlight(row.dilution_fold) || '—'"></div>
           </div>
           <div class="metric">
             <div class="metric-label">稀释液</div>
-            <div class="metric-value">{{ row.diluent || '—' }}</div>
+            <div class="metric-value" v-html="highlight(row.diluent) || '—'"></div>
           </div>
         </div>
 
         <div class="info-list">
           <div class="info-row">
             <span class="info-label">参考范围</span>
-            <span class="info-value reference">{{ row.reference || '—' }}</span>
+            <span class="info-value reference" v-html="highlight(row.reference) || '—'"></span>
           </div>
           <div class="info-row">
             <span class="info-label">线性范围</span>
-            <span class="info-value">{{ row.linear_range || '—' }}</span>
+            <span class="info-value" v-html="highlight(row.linear_range) || '—'"></span>
           </div>
           <div class="info-row">
             <span class="info-label">可报告范围</span>
-            <span class="info-value">{{ row.reportable_range || '—' }}</span>
+            <span class="info-value" v-html="highlight(row.reportable_range) || '—'"></span>
           </div>
           <div class="info-row">
             <span class="info-label">校准品</span>
-            <span class="info-value">{{ row.calibrator || '—' }}</span>
+            <span class="info-value" v-html="highlight(row.calibrator) || '—'"></span>
           </div>
           <div class="info-row">
             <span class="info-label">溯源性</span>
-            <span class="info-value trace">{{ row.traceability || '—' }}</span>
+            <span class="info-value trace" v-html="highlight(row.traceability) || '—'"></span>
           </div>
         </div>
 
@@ -123,25 +123,25 @@
               <div class="interference-label">
                 <span class="dot hemolysis"></span>溶血
               </div>
-              <div class="interference-value">{{ row.interference_hemolysis }}</div>
+              <div class="interference-value" v-html="highlight(row.interference_hemolysis)"></div>
             </div>
             <div v-if="row.interference_bilirubin" class="interference-item">
               <div class="interference-label">
                 <span class="dot bilirubin"></span>黄疸
               </div>
-              <div class="interference-value">{{ row.interference_bilirubin }}</div>
+              <div class="interference-value" v-html="highlight(row.interference_bilirubin)"></div>
             </div>
             <div v-if="row.interference_lipemia" class="interference-item">
               <div class="interference-label">
                 <span class="dot lipemia"></span>脂血
               </div>
-              <div class="interference-value">{{ row.interference_lipemia }}</div>
+              <div class="interference-value" v-html="highlight(row.interference_lipemia)"></div>
             </div>
           </div>
         </div>
 
         <div class="card-footer">
-          <span v-if="row.specimen" class="specimen">标本：{{ row.specimen }}</span>
+          <span v-if="row.specimen" class="specimen">标本：<span v-html="highlight(row.specimen)"></span></span>
           <span v-if="row.last_update" class="update-time">更新于：{{ row.last_update }}</span>
         </div>
       </el-card>
@@ -255,6 +255,23 @@ function extractCode(row) {
   return first
 }
 
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+function highlight(text) {
+  const kw = query.keyword.trim()
+  const safe = escapeHtml(text)
+  if (!kw) return safe
+  const kwSafe = escapeHtml(kw)
+  const re = new RegExp('(' + escapeRegExp(kwSafe) + ')', 'gi')
+  return safe.replace(re, '<mark class="hl">$1</mark>')
+}
 function categoryType(cat) {
   if (cat === '生化') return 'success'
   if (cat === '免疫') return 'primary'
@@ -560,6 +577,14 @@ async function onDelete(row) {
   justify-content: flex-end;
   margin-top: 20px;
   padding-bottom: 8px;
+}
+
+.item-card :deep(mark.hl) {
+  background: #fff3a0;
+  color: #c0392b;
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 700;
 }
 
 @media (max-width: 768px) {
