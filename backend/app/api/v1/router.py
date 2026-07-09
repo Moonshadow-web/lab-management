@@ -1,6 +1,18 @@
 from fastapi import APIRouter
 
-from . import auth, documents, instruments, notifications, test_items, users
+from . import (
+    auth,
+    documents,
+    instruments,
+    nonconformity,
+    notifications,
+    qc,
+    reagents,
+    test_items,
+    training,
+    users,
+    verification,
+)
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
@@ -8,4 +20,9 @@ api_router.include_router(users.router)
 api_router.include_router(test_items.router)
 api_router.include_router(documents.router)
 api_router.include_router(instruments.router)
+api_router.include_router(qc.router)
+api_router.include_router(reagents.router)
+api_router.include_router(training.router)
+api_router.include_router(verification.router)
+api_router.include_router(nonconformity.router)
 api_router.include_router(notifications.router)

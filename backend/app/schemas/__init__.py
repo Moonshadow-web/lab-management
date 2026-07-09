@@ -159,6 +159,158 @@ class CalibrationRecordRead(CalibrationRecordBase):
     created_at: datetime | None = None
 
 
+# ---------------- QCRecord ----------------
+class QCRecordBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    test_item: str = ""
+    level: str = ""
+    lot_no: str = ""
+    instrument: str = ""
+    target_mean: str = ""
+    target_sd: str = ""
+    measured_value: str = ""
+    qc_date: str = ""
+    status: str = "在控"
+    rule_violated: str = ""
+    operator: str = ""
+    remark: str = ""
+
+
+class QCRecordCreate(QCRecordBase):
+    pass
+
+
+class QCRecordUpdate(QCRecordBase):
+    pass
+
+
+class QCRecordRead(QCRecordBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+# ---------------- Reagent ----------------
+class ReagentBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    name: str = ""
+    brand: str = ""
+    spec: str = ""
+    lot_no: str = ""
+    quantity: str = ""
+    unit: str = ""
+    production_date: str = ""
+    expiry_date: str = ""
+    in_date: str = ""
+    supplier: str = ""
+    storage_condition: str = ""
+    status: str = "在库"
+    operator: str = ""
+    remark: str = ""
+
+
+class ReagentCreate(ReagentBase):
+    pass
+
+
+class ReagentUpdate(ReagentBase):
+    pass
+
+
+class ReagentRead(ReagentBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+# ---------------- TrainingRecord ----------------
+class TrainingRecordBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    person: str = ""
+    title: str = ""
+    category: str = ""
+    train_date: str = ""
+    hours: str = ""
+    credits: str = ""
+    organizer: str = ""
+    certificate_no: str = ""
+    status: str = "已完成"
+    remark: str = ""
+
+
+class TrainingRecordCreate(TrainingRecordBase):
+    pass
+
+
+class TrainingRecordUpdate(TrainingRecordBase):
+    pass
+
+
+class TrainingRecordRead(TrainingRecordBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+# ---------------- VerificationRecord ----------------
+class VerificationRecordBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    test_item: str = ""
+    verify_type: str = ""
+    instrument: str = ""
+    verify_date: str = ""
+    criteria: str = ""
+    result: str = ""
+    conclusion: str = "通过"
+    report_file_path: str = ""
+    operator: str = ""
+    remark: str = ""
+
+
+class VerificationRecordCreate(VerificationRecordBase):
+    pass
+
+
+class VerificationRecordUpdate(VerificationRecordBase):
+    pass
+
+
+class VerificationRecordRead(VerificationRecordBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+# ---------------- Nonconformity ----------------
+class NonconformityBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    title: str = ""
+    nc_type: str = ""
+    source: str = ""
+    description: str = ""
+    root_cause: str = ""
+    corrective_action: str = ""
+    responsible: str = ""
+    found_date: str = ""
+    due_date: str = ""
+    close_date: str = ""
+    status: str = "待处理"
+
+
+class NonconformityCreate(NonconformityBase):
+    pass
+
+
+class NonconformityUpdate(NonconformityBase):
+    pass
+
+
+class NonconformityRead(NonconformityBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 # ---------------- Notification ----------------
 class NotificationBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)

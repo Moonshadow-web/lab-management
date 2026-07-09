@@ -27,6 +27,31 @@
       </el-col>
     </el-row>
 
+    <AppCard title="业务台账概览" class="mt">
+      <div class="mini-stats">
+        <div class="mini" @click="go('/qc')">
+          <span class="mini-num">{{ stats.qc }}</span>
+          <span class="mini-label">质控记录</span>
+        </div>
+        <div class="mini" @click="go('/reagents')">
+          <span class="mini-num">{{ stats.reagents }}</span>
+          <span class="mini-label">试剂台账</span>
+        </div>
+        <div class="mini" @click="go('/training')">
+          <span class="mini-num">{{ stats.training }}</span>
+          <span class="mini-label">培训记录</span>
+        </div>
+        <div class="mini" @click="go('/verification')">
+          <span class="mini-num">{{ stats.verification }}</span>
+          <span class="mini-label">性能验证</span>
+        </div>
+        <div class="mini" @click="go('/iso15189')">
+          <span class="mini-num">{{ stats.nc }}</span>
+          <span class="mini-label">不符合项</span>
+        </div>
+      </div>
+    </AppCard>
+
     <AppCard title="提醒事项" class="mt">
       <template #header-extra>
         <el-button v-if="notices.length" size="small" @click="onReadAll">全部已读</el-button>
@@ -55,13 +80,23 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import AppCard from '../components/AppCard.vue'
 import { listTestItems } from '../api/testItems'
 import { listInstruments } from '../api/instruments'
 import { listDocuments } from '../api/documents'
 import { listNotifications, markRead, markAllRead } from '../api/notifications'
+import { listQC } from '../api/qc'
+import { listReagents } from '../api/reagents'
+import { listTraining } from '../api/training'
+import { listVerification } from '../api/verification'
+import { listNC } from '../api/nonconformity'
 
-const stats = ref({ testItems: '-', instruments: '-', documents: '-', notifications: '-' })
+const router = useRouter()
+const stats = ref({
+  testItems: '-', instruments: '-', documents: '-', notifications: '-',
+  qc: '-', reagents: '-', training: '-', verification: '-', nc: '-',
+})
 const notices = ref([])
 
 function levelType(level) {
@@ -70,19 +105,33 @@ function levelType(level) {
   return 'info'
 }
 
+function go(path) {
+  router.push(path)
+}
+
 async function loadStats() {
   try {
-    const [ti, ins, docs, notis] = await Promise.all([
+    const [ti, ins, docs, notis, qc, rea, tr, ver, nc] = await Promise.all([
       listTestItems({ page: 1, page_size: 1 }),
       listInstruments({ page: 1, page_size: 1 }),
       listDocuments({ page: 1, page_size: 1 }),
       listNotifications({ page: 1, page_size: 1, unread_only: true }),
+      listQC({ page: 1, page_size: 1 }),
+      listReagents({ page: 1, page_size: 1 }),
+      listTraining({ page: 1, page_size: 1 }),
+      listVerification({ page: 1, page_size: 1 }),
+      listNC({ page: 1, page_size: 1 }),
     ])
     stats.value = {
       testItems: ti.total,
       instruments: ins.total,
       documents: docs.total,
       notifications: notis.total,
+      qc: qc.total,
+      reagents: rea.total,
+      training: tr.total,
+      verification: ver.total,
+      nc: nc.total,
     }
   } catch (e) {
     // 忽略
@@ -140,5 +189,36 @@ onMounted(() => {
 }
 .mt {
   margin-top: 16px;
+}
+.mini-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mini {
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 8px;
+  border: 1px solid #eef2f7;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mini:hover {
+  border-color: #1a365d;
+  background: #f7fafc;
+}
+.mini-num {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a365d;
+}
+.mini-label {
+  color: #888;
+  font-size: 13px;
+  margin-top: 4px;
 }
 </style>

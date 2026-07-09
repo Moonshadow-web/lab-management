@@ -18,9 +18,11 @@ export const useAuthStore = defineStore('auth', {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
       this.token = data.access_token
+      // 必须先把 token 写入 localStorage，请求拦截器从这里读取；
+      // 否则紧接着的 /auth/me 请求会缺少 Authorization 头而被判 401，导致登录被顶回。
+      localStorage.setItem('token', this.token)
       const me = await request.get('/api/v1/auth/me')
       this.user = me
-      localStorage.setItem('token', this.token)
       localStorage.setItem('user', JSON.stringify(this.user))
       return me
     },

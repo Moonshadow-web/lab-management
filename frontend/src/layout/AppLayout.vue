@@ -51,11 +51,11 @@ const menus = [
   { path: '/test-items', title: '项目查询', icon: 'Document' },
   { path: '/documents', title: '文件管理', icon: 'Files' },
   { path: '/instruments', title: '仪器档案', icon: 'Cpu' },
-  { path: '/qc', title: '质控管理', icon: 'DataLine', wip: true },
-  { path: '/reagents', title: '试剂管理', icon: 'ShoppingCart', wip: true },
-  { path: '/training', title: '继教培训', icon: 'Reading', wip: true },
-  { path: '/verification', title: '性能验证', icon: 'DataAnalysis', wip: true },
-  { path: '/iso15189', title: '15189专项', icon: 'Stamp', wip: true },
+  { path: '/qc', title: '质控管理', icon: 'DataLine' },
+  { path: '/reagents', title: '试剂管理', icon: 'ShoppingCart' },
+  { path: '/training', title: '继教培训', icon: 'Reading' },
+  { path: '/verification', title: '性能验证', icon: 'DataAnalysis' },
+  { path: '/iso15189', title: '15189专项', icon: 'Stamp' },
 ]
 
 const activeMenu = computed(() => route.path)

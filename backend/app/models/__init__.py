@@ -2,9 +2,14 @@
 from .audit_log import AuditLog
 from .document import Document, DocumentVersion
 from .instrument import CalibrationRecord, Instrument
+from .nonconformity import Nonconformity
 from .notification import Notification
+from .qc import QCRecord
+from .reagent import Reagent
 from .test_item import TestItem
+from .training import TrainingRecord
 from .user import User
+from .verification import VerificationRecord
 
 __all__ = [
     "User",
@@ -15,4 +20,9 @@ __all__ = [
     "CalibrationRecord",
     "Notification",
     "AuditLog",
+    "QCRecord",
+    "Reagent",
+    "TrainingRecord",
+    "VerificationRecord",
+    "Nonconformity",
 ]
