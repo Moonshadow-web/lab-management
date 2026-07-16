@@ -128,7 +128,11 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
 
         matrix = []
         overall_min = 100.0
+        # 仅纳入本次计划实际录入了定性结果的项目（比对分批次进行，未参与本次的不列）
+        involved = set(quals.keys())
         for it in items:
+            if it["name"] not in involved:
+                continue
             qr = quals.get(it["name"])
             rj = _load_json(qr.results_json, {}) if qr else {}
             ref_res = rj.get(str(ref_id))
@@ -160,6 +164,8 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
         for r in db.query(ComparisonResult).filter_by(plan_id=plan.id).all()
     }
     levels = group.levels or 5
+    # 仅纳入本次计划实际录入了定量结果的项目（比对分批次进行，未参与本次的不列）
+    involved = {name for (name, _lv) in results.keys()}
 
     def _applicable(it):
         """该项目适用的比对仪器 id 集合；未配置(空)=组内全部比对仪器。"""
@@ -172,6 +178,8 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
     for lv in range(1, levels + 1):
         rows = []
         for it in items:
+            if it["name"] not in involved:
+                continue
             r = results.get((it["name"], lv))
             ref_val = r.reference_value if r else ""
             app = _applicable(it)
@@ -196,6 +204,8 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
     # 汇总：每项目各水平是否全部允许（仅统计适用仪器）
     summary = []
     for it in items:
+        if it["name"] not in involved:
+            continue
         app = _applicable(it)
         level_ok = []
         for lv in range(1, levels + 1):
