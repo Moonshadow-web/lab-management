@@ -1,0 +1,432 @@
+<template>
+  <div class="interlab-page">
+    <div class="toolbar">
+      <el-select v-model="filterYear" placeholder="年份" clearable style="width:110px" @change="reload">
+        <el-option v-for="y in yearOptions" :key="y" :label="y" :value="y" />
+      </el-select>
+      <el-select v-model="filterHalf" placeholder="半年" clearable style="width:110px" @change="reload">
+        <el-option label="上半年" :value="1" />
+        <el-option label="下半年" :value="2" />
+      </el-select>
+      <el-select v-model="filterInstrument" placeholder="仪器" clearable filterable style="width:180px" @change="reload">
+        <el-option v-for="i in instruments" :key="i.id" :label="i.name" :value="i.id" />
+      </el-select>
+      <div style="flex:1" />
+      <el-button type="primary" :icon="Plus" @click="openPlanCreate" v-if="canWrite">新建计划</el-button>
+    </div>
+
+      <el-alert v-if="!plans.length" type="info" :closable="false" show-icon
+      title="尚无室间比对计划。室间比对用于「无室间质评且有外部参比实验室」的项目，每半年一次。点击右上角「新建计划」开始。" />
+
+    <el-card class="guide-card" shadow="never" style="margin-bottom:10px">
+      <template #header>
+        <span class="guide-title">必做室间比对项目（无室间质评，每半年一次）</span>
+        <span class="guide-sub">—— 以下项目系统已按仪器档案自动归集，新建计划时会自动带出</span>
+      </template>
+      <el-table :data="mandatory" border size="small" max-height="260">
+        <el-table-column prop="name" label="检验项目" min-width="220">
+          <template #default="{ row }">
+            <el-tag type="danger" size="small" effect="dark" style="margin-right:6px">必做</el-tag>{{ row.name }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="unit" label="单位" width="90" />
+        <el-table-column label="所属仪器" min-width="220">
+          <template #default="{ row }">
+            <el-tag v-for="ins in (row.instruments||[])" :key="ins.id" size="small" style="margin-right:4px">{{ ins.name }}</el-tag>
+            <span v-if="!row.instruments || !row.instruments.length" class="no">未关联仪器</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-table :data="plans" border size="small" style="margin-top:12px">
+      <el-table-column prop="year" label="年份" width="90" />
+      <el-table-column label="半年" width="80">
+        <template #default="{ row }">{{ row.half === 1 ? '上半年' : '下半年' }}</template>
+      </el-table-column>
+      <el-table-column label="仪器" width="150">
+        <template #default="{ row }">{{ instrumentName(row.instrument_id) }}</template>
+      </el-table-column>
+      <el-table-column prop="reference_lab" label="参比实验室" min-width="140" />
+      <el-table-column prop="compared_at" label="比对日期" width="120" />
+      <el-table-column prop="operator" label="操作者" width="90" />
+      <el-table-column prop="reviewer" label="审核者" width="90" />
+      <el-table-column label="结论" width="100">
+        <template #default="{ row }">
+          <el-tag v-if="row.conclusion === '可接受'" type="success" size="small">可接受</el-tag>
+          <el-tag v-else-if="row.conclusion === '不可接受'" type="danger" size="small">不可接受</el-tag>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="报告" width="110">
+        <template #default="{ row }">
+          <el-tag v-if="row.report_filename" type="primary" size="small" effect="plain">已生成</el-tag>
+          <span v-else class="no">未生成</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" min-width="280" fixed="right">
+        <template #default="{ row }">
+          <el-button size="small" @click="openEntry(row)">录入</el-button>
+          <el-button size="small" type="warning" @click="openReport(row)">报告</el-button>
+          <el-button size="small" @click="openPlanEdit(row)" v-if="canWrite">编辑</el-button>
+          <el-button size="small" type="danger" @click="onDeletePlan(row)" v-if="canWrite">删除</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 计划对话框 -->
+    <el-dialog v-model="planVisible" :title="editingPlan ? '编辑室间比对计划' : '新建室间比对计划'" width="560px">
+      <el-form :model="planForm" label-width="96px">
+        <el-form-item label="年份">
+          <el-input-number v-model="planForm.year" :min="2000" :max="2100" />
+        </el-form-item>
+        <el-form-item label="半年">
+          <el-radio-group v-model="planForm.half">
+            <el-radio :value="1">上半年</el-radio>
+            <el-radio :value="2">下半年</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="我室仪器">
+          <el-select v-model="planForm.instrument_id" filterable placeholder="选择仪器" style="width:100%">
+            <el-option v-for="i in instruments" :key="i.id" :label="i.name" :value="i.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="参比实验室">
+          <el-input v-model="planForm.reference_lab" placeholder="如：某某医院检验科" />
+        </el-form-item>
+        <el-form-item label="比对日期">
+          <el-date-picker v-model="planForm.compared_at" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" />
+        </el-form-item>
+        <el-form-item label="操作者">
+          <el-input v-model="planForm.operator" />
+        </el-form-item>
+        <el-form-item label="审核者">
+          <el-input v-model="planForm.reviewer" />
+        </el-form-item>
+        <el-form-item label="结论">
+          <el-select v-model="planForm.conclusion" clearable placeholder="选择" style="width:100%">
+            <el-option label="可接受" value="可接受" />
+            <el-option label="不可接受" value="不可接受" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="结果分析">
+          <el-input v-model="planForm.summary" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="处理方案">
+          <el-input v-model="planForm.handle_plan" type="textarea" :rows="2" placeholder="如不合格时的处理措施" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="planVisible = false">取消</el-button>
+        <el-button type="primary" @click="savePlan" :loading="saving">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 结果录入对话框 -->
+    <el-dialog v-model="entryVisible" title="室间比对结果录入" width="900px" top="5vh">
+      <div v-if="entryPlan">
+        <el-alert type="info" :closable="false" show-icon style="margin-bottom:10px"
+          :title="`${entryPlan.year}年${entryPlan.half === 1 ? '上半年' : '下半年'} ｜ 仪器：${instrumentName(entryPlan.instrument_id)} ｜ 参比实验室：${entryPlan.reference_lab || '—'}`" />
+        <div style="margin-bottom:10px">
+          <el-button size="small" type="primary" :icon="Plus" @click="addItemRow" v-if="canWrite">添加项目</el-button>
+          <span class="tip">偏倚% = (我室−参比)/参比×100；允许偏倚内为合格。可点「候选」快速添加本仪器可比对项目。</span>
+        </div>
+        <el-table :data="entryRows" border size="small">
+          <el-table-column label="检验项目" min-width="170">
+            <template #default="{ row, $index }">
+              <el-select v-model="row.item" filterable allow-create default-first-option placeholder="项目"
+                style="width:100%" @visible-change="(v)=>{ if(v) loadCandidates(entryPlan.instrument_id) }">
+                <el-option v-for="p in candidates" :key="p.id" :label="p.name" :value="p.name">
+                  <span v-if="p.mandatory" style="color:#c0392b;margin-right:4px">[必做]</span>{{ p.name }}
+                </el-option>
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="单位" width="90">
+            <template #default="{ row }"><el-input v-model="row.unit" /></template>
+          </el-table-column>
+          <el-table-column label="定性/定量" width="100">
+            <template #default="{ row }">
+              <el-select v-model="row.kind" style="width:100%">
+                <el-option label="定量" value="定量" />
+                <el-option label="定性" value="定性" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="我室结果" width="110">
+            <template #default="{ row }"><el-input v-model="row.our_value" /></template>
+          </el-table-column>
+          <el-table-column label="参比结果" width="110">
+            <template #default="{ row }"><el-input v-model="row.ref_value" /></template>
+          </el-table-column>
+          <el-table-column label="允许偏倚" width="100">
+            <template #default="{ row }"><el-input v-model="row.te" /></template>
+          </el-table-column>
+          <el-table-column label="方式" width="100">
+            <template #default="{ row }">
+              <el-select v-model="row.mode" style="width:100%">
+                <el-option label="相对%" value="relative" />
+                <el-option label="绝对" value="absolute" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="120">
+            <template #default="{ row }"><el-input v-model="row.note" /></template>
+          </el-table-column>
+          <el-table-column label="" width="50" v-if="canWrite">
+            <template #default="{ $index }">
+              <el-button size="small" type="danger" :icon="Delete" circle @click="entryRows.splice($index, 1)" />
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <el-button @click="entryVisible = false">关闭</el-button>
+        <el-button type="primary" @click="saveEntry" :loading="saving" v-if="canWrite">保存结果</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 报告对话框 -->
+    <el-dialog v-model="reportVisible" title="室间比对报告" width="1000px" top="4vh">
+      <div class="rep-toolbar">
+        <el-button :icon="View" @click="doPreview" :loading="previewing">预览</el-button>
+        <el-button type="success" :icon="Document" @click="doGenerate" :loading="generating" v-if="canWrite">生成报告</el-button>
+        <el-button :icon="Download" @click="doDownload" :disabled="!reportPlan || !reportPlan.report_filename">下载</el-button>
+        <el-button :icon="Printer" @click="doPrint" :disabled="!previewHtml">打印</el-button>
+        <el-upload :show-file-list="false" :auto-upload="true" :http-request="doUpload" v-if="canWrite">
+          <el-button :icon="Upload">上传存档</el-button>
+        </el-upload>
+        <el-button type="danger" :icon="Delete" @click="doDeleteReport" :disabled="!reportPlan || !reportPlan.report_filename" v-if="canWrite">删除报告</el-button>
+      </div>
+      <div class="rep-preview" v-html="previewHtml" v-loading="previewing" />
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Delete, View, Document, Download, Printer, Upload } from '@element-plus/icons-vue'
+import {
+  interlabInstruments, interlabProjects, interlabMandatory, listInterlabPlans, createInterlabPlan,
+  updateInterlabPlan, deleteInterlabPlan, getInterlabResults, saveInterlabResults,
+  previewInterlabReport, generateInterlabReport, downloadInterlabReport,
+  uploadInterlabReport, deleteInterlabReport,
+} from '../../api/interlab'
+import { useAuthStore } from '../../store/auth'
+
+const auth = useAuthStore()
+const canWrite = computed(() => {
+  const roles = auth.user?.roles || auth.user?.role || ''
+  return String(roles).includes('admin') || String(roles).includes('qc_manager')
+})
+
+const instruments = ref([])
+const plans = ref([])
+const mandatory = ref([])
+const filterYear = ref(null)
+const filterHalf = ref(null)
+const filterInstrument = ref(null)
+const yearOptions = ref([])
+
+const planVisible = ref(false)
+const editingPlan = ref(null)
+const saving = ref(false)
+const planForm = reactive({
+  year: new Date().getFullYear(), half: 1, instrument_id: null, reference_lab: '',
+  compared_at: '', operator: '', reviewer: '', conclusion: '', summary: '', handle_plan: '',
+})
+
+const entryVisible = ref(false)
+const entryPlan = ref(null)
+const entryRows = ref([])
+const candidates = ref([])
+
+const reportVisible = ref(false)
+const reportPlan = ref(null)
+const previewHtml = ref('')
+const previewing = ref(false)
+const generating = ref(false)
+
+const instrumentName = (id) => {
+  const i = instruments.value.find((x) => x.id === id)
+  return i ? i.name : (id ? `仪器${id}` : '—')
+}
+
+async function loadInstruments() {
+  try { instruments.value = await interlabInstruments() } catch (e) { instruments.value = [] }
+}
+async function loadMandatory() {
+  try { mandatory.value = await interlabMandatory() } catch (e) { mandatory.value = [] }
+}
+async function reload() {
+  const params = {}
+  if (filterYear.value) params.year = filterYear.value
+  if (filterHalf.value) params.half = filterHalf.value
+  if (filterInstrument.value) params.instrument_id = filterInstrument.value
+  const r = await listInterlabPlans(params)
+  plans.value = r.items || []
+  const yrs = new Set(plans.value.map((p) => p.year))
+  yearOptions.value = Array.from(yrs).sort((a, b) => b - a)
+}
+
+function openPlanCreate() {
+  editingPlan.value = null
+  Object.assign(planForm, {
+    year: new Date().getFullYear(), half: 1, instrument_id: null, reference_lab: '',
+    compared_at: '', operator: '', reviewer: '', conclusion: '', summary: '', handle_plan: '',
+  })
+  planVisible.value = true
+}
+function openPlanEdit(row) {
+  editingPlan.value = row
+  Object.assign(planForm, {
+    year: row.year, half: row.half, instrument_id: row.instrument_id, reference_lab: row.reference_lab,
+    compared_at: row.compared_at, operator: row.operator, reviewer: row.reviewer,
+    conclusion: row.conclusion, summary: row.summary, handle_plan: row.handle_plan,
+  })
+  planVisible.value = true
+}
+async function savePlan() {
+  saving.value = true
+  try {
+    const payload = { ...planForm }
+    if (editingPlan.value) {
+      await updateInterlabPlan(editingPlan.value.id, payload)
+      ElMessage.success('计划已更新')
+    } else {
+      await createInterlabPlan(payload)
+      ElMessage.success('计划已创建')
+    }
+    planVisible.value = false
+    await reload()
+  } catch (e) {
+    ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    saving.value = false
+  }
+}
+async function onDeletePlan(row) {
+  try {
+    await ElMessageBox.confirm(`确认删除 ${row.year}年${row.half === 1 ? '上半年' : '下半年'} 的室间比对计划？`, '警告', { type: 'warning' })
+    await deleteInterlabPlan(row.id)
+    ElMessage.success('已删除')
+    await reload()
+  } catch (e) { if (e !== 'cancel') ElMessage.error('删除失败') }
+}
+
+async function openEntry(row) {
+  entryPlan.value = row
+  entryRows.value = []
+  try {
+    const r = await getInterlabResults(row.id)
+    entryRows.value = (r.items || []).map((it) => ({ ...it, kind: it.kind || '定量' }))
+  } catch (e) { /* ignore */ }
+  entryVisible.value = true
+}
+function addItemRow() {
+  entryRows.value.push({ item: '', unit: '', our_value: '', ref_value: '', te: '0', mode: 'relative', kind: '定量', note: '' })
+}
+async function loadCandidates(instrumentId) {
+  if (!instrumentId) return
+  try { candidates.value = await interlabProjects(instrumentId) } catch (e) { candidates.value = [] }
+}
+async function saveEntry() {
+  saving.value = true
+  try {
+    await saveInterlabResults(entryPlan.value.id, { items: entryRows.value.filter((r) => r.item) })
+    ElMessage.success('结果已保存')
+    entryVisible.value = false
+    await reload()
+  } catch (e) {
+    ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    saving.value = false
+  }
+}
+
+function openReport(row) {
+  reportPlan.value = row
+  previewHtml.value = ''
+  reportVisible.value = true
+}
+async function doPreview() {
+  previewing.value = true
+  try {
+    const r = await previewInterlabReport(reportPlan.value.id)
+    previewHtml.value = r.html
+  } catch (e) {
+    ElMessage.error('预览失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    previewing.value = false
+  }
+}
+async function doGenerate() {
+  generating.value = true
+  try {
+    const p = await generateInterlabReport(reportPlan.value.id)
+    reportPlan.value = p
+    ElMessage.success('报告已生成')
+    await doPreview()
+    await reload()
+  } catch (e) {
+    ElMessage.error('生成失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    generating.value = false
+  }
+}
+function doPrint() {
+  if (!previewHtml.value) { ElMessage.warning('请先预览'); return }
+  const w = window.open('', '_blank')
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + previewHtml.value + '</body></html>')
+  w.document.close()
+  setTimeout(() => { w.focus(); w.print() }, 300)
+}
+async function doDownload() {
+  try {
+    const r = await downloadInterlabReport(reportPlan.value.id)
+    const blob = new Blob([r.data])
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = reportPlan.value.report_filename || '室间比对报告.docx'
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e) { ElMessage.error('下载失败') }
+}
+async function doUpload(option) {
+  try {
+    const p = await uploadInterlabReport(reportPlan.value.id, option.file)
+    reportPlan.value = p
+    ElMessage.success('已上传存档')
+    await reload()
+  } catch (e) { ElMessage.error('上传失败：' + (e.response?.data?.detail || e.message)) }
+}
+async function doDeleteReport() {
+  try {
+    await ElMessageBox.confirm('确认删除已生成报告？', '警告', { type: 'warning' })
+    const p = await deleteInterlabReport(reportPlan.value.id)
+    reportPlan.value = p
+    ElMessage.success('报告已删除')
+    await reload()
+  } catch (e) { if (e !== 'cancel') ElMessage.error('删除失败') }
+}
+
+onMounted(async () => {
+  await loadInstruments()
+  await loadMandatory()
+  await reload()
+})
+</script>
+
+<style scoped>
+.interlab-page { padding: 4px; }
+.toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+.tip { font-size: 12px; color: #888; margin-left: 8px; }
+.no { color: #c0392b; }
+.guide-card { border: 1px solid #f0d9d9; }
+.guide-title { font-weight: 700; color: #c0392b; }
+.guide-sub { font-size: 12px; color: #888; margin-left: 8px; }
+.rep-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.rep-preview { border: 1px solid #ddd; border-radius: 4px; padding: 12px; min-height: 400px; max-height: 70vh; overflow: auto; background: #fff; }
+</style>

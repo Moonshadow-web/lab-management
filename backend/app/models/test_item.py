@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.database import Base
@@ -34,3 +34,6 @@ class TestItem(Base):
     interference_lipemia: Mapped[str] = mapped_column(String(100), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # 室间质评 / 室间比对标记：默认均有（1）；无室间质评=0；无室间比对（既无 EQA 也无外部参比）=0
+    has_eqa: Mapped[int] = mapped_column(Integer, default=1)
+    has_interlab: Mapped[int] = mapped_column(Integer, default=1)

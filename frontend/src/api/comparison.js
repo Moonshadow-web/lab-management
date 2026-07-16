@@ -43,6 +43,12 @@ export function getResults(planId) {
 export function saveResults(planId, data) {
   return request.put(`/api/v1/comparison/plans/${planId}/results`, data)
 }
+// 从填好的定量比对结果 Excel（如 BG-SM-CZ-025）批量导入
+export function importResults(planId, formData) {
+  return request.post(`/api/v1/comparison/plans/${planId}/results/import`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
 
 // 报告：预览 / 生成 / 下载 / 上传 / 删除
 export function previewReport(planId) {

@@ -61,6 +61,9 @@ def _migrate_schema():
             "has_eqa": "INTEGER",
             "has_interlab": "INTEGER",
         },
+        "interlab_items": {
+            "kind": "VARCHAR(20)",
+        },
     }
     with engine.begin() as conn:
         for table, cols in alters.items():
@@ -93,6 +96,31 @@ def _migrate_schema():
         try:
             conn.exec_driver_sql(
                 "UPDATE users SET must_change_password=0 WHERE must_change_password IS NULL"
+            )
+        except Exception:
+            pass
+        # test_items 新增 has_eqa/has_interlab 列：旧行 NULL → 回填默认 1（默认均有室间质评/室间比对）
+        try:
+            conn.exec_driver_sql("UPDATE test_items SET has_eqa=1 WHERE has_eqa IS NULL")
+            conn.exec_driver_sql("UPDATE test_items SET has_interlab=1 WHERE has_interlab IS NULL")
+        except Exception:
+            pass
+        # 无室间质评、但需室间比对的 12 类项目（含 IgG/IgM 变体）：has_eqa=0, has_interlab=1
+        try:
+            conn.exec_driver_sql(
+                "UPDATE test_items SET has_eqa=0, has_interlab=1 WHERE name IN ("
+                "'乙型肝炎病毒表面抗原定量','可溶性生长刺激表达基因2蛋白','抑制素B',"
+                "'抗精子抗体IgG','抗精子抗体IgM','抗卵巢抗体IgG','抗卵巢抗体IgM',"
+                "'抗子宫内膜抗体IgG','抗子宫内膜抗体IgM','血管紧张素转化酶','血氨',"
+                "'17-羟类固醇','17-酮类固醇','香草扁桃酸','肺癌自身抗体检测（七项）',"
+                "'N-乙酰-β-D-氨基葡萄糖苷酶（尿液）')"
+            )
+        except Exception:
+            pass
+        # interlab_items 新增 kind 列：旧行 NULL/空 → 回填默认「定量」（12 类必做项目均为定量）
+        try:
+            conn.exec_driver_sql(
+                "UPDATE interlab_items SET kind='定量' WHERE kind IS NULL OR kind=''"
             )
         except Exception:
             pass

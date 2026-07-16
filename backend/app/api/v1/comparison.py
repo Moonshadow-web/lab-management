@@ -251,6 +251,33 @@ def get_results(pid: int, db: Session = Depends(get_db), user: User = Depends(ge
     }
 
 
+def _apply_results(db: Session, pid: int, quant: list, qual: list):
+    """定量/定性结果 upsert（保存与导入共用）。quant: [{item,level,reference_value,values}]；
+    qual: [{item,results}]。"""
+    for row in (quant or []):
+        existing = db.query(ComparisonResult).filter_by(
+            plan_id=pid, item=row["item"], level=row["level"]).first()
+        vals_json = json.dumps(row.get("values", {}))
+        if existing:
+            existing.reference_value = row.get("reference_value", "")
+            existing.values_json = vals_json
+            existing.updated_at = datetime.utcnow()
+        else:
+            db.add(ComparisonResult(
+                plan_id=pid, item=row["item"], level=row["level"],
+                reference_value=row.get("reference_value", ""), values_json=vals_json,
+            ))
+    for row in (qual or []):
+        existing = db.query(ComparisonQualResult).filter_by(plan_id=pid, item=row["item"]).first()
+        rj = json.dumps(row.get("results", {}))
+        if existing:
+            existing.results_json = rj
+            existing.updated_at = datetime.utcnow()
+        else:
+            db.add(ComparisonQualResult(
+                plan_id=pid, item=row["item"], results_json=rj))
+
+
 @router.put("/plans/{pid}/results")
 def save_results(
     pid: int, body: ComparisonResultsPayload, db: Session = Depends(get_db), user: User = Depends(WRITE),
@@ -258,30 +285,45 @@ def save_results(
     p = db.get(ComparisonPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
-    # 定量
-    for row in body.quant:
-        existing = db.query(ComparisonResult).filter_by(
-            plan_id=pid, item=row.item, level=row.level).first()
-        if existing:
-            existing.reference_value = row.reference_value
-            existing.values_json = json.dumps(row.values)
-            existing.updated_at = datetime.utcnow()
-        else:
-            db.add(ComparisonResult(
-                plan_id=pid, item=row.item, level=row.level,
-                reference_value=row.reference_value, values_json=json.dumps(row.values),
-            ))
-    # 定性
-    for row in body.qual:
-        existing = db.query(ComparisonQualResult).filter_by(plan_id=pid, item=row.item).first()
-        if existing:
-            existing.results_json = json.dumps(row.results)
-            existing.updated_at = datetime.utcnow()
-        else:
-            db.add(ComparisonQualResult(
-                plan_id=pid, item=row.item, results_json=json.dumps(row.results)))
+    _apply_results(db, pid, body.quant, body.qual)
     db.commit()
     return {"ok": True}
+
+
+@router.post("/plans/{pid}/results/import")
+async def import_results(
+    pid: int, file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(WRITE),
+):
+    """从填好的定量比对结果 Excel（如 BG-SM-CZ-025）导入结果，自动匹配仪器与项目。"""
+    p = db.get(ComparisonPlan, pid)
+    if not p:
+        raise HTTPException(404, "未找到计划")
+    g = db.get(ComparisonGroup, p.group_id)
+    if not g:
+        raise HTTPException(404, "未找到分组")
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "文件为空")
+    try:
+        res = svc.import_quant_from_excel(db, g, p, data)
+    except Exception as e:
+        raise HTTPException(422, f"解析失败：{e}")
+    if not res["quant"]:
+        return {
+            "ok": True, "imported": 0, "levels": 0,
+            "matched_items": res["matched_items"],
+            "unmatched_items": res["unmatched_items"],
+            "instruments_matched": res["instruments_matched"],
+            "message": "未解析到可匹配的结果，请检查 Excel 表头与仪器/项目命名",
+        }
+    _apply_results(db, pid, res["quant"], [])
+    db.commit()
+    return {
+        "ok": True, "imported": len(res["quant"]), "levels": res["levels"],
+        "matched_items": res["matched_items"],
+        "unmatched_items": res["unmatched_items"],
+        "instruments_matched": res["instruments_matched"],
+    }
 
 
 # ---------------------------------------------------------------------------

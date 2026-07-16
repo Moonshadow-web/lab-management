@@ -10,7 +10,9 @@
 
 import json
 import os
+import re as _re
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 
 from docx import Document
@@ -179,12 +181,12 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
                     insts[str(cid)] = {"value": "", "bias": None, "accepted": None, "masked": True}
                     continue
                 v = _load_json(r.values_json, {}).get(str(cid), "") if r else ""
-                bias, accepted = _compute_bias(ref_val, v, it.get("te", "0"), it.get("mode", "relative"))
+                bias, accepted = _compute_bias(ref_val, v, _resolve_te(it), it.get("mode", "relative"))
                 insts[str(cid)] = {"value": v, "bias": bias, "accepted": accepted, "masked": False}
             rows.append({
                 "item": it["name"],
                 "label": it.get("label", ""),
-                "te": it.get("te", "0"),
+                "te": _resolve_te(it),
                 "mode": it.get("mode", "relative"),
                 "ref": ref_val,
                 "insts": insts,
@@ -203,7 +205,7 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
                 if cid not in app:
                     continue
                 v = _load_json(r.values_json, {}).get(str(cid), "") if r else ""
-                _, accepted = _compute_bias(r.reference_value if r else "", v, it.get("te", "0"), it.get("mode", "relative"))
+                _, accepted = _compute_bias(r.reference_value if r else "", v, _resolve_te(it), it.get("mode", "relative"))
                 if accepted is not True:
                     ok = False
                     break
@@ -513,6 +515,221 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     doc.save(out_path)
+
+
+# ---------------------------------------------------------------------------
+# 定量比对结果 Excel 导入（解析 BG-SM-CZ-025 等"横排分水平"比对表）
+# ---------------------------------------------------------------------------
+_EXCEL_KEYWORDS = {"允许TE%", "允许TE", "偏倚%", "是否允许", "是否允许Y/N", "TE%", "偏倚"}
+
+
+def _norm_token(s: str) -> str:
+    return _re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def _is_instr_header(v):
+    """Excel 表头行里，某单元格是否为仪器名列（而非 允许TE%/偏倚%/是否允许 等关键字，
+    也非纯数字/百分比，也非'水平N'标记，也非 Y/N 判定列）。"""
+    if v is None:
+        return False
+    s = str(v).strip()
+    if s == "":
+        return False
+    if s in _EXCEL_KEYWORDS:
+        return False
+    if "水平" in s:
+        return False
+    if s.upper() in ("Y", "N", "YN"):
+        return False
+    # 纯数字 / 百分比不是仪器列
+    if s.replace(".", "").replace("-", "").replace("%", "").isdigit():
+        return False
+    return True
+
+
+def _match_instrument(header, instruments):
+    """header: Excel 列头（如 AU5821-B / 5811-急诊）；instruments: [{id,name,model}]。
+    返回匹配到的系统仪器 id，或 None。"""
+    h = (header or "").strip()
+    if not h:
+        return None
+    hn = _norm_token(h)
+    # 精确（规范化后）
+    for ins in instruments:
+        if _norm_token(ins.get("name", "")) == hn or _norm_token(ins.get("model", "")) == hn:
+            return ins["id"]
+    # 含"急诊" → 匹配含"急诊"的仪器（处理 5811-急诊 ↔ AU5800急诊 之类命名差异）
+    if "急诊" in h:
+        for ins in instruments:
+            if "急诊" in (ins.get("name", "") + ins.get("model", "")):
+                return ins["id"]
+    # AU5821 + 后缀字母
+    m = _re.search(r"au5821([ab])", hn)
+    if m:
+        L = m.group(1)
+        for ins in instruments:
+            n = _norm_token(ins.get("name", "") + ins.get("model", ""))
+            if "au5821" in n and n.endswith(L):
+                return ins["id"]
+    # DXI800
+    if "dxi800" in hn:
+        for ins in instruments:
+            if "dxi800" in _norm_token(ins.get("name", "") + ins.get("model", "")):
+                return ins["id"]
+    # TOP700 + 后缀字母
+    if "top700" in hn:
+        mm = _re.search(r"top700([abc])", hn)
+        L = mm.group(1) if mm else None
+        for ins in instruments:
+            n = _norm_token(ins.get("name", "") + ins.get("model", ""))
+            if "top700" in n and (L is None or n.endswith(L)):
+                return ins["id"]
+    # 通用子串兜底
+    for ins in instruments:
+        n = _norm_token(ins.get("name", "") + ins.get("model", ""))
+        if hn and (hn in n or n in hn):
+            return ins["id"]
+    return None
+
+
+# 定量比对 Excel 常用缩写 ↔ 系统项目代码 同义表。
+# SOP 表单（BG-SM-CZ-025 等）用 BUN/CHOL/CRE，而系统分组用 UREA/TC/Cr 等代码，
+# 二者需打通才能正确匹配。键/值均为规范化(去非字母数字+小写)后的名称。
+QUANT_SYNONYMS = {
+    "bun": "urea",      # Blood Urea Nitrogen = 尿素
+    "chol": "tc",       # Cholesterol = 总胆固醇
+    "cre": "cr",        # Creatinine = 肌酐
+}
+
+# 反向同义：系统分组代码 → Excel 缩写（用于回退查 TE_LOOKUP 标准允许TE）
+_GROUP_TO_EXCEL = {v: k for k, v in QUANT_SYNONYMS.items()}
+
+
+def _resolve_te(it: dict):
+    """允许TE 解析：优先用分组里配置好的 te；若为空/0，则回退到内置 TE_LOOKUP
+    （含同义缩写映射，如分组 UREA → TE_LOOKUP 的 BUN=3）。保证缺配项目也能算出偏倚与判定。"""
+    te = it.get("te")
+    if str(te or "").strip() not in ("", "0", "0.0"):
+        return te
+    name = _norm_token(it.get("name", ""))
+    up = name.upper()
+    if up in TE_LOOKUP:
+        return TE_LOOKUP[up][0]
+    ex = _GROUP_TO_EXCEL.get(name)
+    if ex and ex.upper() in TE_LOOKUP:
+        return TE_LOOKUP[ex.upper()][0]
+    return te or "0"
+
+
+def _match_item(name, items):
+    """name: Excel 项目名；items: [{name,label,...}]（系统分组项目）。按规范化代码匹配，
+    并支持 QUANT_SYNONYMS 同义缩写。"""
+    h = (name or "").strip()
+    if not h:
+        return None
+    hn = _norm_token(h)
+    # 1) 精确（规范化后）
+    for it in items:
+        if _norm_token(it.get("name", "")) == hn:
+            return it["name"]
+    # 2) 同义缩写映射（Excel 缩写 → 系统代码）
+    syn = QUANT_SYNONYMS.get(hn)
+    if syn:
+        for it in items:
+            if _norm_token(it.get("name", "")) == syn:
+                return it["name"]
+    # 3) 子串兜底
+    for it in items:
+        if hn and hn in _norm_token(it.get("name", "")):
+            return it["name"]
+    return None
+
+
+def import_quant_from_excel(db, group: ComparisonGroup, plan: ComparisonPlan, file_bytes: bytes):
+    """解析定量比对结果 Excel，返回 {quant:[...], levels, matched_items, unmatched_items, instruments_matched}。
+
+    适用布局：表头行含"允许TE%"，每个水平块内仪器列依次是 [参照仪器, 允许TE%, 仪器B, 偏倚%, 是否允许, 仪器C, ...]；
+    项目名在 A 列；一个 sheet 可含多个水平块（水平1/2/3 横排，4/5 在下方另一表头行）。
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(BytesIO(file_bytes), data_only=True)
+    instruments = _instruments_of(db, group)  # [{id,name,model,is_reference}]
+    items = _load_json(group.items, [])
+    K = max(len(instruments), 1)
+
+    quant = []
+    matched_items = set()
+    unmatched_items = []
+    instr_matched = set()
+
+    for ws in wb.worksheets:
+        maxr, maxc = ws.max_row, ws.max_column
+        # 表头行唯一可靠标志：含"允许TE%"或"偏倚%"列（数据行的 Y/N 不会误判）
+        header_rows = [
+            r for r in range(1, maxr + 1)
+            if any(str(ws.cell(r, c).value or "").strip() in ("允许TE%", "偏倚%", "允许TE")
+                   for c in range(1, maxc + 1))
+        ]
+        level_counter = 0
+        for H in sorted(set(header_rows)):
+            instr_cols = [(c - 1, ws.cell(H, c).value)
+                         for c in range(1, maxc + 1) if _is_instr_header(ws.cell(H, c).value)]
+            if not instr_cols:
+                continue
+            chunks = [instr_cols[i:i + K] for i in range(0, len(instr_cols), K)]
+            for chunk in chunks:
+                level_counter += 1
+                level = level_counter
+                for r in range(H + 1, maxr + 1):
+                    nm = ws.cell(r, 1).value
+                    if nm is None or str(nm).strip() == "":
+                        break
+                    if "水平" in str(nm):
+                        break
+                    if r in set(header_rows):
+                        break
+                    mitem = _match_item(nm, items)
+                    if not mitem:
+                        s = str(nm).strip()
+                        if s not in unmatched_items:
+                            unmatched_items.append(s)
+                        continue
+                    matched_items.add(mitem)
+                    vals = {}
+                    for (col, hdr) in chunk:
+                        iid = _match_instrument(hdr, instruments)
+                        if iid is None:
+                            continue
+                        # instr_cols 中的 col 为 0 基，+1 即回到 1 基的表头同列
+                        # （BG-SM-CZ-025 布局：仪器表头与对应测量值同列）
+                        v = ws.cell(r, col + 1).value
+                        if v is None or str(v).strip() == "":
+                            continue
+                        vals[iid] = v
+                        instr_matched.add(iid)
+                    if not vals:
+                        continue
+                    ref_id = group.reference_instrument_id
+                    ref_val = vals.get(ref_id)
+                    if ref_val is None and vals:
+                        ref_id = next(iter(vals.keys()))
+                        ref_val = vals[ref_id]
+                    compared = {iid: v for iid, v in vals.items() if iid != ref_id}
+                    quant.append({
+                        "item": mitem,
+                        "level": level,
+                        "reference_value": "" if ref_val is None else str(ref_val),
+                        "values": {str(k): ("" if v is None else str(v)) for k, v in compared.items()},
+                    })
+
+    return {
+        "quant": quant,
+        "levels": max((q["level"] for q in quant), default=0),
+        "matched_items": sorted(matched_items),
+        "unmatched_items": unmatched_items,
+        "instruments_matched": sorted(instr_matched),
+    }
 
 
 # ---------------------------------------------------------------------------

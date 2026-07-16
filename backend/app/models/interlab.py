@@ -54,6 +54,7 @@ class InterlabItem(Base):
     ref_value: Mapped[str] = mapped_column(String(50), default="")  # 参比实验室检测值
     te: Mapped[str] = mapped_column(String(20), default="0")  # 允许偏倚，数字字符串
     mode: Mapped[str] = mapped_column(String(20), default="relative")  # relative(相对%) / absolute(绝对)
+    kind: Mapped[str] = mapped_column(String(20), default="定量")  # 定性 / 定量（决定套用 BG-SM-CZ-018 / 019 模板）
     note: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

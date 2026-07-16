@@ -11,6 +11,10 @@ node_modules/
 dist/
 *.local
 
+# Logs (runtime / scratch)
+*.log
+backend_*.log
+
 # Local data (sqlite db + uploaded files)
 data/
 

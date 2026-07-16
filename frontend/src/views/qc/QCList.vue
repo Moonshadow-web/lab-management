@@ -562,8 +562,8 @@
       <el-tab-pane label="留样再测" name="retain">
         <el-empty description="留样再测功能即将上线" />
       </el-tab-pane>
-      <el-tab-pane label="室间比对" name="interlab">
-        <el-empty description="室间比对功能即将上线" />
+      <el-tab-pane label="室间比对" name="interlab" lazy>
+        <InterlabComparison />
       </el-tab-pane>
       <el-tab-pane label="批号累计靶值" name="lot">
         <el-empty description="质控品更换批号累计靶值功能即将上线" />
@@ -591,6 +591,7 @@ import {
 } from '../../api/eqa'
 import { useAuthStore } from '../../store/auth'
 import Comparison from '../comparison/Comparison.vue'
+import InterlabComparison from '../interlab/InterlabComparison.vue'
 
 const activeTab = ref('summary')
 const auth = useAuthStore()

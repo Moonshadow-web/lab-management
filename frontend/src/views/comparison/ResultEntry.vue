@@ -67,6 +67,10 @@
       </template>
     </template>
     <template #footer>
+      <el-upload v-if="category === '定量'" :show-file-list="false" accept=".xlsx,.xls"
+        :before-upload="onImportFile" style="display:inline-block;margin-right:8px">
+        <el-button :loading="importing">从Excel导入</el-button>
+      </el-upload>
       <el-button @click="$emit('close')">关闭</el-button>
       <el-button type="primary" :loading="saving" @click="onSave">保存结果</el-button>
     </template>
@@ -74,9 +78,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getResults, saveResults } from '../../api/comparison'
+import { getResults, saveResults, importResults } from '../../api/comparison'
 
 const props = defineProps({
   visible: Boolean,
@@ -87,6 +91,7 @@ const emit = defineEmits(['close', 'saved'])
 
 const loading = ref(false)
 const saving = ref(false)
+const importing = ref(false)
 const category = ref('定量')
 const levels = ref(5)
 const allInstruments = ref([])
@@ -133,10 +138,12 @@ function isApplicable(item, insId) {
 
 const currentRows = computed(() => quantRows.value.filter((r) => r.level === currentLevel.value))
 
+// 对话框以 v-if 挂载，挂载时 props.visible 已为 true；用 immediate 确保挂载即加载，
+// 避免「打开录入对话框却是空白、无法录入」的问题。
 watch(() => props.visible, async (v) => {
   if (!v || !props.plan) return
   await load()
-})
+}, { immediate: true })
 async function load() {
   loading.value = true
   try {
@@ -179,6 +186,30 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+async function onImportFile(file) {
+  importing.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await importResults(props.plan.id, fd)
+    const matched = res.matched_items?.length || 0
+    const unmatched = res.unmatched_items?.length || 0
+    if (unmatched > 0) {
+      ElMessage.warning(
+        `已导入 ${res.imported} 条结果（${matched} 个项目）；未能匹配项目：${res.unmatched_items.join('、')}`)
+    } else {
+      ElMessage.success(`已导入 ${res.imported} 条结果（${matched} 个项目，水平 ${res.levels}）`)
+    }
+    await load()
+    emit('saved')
+  } catch (e) {
+    ElMessage.error('导入失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    importing.value = false
+  }
+  return false // 阻止 el-upload 自动上传（我们手动发请求）
 }
 
 async function onSave() {
