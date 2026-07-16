@@ -15,6 +15,7 @@ from . import (
     reminders,
     comparison,
     interlab,
+    qc_target,
 
     qc_summaries,
     reagents,
@@ -45,6 +46,7 @@ api_router.include_router(notifications.router)
 api_router.include_router(reminders.router)
 api_router.include_router(comparison.router)
 api_router.include_router(interlab.router)
+api_router.include_router(qc_target.router)
 
 # 将 test-items 的静态路由 /stats、/export 移到参数路由 /{item_id} 之前，
 # 避免具体路径被通用参数路由吞掉（如 GET /test-items/stats 误命中 /{item_id}）。

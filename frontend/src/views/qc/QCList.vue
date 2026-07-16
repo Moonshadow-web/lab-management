@@ -559,14 +559,11 @@
       <el-tab-pane label="仪器间比对" name="cmp" lazy>
         <Comparison />
       </el-tab-pane>
-      <el-tab-pane label="留样再测" name="retain">
-        <el-empty description="留样再测功能即将上线" />
-      </el-tab-pane>
       <el-tab-pane label="室间比对" name="interlab" lazy>
         <InterlabComparison />
       </el-tab-pane>
-      <el-tab-pane label="批号累计靶值" name="lot">
-        <el-empty description="质控品更换批号累计靶值功能即将上线" />
+      <el-tab-pane label="批号累积靶值" name="lot" lazy>
+        <TargetValueBoard />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -592,6 +589,7 @@ import {
 import { useAuthStore } from '../../store/auth'
 import Comparison from '../comparison/Comparison.vue'
 import InterlabComparison from '../interlab/InterlabComparison.vue'
+import TargetValueBoard from './TargetValueBoard.vue'
 
 const activeTab = ref('summary')
 const auth = useAuthStore()

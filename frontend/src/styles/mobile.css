@@ -100,7 +100,8 @@
     -webkit-overflow-scrolling: touch;
   }
   .crud-table .el-table,
-  .page > .el-table {
+  .page > .el-table,
+  .target-board .el-table {
     min-width: 760px !important;
   }
   /* 表格操作列的 link 按钮改为竖排，不挤 */

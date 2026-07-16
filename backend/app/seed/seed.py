@@ -192,6 +192,9 @@ def seed_families(db):
         if keys:
             matched = set()
             for inst in instruments:
+                # 停用仪器不作为家族成员（已由替代机取代，项目应挂在替代机而非停用机）
+                if inst.status and "停用" in (inst.status or ""):
+                    continue
                 hay = (inst.name or "") + " " + (inst.model or "")
                 hay_l = hay.lower()
                 for k in keys:

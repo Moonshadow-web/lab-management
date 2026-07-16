@@ -180,9 +180,13 @@ def mandatory_projects(db):
         insts = []
         for iid in sorted(expanded):
             inst = inst_lut.get(iid)
-            if inst:
-                nm = (inst.model or inst.name or "").strip() or f"仪器{iid}"
-                insts.append({"id": iid, "name": nm})
+            if not inst:
+                continue
+            # 指导面板只展示可选择的（非停用）仪器
+            if inst.status and "停用" in (inst.status or ""):
+                continue
+            nm = (inst.model or inst.name or "").strip() or f"仪器{iid}"
+            insts.append({"id": iid, "name": nm})
         out.append({
             "id": ti.id,
             "code": (ti.code or "").strip(),

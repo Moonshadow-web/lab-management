@@ -17,7 +17,7 @@ from ...models.instrument import Instrument
 from ...models.user import User
 from ...schemas.interlab import (
     InterlabPlanCreate, InterlabPlanUpdate, InterlabPlanRead,
-    InterlabResultsPayload, InterlabProject,
+    InterlabResultsPayload, InterlabProject, InterlabItemRow,
 )
 from ...services import interlab_report as svc
 
@@ -116,16 +116,23 @@ def create_plan(body: InterlabPlanCreate, db: Session = Depends(get_db), user: U
     else:
         rows = []
     for r in rows:
-        if not getattr(r, "item", None):
+        if isinstance(r, InterlabItemRow):
+            item = r.item
+            unit = r.unit
+            kind = r.kind or "定量"
+            te = r.te or "0"
+            mode = r.mode or "relative"
+        else:
+            item = r.get("name") or r.get("item")
+            unit = r.get("unit") or ""
+            kind = r.get("kind") or "定量"
+            te = r.get("te") or "0"
+            mode = r.get("mode") or "relative"
+        if not item:
             continue
-        item = r.item if isinstance(r, InterlabItemRow) else r.get("item")
-        unit = getattr(r, "unit", "") if isinstance(r, InterlabItemRow) else (r.get("unit") or "")
-        kind = getattr(r, "kind", "定量") if isinstance(r, InterlabItemRow) else (r.get("kind") or "定量")
         db.add(InterlabItem(
             plan_id=p.id, item=item, unit=unit or "", our_value="", ref_value="",
-            te=(getattr(r, "te", "0") if isinstance(r, InterlabItemRow) else (r.get("te") or "0")),
-            mode=(getattr(r, "mode", "relative") if isinstance(r, InterlabItemRow) else (r.get("mode") or "relative")),
-            kind=kind, note="",
+            te=te, mode=mode, kind=kind, note="",
         ))
     db.commit(); db.refresh(p)
     return p
@@ -190,7 +197,8 @@ def save_results(pid: int, body: InterlabResultsPayload, db: Session = Depends(g
             continue
         db.add(InterlabItem(
             plan_id=pid, item=row.item, unit=row.unit, our_value=row.our_value,
-            ref_value=row.ref_value, te=row.te, mode=row.mode, note=row.note,
+            ref_value=row.ref_value, te=row.te, mode=row.mode,
+            kind=getattr(row, "kind", None) or "定量", note=row.note,
         ))
     db.commit()
     return {"ok": True}

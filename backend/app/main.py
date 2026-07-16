@@ -13,6 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from .core.config import BACKEND_DIR, FRONTEND_ORIGIN, PROJECT_ROOT, UPLOAD_ROOT
 from .core.database import Base, SessionLocal, engine
 from .models import *  # noqa: F401,F403 注册全部表
+from .models.test_item import TestItem
 from .api.v1.router import api_router
 from .seed.seed import run_seed
 from .services.notification_service import refresh_calibration_notifications, refresh_eqa_notifications
@@ -67,6 +68,9 @@ def _migrate_schema():
         "comparison_plans": {
             "only_uncompared": "BOOLEAN",
         },
+        "qc_target_batches": {
+            "level": "INTEGER",
+        },
     }
     with engine.begin() as conn:
         for table, cols in alters.items():
@@ -108,18 +112,8 @@ def _migrate_schema():
             conn.exec_driver_sql("UPDATE test_items SET has_interlab=1 WHERE has_interlab IS NULL")
         except Exception:
             pass
-        # 无室间质评、但需室间比对的 12 类项目（含 IgG/IgM 变体）：has_eqa=0, has_interlab=1
-        try:
-            conn.exec_driver_sql(
-                "UPDATE test_items SET has_eqa=0, has_interlab=1 WHERE name IN ("
-                "'乙型肝炎病毒表面抗原定量','可溶性生长刺激表达基因2蛋白','抑制素B',"
-                "'抗精子抗体IgG','抗精子抗体IgM','抗卵巢抗体IgG','抗卵巢抗体IgM',"
-                "'抗子宫内膜抗体IgG','抗子宫内膜抗体IgM','血管紧张素转化酶','血氨',"
-                "'17-羟类固醇','17-酮类固醇','香草扁桃酸','肺癌自身抗体检测（七项）',"
-                "'N-乙酰-β-D-氨基葡萄糖苷酶（尿液）')"
-            )
-        except Exception:
-            pass
+        # 注意：has_eqa / has_interlab 的最终取值由下方「室间比对标记」逻辑统一计算
+        #（has_eqa 由 EQA 关联自动判定，has_interlab 按「例外/有EQA/无EQA」三态设置），此处仅做 NULL 兜底。
         # interlab_items 新增 kind 列：旧行 NULL/空 → 回填默认「定量」（12 类必做项目均为定量）
         try:
             conn.exec_driver_sql(
@@ -136,6 +130,52 @@ def _migrate_schema():
             )
         except Exception:
             pass
+
+    # ---------------------------------------------------------------------------
+    # 室间比对 / 室间质评 标记（部署幂等、自修复）
+    # 规则：
+    #   ① 每个项目是否参加 EQA 由 EQA 关联自动判定（复用 eqa_associations 匹配逻辑，
+    #      与「项目库↔室间质评关联查询」页面一致；标本变体靠 _MANUAL_ASSOCIATIONS 兜底）
+    #   ② 16 个例外项目（无 EQA，但实验室决定不做室间比对）→ has_interlab=0
+    #   ③ 有 EQA → 无需室间比对 has_interlab=0
+    #   ④ 无 EQA 且不在例外 → 需做室间比对 has_interlab=1
+    # 说明：has_eqa 用 ORM 会话写（依赖 eqa_plans 数据）；has_interlab 用纯 SQL 重算，
+    #      因此即使手动改过列值，每次启动都会回到与 EQA 关联一致的正确状态。
+    # ---------------------------------------------------------------------------
+    EXCLUDE_INTERLAB_NAMES = (
+        '乙型肝炎病毒表面抗原定量', '可溶性生长刺激表达基因2蛋白', '抑制素B',
+        '抗精子抗体IgG', '抗精子抗体IgM', '抗卵巢抗体IgG', '抗卵巢抗体IgM',
+        '抗子宫内膜抗体IgG', '抗子宫内膜抗体IgM', '血管紧张素转化酶', '血氨',
+        '17-羟类固醇', '17-酮类固醇', '香草扁桃酸', '肺癌自身抗体检测（七项）',
+        'N-乙酰-β-D-氨基葡萄糖苷酶（尿液）',
+    )
+    try:
+        from .api.v1.eqa_associations import _compute_associations
+        with SessionLocal() as db:
+            for r in _compute_associations(db):
+                ti = db.get(TestItem, r.id)
+                if ti is None:
+                    continue
+                ti.has_eqa = 1 if r.has_eqa else 0
+            db.commit()
+    except Exception:
+        pass
+    try:
+        with engine.begin() as conn2:
+            # 有 EQA → 无室间比对
+            conn2.exec_driver_sql("UPDATE test_items SET has_interlab=0 WHERE has_eqa=1")
+            # 16 个例外（无 EQA 但不做室间比对）→ 无室间比对
+            conn2.exec_driver_sql(
+                "UPDATE test_items SET has_interlab=0 WHERE name IN (%s)"
+                % ",".join("'%s'" % n for n in EXCLUDE_INTERLAB_NAMES)
+            )
+            # 其余无 EQA → 需做室间比对
+            conn2.exec_driver_sql(
+                "UPDATE test_items SET has_interlab=1 WHERE has_eqa=0 AND name NOT IN (%s)"
+                % ",".join("'%s'" % n for n in EXCLUDE_INTERLAB_NAMES)
+            )
+    except Exception:
+        pass
 
     # 室内质控受控仪器白名单（月结下拉限定）：AU×3 / DXI800 1·3·4·急·唐 / 罗氏×3 /
     # TOP×3 / 血气×2 / 日立 / 东曹G8 / 爱康 / Stago(CompactMax) / 安图A6200
