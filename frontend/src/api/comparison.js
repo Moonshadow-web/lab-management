@@ -40,6 +40,10 @@ export function deletePlan(id) {
 export function getResults(planId) {
   return request.get(`/api/v1/comparison/plans/${planId}/results`)
 }
+// 某分组在某(年份,半年)下尚未比对的项目（同半年补录用）
+export function getUncompared(groupId, params) {
+  return request.get(`/api/v1/comparison/groups/${groupId}/uncompared`, { params })
+}
 export function saveResults(planId, data) {
   return request.put(`/api/v1/comparison/plans/${planId}/results`, data)
 }

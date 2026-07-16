@@ -53,7 +53,8 @@ def _ser_plan(p: ComparisonPlan):
         "form_code": p.form_code, "form_title": p.form_title,
         "compared_at": p.compared_at, "operator": p.operator, "reviewer": p.reviewer,
         "summary": p.summary, "conclusion": p.conclusion, "handle_plan": p.handle_plan,
-        "status": p.status, "report_path": p.report_path, "report_filename": p.report_filename,
+        "status": p.status, "only_uncompared": bool(p.only_uncompared),
+        "report_path": p.report_path, "report_filename": p.report_filename,
         "created_by": p.created_by, "created_at": p.created_at, "updated_at": p.updated_at,
     }
 
@@ -118,6 +119,34 @@ def get_group(gid: int, db: Session = Depends(get_db), user: User = Depends(get_
     if not g:
         raise HTTPException(404, "未找到分组")
     return _ser_group(g)
+
+
+@router.get("/groups/{gid}/uncompared")
+def uncompared_items(
+    gid: int, year: int, half: int, exclude_plan_id: int = None,
+    db: Session = Depends(get_db), user: User = Depends(get_current_user),
+):
+    """返回该分组在 (年份, 半年) 下尚未比对的项目，用于同半年补录计划快速锁定待做项。"""
+    g = db.get(ComparisonGroup, gid)
+    if not g:
+        raise HTTPException(404, "未找到分组")
+    group_items = json.loads(g.items) if g.items else []
+    # 同分组同半年、其它计划里已录入结果的项 = 已比对
+    done = set()
+    q = db.query(ComparisonPlan).filter_by(group_id=gid, year=year, half=half)
+    if exclude_plan_id is not None:
+        q = q.filter(ComparisonPlan.id != exclude_plan_id)
+    plan_ids = [p.id for p in q.all()]
+    if plan_ids:
+        rows = db.query(ComparisonResult.item).filter(
+            ComparisonResult.plan_id.in_(plan_ids)).distinct().all()
+        done = {r.item for r in rows}
+    items = [{"name": it.get("name"), "done": it.get("name") in done} for it in group_items]
+    uncompared = [it["name"] for it in items if not it["done"]]
+    return {
+        "items": items, "uncompared": uncompared,
+        "total": len(group_items), "done_count": len(done),
+    }
 
 
 @router.put("/groups/{gid}")
@@ -366,7 +395,7 @@ def generate_report(pid: int, db: Session = Depends(get_db), user: User = Depend
     if p.report_path:
         _safe_remove(p.report_path)
     p.report_path = f"comparison_reports/{safe}"
-    p.report_filename = f"{g.form_code}_{p.year}_半年{p.half}.docx"
+    p.report_filename = f"BG-SM-CZ-022_{g.form_code}_{p.year}_半年{p.half}.docx"
     p.updated_at = datetime.utcnow()
     db.commit()
     return _ser_plan(p)

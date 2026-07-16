@@ -77,6 +77,7 @@ class ComparisonPlanBase(BaseModel):
     conclusion: str = ""
     handle_plan: str = ""
     status: str = "draft"
+    only_uncompared: bool = False
     report_filename: str = ""
 
 
@@ -97,6 +98,7 @@ class ComparisonPlanUpdate(BaseModel):
     conclusion: Optional[str] = None
     handle_plan: Optional[str] = None
     status: Optional[str] = None
+    only_uncompared: Optional[bool] = None
     report_filename: Optional[str] = None
 
 

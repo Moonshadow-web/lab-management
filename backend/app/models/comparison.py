@@ -58,6 +58,7 @@ class ComparisonPlan(Base):
     conclusion: Mapped[str] = mapped_column(String(50), default="")  # 可接受 / 不可接受 / 空
     handle_plan: Mapped[str] = mapped_column(Text, default="")  # 处理方案（如不合格）
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft / done
+    only_uncompared: Mapped[bool] = mapped_column(Boolean, default=False)  # 仅纳入本期未比对项目（同分组同半年补录）
     report_path: Mapped[str] = mapped_column(String(500), default="")  # 报告相对路径
     report_filename: Mapped[str] = mapped_column(String(300), default="")  # 报告原始文件名
     created_by: Mapped[str] = mapped_column(String(100), default="")

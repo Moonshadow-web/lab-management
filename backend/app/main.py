@@ -64,6 +64,9 @@ def _migrate_schema():
         "interlab_items": {
             "kind": "VARCHAR(20)",
         },
+        "comparison_plans": {
+            "only_uncompared": "BOOLEAN",
+        },
     }
     with engine.begin() as conn:
         for table, cols in alters.items():
@@ -121,6 +124,15 @@ def _migrate_schema():
         try:
             conn.exec_driver_sql(
                 "UPDATE interlab_items SET kind='定量' WHERE kind IS NULL OR kind=''"
+            )
+        except Exception:
+            pass
+        # 仪器替代关系：停用仪器不再作为任何家族成员（项目应挂在替代机而非停用机）。
+        # AU5822/DXI800C/D/急诊/唐筛 已停用，由 AU5821A/B、DXI800 1-4/急/唐 取代。
+        try:
+            conn.exec_driver_sql(
+                "DELETE FROM instrument_family_members "
+                "WHERE instrument_id IN (SELECT id FROM instruments WHERE status LIKE '%停用%')"
             )
         except Exception:
             pass

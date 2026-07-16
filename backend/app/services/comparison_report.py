@@ -255,8 +255,9 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
     title = group.form_title or ("定性室内比对结果记录及分析报告表" if group.category == "定性" else "定量室内比对结果记录分析表")
     form_code = group.form_code or ""
     year = plan.year or ""
-    html = [f'<div class="rep">{css}<h1>{title}</h1>']
-    html.append(f'<div class="sub">表格编号 {form_code}　　民航总医院检验科生化免疫组　　生效日期：{year}.01.01</div>')
+    html = [f'<div class="rep">{css}<h1>定量室内比对报告（{group.name}）</h1>']
+    html.append(f'<div class="sub">表格编号 BG-SM-CZ-022（封面） / {form_code}（数据页）　　民航总医院检验科生化免疫组　　生效日期：{year}.01.01</div>')
+    html.append(f'<h2>数据页：{title}（{form_code}）</h2>')
 
     if data["category"] == "定性":
         html.append("<h2>比对结果</h2>")
@@ -390,17 +391,34 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
         s.left_margin = Cm(1.8); s.right_margin = Cm(1.8)
 
     title = group.form_title or ("定性室内比对结果记录及分析报告表" if group.category == "定性" else "定量室内比对结果记录分析表")
+    # 封面（BG-SM-CZ-022 样式）：标题 + 副标题同时保留封面号与数据页号
     h = doc.add_paragraph()
     h.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = h.add_run(title)
+    r = h.add_run(f"定量室内比对报告（{group.name}）")
     r.font.size = Pt(16); r.font.bold = True; r.font.name = "SimSun"
     r._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
 
     sub = doc.add_paragraph()
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    rs = sub.add_run(f"表格编号 {group.form_code or ''}　　民航总医院检验科生化免疫组　　生效日期：{plan.year or ''}.01.01")
+    rs = sub.add_run(
+        f"表格编号 BG-SM-CZ-022（封面） / {group.form_code or ''}（数据页）　　"
+        f"民航总医院检验科生化免疫组　　生效日期：{plan.year or ''}.01.01"
+    )
     rs.font.size = Pt(10.5); rs.font.name = "SimSun"
     rs._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+
+    # 数据页（024/025/026/027/071 样式）：分页后再列详细结果表
+    doc.add_page_break()
+    dh = doc.add_paragraph()
+    dh.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    dr = dh.add_run(title)
+    dr.font.size = Pt(15); dr.font.bold = True; dr.font.name = "SimSun"
+    dr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+    dsub = doc.add_paragraph()
+    dsub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    drs = dsub.add_run(f"表格编号 {group.form_code or ''}　　民航总医院检验科生化免疫组　　生效日期：{plan.year or ''}.01.01")
+    drs.font.size = Pt(10.5); drs.font.name = "SimSun"
+    drs._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
 
     if data["category"] == "定性":
         _heading(doc, "比对结果")
@@ -435,6 +453,21 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
         rp = p.add_run(f"总结：使用5例样本进行室内比对，结果阴阳符合率见上表，结果一致性{'可接受' if all_ok else '需关注'}。")
         rp.font.size = Pt(11); rp.font.name = "SimSun"
         rp._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+
+        _heading(doc, "结果分析")
+        p = doc.add_paragraph(); rp = p.add_run(plan.summary or "各仪器上述所有项目均比对合格。")
+        rp.font.size = Pt(11); rp.font.name = "SimSun"
+        rp._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+
+        _heading(doc, "处理方案（如不合格）")
+        p = doc.add_paragraph(); rp = p.add_run(plan.handle_plan or "无")
+        rp.font.size = Pt(11); rp.font.name = "SimSun"
+        rp._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+
+        foot = doc.add_paragraph()
+        rf = foot.add_run(f"操作者：{plan.operator or '　　　　'}　　审核者：{plan.reviewer or '　　　　'}　　日期：{plan.compared_at or '　　　　'}")
+        rf.font.size = Pt(11); rf.font.name = "SimSun"
+        rf._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
     else:
         ref = next((i for i in data["instruments"] if i["is_reference"]), None)
         compared = [i for i in data["instruments"] if not i["is_reference"]]
@@ -456,6 +489,19 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
             pp = doc.add_paragraph(); rr = pp.add_run(line)
             rr.font.size = Pt(11); rr.font.name = "SimSun"
             rr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+
+        # 数据页（024/025/026/027/071 样式）：分页后再列详细结果表
+        doc.add_page_break()
+        dh = doc.add_paragraph()
+        dh.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        dr = dh.add_run(title)
+        dr.font.size = Pt(15); dr.font.bold = True; dr.font.name = "SimSun"
+        dr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+        dsub = doc.add_paragraph()
+        dsub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        drs = dsub.add_run(f"表格编号 {group.form_code or ''}　　民航总医院检验科生化免疫组　　生效日期：{plan.year or ''}.01.01")
+        drs.font.size = Pt(10.5); drs.font.name = "SimSun"
+        drs._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
 
         for blk in data["matrix"]:
             _heading(doc, f"水平{blk['level']}")

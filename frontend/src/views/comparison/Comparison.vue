@@ -17,9 +17,19 @@
       title="请先选择或新建一个比对分组。系统已预设：生化分析仪/ DXI800 / 凝血 / 早孕系列 / 血气 / 定性 等分组（对应 BG-SM-CZ-021/024~027/071）。" />
 
     <el-table v-else :data="plans" border size="small" style="margin-top:12px">
-      <el-table-column prop="year" label="年份" width="90" />
-      <el-table-column label="半年" width="80">
-        <template #default="{ row }">{{ row.half === 1 ? '上半年' : '下半年' }}</template>
+      <el-table-column label="年份" width="110">
+        <template #default="{ row }">
+          <el-input-number v-model="row.year" :min="2000" :max="2100" size="small"
+            controls-position="right" style="width:100%" @change="(v) => onInlineEdit(row, { year: v })" />
+        </template>
+      </el-table-column>
+      <el-table-column label="半年" width="120">
+        <template #default="{ row }">
+          <el-select v-model="row.half" size="small" @change="(v) => onInlineEdit(row, { half: v })">
+            <el-option :value="1" label="上半年" />
+            <el-option :value="2" label="下半年" />
+          </el-select>
+        </template>
       </el-table-column>
       <el-table-column prop="compared_at" label="比对日期" width="120" />
       <el-table-column prop="operator" label="操作者" width="100" />
@@ -63,7 +73,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, EditPen, Delete } from '@element-plus/icons-vue'
 import {
-  listGroups, deleteGroup, listPlans, deletePlan, instrumentOptions,
+  listGroups, deleteGroup, listPlans, deletePlan, updatePlan, instrumentOptions,
 } from '../../api/comparison'
 import GroupDialog from './GroupDialog.vue'
 import PlanDialog from './PlanDialog.vue'
@@ -143,6 +153,15 @@ async function onDeletePlan(row) {
 
 function openEntry(row) { activePlan.value = row; entryVisible.value = true }
 function openReport(row) { activePlan.value = row; reportVisible.value = true }
+async function onInlineEdit(row, patch) {
+  try {
+    await updatePlan(row.id, patch)
+    ElMessage.success('已更新')
+  } catch (e) {
+    ElMessage.error('更新失败：' + (e.response?.data?.detail || e.message))
+    reloadPlans()
+  }
+}
 
 onMounted(() => { loadGroups(); loadInstruments() })
 </script>

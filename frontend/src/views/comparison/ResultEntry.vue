@@ -1,70 +1,102 @@
 <template>
-  <el-dialog :model-value="visible" :title="`结果录入 · ${plan?.form_code || ''}`" width="1080px"
-    top="4vh" @update:model-value="(v) => !v && $emit('close')">
+  <el-dialog :model-value="visible" :title="`结果录入 · ${plan?.form_code || ''}`" width="1180px"
+    top="3vh" @update:model-value="(v) => !v && $emit('close')">
     <div v-if="loading" v-loading="true" style="height:300px" />
     <template v-else>
       <el-alert v-if="category === '定量'" type="info" :closable="false" show-icon
-        title="录入参照仪器与各比对仪器的检测值，偏倚%与是否允许自动计算。" style="margin-bottom:10px" />
+        title="录入参照仪器与各比对仪器的检测值，偏倚%与是否允许自动计算。" style="margin-bottom:8px" />
       <el-alert v-else type="info" :closable="false" show-icon
-        title="逐台仪器录入5例样本阴/阳性（P/N），符合率自动计算（以参照仪器为基准）。" style="margin-bottom:10px" />
+        title="逐台仪器录入5例样本阴/阳性（P/N），符合率自动计算（以参照仪器为基准）。" style="margin-bottom:8px" />
+      <el-alert v-if="plan?.only_uncompared" type="warning" :closable="false" show-icon
+        title="本计划为同半年补录：仅列出本期尚未比对的项目，已做项目不显示。" style="margin-bottom:8px" />
 
-      <!-- 定量 -->
-      <template v-if="category === '定量'">
-        <el-tabs v-model="currentLevel" type="card">
-          <el-tab-pane v-for="lv in levels" :key="lv" :label="`水平${lv}`" :name="lv" />
-        </el-tabs>
-        <el-table :data="currentRows" size="small" border>
-          <el-table-column prop="item" label="项目" min-width="120" fixed />
-          <el-table-column label="参照值" width="110">
-            <template #default="{ row }">
-              <el-input v-model="row.reference_value" size="small" @input="onEdit" />
-            </template>
-          </el-table-column>
-          <el-table-column v-for="ins in compared" :key="ins.id" :label="ins.name">
-            <template #header>
-              <span>{{ ins.name }}</span>
-            </template>
-            <template #default="{ row }">
-              <div v-if="!isApplicable(row.item, ins.id)" class="masked" title="该项目不在此仪器上开展">/</div>
-              <div v-else style="display:flex;flex-direction:column;gap:2px">
-                <el-input v-model="row.values[ins.id]" size="small" placeholder="值" @input="onEdit" />
-                <div style="font-size:11px">
-                  <span :class="biasOf(row, ins).ok === false ? 'no' : (biasOf(row, ins).ok ? 'yes' : '')">
-                    偏倚 {{ fmt(biasOf(row, ins).bias) }}%
-                  </span>
-                  <span :class="biasOf(row, ins).ok === false ? 'no' : (biasOf(row, ins).ok ? 'yes' : '')">
-                    {{ biasOf(row, ins).ok === false ? '✗' : (biasOf(row, ins).ok ? '✓' : '-') }}
-                  </span>
-                </div>
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
-      </template>
+      <div style="display:flex;gap:12px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+        <el-switch v-model="showOnlyUnfinished" active-text="仅显示未完成" />
+        <el-button size="small" :type="focusItem ? 'primary' : 'default'" @click="focusItem = null">
+          全部项目{{ focusItem ? `（聚焦：${focusItem}）` : '' }}
+        </el-button>
+        <span style="color:#888;font-size:12px">共 {{ navItems.length }} 项，已完成 {{ doneCount }} 项</span>
+      </div>
 
-      <!-- 定性 -->
-      <template v-else>
-        <el-table :data="qualRows" size="small" border>
-          <el-table-column prop="item" label="项目" min-width="140" fixed />
-          <el-table-column v-for="ins in allInstruments" :key="ins.id" :label="ins.name + (ins.is_reference ? '（参照）' : '')">
-            <template #default="{ row }">
-              <div v-if="!isApplicable(row.item, ins.id)" class="masked" title="该项目不在此仪器上开展">/</div>
-              <template v-else>
-                <div style="display:flex;gap:3px;flex-wrap:wrap">
-                  <el-select v-for="k in 5" :key="k" v-model="row.results[ins.id][k - 1]" size="small"
-                    style="width:58px" @change="onEdit">
-                    <el-option label="P" value="P" />
-                    <el-option label="N" value="N" />
-                  </el-select>
-                </div>
-                <div style="font-size:11px" :class="agreementOf(row, ins).ok === false ? 'no' : (agreementOf(row, ins).ok ? 'yes' : '')">
-                  符合率 {{ agreementOf(row, ins).val == null ? '-' : agreementOf(row, ins).val + '%' }}
-                </div>
-              </template>
-            </template>
-          </el-table-column>
-        </el-table>
-      </template>
+      <div style="display:flex;gap:12px">
+        <!-- 左侧项目导航：点击聚焦，已完成打勾 -->
+        <div style="width:170px;flex:none;border:1px solid #ebeef5;border-radius:6px;overflow:hidden">
+          <div style="background:#f5f7fa;padding:6px 10px;font-size:12px;color:#666;border-bottom:1px solid #ebeef5">
+            项目导航（点击聚焦）
+          </div>
+          <el-scrollbar style="height:420px">
+            <div
+              v-for="it in navItems" :key="it.name"
+              @click="focusItem = (focusItem === it.name ? null : it.name)"
+              :class="['nav-item', { active: focusItem === it.name, done: it.done }]"
+            >
+              <span class="nav-dot">{{ it.done ? '✓' : '○' }}</span>
+              <span class="nav-name">{{ it.name }}</span>
+            </div>
+          </el-scrollbar>
+        </div>
+
+        <!-- 右侧录入区 -->
+        <div style="flex:1;min-width:0">
+          <!-- 定量 -->
+          <template v-if="category === '定量'">
+            <el-tabs v-model="currentLevel" type="card">
+              <el-tab-pane v-for="lv in levels" :key="lv" :label="`水平${lv}`" :name="lv" />
+            </el-tabs>
+            <el-table :data="quantDisplay" size="small" border max-height="460">
+              <el-table-column prop="item" label="项目" min-width="120" fixed />
+              <el-table-column label="参照值" width="110">
+                <template #default="{ row }">
+                  <el-input v-model="row.reference_value" size="small" @input="onEdit" />
+                </template>
+              </el-table-column>
+              <el-table-column v-for="ins in compared" :key="ins.id" :label="ins.name">
+                <template #header>
+                  <span>{{ ins.name }}</span>
+                </template>
+                <template #default="{ row }">
+                  <div v-if="!isApplicable(row.item, ins.id)" class="masked" title="该项目不在此仪器上开展">/</div>
+                  <div v-else style="display:flex;flex-direction:column;gap:2px">
+                    <el-input v-model="row.values[ins.id]" size="small" placeholder="值" @input="onEdit" />
+                    <div style="font-size:11px">
+                      <span :class="biasOf(row, ins).ok === false ? 'no' : (biasOf(row, ins).ok ? 'yes' : '')">
+                        偏倚 {{ fmt(biasOf(row, ins).bias) }}%
+                      </span>
+                      <span :class="biasOf(row, ins).ok === false ? 'no' : (biasOf(row, ins).ok ? 'yes' : '')">
+                        {{ biasOf(row, ins).ok === false ? '✗' : (biasOf(row, ins).ok ? '✓' : '-') }}
+                      </span>
+                    </div>
+                  </div>
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
+
+          <!-- 定性 -->
+          <template v-else>
+            <el-table :data="qualDisplay" size="small" border max-height="460">
+              <el-table-column prop="item" label="项目" min-width="140" fixed />
+              <el-table-column v-for="ins in allInstruments" :key="ins.id" :label="ins.name + (ins.is_reference ? '（参照）' : '')">
+                <template #default="{ row }">
+                  <div v-if="!isApplicable(row.item, ins.id)" class="masked" title="该项目不在此仪器上开展">/</div>
+                  <template v-else>
+                    <div style="display:flex;gap:3px;flex-wrap:wrap">
+                      <el-select v-for="k in 5" :key="k" v-model="row.results[ins.id][k - 1]" size="small"
+                        style="width:58px" @change="onEdit">
+                        <el-option label="P" value="P" />
+                        <el-option label="N" value="N" />
+                      </el-select>
+                    </div>
+                    <div style="font-size:11px" :class="agreementOf(row, ins).ok === false ? 'no' : (agreementOf(row, ins).ok ? 'yes' : '')">
+                      符合率 {{ agreementOf(row, ins).val == null ? '-' : agreementOf(row, ins).val + '%' }}
+                    </div>
+                  </template>
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
+        </div>
+      </div>
     </template>
     <template #footer>
       <el-upload v-if="category === '定量'" :show-file-list="false" accept=".xlsx,.xls"
@@ -80,7 +112,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getResults, saveResults, importResults } from '../../api/comparison'
+import { getResults, saveResults, importResults, getUncompared } from '../../api/comparison'
 
 const props = defineProps({
   visible: Boolean,
@@ -101,7 +133,35 @@ const qualRows = ref([]) // {item, results:{id:[5]}}
 const currentLevel = ref(1)
 const dirty = ref(false)
 
+// 便捷性增强
+const showOnlyUnfinished = ref(false)
+const focusItem = ref(null)
+const savedItems = ref(new Set())   // 本计划已录入结果的项目名
+const allItemNames = ref([])        // 分组全量项目名
+const scopeItems = ref(null)        // plan.only_uncompared 时=本期未比对项目名；否则 null(全量)
+
 const compared = computed(() => allInstruments.value.filter((i) => !i.is_reference))
+
+const isDone = (name) => savedItems.value.has(name)
+const scopeSet = computed(() => (scopeItems.value ? new Set(scopeItems.value) : null))
+
+// 导航项：优先用本期未比对范围；按"仅显示未完成"过滤
+const navItems = computed(() => {
+  const base = scopeItems.value || allItemNames.value
+  return base.map((name) => ({ name, done: isDone(name) }))
+    .filter((it) => !showOnlyUnfinished.value || !it.done)
+})
+const doneCount = computed(() => navItems.value.filter((i) => i.done).length)
+
+const currentRows = computed(() => quantRows.value.filter((r) => r.level === currentLevel.value))
+function _passScope(item) {
+  if (scopeSet.value && !scopeSet.value.has(item)) return false
+  if (showOnlyUnfinished.value && isDone(item)) return false
+  if (focusItem.value && focusItem.value !== item) return false
+  return true
+}
+const quantDisplay = computed(() => currentRows.value.filter((r) => _passScope(r.item)))
+const qualDisplay = computed(() => qualRows.value.filter((r) => _passScope(r.item)))
 
 function onEdit() { dirty.value = true }
 
@@ -136,8 +196,6 @@ function isApplicable(item, insId) {
   return ids.includes(insId)
 }
 
-const currentRows = computed(() => quantRows.value.filter((r) => r.level === currentLevel.value))
-
 // 对话框以 v-if 挂载，挂载时 props.visible 已为 true；用 immediate 确保挂载即加载，
 // 避免「打开录入对话框却是空白、无法录入」的问题。
 watch(() => props.visible, async (v) => {
@@ -146,6 +204,7 @@ watch(() => props.visible, async (v) => {
 }, { immediate: true })
 async function load() {
   loading.value = true
+  focusItem.value = null
   try {
     const data = await getResults(props.plan.id)
     category.value = data.category
@@ -153,7 +212,27 @@ async function load() {
     allInstruments.value = data.instruments
     itemMeta.value = {}
     data.items.forEach((i) => { itemMeta.value[i.name] = i })
+    allItemNames.value = data.items.map((i) => i.name)
     currentLevel.value = 1
+    // 已录入结果的项目（用于"已完成"标记）
+    const done = new Set()
+    data.quant.forEach((r) => { if (r.reference_value || (r.values && Object.values(r.values).some((v) => v !== '' && v != null))) done.add(r.item) })
+    data.qual.forEach((r) => { if (r.results && Object.values(r.results).some((arr) => Array.isArray(arr) && arr.some((x) => x))) done.add(r.item) })
+    savedItems.value = done
+    // 同半年补录：拉取本期未比对项目作为范围
+    if (props.plan.only_uncompared && props.group) {
+      try {
+        const res = await getUncompared(props.group.id, {
+          year: props.plan.year, half: props.plan.half, exclude_plan_id: props.plan.id,
+        })
+        scopeItems.value = res.uncompared || []
+      } catch (e) {
+        scopeItems.value = null
+      }
+    } else {
+      scopeItems.value = null
+    }
+    showOnlyUnfinished.value = !!props.plan.only_uncompared
     // 定量：补齐 项目×水平
     const qmap = {}
     data.quant.forEach((r) => { qmap[`${r.item}__${r.level}`] = r })
@@ -251,4 +330,13 @@ async function onSave() {
   text-align: center; color: #bbb; font-size: 16px; font-weight: 700;
   background: #f5f5f5; border-radius: 4px; padding: 6px 0; user-select: none;
 }
+.nav-item {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px; cursor: pointer;
+  font-size: 13px; border-bottom: 1px solid #f5f5f5;
+}
+.nav-item:hover { background: #f0f7ff; }
+.nav-item.active { background: #e6f0ff; font-weight: 700; }
+.nav-item.done { color: #27ae60; }
+.nav-dot { width: 16px; text-align: center; }
+.nav-name { flex: 1; }
 </style>

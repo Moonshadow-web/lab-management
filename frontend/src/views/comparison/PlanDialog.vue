@@ -38,6 +38,11 @@
           </el-form-item>
         </el-col>
       </el-row>
+      <el-form-item v-if="!plan" label="范围">
+        <el-checkbox v-model="form.only_uncompared">
+          仅纳入本期未比对项目（同分组同半年补录：自动排除已做项，录入时只显示待做项目）
+        </el-checkbox>
+      </el-form-item>
       <el-row :gutter="12">
         <el-col :span="12">
           <el-form-item label="操作者">
@@ -85,6 +90,7 @@ const emit = defineEmits(['close', 'saved'])
 const form = reactive({
   group_id: null, year: new Date().getFullYear(), half: 1, compared_at: '', operator: '',
   reviewer: '', summary: '', conclusion: '', handle_plan: '', status: 'draft',
+  only_uncompared: false,
   form_code: '', form_title: '',
 })
 const saving = ref(false)
@@ -104,6 +110,7 @@ watch(() => props.visible, (v) => {
       compared_at: props.plan.compared_at, operator: props.plan.operator,
       reviewer: props.plan.reviewer, summary: props.plan.summary, conclusion: props.plan.conclusion,
       handle_plan: props.plan.handle_plan, status: props.plan.status || 'draft',
+      only_uncompared: !!props.plan.only_uncompared,
       form_code: props.plan.form_code, form_title: props.plan.form_title,
     })
   } else {
@@ -111,6 +118,7 @@ watch(() => props.visible, (v) => {
     Object.assign(form, {
       group_id: gid, year: new Date().getFullYear(), half: 1, compared_at: '', operator: '',
       reviewer: '', summary: '', conclusion: '', handle_plan: '', status: 'draft',
+      only_uncompared: false,
       form_code: '', form_title: '',
     })
     if (gid) onGroupChange(gid)
@@ -124,6 +132,7 @@ async function onSave() {
     group_id: form.group_id, year: form.year, half: form.half, compared_at: form.compared_at,
     operator: form.operator, reviewer: form.reviewer, summary: form.summary,
     conclusion: form.conclusion, handle_plan: form.handle_plan, status: form.status,
+    only_uncompared: form.only_uncompared,
     form_code: form.form_code, form_title: form.form_title,
   }
   saving.value = true
