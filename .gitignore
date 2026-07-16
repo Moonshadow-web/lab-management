@@ -22,6 +22,9 @@ data/
 # WorkBuddy internal
 .workbuddy/
 
+# CloudBase deploy config (contains secrets: SECRET_KEY, SMTP auth code)
+cloudbaserc.json
+
 # Scratch / temp scripts from data-cleanup tasks
 _tmp_*.py
 _tmp_*.txt

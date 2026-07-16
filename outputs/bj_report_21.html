@@ -1,0 +1,2226 @@
+<html><head>
+<meta http-equiv="Expires" content="0">
+<meta http-equiv="Content-Type" content="text/html; charset=gb2312">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<title>2026年肝炎标志物第2次质评上报表</title>
+<script language="javascript" src="/common/images/js/validator-minf.js"></script><!--注意路径影响效果-->
+<script src="/clinetbusiness/jsfile/jquery-1.7.2.min.js" type="text/javascript"></script>
+<script type="text/javascript" src="/clinetbusiness/jsfile/dragClass.js"></script>
+<script type="text/javascript" src="/clinetbusiness/hospital/jsfile/save_load_report_other_normal.js"></script>
+
+<!--[if lte IE 7]>
+<script type="text/javascript" src="/clinetbusiness/hospital/app/EqaDataSave/js/json2.js"></script>
+<![endif]-->
+<script type="text/javascript" src="/clinetbusiness/hospital/app/EqaDataSave/js/save_load_data.js"></script>
+
+<script type="text/javascript" src="/clinetbusiness/hospital/jsfile/common.js?v=2"></script>
+<link href="/clinetbusiness/jsfile/layui/css/layui.css" rel="stylesheet">
+<script src="/clinetbusiness/jsfile/layui/layui.js" type="text/javascript"></script>
+
+<style type="text/css">
+<!--
+.ime{
+ime-mode:disabled;
+}
+.butt1{
+    background:url(butt.jpg) no-repeat;
+	border:0;
+	color:#333;
+	width:58px;
+	height:26px;
+	}
+.butt{
+    background:url(butt1.jpg) no-repeat;
+	border:0;
+	color:red;
+	width:128px;
+	height:26px;
+	margin-left:3px}
+INPUT
+{
+    BORDER-BOTTOM: window 1px solid;
+    BORDER-LEFT: window 1px solid;
+    BORDER-RIGHT: window 1px solid;
+    BORDER-TOP: window 1px solid;
+    COLOR: black;
+    CURSOR: hand;
+    FONT: icon;
+	font-size:12px
+}
+.tdtitle
+{
+	background-color:buttonface;
+	font-size:10pt;
+	font-weight:bolder;
+	nowrap;
+}
+.tritem
+{
+	border-color:buttonface;
+}
+.tditem1
+{
+	background-color:buttonface;
+	border-color:buttonface;
+}
+.tditem2
+{
+	background-color:buttonface;
+	border-color:buttonface;
+}
+.tditem3
+{
+	background-color:buttonface;
+	border-color:buttonface;
+}
+.tditem4
+{
+	background-color:buttonface;
+	border-color:#eeeeee;
+}
+.inputitem
+{
+	background-color:buttonface;
+	width:100%;
+	height:100%;
+}
+.inputdata1
+{
+	width:80px;
+}
+.inputdata2
+{
+	width:98%;
+}
+.td1{
+ border-bottom:1px solid #9CB5F3}
+.td{
+ border:1px solid #9CB5F3}
+ .Qualitative{
+ display:none
+ }
+ 
+  /*与方法仪器试剂弹出层有关*/
+.butt1{background:url(butt.jpg) no-repeat;border:0;color:#333;width:58px;height:26px;}
+.butt{background:url(butt1.jpg) no-repeat;border:0;color:red;width:128px;height:26px;margin-left:3px}
+.td1{border-bottom:1px solid #9CB5F3}
+.td{border:1px solid #9CB5F3; width:200px; height:25px; padding-top:5px; padding-bottom:5px}
+.cao{font-size:12px;position:absolute;width:400px;height:300px;background-color:#ffffff;border:1px solid #0000CC;display:none}	
+.cao0{width:400px;height:22px; background-color:#9CB5F3; cursor:move; padding-top:5px; padding-bottom:5px}	 
+.cao1{height:270px; background-color:#FFFFFF}
+.cao2{height:270px; display:none; text-align:center; padding-top:50px}
+/*与方法仪器试剂弹出层有关*/
+
+.title{ text-align:left; padding-left:5px; font-size:14px; font-weight:600; margin-top:10px; margin-bottom:10px}
+.jieshi{text-align:left; padding-left:10px; font-size:12px; margin-top:10px; font-weight:600; line-height:2; color:#0000FF}
+
+#goodtable0,#goodtable{border-collapse:collapse}
+.td_title{ background-color:buttonface;height:20px;font-size:12px;font-weight:600; text-align:center}
+#goodtable td{ line-height:22px; height:22px; padding:0;}
+-->
+
+</style>
+<!--定性项目下拉列表-->
+<link rel="stylesheet" type="text/css" href="/clinetbusiness/jsfile/myselect/mysel.css">
+<script type="text/javascript" src="/clinetbusiness/jsfile/myselect/mysel.js"></script>
+<!--定性项目下拉列表-->
+<script language="javascript">
+$(function(){
+ 
+  
+  layui.use(['laydate'], function(){
+		  var laydate = layui.laydate;
+		  
+		  //执行一个laydate实例
+		  laydate.render({
+			elem: '#testdate', //指定元素
+			"max": GetDate()
+		  });
+	
+	});
+});
+
+var cao_x,cao_y;
+var beDiv;
+beDiv="";
+function ifDiv(s)
+{
+	noplayDiv(s);
+}
+function noplayDiv(itemindex)
+{
+	document.getElementById(itemindex).style.display='none';
+	document.getElementById("cao2").style.display='none';
+	document.getElementById("cao3").style.display='none';
+	document.getElementById("cao4").style.display='none';  
+	}
+function jsSelectItemByValue(objSelect, objItemText) {            
+    //判断是否存在        
+          
+    for (var i = 0; i < objSelect.options.length; i++) {        
+        if (objSelect.options[i].value == objItemText) {        
+            objSelect.options[i].selected = true;        
+               
+            break;        
+        }        
+    }              
+   
+} 
+function displayf(s,itemindex,objs,objt) 
+{
+var hidden;
+  ifDiv(itemindex);
+  //beDiv="cao1";
+  hidden=document.getElementById("cenhidden").value;
+  if (hidden!="")
+   {
+  document.getElementById(hidden).style.display='none'; }
+  document.getElementById("obj"+itemindex).value=s;
+  document.getElementById(itemindex).style.display='block';
+  document.getElementById("cenhidden").value=itemindex; 
+   document.getElementById("obj"+itemindex+"s").value=objs;
+  document.getElementById("obj"+itemindex+"t").value=objt;
+ var vx,vy;
+  vx=event.x;
+  vy=event.y;
+  if ((document.body.clientWidth-event.x)<(document.getElementById(itemindex).offsetWidth))
+  {
+    vx=event.x-document.getElementById(itemindex).offsetWidth;
+  }  
+  //if ((document.body.clientHeight-event.y)<(document.getElementById(itemindex).offsetWidth))
+//  {
+//    vy=event.y-document.getElementById(itemindex).offsetWidth;
+//  }   
+  document.getElementById(itemindex).style.left=vx+"px";
+  //document.getElementById(itemindex).style.pixelTop=vy+document.documentElement.scrollTop;
+  document.getElementById(itemindex).style.top=vy+"px";
+  
+  var sel=document.getElementById(objs);
+  var selvalue=sel.value;
+  var tex=document.getElementById(objt);
+   if(sel.value!="")
+  {
+      changeinputff(itemindex,'1','obj'+itemindex+'t');
+  var select1=document.getElementById('selectff'+itemindex);
+      jsSelectItemByValue(select1,selvalue);  //select选中的值再点时出现
+  }
+  
+  else if(tex.value!=""){
+  
+  changeinputff(itemindex,'2','obj'+itemindex+'t');
+  document.getElementById('text_'+itemindex).value = document.getElementById(s).value;
+  }
+  else 
+  changeinputff(itemindex,'1','obj'+itemindex+'t');
+  
+}
+function displayy(s,objs,objt) 
+{
+ var hidden;
+  
+  //beDiv="cao1";
+  hidden=document.getElementById("cenhidden").value;
+  if (hidden!="")
+   {
+  document.getElementById(hidden).style.display='none'; }
+  
+  ifDiv("cao2");
+  beDiv="cao2";
+  document.getElementById("obj2").value=s;
+  document.getElementById('cao2').style.display='block'; 
+   document.getElementById("obj2s").value=objs;
+  document.getElementById("obj2t").value=objt;
+  var vx,vy;
+  vx=event.x;
+  vy=event.y;
+  if ((document.body.clientWidth-event.x)<(document.getElementById('cao2').offsetWidth))
+  {
+    vx=event.x-document.getElementById('cao2').offsetWidth;
+  }  
+  //if ((document.body.clientHeight-event.y)<(document.getElementById('cao2').offsetWidth))
+//  {
+//    vy=event.y-document.getElementById('cao2').offsetWidth;
+//  }   
+  document.getElementById('cao2').style.left=vx+"px";
+  document.getElementById('cao2').style.top=vy+"px";
+   
+  var sel=document.getElementById(objs);
+  var selvalue=sel.value;
+  var tex=document.getElementById(objt);
+   if(sel.value!="")
+  {
+       changeInput('cao2','1','obj2t');
+  var select1=document.getElementById('selecty');
+      jsSelectItemByValue(select1,selvalue);  //select选中的值再点时出现
+  }
+  
+  else if(tex.value!=""){
+  
+  changeInput('cao2','2','obj2t');
+  document.getElementById('text_2').value = document.getElementById(s).value;
+  }
+  else 
+  changeInput('cao2','1','obj2t');
+}
+function displays(s,objs,objt) 
+{
+  ifDiv("cao3");
+  beDiv="cao3";
+  document.getElementById("obj3").value=s;
+  document.getElementById('cao3').style.display='block'; 
+  document.getElementById("obj3s").value=objs;
+  document.getElementById("obj3t").value=objt;
+  
+  var vx,vy;
+  vx=event.x;
+  vy=event.y;
+  if ((document.body.clientWidth-event.x)<(document.getElementById('cao3').offsetWidth))
+  {
+    vx=event.x-document.getElementById('cao3').offsetWidth;
+  }  
+  //if ((document.body.clientHeight-event.y)<(document.getElementById('cao3').offsetWidth))
+//  {
+//    vy=event.y-document.getElementById('cao3').offsetWidth;
+//  }   
+  document.getElementById('cao3').style.left=vx+"px";
+  document.getElementById('cao3').style.top=vy+"px";
+  var sel=document.getElementById(objs);
+  var selvalue=sel.value;
+  var tex=document.getElementById(objt);
+   if(sel.value!="")
+   {
+  changeInput('cao3','1','obj3t');
+   var select1=document.getElementById('selectf2');
+        jsSelectItemByValue(select1,selvalue);  //select选中的值再点时出现
+	}
+  else if(tex.value!=""){
+  
+  {
+         changeInput('cao3','2','obj3t');
+   
+	  }
+  document.getElementById('text_3').value = document.getElementById(s).value;
+  }
+  else 
+  changeInput('cao3','1','obj3t');
+}
+function displayss(s,objs,objt) 
+{
+  ifDiv("cao4");
+  beDiv="cao4";
+  document.getElementById("obj4").value=s;
+  document.getElementById('cao4').style.display='block'; 
+  document.getElementById("obj4s").value=objs;
+  document.getElementById("obj4t").value=objt;
+  var vx,vy;
+  vx=event.x;
+  vy=event.y;
+  if ((document.body.clientWidth-event.x)<(document.getElementById('cao4').offsetWidth))
+  {
+    vx=event.x-document.getElementById('cao4').offsetWidth;
+  }  
+  //if ((document.body.clientHeight-event.y)<(document.getElementById('cao4').offsetWidth))
+//  {
+//    vy=event.y-document.getElementById('cao4').offsetWidth;
+//  }   
+  document.getElementById('cao4').style.left=vx+"px";
+  document.getElementById('cao4').style.top=vy+"px";
+  var sel=document.getElementById(objs);
+  var selvalue=sel.value;
+  var tex=document.getElementById(objt);
+   if(sel.value!="")
+  {changeInput('cao4','1','obj4t');
+    var select1=document.getElementById('selectf');
+      jsSelectItemByValue(select1,selvalue);  //select选中的值再点时出现
+  }
+  else if(tex.value!=""){
+  
+  changeInput('cao4','2','obj4t');
+  document.getElementById('text_4').value = document.getElementById(s).value;
+  }
+  else 
+  changeInput('cao4','1','obj4t');
+}
+function caoMove(obj)  //实现层的拖移
+{
+  if(event.button==1)
+  {
+    var caoX=obj.clientLeft;
+    var caoY=obj.clientTop;
+    obj.style.pixelLeft=caoX+(event.x-cao_x);
+    obj.style.pixelTop=caoY+(event.y-cao_y);
+  }
+}
+//function setValue3(obj,sj)
+//{
+// var v=obj.value;
+// var s=document.getElementById(sj).value;
+//  document.getElementById(s).value=v; 
+//}
+
+function baohan_qita(sobj)
+{
+   	var option_text=$(sobj).find("option:selected").html().split("|")[1];
+	if(option_text.indexOf("其他")!=-1 || option_text.indexOf("其它")!=-1 || option_text.indexOf("请注明")!=-1)
+	{
+		return true;
+    }
+	else
+	{
+	    return false;	
+	}
+}
+
+
+function changeinputff(itemindex,mode,objt){
+ var index=document.getElementById(itemindex);
+	 if (index.id==itemindex){
+	
+	   if(mode=='1'){
+	 document.getElementById('selectff'+itemindex).style.display='';
+	 document.getElementById('selectff'+itemindex).selectedIndex=-1;
+	 document.getElementById('text_'+itemindex).style.display='none';
+	 document.getElementById('g'+itemindex).style.display='';
+	   document.getElementById('copy'+itemindex).style.display='';
+	   document.getElementById('c'+itemindex).style.display='';
+	 //document.getElementById('fh'+itemindex).style.display='none';
+	 document.getElementById('qiehuan'+itemindex).style.display='';
+	 document.getElementById('q'+itemindex).style.display='none';
+	  document.getElementById('biao'+itemindex).innerHTML='请双击选填';
+	   }
+	     if(mode=='2'){
+		   if(document.getElementById('selectff'+itemindex).selectedIndex==-1 || !baohan_qita(document.getElementById('selectff'+itemindex))){
+	 alert("请先在列表当中单击选择一个’其它‘选项，然后再点此按钮填写！");
+	 return false;
+	 }
+     document.getElementById('selectff'+itemindex).style.display='none';
+	 document.getElementById('text_'+itemindex).style.display='';
+	 document.getElementById('text_'+itemindex).value=""; 
+	 document.getElementById('g'+itemindex).style.display='none';
+	 document.getElementById('copy'+itemindex).style.display='none';
+	   document.getElementById('c'+itemindex).style.display='none';
+	 //document.getElementById('fh'+itemindex).style.display='';
+	 document.getElementById('qiehuan'+itemindex).style.display='none';
+	 document.getElementById('q'+itemindex).style.display='';
+	  document.getElementById('biao'+itemindex).innerHTML='按回车选填';
+	 var t=document.getElementById(objt).value;
+	 document.getElementById('text_'+itemindex).value=document.getElementById(t).value;
+	 document.getElementById('text_'+itemindex).focus();
+	   }
+	 }
+}
+function changeInput(cao,mode,objt)   //改变输入方式，手动或者从列表中选择
+{
+    if(cao=='cao1'){  //cao1实际上没有了
+     if(mode=='1')  //选择列表输入
+	 {
+     document.getElementById('selectf').style.display='';
+	 document.getElementById('selectf').selectedIndex=-1;
+	 document.getElementById('text_1').style.display='none';
+	 document.getElementById('g1').style.display='';
+	 //document.getElementById('fh1').style.display='none';
+	 document.getElementById('qiehuan1').style.display='';
+	 document.getElementById('q1').style.display='none';
+	 
+	 }
+	 if(mode=='2')  //选择文本框输入
+	 {
+	 document.getElementById('selectf').style.display='none';
+	 document.getElementById('text_1').style.display='';
+	 document.getElementById('text_1').value=""; 
+	 document.getElementById('g1').style.display='none';
+	 //document.getElementById('fh1').style.display='';
+	 
+	 document.getElementById('qiehuan1').style.display='none';
+	 document.getElementById('q1').style.display='';
+
+
+
+
+
+
+
+
+
+	 
+	 var t=document.getElementById(objt).value;
+	 document.getElementById('text_1').value=document.getElementById(t).value;
+	 
+	 document.getElementById('text_1').focus();
+	 }
+	}
+  if(cao=='cao2'){ 
+     if(mode=='1')  //选择列表输入
+	 {
+     document.getElementById('selecty').style.display='';
+	 document.getElementById('selecty').selectedIndex=-1;
+	 document.getElementById('text_2').style.display='none';
+	 document.getElementById('g2').style.display='';
+	  document.getElementById('copy2').style.display='';
+	   document.getElementById('c2').style.display='';
+	 //document.getElementById('fh2').style.display='none';
+	 document.getElementById('qiehuan2').style.display='';
+	 document.getElementById('q2').style.display='none';
+	 document.getElementById('biao2').innerHTML='请双击选填';
+	 
+	 
+	 }
+	 if(mode=='2')  //选择文本框输入
+	 {
+	  if(document.getElementById('selecty').selectedIndex==-1 || !baohan_qita(document.getElementById('selecty'))){
+	 alert("请先在列表当中单击选择一个’其它‘选项，然后再点此按钮填写！");
+	 return false;
+	 }
+	 document.getElementById(objt).value;
+	 document.getElementById('selecty').style.display='none';
+	 document.getElementById('text_2').style.display=''; 
+	 document.getElementById('text_2').value="";
+	 document.getElementById('g2').style.display='none';
+	  document.getElementById('copy2').style.display='none';
+	   document.getElementById('c2').style.display='none';
+	// document.getElementById('fh2').style.display='';
+	 document.getElementById('qiehuan2').style.display='none';
+	 document.getElementById('q2').style.display='';
+	 document.getElementById('biao2').innerHTML='请回车选填';
+	 var t=document.getElementById(objt).value;
+	 document.getElementById('text_2').value=document.getElementById(t).value;
+	 
+	 document.getElementById('text_2').focus();
+	 }
+	} 
+  if(cao=='cao3'){ 
+     if(mode=='1')  //选择列表输入
+	 {
+     document.getElementById('selectf2').style.display='';
+	 document.getElementById('selectf2').selectedIndex=-1;
+
+	 document.getElementById('text_3').style.display='none';
+	 document.getElementById('g3').style.display='';
+	  document.getElementById('copy3').style.display='';
+	   document.getElementById('c3').style.display='';
+	 //document.getElementById('fh3').style.display='none';
+	 document.getElementById('qiehuan3').style.display='';
+	 document.getElementById('q3').style.display='none';
+	  document.getElementById('biao3').innerHTML='请双击选填';
+	 
+	 
+	 }
+	 if(mode=='2')  //选择文本框输入
+	 {
+	 	 if(document.getElementById('selectf2').selectedIndex==-1 || !baohan_qita(document.getElementById('selectf2'))){
+	 alert("请先在列表当中单击选择一个’其它‘选项，然后再点此按钮填写！");
+	 return false;
+	 }
+	 document.getElementById(objt).value;
+	 document.getElementById('selectf2').style.display='none';
+	 document.getElementById('text_3').style.display='';
+	 document.getElementById('text_3').value=""; 
+	 document.getElementById('g3').style.display='none';
+	  document.getElementById('copy3').style.display='none';
+	   document.getElementById('c3').style.display='none';
+	// document.getElementById('fh3').style.display='';
+	 document.getElementById('qiehuan3').style.display='none';
+	 document.getElementById('q3').style.display='';
+	 document.getElementById('biao3').innerHTML='按回车选填';
+	 var t=document.getElementById(objt).value;
+	 document.getElementById('text_3').value=document.getElementById(t).value;
+	 document.getElementById('text_3').focus();
+	 }
+	
+	}    
+	 if(cao=='cao4'){ 
+     if(mode=='1')  //选择列表输入
+	 {
+	 
+     document.getElementById('selectf').style.display='';
+	 document.getElementById('selectf').selectedIndex=-1;
+	 document.getElementById('text_4').style.display='none';
+	 document.getElementById('g4').style.display='';
+	 	  document.getElementById('copy4').style.display='';
+	   document.getElementById('c4').style.display='';
+	 //document.getElementById('fh4').style.display='none';
+	 document.getElementById('qiehuan4').style.display='';
+	 document.getElementById('q4').style.display='none';
+	 document.getElementById('biao4').innerHTML='请双击选填';
+	 
+	 
+	 }
+	 if(mode=='2')  //选择文本框输入
+
+	 {
+	 if(document.getElementById('selectf').selectedIndex==-1 || !baohan_qita(document.getElementById('selectf'))){
+	 alert("请先在列表当中单击选择一个’其它‘选项，然后再点此按钮填写！");
+	 return false;
+	 }
+	  document.getElementById(objt).value;
+	 document.getElementById('selectf').style.display='none';
+	 document.getElementById('text_4').style.display='';
+	 document.getElementById('text_4').value=""; 
+	 document.getElementById('g4').style.display='none';
+	   document.getElementById('copy4').style.display='none';
+	   document.getElementById('c4').style.display='none';
+	 //document.getElementById('fh4').style.display='';
+	 document.getElementById('qiehuan4').style.display='none';
+	 document.getElementById('q4').style.display='';
+	  document.getElementById('biao4').innerHTML='按回车选填';
+	 var t=document.getElementById(objt).value;
+	 document.getElementById('text_4').value=document.getElementById(t).value;
+	 document.getElementById('text_4').focus();
+	 }
+	
+	}    
+}
+function setValue2(itemindex,text,itext,objs,objt)   //带本层ID将手工输入内容放入input当中
+{
+ //text手工输入文本框
+ var v=document.getElementById(text).value;
+ var s=document.getElementById(itext).value;
+  document.getElementById(s).value=v; 
+ var o=document.getElementById(objt).value;
+ document.getElementById(o).value=v;
+ var t=document.getElementById(objs).value;
+ var x1=document.getElementById(t).value; //列表输入的值
+ /*if(x1!="" && v!="")
+ document.getElementById(s).value=x1 + "|" + v; 
+ else
+ document.getElementById(s).value=x1;*/
+  noplayDiv(itemindex);
+}
+function setValue3(text,itext,objs,objt)   //将手工输入内容放入input当中
+{
+ //text手工输入文本框
+ var v=document.getElementById(text).value;
+ var s=document.getElementById(itext).value;
+  document.getElementById(s).value=v; 
+ var o=document.getElementById(objt).value;
+ document.getElementById(o).value=v;
+ var t=document.getElementById(objs).value;
+ var x1=document.getElementById(t).value; //列表输入的值
+ /*if(x1!="" && v!="")
+ document.getElementById(s).value=x1 + "|" + v; 
+ else
+ document.getElementById(s).value=x1;*/
+// noplayDiv();
+}
+function setValue(sel,itext,objs,objt)   //将列表的选中的值放入input当中
+{
+ //sel 列表对象
+ //itext 存储class=inputdata的text名称的hidden名称
+ //objs 存储sel——hidden名称的hidden名称
+ //objt 存储text——hidden名称的hidden名称
+ var v=sel.value;
+ var option_text=$(sel).find("option:selected").html().split("|")[1];
+ var s=document.getElementById(itext).value;
+  document.getElementById(s).value=option_text; 
+ var o=document.getElementById(objs).value;
+ document.getElementById(o).value=v;
+ var t=document.getElementById(objt).value;
+ document.getElementById(t).value="";
+}
+var drag=new dragClass();
+</script>
+<script language="javascript">
+<!--
+function checkKey(){
+	var colcount=report.totalcols.value;
+	var rowcount=report.totalrows.value;
+	var elname=event.srcElement.name;
+	if (event.srcElement.type=="text") {
+	var thisCNum=elname.substring(elname.lastIndexOf("_")+1,elname.length);
+	var thisRNum=elname.substring(elname.indexOf("_")+1,elname.indexOf("_cols"));
+	if(event.keyCode==37){
+		var thisCNum=parseInt(thisCNum)-1;
+		var thisRNum=parseInt(thisRNum);
+		if(thisCNum>3){
+			var newEl=eval("report.rows_"+thisRNum+"_cols_"+thisCNum);
+			newEl.focus();
+		}
+	}
+	else if(event.keyCode==38){
+			var thisCNum=parseInt(thisCNum);
+			var thisRNum=parseInt(thisRNum)-1;
+			if(thisRNum>-1){
+				var newEl=eval("report.rows_"+thisRNum+"_cols_"+thisCNum);
+				newEl.focus();
+			}
+		 }
+		 else if(event.keyCode==39){
+				var thisCNum=parseInt(thisCNum)+1;
+				var thisRNum=parseInt(thisRNum);
+				if(thisCNum<colcount){
+					var newEl=eval("report.rows_"+thisRNum+"_cols_"+thisCNum);
+					newEl.focus();
+				}
+			  }
+			  else if(event.keyCode==40){
+					var thisCNum=parseInt(thisCNum);
+					var thisRNum=parseInt(thisRNum)+1;
+					if(thisRNum<rowcount){
+						var newEl=eval("report.rows_"+thisRNum+"_cols_"+thisCNum);
+						newEl.focus();
+					}
+				   }
+	else if(event.keyCode==13){	
+						var thisCNum=parseInt(thisCNum)+1;						
+						if (thisCNum<colcount-4) {
+						    var thisRNum=parseInt(thisRNum);
+							var newEl=eval("report.rows_"+thisRNum+"_cols_" + thisCNum);
+							newEl.focus();
+						}
+						else{
+						  var thisRNum=parseInt(thisRNum)+1;
+						  if(thisRNum<rowcount){
+							var newEl=eval("report.rows_"+thisRNum+"_cols_4");
+							newEl.focus();
+						  }
+						}
+	}
+}}
+//-->
+</script>
+<script language="javascript">
+function mycopycode_1(obj,cao){
+    var temp_result='';
+	var i=0;
+	var temp_name1s='';
+	temp_namez=document.getElementById(obj).value;
+	myrows_cols(temp_namez);
+	for(i=rows;i>=0;i--){
+			temp_nameq="report.rows_" + i + "_cols_" + cols;
+			temp_nameq=eval(temp_nameq);
+			if (temp_nameq.value!=""){
+			    temp_valueq=temp_nameq.value;
+				temp_value_sq=eval("report."+temp_nameq.name+"_s").value;
+				temp_value_tq=eval("report."+temp_nameq.name+"_t").value;
+				temp_result="qi";
+				break;
+			}
+		}  //寻找起点的3个值
+		if (temp_result=="qi")
+		{
+			for(j=i;j<=rows;j++)
+			{
+				temp_name1="report.rows_" + j + "_cols_" + cols;
+				temp_name1=eval(temp_name1);
+				temp_name1s="report.rows_" + j + "_cols_" + cols+"_s";
+				temp_name1s=eval(temp_name1s);
+				temp_name1t="report.rows_" + j + "_cols_" + cols+"_t";
+				temp_name1t=eval(temp_name1t);
+				temp_name1.value=temp_valueq;
+			    temp_name1t.value=temp_value_tq;
+			    temp_name1s.value=temp_value_sq;
+			
+			}
+			so_sel(cao,temp_name1s.value);
+		}
+		else{
+			alert("未填写任何值")
+		}
+	
+}
+function so_sel(cao,temp_value) //col:列数，sel_s：文本框显示的值;用于赋值之后select选项的显示
+{
+     var sel_e;
+     if(cao=='cao1') 
+	 sel_e=document.getElementById('selectf');
+	 else if(cao=='cao2')
+	 sel_e=document.getElementById('selecty'); 
+	 else
+	 sel_e=document.getElementById('selectf2'); 
+	 jsSelectItemByValue(sel_e,temp_value);  
+
+}
+function cle(obj,sel_n)
+{ 
+      var e=document.getElementById(obj).value;
+	  document.getElementById(sel_n).selectedIndex=-1;
+	  document.getElementById(e).value="";
+	  document.getElementById(e+"_s").value="";
+	  document.getElementById(e+"_t").value="";
+}
+function myrows_cols(str1){
+   var str2="_";
+    
+   var s = str1.lastIndexOf(str2);
+   cols=str1.substring(s+1,str1.length)
+   
+   
+   var s1 = str1.indexOf(str2);
+   var ss1=str1.substring(s1+1,str1.length);
+   var s2=ss1.indexOf(str2);
+   rows=ss1.substring(0,s2);
+}
+//var temp_value,temp_name,cols,rows;
+//function mytakevalue(sel){
+//	temp_value=sel.value;
+//	temp_name=sel.name;
+//	myrows_cols(temp_name);
+//}
+//function mycopycode(){
+//	var i,j,all_row,temp_name1,mys,temp_name2,temp_result="";
+//	mys=report.speciality.value;
+//	all_row=report.totalrows.value;
+//	if (mys=="01"&&temp_value=="A"){
+//		for(i=rows;i<=(all_row-1);i++){
+//			temp_name1="report.rows_" + i + "_cols_" + cols;
+//			temp_name1=eval(temp_name1);
+//			if (temp_name1.value=="0"){
+//				temp_result="zz"
+//				break;
+//			}
+//		}
+//		if (temp_result=="zz"){
+//			for(i=1;i<=(all_row-1);i++){
+//				temp_name1="report.rows_" + i + "_cols_" + cols;
+//				temp_name1=eval(temp_name1);
+//				temp_name2=eval("report.rows_" + i + "_cols_1")
+//				if (temp_name1.value=="0"){
+//					temp_name1.value=temp_name2.value;
+//					break;
+//				}
+//				else{
+//					temp_name1.value=temp_name2.value;	
+//				}
+//			}
+//		}
+//		else{
+//			alert("请指明结束标识位置，并填写0")
+//		}
+//	}
+//	else{
+//		for(i=rows;i<=(all_row-1);i++){
+//			temp_name1="report.rows_" + i + "_cols_" + cols;
+//			temp_name1=eval(temp_name1);
+//			if (temp_name1.value=="0"){
+//				temp_result="zz"
+//				break;
+//			}
+//		}
+//		if (temp_result=="zz"){
+//			for(i=rows;i<=(all_row-1);i++){
+//				temp_name1="report.rows_" + i + "_cols_" + cols;
+//				temp_name1=eval(temp_name1);
+//				if (temp_name1.value=="0"){
+//					temp_name1.value=temp_value;
+//					break;
+//				}
+//				else{
+//					temp_name1.value=temp_value;	
+//				}
+//			}
+//		}
+//		else{
+//			alert("请指明结束标识位置，并填写0")
+//		}
+//	}
+//}
+//function myrows_cols(str1){
+//   var str2="_";
+//    
+//   var s = str1.lastIndexOf(str2);
+//   cols=str1.substring(s+1,str1.length)
+//   
+//   
+//   var s1 = str1.indexOf(str2);
+//   var ss1=str1.substring(s1+1,str1.length);
+//   var s2=ss1.indexOf(str2);
+//   rows=ss1.substring(0,s2);
+//}
+function myaddvalue(sel){
+  var now_name,tcols,temp_name1,totle_row,s,totlenum=0,i,t;
+  var tstr="_";
+  sel.value=""
+  now_name=sel.name;
+  var s=now_name.lastIndexOf(tstr);
+  totle_row=report.totalrows.value;  
+  tcols=now_name.substring(s+1,now_name.length)
+  for(i=0;i<totle_row;i++){
+			temp_name1="report.rows_" + i + "_cols_" + tcols;
+			temp_name1=eval(temp_name1);
+			if (temp_name1.value!=""){
+			   t=temp_name1.value;			   			
+			   
+			   if (!isNaN(t)) {
+			     t=parseFloat(t);
+			     totlenum=parseFloat(totlenum)+t;
+				  totlenum=Math.round(totlenum*1000)/1000.0;
+			   }
+			}
+  }
+  sel.value=totlenum;
+}
+//判断是否为中文
+function ischinese(s){
+var ret=true;
+for(var i=0;i<s.length;i++){
+ret=ret && (s.charCodeAt(i)>=10000);
+return ret;
+}
+		}
+	
+	
+		//查看方法、仪器、试剂、校准物是否必填
+function check_bianma(start)
+{
+   var spec=document.getElementById("speciality").value;
+   var yiqi=document.getElementById("selecty").options.length;
+   var shiji=document.getElementById("selectf2").options.length;
+   var jiao=document.getElementById("selectf").options.length;
+   
+   var cols_count=parseInt(document.getElementById("totalcols").value);
+   var rows_count=parseInt(document.getElementById("totalrows").value);
+   var pihao_num=cols_count-start-4;
+   for(var i=0;i<rows_count;i++)
+   {
+       var b=false;
+	   for(var j=0;j<pihao_num;j++)
+	   {
+		  if(document.getElementById("rows_"+i+"_cols_"+(j+4)).value!="")
+		  {
+		    b=true;
+			break;
+		  }
+	   }
+	   if(b)
+	   {
+	      if(spec!="11" && jiao>0 && document.getElementById("rows_"+i+"_cols_"+(cols_count-1)).type=="text")
+		  {
+			document.getElementById("rows_"+i+"_cols_"+(cols_count-1)).setAttribute("dtype","Require");
+		  }
+		  if(shiji>0 && $("#rows_"+i+"_cols_"+(cols_count-2)).prop("disabled")==false)
+		  {
+		    document.getElementById("rows_"+i+"_cols_"+(cols_count-2)).setAttribute("dtype","Require");
+		  }
+		  if(yiqi>0 && $("#rows_"+i+"_cols_"+(cols_count-3)).prop("disabled")==false)
+		  {
+		    document.getElementById("rows_"+i+"_cols_"+(cols_count-3)).setAttribute("dtype","Require");
+		  }
+		  if(document.getElementById("selectff"+document.getElementById("rows_"+i+"_fangfa").value).options.length>0 && $("#rows_"+i+"_cols_"+(cols_count-4)).prop("disabled")==false) //方法列表长度>0
+		  {
+		    document.getElementById("rows_"+i+"_cols_"+(cols_count-4)).setAttribute("dtype","Require");
+		  }
+		  
+	   }
+	   else
+	   {
+	      if(spec!="11")
+		  {
+	         document.getElementById("rows_"+i+"_cols_"+(cols_count-1)).removeAttribute("dtype");
+		  }
+		  document.getElementById("rows_"+i+"_cols_"+(cols_count-2)).removeAttribute("dtype");
+		  document.getElementById("rows_"+i+"_cols_"+(cols_count-3)).removeAttribute("dtype");
+		  document.getElementById("rows_"+i+"_cols_"+(cols_count-4)).removeAttribute("dtype");
+		  
+	   }
+   }
+}		
+	
+	function has_tianxie(cols)
+	{
+	   var s=false;
+	   cols.each(function(index,element){
+		  if($.trim($(element).val())!="")
+		  {
+			 s=true;
+			 return false;
+		  }
+	   });
+	   return s;
+	}
+		
+	function mycheck(othis){
+         /*try{
+	        check_bianma(4);
+			}catch(e){}
+			*/
+		 
+		 //console.log(unitMsg);
+		 if(has_tianxie($("#goodtable").find("input:text.myresult"))==false)
+		 {
+		   alert("您没有填写任何结果，请填写");
+		   return false;
+		 }
+		 
+		 if(Validator.Validate(othis, 2))
+		 {
+		   var unitMsg=confirm_unit();
+		   if(unitMsg.length>0)
+		   {
+		      return confirm(unitMsg) && confirm("请再次确认您已经正确填写了所有的数据，您确定要发送吗？");
+		   }
+		   else
+		   {
+		      return confirm("请再次确认您已经正确填写了所有的数据，您确定要发送吗？");
+		   }
+         }	
+		 else 
+	     return false;
+	}
+		  
+		  
+    function confirm_unit()
+	{
+	    var rows=parseInt($("#totalrows").val());
+		var msg="";
+		for(var i=0;i<rows;i++)
+		{
+		   if($("#rows_"+i+"_cols_3.unt").size()>0 && has_result($("input:text[id^='rows_"+i+"_cols_'].result")))
+		   {
+		      var theItem=$("#rows_"+i+"_cols_2").val();
+		      var theUnit=$("#rows_"+i+"_cols_3").val();
+			  msg=msg+"您【"+theItem+"】项目选择的单位是【"+theUnit+"】\n";
+		   }
+		}
+		if(msg.length>0)
+		{
+		   return "您各个项目选择的单位如下所示，请确认：\n"+msg;
+		}
+		else
+		{
+		   return "";
+		}
+	}
+	
+	function has_result(cols)
+	{
+	   var s=false;
+	   cols.each(function(index,element){
+	      if($.trim($(element).val())!="")
+		  {
+		     s=true;
+			 return false;
+		  }
+	   });
+	   return s;
+	}
+
+	function showcalendar(obj)
+{
+  dv=window.showModalDialog("../calendar.html",44,"center1;help:no;status:no;dialogHeight:246px;dialogWidth:216px;scroll:no")
+  if (dv) 
+  {
+	  if (dv=="null") 
+	  {
+		 obj.value='';
+	  }
+	  else 
+	  {
+		 obj.value=dv;
+	  }
+  }
+}
+function check_updown(hang)
+{
+   var i;
+   var j;
+   var list=YAHOO.util.Dom.getElementsByClassName(hang,"input",hang);
+    var up=YAHOO.util.Dom.getElementsByClassName(hang+"up","input",hang);
+	var down=YAHOO.util.Dom.getElementsByClassName(hang+"down","input",hang);
+       for(i=0;i<list.length;i++)
+	   { var qualitive=up[0].getAttribute("dup");
+	   
+	    if (list[i].value &&qualitive=="Quantitative")
+				  { 
+				  
+				    //alert("ss");
+					up[0].setAttribute("require","true");
+					down[0].setAttribute("require","true");
+					break;
+					//alert(up[0].getAttribute("require"));
+										   
+				  }
+		else
+		{	up[0].setAttribute("require","false");
+					down[0].setAttribute("require","false");
+					}
+	  
+	   }
+}	   
+//-->
+</script>
+<script type="text/javascript">
+$(document).ready(function(){
+  if($("#speciality").val()=="71_")
+  {
+    $(".reaname").html("质控物");
+	$(".xzname").html("检测状态");
+  }
+  else if($("#speciality").val()=="C4")
+  {
+    $(".reaname").html("抗体");
+	$(".xzname").html("溶血素");
+  }
+  else if($("#speciality").val()=="D1" || $("#speciality").val()=="D6" || $("#speciality").val()=="D2")
+  {
+    $(".reaname").html("提取试剂");
+	$(".xzname").html("扩增试剂");
+  }
+  else if($("#speciality").val()=="10" || $("#speciality").val()=="I6")
+  {
+    $(".methodname").html("方法");
+	$(".reaname").html("溶血剂");
+	$(".xzname").html("稀释液");
+	//$("input.xz").attr("onclick","");
+	//$("input.xz").off();
+	//$("input.xz").unbind();
+  }
+  
+  change_bm_dmsg("method",$("span.methodname").eq(0).html());
+  change_bm_dmsg("rea",$("span.reaname").eq(0).html());
+  change_bm_dmsg("xz",$("span.xzname").eq(0).html());
+});
+
+function change_bm_dmsg(bm,bmname)
+{
+   $("#goodtable").find("input.inputdata2."+bm).each(function(index,element){
+     var dmsg=$(element).attr("dmsg");
+	 dmsg=dmsg.replace("{$bname}",bmname);
+	 $(element).attr("dmsg",dmsg);
+   });
+}
+</script>
+<link id="layuicss-laydate" rel="stylesheet" href="https://www.clinet.com.cn/clinetbusiness/jsfile/layui/css/modules/laydate/default/laydate.css?v=5.0.9" media="all"></head>
+<body leftmargin="0" topmargin="0" onkeyup="return checkKey()">
+
+<fieldset style="BACKGROUND: buttonface">
+<table id="editbar" cellspacing="0" cellpadding="0" style="font-size:9pt;width:100%;FONT-WEIGHT: bold">
+<tbody><tr>
+    <td style="width:100%">上报单位：民航总医院检验科</td>
+</tr>
+<tr>
+<td style="width:100%">上报主题:2026年肝炎标志物第2次质评上报表</td>
+</tr>
+<tr>
+<td style="width:100%">建议测试日期：2026/7/6</td>
+</tr>
+<tr>
+   <td style="width:100%">上报截止日期：2026/7/17</td>
+</tr>
+<tr>
+<td style="width:100%">成绩回报日期：</td>
+</tr>
+</tbody></table>
+</fieldset>
+
+<form style="margin:0" name="report" method="post" action="../../../desktop/saveuploadreportrule.asp" onsubmit="return mycheck(this)">
+<input type="hidden" id="labindex" name="labindex" value="01110025">
+<input type="hidden" id="ccldir" name="ccldir" value="clinet_beijing">
+<input type="hidden" id="team_id" name="team_id" value="9239">
+<input type="hidden" id="member_id" name="member_id" value="33925">
+<input type="hidden" id="nickname" name="nickname" value="01110025">
+<input type="hidden" id="cclindex" name="cclindex" value="4731">
+<input type="hidden" name="speciality" id="speciality" value="21">
+<input type="hidden" id="specname" name="specname" value="肝炎标志物">
+<input type="hidden" id="year" name="year" value="2026">
+<input type="hidden" id="times" name="times" value="2">
+<input type="hidden" id="cenhidden" name="cenhidden" value="">
+<input type="hidden" id="material0" name="material0" value="202621">
+<input type="hidden" id="material1" name="material1" value="202622">
+<input type="hidden" id="material2" name="material2" value="202623">
+<input type="hidden" id="material3" name="material3" value="202624">
+<input type="hidden" id="material4" name="material4" value="202625">
+
+<fieldset style="BACKGROUND: buttonface">
+<table id="editbar" cellspacing="0" cellpadding="0" style="font-size:9pt;width:100%;FONT-WEIGHT: bold">
+<tbody><tr>
+	<td style="width:100%">
+	测定日期：<input id="testdate" readonly="" name="testdate" style=" WIDTH: 119px;BORDER-BOTTOM: window 1px solid;BORDER-LEFT: window 1px solid;BORDER-RIGHT: window 1px solid;BORDER-TOP: window 1px solid;" class="save" dtype="Date" dmsg="测定日期不能为空" lay-key="1">
+        &nbsp;&nbsp;&nbsp;(日期格式如上所示)&nbsp;&nbsp;&nbsp;
+<input type="submit" value="发送" style="background-color:#aaaaaa;padding:2px 20px;color:red;BORDER-BOTTOM: window 1px solid;BORDER-LEFT: window 1px solid;BORDER-RIGHT: 1px solid;BORDER-TOP:1px solid" title="点击这里发送报表" id="submit1" name="submit1">&nbsp;&nbsp;
+<!--
+<input type=button name=button1 title=由此可以浏览、保存、打印上报数据 style="background-color:#aaaaaa;width:80;color:red;width:80;BORDER-BOTTOM: window 1px solid;BORDER-LEFT: window 1px solid;BORDER-RIGHT: 1px solid;BORDER-TOP:1px solid" onclick=javascript:window.open('../../../desktop/outputtext.asp') value=浏览>
+//-->
+        　　 
+		<!--<input type=button name="bsave" value="导出数据" onClick="savereportfile('c:\\2026年21专业第2次质上报表.txt')">
+		<input type=button name="bsave" value="导入数据" onClick="loadreportfile()">-->
+        
+        &nbsp;&nbsp;<input type="button" value="保存" class="button" style="padding:2px 20px;" title="将数据临时存储在服务器上，不代表您正式提交数据" onclick="SaveData('clinet_beijing','21','2026','2','01110025','savemsg');">&nbsp;
+        <input type="button" value="加载" class="button" style="padding:2px 20px;" title="加载服务器上临时存储的数据到本页面上，将覆盖本页面的已经填写的数据" onclick="LoadData('clinet_beijing','21','2026','2','01110025','savemsg');">&nbsp;
+        <span id="savemsg"></span>
+        　　
+      </td>
+</tr>
+</tbody></table>
+</fieldset>
+<fieldset style="BACKGROUND: buttonface">
+<table cellspacing="0" cellpadding="0" style="font-size:9pt;width:100%;FONT-WEIGHT: bold">
+<tbody><tr>
+	<td style="width:100%">
+	<input name="director" dtype="Limit" dmsg="实验室主任名称过长" class="save" style=" display:none; background:none">&nbsp;&nbsp;&nbsp;
+    <input name="phone" dtype="Limit" dmsg="请输入正确电话号码" class="save ime" max="20" min="0" style=" display:none; background:none">&nbsp;&nbsp;&nbsp;
+    <input name="email" style=" display:none; background:none" dtype="Limit" dmsg="E-mail地址格式错误" class="save ime" max="40">&nbsp;&nbsp;&nbsp;
+<input name="grade" style=" display:none; background:none" dtype="Limit" dmsg="医院等级字符长度不对" max="20" min="0">
+	</td>
+</tr>
+</tbody></table>
+</fieldset>
+<table border="1" cellspacing="0" cellpadding="0" style="border-color:buttonface; border-collapse:collapse" id="goodtable">
+  <tbody><tr style="border-color:#eeeeee"> 
+    <td colspan="4" class="td_title">项目</td>
+    <td colspan="5" class="td_title">结果</td>
+    <td colspan="6" class="td_title">编码</td>
+  </tr>
+  <tr style="border-color:#eeeeee"> 
+    <td nowrap="" class="td_title" style="width:50px;">序号</td>
+    <td nowrap="" class="td_title" style="width:60px;">编码</td>
+    <td nowrap="" class="td_title" style="width:250px;">项目</td>
+    <td nowrap="" class="td_title" style="width:80px;">单位</td>
+    <td class="tdtitle" style="width:80px; text-align:center">202621</td>
+	<td class="tdtitle" style="width:80px; text-align:center">202622</td>
+	<td class="tdtitle" style="width:80px; text-align:center">202623</td>
+	<td class="tdtitle" style="width:80px; text-align:center">202624</td>
+	<td class="tdtitle" style="width:80px; text-align:center">202625</td>
+	
+    
+	 <td nowrap="" class="td_title" style="width:200px;">
+<span class="methodname">方法</span>
+	</td>
+    <td nowrap="" class="td_title" style="width:200px;">仪器</td>
+    <td nowrap="" class="td_title" style="width:200px;">
+<span class="reaname">试剂</span>
+	</td>
+    <td nowrap="" class="td_title" style="width:200px;">
+<span class="xzname"></span>
+	</td>
+  </tr>
+  
+    <tr class="tritem " id="rows0">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_0_cols_0" class="inputitem" value="0 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_0_cols_1" id="rows_0_cols_1" class="inputitem" value="2101">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_0_cols_2" id="rows_0_cols_2" class="inputitem" value="HBsAg">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_0_cols_3" class="inputitem" value="定性">             
+              
+                 
+            </td>   
+			 <!--$input$--> 
+			 
+			 <td class="tddate1" style="width:80px;"> <input name="rows_0_cols_4" id="rows_0_cols_4" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_0_cols_4cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_0_cols_4cen" class="select">
+    <li onclick="settou('rows_0_cols_4','rows_0_cols_4toutou')" id="rows_0_cols_4toutou" title="" onmouseover="biandise_c('rows_0_cols_4toutou')" onmouseout="biandise_f('rows_0_cols_4toutou')">请选择</li>
+    <li onclick="settou('rows_0_cols_4','rows_0_cols_4__-')" id="rows_0_cols_4__-" title="-" onmouseover="biandise_c('rows_0_cols_4__-')" onmouseout="biandise_f('rows_0_cols_4__-')">-|阴性</li> <li onclick="settou('rows_0_cols_4','rows_0_cols_4__+')" id="rows_0_cols_4__+" title="+" onmouseover="biandise_c('rows_0_cols_4__+')" onmouseout="biandise_f('rows_0_cols_4__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_0_cols_5" id="rows_0_cols_5" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_0_cols_5cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_0_cols_5cen" class="select">
+    <li onclick="settou('rows_0_cols_5','rows_0_cols_5toutou')" id="rows_0_cols_5toutou" title="" onmouseover="biandise_c('rows_0_cols_5toutou')" onmouseout="biandise_f('rows_0_cols_5toutou')">请选择</li>
+    <li onclick="settou('rows_0_cols_5','rows_0_cols_5__-')" id="rows_0_cols_5__-" title="-" onmouseover="biandise_c('rows_0_cols_5__-')" onmouseout="biandise_f('rows_0_cols_5__-')">-|阴性</li> <li onclick="settou('rows_0_cols_5','rows_0_cols_5__+')" id="rows_0_cols_5__+" title="+" onmouseover="biandise_c('rows_0_cols_5__+')" onmouseout="biandise_f('rows_0_cols_5__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_0_cols_6" id="rows_0_cols_6" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_0_cols_6cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_0_cols_6cen" class="select">
+    <li onclick="settou('rows_0_cols_6','rows_0_cols_6toutou')" id="rows_0_cols_6toutou" title="" onmouseover="biandise_c('rows_0_cols_6toutou')" onmouseout="biandise_f('rows_0_cols_6toutou')">请选择</li>
+    <li onclick="settou('rows_0_cols_6','rows_0_cols_6__-')" id="rows_0_cols_6__-" title="-" onmouseover="biandise_c('rows_0_cols_6__-')" onmouseout="biandise_f('rows_0_cols_6__-')">-|阴性</li> <li onclick="settou('rows_0_cols_6','rows_0_cols_6__+')" id="rows_0_cols_6__+" title="+" onmouseover="biandise_c('rows_0_cols_6__+')" onmouseout="biandise_f('rows_0_cols_6__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_0_cols_7" id="rows_0_cols_7" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_0_cols_7cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_0_cols_7cen" class="select">
+    <li onclick="settou('rows_0_cols_7','rows_0_cols_7toutou')" id="rows_0_cols_7toutou" title="" onmouseover="biandise_c('rows_0_cols_7toutou')" onmouseout="biandise_f('rows_0_cols_7toutou')">请选择</li>
+    <li onclick="settou('rows_0_cols_7','rows_0_cols_7__-')" id="rows_0_cols_7__-" title="-" onmouseover="biandise_c('rows_0_cols_7__-')" onmouseout="biandise_f('rows_0_cols_7__-')">-|阴性</li> <li onclick="settou('rows_0_cols_7','rows_0_cols_7__+')" id="rows_0_cols_7__+" title="+" onmouseover="biandise_c('rows_0_cols_7__+')" onmouseout="biandise_f('rows_0_cols_7__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_0_cols_8" id="rows_0_cols_8" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_0_cols_8cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_0_cols_8cen" class="select">
+    <li onclick="settou('rows_0_cols_8','rows_0_cols_8toutou')" id="rows_0_cols_8toutou" title="" onmouseover="biandise_c('rows_0_cols_8toutou')" onmouseout="biandise_f('rows_0_cols_8toutou')">请选择</li>
+    <li onclick="settou('rows_0_cols_8','rows_0_cols_8__-')" id="rows_0_cols_8__-" title="-" onmouseover="biandise_c('rows_0_cols_8__-')" onmouseout="biandise_f('rows_0_cols_8__-')">-|阴性</li> <li onclick="settou('rows_0_cols_8','rows_0_cols_8__+')" id="rows_0_cols_8__+" title="+" onmouseover="biandise_c('rows_0_cols_8__+')" onmouseout="biandise_f('rows_0_cols_8__+')">+|阳性</li>
+
+  </ul> </td>
+			
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_0_cols_9" id="rows_0_cols_9" class="inputdata2 save method" onclick="displayf('rows_0_cols_9','21','rows_0_cols_9_s','rows_0_cols_9_t')" dmsg="HBsAg项目的方法为必填项"> 
+          <input type="hidden" name="rows_0_cols_9_s" class="save" id="rows_0_cols_9_s" value="2117">
+          <input type="hidden" name="rows_0_cols_9_t" class="save" id="rows_0_cols_9_t" value="">
+          <input type="hidden" id="rows_0_fangfa" name="rows_0_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_0_cols_10" id="rows_0_cols_10" class="inputdata2 save ins" onclick="displayy('rows_0_cols_10','rows_0_cols_10_s','rows_0_cols_10_t')" dmsg="HBsAg项目的仪器为必填项"> 
+          <input type="hidden" name="rows_0_cols_10_s" class="save" id="rows_0_cols_10_s" value="215004">
+          <input type="hidden" name="rows_0_cols_10_t" class="save" id="rows_0_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_0_cols_11" id="rows_0_cols_11" class="inputdata2 save rea" onclick="displays('rows_0_cols_11','rows_0_cols_11_s','rows_0_cols_11_t')" dmsg="HBsAg项目的试剂为必填项"> 
+          <input type="hidden" name="rows_0_cols_11_s" class="save" id="rows_0_cols_11_s" value="21082">
+          <input type="hidden" name="rows_0_cols_11_t" class="save" id="rows_0_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_0_cols_12" id="rows_0_cols_12" class="inputdata2 save xz" onclick="displayss('rows_0_cols_12','rows_0_cols_12_s','rows_0_cols_12_t')" dmsg="HBsAg项目的为必填项" value=""> 
+          <input type="hidden" name="rows_0_cols_12_s" class="save" id="rows_0_cols_12_s" value="">
+          <input type="hidden" name="rows_0_cols_12_t" class="save" id="rows_0_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows1">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_1_cols_0" class="inputitem" value="1 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_1_cols_1" id="rows_1_cols_1" class="inputitem" value="21011">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_1_cols_2" id="rows_1_cols_2" class="inputitem" value="HBsAg">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_1_cols_3" class="inputitem" value="S/CO">             
+              
+                 
+            </td>   
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_1_cols_4" name="rows_1_cols_4" class="rows1 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21011编码第5列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_1_cols_5" name="rows_1_cols_5" class="rows1 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21011编码第6列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_1_cols_6" name="rows_1_cols_6" class="rows1 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21011编码第7列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_1_cols_7" name="rows_1_cols_7" class="rows1 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21011编码第8列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_1_cols_8" name="rows_1_cols_8" class="rows1 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21011编码第9列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			  
+			 
+			<!--$qual$-->
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_1_cols_9" id="rows_1_cols_9" class="inputdata2 save method" onclick="displayf('rows_1_cols_9','21','rows_1_cols_9_s','rows_1_cols_9_t')" dmsg="HBsAg项目的方法为必填项"> 
+          <input type="hidden" name="rows_1_cols_9_s" class="save" id="rows_1_cols_9_s" value="2117">
+          <input type="hidden" name="rows_1_cols_9_t" class="save" id="rows_1_cols_9_t" value="">
+          <input type="hidden" id="rows_1_fangfa" name="rows_1_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_1_cols_10" id="rows_1_cols_10" class="inputdata2 save ins" onclick="displayy('rows_1_cols_10','rows_1_cols_10_s','rows_1_cols_10_t')" dmsg="HBsAg项目的仪器为必填项"> 
+          <input type="hidden" name="rows_1_cols_10_s" class="save" id="rows_1_cols_10_s" value="215004">
+          <input type="hidden" name="rows_1_cols_10_t" class="save" id="rows_1_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_1_cols_11" id="rows_1_cols_11" class="inputdata2 save rea" onclick="displays('rows_1_cols_11','rows_1_cols_11_s','rows_1_cols_11_t')" dmsg="HBsAg项目的试剂为必填项"> 
+          <input type="hidden" name="rows_1_cols_11_s" class="save" id="rows_1_cols_11_s" value="21082">
+          <input type="hidden" name="rows_1_cols_11_t" class="save" id="rows_1_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_1_cols_12" id="rows_1_cols_12" class="inputdata2 save xz" onclick="displayss('rows_1_cols_12','rows_1_cols_12_s','rows_1_cols_12_t')" dmsg="HBsAg项目的为必填项" value=""> 
+          <input type="hidden" name="rows_1_cols_12_s" class="save" id="rows_1_cols_12_s" value="">
+          <input type="hidden" name="rows_1_cols_12_t" class="save" id="rows_1_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows2">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_2_cols_0" class="inputitem" value="2 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_2_cols_1" id="rows_2_cols_1" class="inputitem" value="2102">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_2_cols_2" id="rows_2_cols_2" class="inputitem" value="HBsAb">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_2_cols_3" class="inputitem" value="定性">             
+              
+                 
+            </td>   
+			 <!--$input$--> 
+			 
+			 <td class="tddate1" style="width:80px;"> <input name="rows_2_cols_4" id="rows_2_cols_4" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_2_cols_4cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_2_cols_4cen" class="select">
+    <li onclick="settou('rows_2_cols_4','rows_2_cols_4toutou')" id="rows_2_cols_4toutou" title="" onmouseover="biandise_c('rows_2_cols_4toutou')" onmouseout="biandise_f('rows_2_cols_4toutou')">请选择</li>
+    <li onclick="settou('rows_2_cols_4','rows_2_cols_4__-')" id="rows_2_cols_4__-" title="-" onmouseover="biandise_c('rows_2_cols_4__-')" onmouseout="biandise_f('rows_2_cols_4__-')">-|阴性</li> <li onclick="settou('rows_2_cols_4','rows_2_cols_4__+')" id="rows_2_cols_4__+" title="+" onmouseover="biandise_c('rows_2_cols_4__+')" onmouseout="biandise_f('rows_2_cols_4__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_2_cols_5" id="rows_2_cols_5" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_2_cols_5cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_2_cols_5cen" class="select">
+    <li onclick="settou('rows_2_cols_5','rows_2_cols_5toutou')" id="rows_2_cols_5toutou" title="" onmouseover="biandise_c('rows_2_cols_5toutou')" onmouseout="biandise_f('rows_2_cols_5toutou')">请选择</li>
+    <li onclick="settou('rows_2_cols_5','rows_2_cols_5__-')" id="rows_2_cols_5__-" title="-" onmouseover="biandise_c('rows_2_cols_5__-')" onmouseout="biandise_f('rows_2_cols_5__-')">-|阴性</li> <li onclick="settou('rows_2_cols_5','rows_2_cols_5__+')" id="rows_2_cols_5__+" title="+" onmouseover="biandise_c('rows_2_cols_5__+')" onmouseout="biandise_f('rows_2_cols_5__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_2_cols_6" id="rows_2_cols_6" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_2_cols_6cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_2_cols_6cen" class="select">
+    <li onclick="settou('rows_2_cols_6','rows_2_cols_6toutou')" id="rows_2_cols_6toutou" title="" onmouseover="biandise_c('rows_2_cols_6toutou')" onmouseout="biandise_f('rows_2_cols_6toutou')">请选择</li>
+    <li onclick="settou('rows_2_cols_6','rows_2_cols_6__-')" id="rows_2_cols_6__-" title="-" onmouseover="biandise_c('rows_2_cols_6__-')" onmouseout="biandise_f('rows_2_cols_6__-')">-|阴性</li> <li onclick="settou('rows_2_cols_6','rows_2_cols_6__+')" id="rows_2_cols_6__+" title="+" onmouseover="biandise_c('rows_2_cols_6__+')" onmouseout="biandise_f('rows_2_cols_6__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_2_cols_7" id="rows_2_cols_7" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_2_cols_7cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_2_cols_7cen" class="select">
+    <li onclick="settou('rows_2_cols_7','rows_2_cols_7toutou')" id="rows_2_cols_7toutou" title="" onmouseover="biandise_c('rows_2_cols_7toutou')" onmouseout="biandise_f('rows_2_cols_7toutou')">请选择</li>
+    <li onclick="settou('rows_2_cols_7','rows_2_cols_7__-')" id="rows_2_cols_7__-" title="-" onmouseover="biandise_c('rows_2_cols_7__-')" onmouseout="biandise_f('rows_2_cols_7__-')">-|阴性</li> <li onclick="settou('rows_2_cols_7','rows_2_cols_7__+')" id="rows_2_cols_7__+" title="+" onmouseover="biandise_c('rows_2_cols_7__+')" onmouseout="biandise_f('rows_2_cols_7__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_2_cols_8" id="rows_2_cols_8" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_2_cols_8cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_2_cols_8cen" class="select">
+    <li onclick="settou('rows_2_cols_8','rows_2_cols_8toutou')" id="rows_2_cols_8toutou" title="" onmouseover="biandise_c('rows_2_cols_8toutou')" onmouseout="biandise_f('rows_2_cols_8toutou')">请选择</li>
+    <li onclick="settou('rows_2_cols_8','rows_2_cols_8__-')" id="rows_2_cols_8__-" title="-" onmouseover="biandise_c('rows_2_cols_8__-')" onmouseout="biandise_f('rows_2_cols_8__-')">-|阴性</li> <li onclick="settou('rows_2_cols_8','rows_2_cols_8__+')" id="rows_2_cols_8__+" title="+" onmouseover="biandise_c('rows_2_cols_8__+')" onmouseout="biandise_f('rows_2_cols_8__+')">+|阳性</li>
+
+  </ul> </td>
+			
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_2_cols_9" id="rows_2_cols_9" class="inputdata2 save method" onclick="displayf('rows_2_cols_9','21','rows_2_cols_9_s','rows_2_cols_9_t')" dmsg="HBsAb项目的方法为必填项"> 
+          <input type="hidden" name="rows_2_cols_9_s" class="save" id="rows_2_cols_9_s" value="2117">
+          <input type="hidden" name="rows_2_cols_9_t" class="save" id="rows_2_cols_9_t" value="">
+          <input type="hidden" id="rows_2_fangfa" name="rows_2_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_2_cols_10" id="rows_2_cols_10" class="inputdata2 save ins" onclick="displayy('rows_2_cols_10','rows_2_cols_10_s','rows_2_cols_10_t')" dmsg="HBsAb项目的仪器为必填项"> 
+          <input type="hidden" name="rows_2_cols_10_s" class="save" id="rows_2_cols_10_s" value="215004">
+          <input type="hidden" name="rows_2_cols_10_t" class="save" id="rows_2_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_2_cols_11" id="rows_2_cols_11" class="inputdata2 save rea" onclick="displays('rows_2_cols_11','rows_2_cols_11_s','rows_2_cols_11_t')" dmsg="HBsAb项目的试剂为必填项"> 
+          <input type="hidden" name="rows_2_cols_11_s" class="save" id="rows_2_cols_11_s" value="21082">
+          <input type="hidden" name="rows_2_cols_11_t" class="save" id="rows_2_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_2_cols_12" id="rows_2_cols_12" class="inputdata2 save xz" onclick="displayss('rows_2_cols_12','rows_2_cols_12_s','rows_2_cols_12_t')" dmsg="HBsAb项目的为必填项" value=""> 
+          <input type="hidden" name="rows_2_cols_12_s" class="save" id="rows_2_cols_12_s" value="">
+          <input type="hidden" name="rows_2_cols_12_t" class="save" id="rows_2_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows3">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_3_cols_0" class="inputitem" value="3 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_3_cols_1" id="rows_3_cols_1" class="inputitem" value="21021">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_3_cols_2" id="rows_3_cols_2" class="inputitem" value="HBsAb">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_3_cols_3" class="inputitem" value="S/CO">             
+              
+                 
+            </td>   
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_3_cols_4" name="rows_3_cols_4" class="rows3 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21021编码第5列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_3_cols_5" name="rows_3_cols_5" class="rows3 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21021编码第6列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_3_cols_6" name="rows_3_cols_6" class="rows3 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21021编码第7列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_3_cols_7" name="rows_3_cols_7" class="rows3 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21021编码第8列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_3_cols_8" name="rows_3_cols_8" class="rows3 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21021编码第9列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			  
+			 
+			<!--$qual$-->
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_3_cols_9" id="rows_3_cols_9" class="inputdata2 save method" onclick="displayf('rows_3_cols_9','21','rows_3_cols_9_s','rows_3_cols_9_t')" dmsg="HBsAb项目的方法为必填项"> 
+          <input type="hidden" name="rows_3_cols_9_s" class="save" id="rows_3_cols_9_s" value="2117">
+          <input type="hidden" name="rows_3_cols_9_t" class="save" id="rows_3_cols_9_t" value="">
+          <input type="hidden" id="rows_3_fangfa" name="rows_3_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_3_cols_10" id="rows_3_cols_10" class="inputdata2 save ins" onclick="displayy('rows_3_cols_10','rows_3_cols_10_s','rows_3_cols_10_t')" dmsg="HBsAb项目的仪器为必填项"> 
+          <input type="hidden" name="rows_3_cols_10_s" class="save" id="rows_3_cols_10_s" value="215004">
+          <input type="hidden" name="rows_3_cols_10_t" class="save" id="rows_3_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_3_cols_11" id="rows_3_cols_11" class="inputdata2 save rea" onclick="displays('rows_3_cols_11','rows_3_cols_11_s','rows_3_cols_11_t')" dmsg="HBsAb项目的试剂为必填项"> 
+          <input type="hidden" name="rows_3_cols_11_s" class="save" id="rows_3_cols_11_s" value="21082">
+          <input type="hidden" name="rows_3_cols_11_t" class="save" id="rows_3_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_3_cols_12" id="rows_3_cols_12" class="inputdata2 save xz" onclick="displayss('rows_3_cols_12','rows_3_cols_12_s','rows_3_cols_12_t')" dmsg="HBsAb项目的为必填项" value=""> 
+          <input type="hidden" name="rows_3_cols_12_s" class="save" id="rows_3_cols_12_s" value="">
+          <input type="hidden" name="rows_3_cols_12_t" class="save" id="rows_3_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows4">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_4_cols_0" class="inputitem" value="4 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_4_cols_1" id="rows_4_cols_1" class="inputitem" value="2103">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_4_cols_2" id="rows_4_cols_2" class="inputitem" value="HBeAg">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_4_cols_3" class="inputitem" value="定性">             
+              
+                 
+            </td>   
+			 <!--$input$--> 
+			 
+			 <td class="tddate1" style="width:80px;"> <input name="rows_4_cols_4" id="rows_4_cols_4" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_4_cols_4cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_4_cols_4cen" class="select">
+    <li onclick="settou('rows_4_cols_4','rows_4_cols_4toutou')" id="rows_4_cols_4toutou" title="" onmouseover="biandise_c('rows_4_cols_4toutou')" onmouseout="biandise_f('rows_4_cols_4toutou')">请选择</li>
+    <li onclick="settou('rows_4_cols_4','rows_4_cols_4__-')" id="rows_4_cols_4__-" title="-" onmouseover="biandise_c('rows_4_cols_4__-')" onmouseout="biandise_f('rows_4_cols_4__-')">-|阴性</li> <li onclick="settou('rows_4_cols_4','rows_4_cols_4__+')" id="rows_4_cols_4__+" title="+" onmouseover="biandise_c('rows_4_cols_4__+')" onmouseout="biandise_f('rows_4_cols_4__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_4_cols_5" id="rows_4_cols_5" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_4_cols_5cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_4_cols_5cen" class="select">
+    <li onclick="settou('rows_4_cols_5','rows_4_cols_5toutou')" id="rows_4_cols_5toutou" title="" onmouseover="biandise_c('rows_4_cols_5toutou')" onmouseout="biandise_f('rows_4_cols_5toutou')">请选择</li>
+    <li onclick="settou('rows_4_cols_5','rows_4_cols_5__-')" id="rows_4_cols_5__-" title="-" onmouseover="biandise_c('rows_4_cols_5__-')" onmouseout="biandise_f('rows_4_cols_5__-')">-|阴性</li> <li onclick="settou('rows_4_cols_5','rows_4_cols_5__+')" id="rows_4_cols_5__+" title="+" onmouseover="biandise_c('rows_4_cols_5__+')" onmouseout="biandise_f('rows_4_cols_5__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_4_cols_6" id="rows_4_cols_6" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_4_cols_6cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_4_cols_6cen" class="select">
+    <li onclick="settou('rows_4_cols_6','rows_4_cols_6toutou')" id="rows_4_cols_6toutou" title="" onmouseover="biandise_c('rows_4_cols_6toutou')" onmouseout="biandise_f('rows_4_cols_6toutou')">请选择</li>
+    <li onclick="settou('rows_4_cols_6','rows_4_cols_6__-')" id="rows_4_cols_6__-" title="-" onmouseover="biandise_c('rows_4_cols_6__-')" onmouseout="biandise_f('rows_4_cols_6__-')">-|阴性</li> <li onclick="settou('rows_4_cols_6','rows_4_cols_6__+')" id="rows_4_cols_6__+" title="+" onmouseover="biandise_c('rows_4_cols_6__+')" onmouseout="biandise_f('rows_4_cols_6__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_4_cols_7" id="rows_4_cols_7" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_4_cols_7cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_4_cols_7cen" class="select">
+    <li onclick="settou('rows_4_cols_7','rows_4_cols_7toutou')" id="rows_4_cols_7toutou" title="" onmouseover="biandise_c('rows_4_cols_7toutou')" onmouseout="biandise_f('rows_4_cols_7toutou')">请选择</li>
+    <li onclick="settou('rows_4_cols_7','rows_4_cols_7__-')" id="rows_4_cols_7__-" title="-" onmouseover="biandise_c('rows_4_cols_7__-')" onmouseout="biandise_f('rows_4_cols_7__-')">-|阴性</li> <li onclick="settou('rows_4_cols_7','rows_4_cols_7__+')" id="rows_4_cols_7__+" title="+" onmouseover="biandise_c('rows_4_cols_7__+')" onmouseout="biandise_f('rows_4_cols_7__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_4_cols_8" id="rows_4_cols_8" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_4_cols_8cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_4_cols_8cen" class="select">
+    <li onclick="settou('rows_4_cols_8','rows_4_cols_8toutou')" id="rows_4_cols_8toutou" title="" onmouseover="biandise_c('rows_4_cols_8toutou')" onmouseout="biandise_f('rows_4_cols_8toutou')">请选择</li>
+    <li onclick="settou('rows_4_cols_8','rows_4_cols_8__-')" id="rows_4_cols_8__-" title="-" onmouseover="biandise_c('rows_4_cols_8__-')" onmouseout="biandise_f('rows_4_cols_8__-')">-|阴性</li> <li onclick="settou('rows_4_cols_8','rows_4_cols_8__+')" id="rows_4_cols_8__+" title="+" onmouseover="biandise_c('rows_4_cols_8__+')" onmouseout="biandise_f('rows_4_cols_8__+')">+|阳性</li>
+
+  </ul> </td>
+			
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_4_cols_9" id="rows_4_cols_9" class="inputdata2 save method" onclick="displayf('rows_4_cols_9','21','rows_4_cols_9_s','rows_4_cols_9_t')" dmsg="HBeAg项目的方法为必填项"> 
+          <input type="hidden" name="rows_4_cols_9_s" class="save" id="rows_4_cols_9_s" value="2117">
+          <input type="hidden" name="rows_4_cols_9_t" class="save" id="rows_4_cols_9_t" value="">
+          <input type="hidden" id="rows_4_fangfa" name="rows_4_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_4_cols_10" id="rows_4_cols_10" class="inputdata2 save ins" onclick="displayy('rows_4_cols_10','rows_4_cols_10_s','rows_4_cols_10_t')" dmsg="HBeAg项目的仪器为必填项"> 
+          <input type="hidden" name="rows_4_cols_10_s" class="save" id="rows_4_cols_10_s" value="215004">
+          <input type="hidden" name="rows_4_cols_10_t" class="save" id="rows_4_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_4_cols_11" id="rows_4_cols_11" class="inputdata2 save rea" onclick="displays('rows_4_cols_11','rows_4_cols_11_s','rows_4_cols_11_t')" dmsg="HBeAg项目的试剂为必填项"> 
+          <input type="hidden" name="rows_4_cols_11_s" class="save" id="rows_4_cols_11_s" value="21082">
+          <input type="hidden" name="rows_4_cols_11_t" class="save" id="rows_4_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_4_cols_12" id="rows_4_cols_12" class="inputdata2 save xz" onclick="displayss('rows_4_cols_12','rows_4_cols_12_s','rows_4_cols_12_t')" dmsg="HBeAg项目的为必填项" value=""> 
+          <input type="hidden" name="rows_4_cols_12_s" class="save" id="rows_4_cols_12_s" value="">
+          <input type="hidden" name="rows_4_cols_12_t" class="save" id="rows_4_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows5">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_5_cols_0" class="inputitem" value="5 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_5_cols_1" id="rows_5_cols_1" class="inputitem" value="21031">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_5_cols_2" id="rows_5_cols_2" class="inputitem" value="HBeAg">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_5_cols_3" class="inputitem" value="S/CO">             
+              
+                 
+            </td>   
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_5_cols_4" name="rows_5_cols_4" class="rows5 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21031编码第5列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_5_cols_5" name="rows_5_cols_5" class="rows5 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21031编码第6列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_5_cols_6" name="rows_5_cols_6" class="rows5 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21031编码第7列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_5_cols_7" name="rows_5_cols_7" class="rows5 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21031编码第8列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_5_cols_8" name="rows_5_cols_8" class="rows5 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21031编码第9列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			  
+			 
+			<!--$qual$-->
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_5_cols_9" id="rows_5_cols_9" class="inputdata2 save method" onclick="displayf('rows_5_cols_9','21','rows_5_cols_9_s','rows_5_cols_9_t')" dmsg="HBeAg项目的方法为必填项"> 
+          <input type="hidden" name="rows_5_cols_9_s" class="save" id="rows_5_cols_9_s" value="2117">
+          <input type="hidden" name="rows_5_cols_9_t" class="save" id="rows_5_cols_9_t" value="">
+          <input type="hidden" id="rows_5_fangfa" name="rows_5_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_5_cols_10" id="rows_5_cols_10" class="inputdata2 save ins" onclick="displayy('rows_5_cols_10','rows_5_cols_10_s','rows_5_cols_10_t')" dmsg="HBeAg项目的仪器为必填项"> 
+          <input type="hidden" name="rows_5_cols_10_s" class="save" id="rows_5_cols_10_s" value="215004">
+          <input type="hidden" name="rows_5_cols_10_t" class="save" id="rows_5_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_5_cols_11" id="rows_5_cols_11" class="inputdata2 save rea" onclick="displays('rows_5_cols_11','rows_5_cols_11_s','rows_5_cols_11_t')" dmsg="HBeAg项目的试剂为必填项"> 
+          <input type="hidden" name="rows_5_cols_11_s" class="save" id="rows_5_cols_11_s" value="21082">
+          <input type="hidden" name="rows_5_cols_11_t" class="save" id="rows_5_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_5_cols_12" id="rows_5_cols_12" class="inputdata2 save xz" onclick="displayss('rows_5_cols_12','rows_5_cols_12_s','rows_5_cols_12_t')" dmsg="HBeAg项目的为必填项" value=""> 
+          <input type="hidden" name="rows_5_cols_12_s" class="save" id="rows_5_cols_12_s" value="">
+          <input type="hidden" name="rows_5_cols_12_t" class="save" id="rows_5_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows6">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_6_cols_0" class="inputitem" value="6 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_6_cols_1" id="rows_6_cols_1" class="inputitem" value="2104">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_6_cols_2" id="rows_6_cols_2" class="inputitem" value="HBeAb">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_6_cols_3" class="inputitem" value="定性">             
+              
+                 
+            </td>   
+			 <!--$input$--> 
+			 
+			 <td class="tddate1" style="width:80px;"> <input name="rows_6_cols_4" id="rows_6_cols_4" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_6_cols_4cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_6_cols_4cen" class="select">
+    <li onclick="settou('rows_6_cols_4','rows_6_cols_4toutou')" id="rows_6_cols_4toutou" title="" onmouseover="biandise_c('rows_6_cols_4toutou')" onmouseout="biandise_f('rows_6_cols_4toutou')">请选择</li>
+    <li onclick="settou('rows_6_cols_4','rows_6_cols_4__-')" id="rows_6_cols_4__-" title="-" onmouseover="biandise_c('rows_6_cols_4__-')" onmouseout="biandise_f('rows_6_cols_4__-')">-|阴性</li> <li onclick="settou('rows_6_cols_4','rows_6_cols_4__+')" id="rows_6_cols_4__+" title="+" onmouseover="biandise_c('rows_6_cols_4__+')" onmouseout="biandise_f('rows_6_cols_4__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_6_cols_5" id="rows_6_cols_5" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_6_cols_5cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_6_cols_5cen" class="select">
+    <li onclick="settou('rows_6_cols_5','rows_6_cols_5toutou')" id="rows_6_cols_5toutou" title="" onmouseover="biandise_c('rows_6_cols_5toutou')" onmouseout="biandise_f('rows_6_cols_5toutou')">请选择</li>
+    <li onclick="settou('rows_6_cols_5','rows_6_cols_5__-')" id="rows_6_cols_5__-" title="-" onmouseover="biandise_c('rows_6_cols_5__-')" onmouseout="biandise_f('rows_6_cols_5__-')">-|阴性</li> <li onclick="settou('rows_6_cols_5','rows_6_cols_5__+')" id="rows_6_cols_5__+" title="+" onmouseover="biandise_c('rows_6_cols_5__+')" onmouseout="biandise_f('rows_6_cols_5__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_6_cols_6" id="rows_6_cols_6" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_6_cols_6cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_6_cols_6cen" class="select">
+    <li onclick="settou('rows_6_cols_6','rows_6_cols_6toutou')" id="rows_6_cols_6toutou" title="" onmouseover="biandise_c('rows_6_cols_6toutou')" onmouseout="biandise_f('rows_6_cols_6toutou')">请选择</li>
+    <li onclick="settou('rows_6_cols_6','rows_6_cols_6__-')" id="rows_6_cols_6__-" title="-" onmouseover="biandise_c('rows_6_cols_6__-')" onmouseout="biandise_f('rows_6_cols_6__-')">-|阴性</li> <li onclick="settou('rows_6_cols_6','rows_6_cols_6__+')" id="rows_6_cols_6__+" title="+" onmouseover="biandise_c('rows_6_cols_6__+')" onmouseout="biandise_f('rows_6_cols_6__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_6_cols_7" id="rows_6_cols_7" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_6_cols_7cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_6_cols_7cen" class="select">
+    <li onclick="settou('rows_6_cols_7','rows_6_cols_7toutou')" id="rows_6_cols_7toutou" title="" onmouseover="biandise_c('rows_6_cols_7toutou')" onmouseout="biandise_f('rows_6_cols_7toutou')">请选择</li>
+    <li onclick="settou('rows_6_cols_7','rows_6_cols_7__-')" id="rows_6_cols_7__-" title="-" onmouseover="biandise_c('rows_6_cols_7__-')" onmouseout="biandise_f('rows_6_cols_7__-')">-|阴性</li> <li onclick="settou('rows_6_cols_7','rows_6_cols_7__+')" id="rows_6_cols_7__+" title="+" onmouseover="biandise_c('rows_6_cols_7__+')" onmouseout="biandise_f('rows_6_cols_7__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_6_cols_8" id="rows_6_cols_8" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_6_cols_8cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_6_cols_8cen" class="select">
+    <li onclick="settou('rows_6_cols_8','rows_6_cols_8toutou')" id="rows_6_cols_8toutou" title="" onmouseover="biandise_c('rows_6_cols_8toutou')" onmouseout="biandise_f('rows_6_cols_8toutou')">请选择</li>
+    <li onclick="settou('rows_6_cols_8','rows_6_cols_8__-')" id="rows_6_cols_8__-" title="-" onmouseover="biandise_c('rows_6_cols_8__-')" onmouseout="biandise_f('rows_6_cols_8__-')">-|阴性</li> <li onclick="settou('rows_6_cols_8','rows_6_cols_8__+')" id="rows_6_cols_8__+" title="+" onmouseover="biandise_c('rows_6_cols_8__+')" onmouseout="biandise_f('rows_6_cols_8__+')">+|阳性</li>
+
+  </ul> </td>
+			
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_6_cols_9" id="rows_6_cols_9" class="inputdata2 save method" onclick="displayf('rows_6_cols_9','21','rows_6_cols_9_s','rows_6_cols_9_t')" dmsg="HBeAb项目的方法为必填项"> 
+          <input type="hidden" name="rows_6_cols_9_s" class="save" id="rows_6_cols_9_s" value="2117">
+          <input type="hidden" name="rows_6_cols_9_t" class="save" id="rows_6_cols_9_t" value="">
+          <input type="hidden" id="rows_6_fangfa" name="rows_6_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_6_cols_10" id="rows_6_cols_10" class="inputdata2 save ins" onclick="displayy('rows_6_cols_10','rows_6_cols_10_s','rows_6_cols_10_t')" dmsg="HBeAb项目的仪器为必填项"> 
+          <input type="hidden" name="rows_6_cols_10_s" class="save" id="rows_6_cols_10_s" value="215004">
+          <input type="hidden" name="rows_6_cols_10_t" class="save" id="rows_6_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_6_cols_11" id="rows_6_cols_11" class="inputdata2 save rea" onclick="displays('rows_6_cols_11','rows_6_cols_11_s','rows_6_cols_11_t')" dmsg="HBeAb项目的试剂为必填项"> 
+          <input type="hidden" name="rows_6_cols_11_s" class="save" id="rows_6_cols_11_s" value="21082">
+          <input type="hidden" name="rows_6_cols_11_t" class="save" id="rows_6_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_6_cols_12" id="rows_6_cols_12" class="inputdata2 save xz" onclick="displayss('rows_6_cols_12','rows_6_cols_12_s','rows_6_cols_12_t')" dmsg="HBeAb项目的为必填项" value=""> 
+          <input type="hidden" name="rows_6_cols_12_s" class="save" id="rows_6_cols_12_s" value="">
+          <input type="hidden" name="rows_6_cols_12_t" class="save" id="rows_6_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows7">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_7_cols_0" class="inputitem" value="7 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_7_cols_1" id="rows_7_cols_1" class="inputitem" value="21041">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_7_cols_2" id="rows_7_cols_2" class="inputitem" value="HBeAb">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_7_cols_3" class="inputitem" value="S/CO">             
+              
+                 
+            </td>   
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_7_cols_4" name="rows_7_cols_4" class="rows7 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21041编码第5列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_7_cols_5" name="rows_7_cols_5" class="rows7 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21041编码第6列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_7_cols_6" name="rows_7_cols_6" class="rows7 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21041编码第7列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_7_cols_7" name="rows_7_cols_7" class="rows7 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21041编码第8列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_7_cols_8" name="rows_7_cols_8" class="rows7 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21041编码第9列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			  
+			 
+			<!--$qual$-->
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_7_cols_9" id="rows_7_cols_9" class="inputdata2 save method" onclick="displayf('rows_7_cols_9','21','rows_7_cols_9_s','rows_7_cols_9_t')" dmsg="HBeAb项目的方法为必填项"> 
+          <input type="hidden" name="rows_7_cols_9_s" class="save" id="rows_7_cols_9_s" value="2117">
+          <input type="hidden" name="rows_7_cols_9_t" class="save" id="rows_7_cols_9_t" value="">
+          <input type="hidden" id="rows_7_fangfa" name="rows_7_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_7_cols_10" id="rows_7_cols_10" class="inputdata2 save ins" onclick="displayy('rows_7_cols_10','rows_7_cols_10_s','rows_7_cols_10_t')" dmsg="HBeAb项目的仪器为必填项"> 
+          <input type="hidden" name="rows_7_cols_10_s" class="save" id="rows_7_cols_10_s" value="215004">
+          <input type="hidden" name="rows_7_cols_10_t" class="save" id="rows_7_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_7_cols_11" id="rows_7_cols_11" class="inputdata2 save rea" onclick="displays('rows_7_cols_11','rows_7_cols_11_s','rows_7_cols_11_t')" dmsg="HBeAb项目的试剂为必填项"> 
+          <input type="hidden" name="rows_7_cols_11_s" class="save" id="rows_7_cols_11_s" value="21082">
+          <input type="hidden" name="rows_7_cols_11_t" class="save" id="rows_7_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_7_cols_12" id="rows_7_cols_12" class="inputdata2 save xz" onclick="displayss('rows_7_cols_12','rows_7_cols_12_s','rows_7_cols_12_t')" dmsg="HBeAb项目的为必填项" value=""> 
+          <input type="hidden" name="rows_7_cols_12_s" class="save" id="rows_7_cols_12_s" value="">
+          <input type="hidden" name="rows_7_cols_12_t" class="save" id="rows_7_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows8">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_8_cols_0" class="inputitem" value="8 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_8_cols_1" id="rows_8_cols_1" class="inputitem" value="2107">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_8_cols_2" id="rows_8_cols_2" class="inputitem" value="抗-HCV">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_8_cols_3" class="inputitem" value="定性">             
+              
+                 
+            </td>   
+			 <!--$input$--> 
+			 
+			 <td class="tddate1" style="width:80px;"> <input name="rows_8_cols_4" id="rows_8_cols_4" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_8_cols_4cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_8_cols_4cen" class="select">
+    <li onclick="settou('rows_8_cols_4','rows_8_cols_4toutou')" id="rows_8_cols_4toutou" title="" onmouseover="biandise_c('rows_8_cols_4toutou')" onmouseout="biandise_f('rows_8_cols_4toutou')">请选择</li>
+    <li onclick="settou('rows_8_cols_4','rows_8_cols_4__-')" id="rows_8_cols_4__-" title="-" onmouseover="biandise_c('rows_8_cols_4__-')" onmouseout="biandise_f('rows_8_cols_4__-')">-|阴性</li> <li onclick="settou('rows_8_cols_4','rows_8_cols_4__+')" id="rows_8_cols_4__+" title="+" onmouseover="biandise_c('rows_8_cols_4__+')" onmouseout="biandise_f('rows_8_cols_4__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_8_cols_5" id="rows_8_cols_5" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_8_cols_5cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_8_cols_5cen" class="select">
+    <li onclick="settou('rows_8_cols_5','rows_8_cols_5toutou')" id="rows_8_cols_5toutou" title="" onmouseover="biandise_c('rows_8_cols_5toutou')" onmouseout="biandise_f('rows_8_cols_5toutou')">请选择</li>
+    <li onclick="settou('rows_8_cols_5','rows_8_cols_5__-')" id="rows_8_cols_5__-" title="-" onmouseover="biandise_c('rows_8_cols_5__-')" onmouseout="biandise_f('rows_8_cols_5__-')">-|阴性</li> <li onclick="settou('rows_8_cols_5','rows_8_cols_5__+')" id="rows_8_cols_5__+" title="+" onmouseover="biandise_c('rows_8_cols_5__+')" onmouseout="biandise_f('rows_8_cols_5__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_8_cols_6" id="rows_8_cols_6" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_8_cols_6cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_8_cols_6cen" class="select">
+    <li onclick="settou('rows_8_cols_6','rows_8_cols_6toutou')" id="rows_8_cols_6toutou" title="" onmouseover="biandise_c('rows_8_cols_6toutou')" onmouseout="biandise_f('rows_8_cols_6toutou')">请选择</li>
+    <li onclick="settou('rows_8_cols_6','rows_8_cols_6__-')" id="rows_8_cols_6__-" title="-" onmouseover="biandise_c('rows_8_cols_6__-')" onmouseout="biandise_f('rows_8_cols_6__-')">-|阴性</li> <li onclick="settou('rows_8_cols_6','rows_8_cols_6__+')" id="rows_8_cols_6__+" title="+" onmouseover="biandise_c('rows_8_cols_6__+')" onmouseout="biandise_f('rows_8_cols_6__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_8_cols_7" id="rows_8_cols_7" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_8_cols_7cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_8_cols_7cen" class="select">
+    <li onclick="settou('rows_8_cols_7','rows_8_cols_7toutou')" id="rows_8_cols_7toutou" title="" onmouseover="biandise_c('rows_8_cols_7toutou')" onmouseout="biandise_f('rows_8_cols_7toutou')">请选择</li>
+    <li onclick="settou('rows_8_cols_7','rows_8_cols_7__-')" id="rows_8_cols_7__-" title="-" onmouseover="biandise_c('rows_8_cols_7__-')" onmouseout="biandise_f('rows_8_cols_7__-')">-|阴性</li> <li onclick="settou('rows_8_cols_7','rows_8_cols_7__+')" id="rows_8_cols_7__+" title="+" onmouseover="biandise_c('rows_8_cols_7__+')" onmouseout="biandise_f('rows_8_cols_7__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_8_cols_8" id="rows_8_cols_8" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_8_cols_8cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_8_cols_8cen" class="select">
+    <li onclick="settou('rows_8_cols_8','rows_8_cols_8toutou')" id="rows_8_cols_8toutou" title="" onmouseover="biandise_c('rows_8_cols_8toutou')" onmouseout="biandise_f('rows_8_cols_8toutou')">请选择</li>
+    <li onclick="settou('rows_8_cols_8','rows_8_cols_8__-')" id="rows_8_cols_8__-" title="-" onmouseover="biandise_c('rows_8_cols_8__-')" onmouseout="biandise_f('rows_8_cols_8__-')">-|阴性</li> <li onclick="settou('rows_8_cols_8','rows_8_cols_8__+')" id="rows_8_cols_8__+" title="+" onmouseover="biandise_c('rows_8_cols_8__+')" onmouseout="biandise_f('rows_8_cols_8__+')">+|阳性</li>
+
+  </ul> </td>
+			
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_8_cols_9" id="rows_8_cols_9" class="inputdata2 save method" onclick="displayf('rows_8_cols_9','21','rows_8_cols_9_s','rows_8_cols_9_t')" dmsg="抗-HCV项目的方法为必填项"> 
+          <input type="hidden" name="rows_8_cols_9_s" class="save" id="rows_8_cols_9_s" value="2117">
+          <input type="hidden" name="rows_8_cols_9_t" class="save" id="rows_8_cols_9_t" value="">
+          <input type="hidden" id="rows_8_fangfa" name="rows_8_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_8_cols_10" id="rows_8_cols_10" class="inputdata2 save ins" onclick="displayy('rows_8_cols_10','rows_8_cols_10_s','rows_8_cols_10_t')" dmsg="抗-HCV项目的仪器为必填项"> 
+          <input type="hidden" name="rows_8_cols_10_s" class="save" id="rows_8_cols_10_s" value="215004">
+          <input type="hidden" name="rows_8_cols_10_t" class="save" id="rows_8_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_8_cols_11" id="rows_8_cols_11" class="inputdata2 save rea" onclick="displays('rows_8_cols_11','rows_8_cols_11_s','rows_8_cols_11_t')" dmsg="抗-HCV项目的试剂为必填项"> 
+          <input type="hidden" name="rows_8_cols_11_s" class="save" id="rows_8_cols_11_s" value="21082">
+          <input type="hidden" name="rows_8_cols_11_t" class="save" id="rows_8_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_8_cols_12" id="rows_8_cols_12" class="inputdata2 save xz" onclick="displayss('rows_8_cols_12','rows_8_cols_12_s','rows_8_cols_12_t')" dmsg="抗-HCV项目的为必填项" value=""> 
+          <input type="hidden" name="rows_8_cols_12_s" class="save" id="rows_8_cols_12_s" value="">
+          <input type="hidden" name="rows_8_cols_12_t" class="save" id="rows_8_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows9">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_9_cols_0" class="inputitem" value="9 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_9_cols_1" id="rows_9_cols_1" class="inputitem" value="21071">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_9_cols_2" id="rows_9_cols_2" class="inputitem" value="抗-HCV">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_9_cols_3" class="inputitem" value="S/CO">             
+              
+                 
+            </td>   
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_9_cols_4" name="rows_9_cols_4" class="rows9 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21071编码第5列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_9_cols_5" name="rows_9_cols_5" class="rows9 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21071编码第6列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_9_cols_6" name="rows_9_cols_6" class="rows9 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21071编码第7列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_9_cols_7" name="rows_9_cols_7" class="rows9 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21071编码第8列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_9_cols_8" name="rows_9_cols_8" class="rows9 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21071编码第9列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			  
+			 
+			<!--$qual$-->
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_9_cols_9" id="rows_9_cols_9" class="inputdata2 save method" onclick="displayf('rows_9_cols_9','21','rows_9_cols_9_s','rows_9_cols_9_t')" dmsg="抗-HCV项目的方法为必填项"> 
+          <input type="hidden" name="rows_9_cols_9_s" class="save" id="rows_9_cols_9_s" value="2117">
+          <input type="hidden" name="rows_9_cols_9_t" class="save" id="rows_9_cols_9_t" value="">
+          <input type="hidden" id="rows_9_fangfa" name="rows_9_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_9_cols_10" id="rows_9_cols_10" class="inputdata2 save ins" onclick="displayy('rows_9_cols_10','rows_9_cols_10_s','rows_9_cols_10_t')" dmsg="抗-HCV项目的仪器为必填项"> 
+          <input type="hidden" name="rows_9_cols_10_s" class="save" id="rows_9_cols_10_s" value="215004">
+          <input type="hidden" name="rows_9_cols_10_t" class="save" id="rows_9_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_9_cols_11" id="rows_9_cols_11" class="inputdata2 save rea" onclick="displays('rows_9_cols_11','rows_9_cols_11_s','rows_9_cols_11_t')" dmsg="抗-HCV项目的试剂为必填项"> 
+          <input type="hidden" name="rows_9_cols_11_s" class="save" id="rows_9_cols_11_s" value="21082">
+          <input type="hidden" name="rows_9_cols_11_t" class="save" id="rows_9_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_9_cols_12" id="rows_9_cols_12" class="inputdata2 save xz" onclick="displayss('rows_9_cols_12','rows_9_cols_12_s','rows_9_cols_12_t')" dmsg="抗-HCV项目的为必填项" value=""> 
+          <input type="hidden" name="rows_9_cols_12_s" class="save" id="rows_9_cols_12_s" value="">
+          <input type="hidden" name="rows_9_cols_12_t" class="save" id="rows_9_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows10">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_10_cols_0" class="inputitem" value="10 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_10_cols_1" id="rows_10_cols_1" class="inputitem" value="2113">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_10_cols_2" id="rows_10_cols_2" class="inputitem" value="HBcAb">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_10_cols_3" class="inputitem" value="定性">             
+              
+                 
+            </td>   
+			 <!--$input$--> 
+			 
+			 <td class="tddate1" style="width:80px;"> <input name="rows_10_cols_4" id="rows_10_cols_4" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_10_cols_4cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_10_cols_4cen" class="select">
+    <li onclick="settou('rows_10_cols_4','rows_10_cols_4toutou')" id="rows_10_cols_4toutou" title="" onmouseover="biandise_c('rows_10_cols_4toutou')" onmouseout="biandise_f('rows_10_cols_4toutou')">请选择</li>
+    <li onclick="settou('rows_10_cols_4','rows_10_cols_4__-')" id="rows_10_cols_4__-" title="-" onmouseover="biandise_c('rows_10_cols_4__-')" onmouseout="biandise_f('rows_10_cols_4__-')">-|阴性</li> <li onclick="settou('rows_10_cols_4','rows_10_cols_4__+')" id="rows_10_cols_4__+" title="+" onmouseover="biandise_c('rows_10_cols_4__+')" onmouseout="biandise_f('rows_10_cols_4__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_10_cols_5" id="rows_10_cols_5" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_10_cols_5cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_10_cols_5cen" class="select">
+    <li onclick="settou('rows_10_cols_5','rows_10_cols_5toutou')" id="rows_10_cols_5toutou" title="" onmouseover="biandise_c('rows_10_cols_5toutou')" onmouseout="biandise_f('rows_10_cols_5toutou')">请选择</li>
+    <li onclick="settou('rows_10_cols_5','rows_10_cols_5__-')" id="rows_10_cols_5__-" title="-" onmouseover="biandise_c('rows_10_cols_5__-')" onmouseout="biandise_f('rows_10_cols_5__-')">-|阴性</li> <li onclick="settou('rows_10_cols_5','rows_10_cols_5__+')" id="rows_10_cols_5__+" title="+" onmouseover="biandise_c('rows_10_cols_5__+')" onmouseout="biandise_f('rows_10_cols_5__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_10_cols_6" id="rows_10_cols_6" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_10_cols_6cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_10_cols_6cen" class="select">
+    <li onclick="settou('rows_10_cols_6','rows_10_cols_6toutou')" id="rows_10_cols_6toutou" title="" onmouseover="biandise_c('rows_10_cols_6toutou')" onmouseout="biandise_f('rows_10_cols_6toutou')">请选择</li>
+    <li onclick="settou('rows_10_cols_6','rows_10_cols_6__-')" id="rows_10_cols_6__-" title="-" onmouseover="biandise_c('rows_10_cols_6__-')" onmouseout="biandise_f('rows_10_cols_6__-')">-|阴性</li> <li onclick="settou('rows_10_cols_6','rows_10_cols_6__+')" id="rows_10_cols_6__+" title="+" onmouseover="biandise_c('rows_10_cols_6__+')" onmouseout="biandise_f('rows_10_cols_6__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_10_cols_7" id="rows_10_cols_7" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_10_cols_7cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_10_cols_7cen" class="select">
+    <li onclick="settou('rows_10_cols_7','rows_10_cols_7toutou')" id="rows_10_cols_7toutou" title="" onmouseover="biandise_c('rows_10_cols_7toutou')" onmouseout="biandise_f('rows_10_cols_7toutou')">请选择</li>
+    <li onclick="settou('rows_10_cols_7','rows_10_cols_7__-')" id="rows_10_cols_7__-" title="-" onmouseover="biandise_c('rows_10_cols_7__-')" onmouseout="biandise_f('rows_10_cols_7__-')">-|阴性</li> <li onclick="settou('rows_10_cols_7','rows_10_cols_7__+')" id="rows_10_cols_7__+" title="+" onmouseover="biandise_c('rows_10_cols_7__+')" onmouseout="biandise_f('rows_10_cols_7__+')">+|阳性</li>
+
+  </ul> </td>
+			 <td class="tddate1" style="width:80px;"> <input name="rows_10_cols_8" id="rows_10_cols_8" type="text" readonly="" style="cursor:pointer" onclick="disblock('rows_10_cols_8cen')" class="selectwidth save myresult">
+  <ul style="display:none;" id="rows_10_cols_8cen" class="select">
+    <li onclick="settou('rows_10_cols_8','rows_10_cols_8toutou')" id="rows_10_cols_8toutou" title="" onmouseover="biandise_c('rows_10_cols_8toutou')" onmouseout="biandise_f('rows_10_cols_8toutou')">请选择</li>
+    <li onclick="settou('rows_10_cols_8','rows_10_cols_8__-')" id="rows_10_cols_8__-" title="-" onmouseover="biandise_c('rows_10_cols_8__-')" onmouseout="biandise_f('rows_10_cols_8__-')">-|阴性</li> <li onclick="settou('rows_10_cols_8','rows_10_cols_8__+')" id="rows_10_cols_8__+" title="+" onmouseover="biandise_c('rows_10_cols_8__+')" onmouseout="biandise_f('rows_10_cols_8__+')">+|阳性</li>
+
+  </ul> </td>
+			
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_10_cols_9" id="rows_10_cols_9" class="inputdata2 save method" onclick="displayf('rows_10_cols_9','21','rows_10_cols_9_s','rows_10_cols_9_t')" dmsg="HBcAb项目的方法为必填项"> 
+          <input type="hidden" name="rows_10_cols_9_s" class="save" id="rows_10_cols_9_s" value="2117">
+          <input type="hidden" name="rows_10_cols_9_t" class="save" id="rows_10_cols_9_t" value="">
+          <input type="hidden" id="rows_10_fangfa" name="rows_10_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_10_cols_10" id="rows_10_cols_10" class="inputdata2 save ins" onclick="displayy('rows_10_cols_10','rows_10_cols_10_s','rows_10_cols_10_t')" dmsg="HBcAb项目的仪器为必填项"> 
+          <input type="hidden" name="rows_10_cols_10_s" class="save" id="rows_10_cols_10_s" value="215004">
+          <input type="hidden" name="rows_10_cols_10_t" class="save" id="rows_10_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_10_cols_11" id="rows_10_cols_11" class="inputdata2 save rea" onclick="displays('rows_10_cols_11','rows_10_cols_11_s','rows_10_cols_11_t')" dmsg="HBcAb项目的试剂为必填项"> 
+          <input type="hidden" name="rows_10_cols_11_s" class="save" id="rows_10_cols_11_s" value="21082">
+          <input type="hidden" name="rows_10_cols_11_t" class="save" id="rows_10_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_10_cols_12" id="rows_10_cols_12" class="inputdata2 save xz" onclick="displayss('rows_10_cols_12','rows_10_cols_12_s','rows_10_cols_12_t')" dmsg="HBcAb项目的为必填项" value=""> 
+          <input type="hidden" name="rows_10_cols_12_s" class="save" id="rows_10_cols_12_s" value="">
+          <input type="hidden" name="rows_10_cols_12_t" class="save" id="rows_10_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+    <tr class="tritem " id="rows11">    
+            <td class="tditem1" style="width:50px;">    
+            <input type="text" readonly="" name="rows_11_cols_0" class="inputitem" value="11 ">    
+            </td>    
+            <td class="tditem2" style="width:60px;">    
+            <input type="text" readonly="" name="rows_11_cols_1" id="rows_11_cols_1" class="inputitem" value="21131">    
+            </td>    
+            <td class="tditem3" style="width:250px;">    
+            <input type="text" readonly="" name="rows_11_cols_2" id="rows_11_cols_2" class="inputitem" value="HBcAb">    
+            </td>    
+            <td class="tditem4" style="width:80px;">    
+              
+            <input type="text" readonly="" name="rows_11_cols_3" class="inputitem" value="S/CO">             
+              
+                 
+            </td>   
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_11_cols_4" name="rows_11_cols_4" class="rows11 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21131编码第5列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_11_cols_5" name="rows_11_cols_5" class="rows11 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21131编码第6列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_11_cols_6" name="rows_11_cols_6" class="rows11 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21131编码第7列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_11_cols_7" name="rows_11_cols_7" class="rows11 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21131编码第8列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			 <td class="tddate1" style="width:80px;">   
+					 <input type="text" id="rows_11_cols_8" name="rows_11_cols_8" class="rows11 inputdata1 ime save result myresult" dtype="Quantitative" dmsg="21131编码第9列数据格式不对请重新输入" require="false"> 
+					   						 </td>
+			  
+			 
+			<!--$qual$-->
+			  
+			 <td class="tdtdate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_11_cols_9" id="rows_11_cols_9" class="inputdata2 save method" onclick="displayf('rows_11_cols_9','21','rows_11_cols_9_s','rows_11_cols_9_t')" dmsg="HBcAb项目的方法为必填项"> 
+          <input type="hidden" name="rows_11_cols_9_s" class="save" id="rows_11_cols_9_s" value="2117">
+          <input type="hidden" name="rows_11_cols_9_t" class="save" id="rows_11_cols_9_t" value="">
+          <input type="hidden" id="rows_11_fangfa" name="rows_11_fangfa" value="21">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="readonly" name="rows_11_cols_10" id="rows_11_cols_10" class="inputdata2 save ins" onclick="displayy('rows_11_cols_10','rows_11_cols_10_s','rows_11_cols_10_t')" dmsg="HBcAb项目的仪器为必填项"> 
+          <input type="hidden" name="rows_11_cols_10_s" class="save" id="rows_11_cols_10_s" value="215004">
+          <input type="hidden" name="rows_11_cols_10_t" class="save" id="rows_11_cols_10_t" value="">
+          </td>    
+          <td class="tddate2" style="width:200px;">    
+          <input type="text" readonly="" name="rows_11_cols_11" id="rows_11_cols_11" class="inputdata2 save rea" onclick="displays('rows_11_cols_11','rows_11_cols_11_s','rows_11_cols_11_t')" dmsg="HBcAb项目的试剂为必填项"> 
+          <input type="hidden" name="rows_11_cols_11_s" class="save" id="rows_11_cols_11_s" value="21082">
+          <input type="hidden" name="rows_11_cols_11_t" class="save" id="rows_11_cols_11_t" value="">     
+          </td>    
+      <td class="tddate2" style="width:200px;">    
+          <input readonly="" type="Hidden" name="rows_11_cols_12" id="rows_11_cols_12" class="inputdata2 save xz" onclick="displayss('rows_11_cols_12','rows_11_cols_12_s','rows_11_cols_12_t')" dmsg="HBcAb项目的为必填项" value=""> 
+          <input type="hidden" name="rows_11_cols_12_s" class="save" id="rows_11_cols_12_s" value="">
+          <input type="hidden" name="rows_11_cols_12_t" class="save" id="rows_11_cols_12_t" value="">     
+     
+        
+          </td>    
+    </tr> 
+			 
+			
+<tr><td style="width: 50px;"><input type="text" readonly="" name="rows_12_cols_0" style="border:none" class="inputitem" value="-"></td><td style="width: 60px;"><input type="text" readonly="" name="rows_12_cols_1" style="border:none" class="inputitem" value="-"></td><td style="width: 250px;"><input type="text" readonly="" name="rows_12_cols_2" class="inputitem" value="校验和"></td><td style="width: 80px;"><input type="text" readonly="" name="rows_12_cols_3" style="border:none" class="inputitem" value="-"></td><td><input type="text" name="rows_12_cols_4" id="rows_12_cols_4" readonly="" class="inputdata1" value="点击计算" onfocus="myaddvalue(this)"></td><td><input type="text" name="rows_12_cols_5" id="rows_12_cols_5" readonly="" class="inputdata1" value="点击计算" onfocus="myaddvalue(this)"></td><td><input type="text" name="rows_12_cols_6" id="rows_12_cols_6" readonly="" class="inputdata1" value="点击计算" onfocus="myaddvalue(this)"></td><td><input type="text" name="rows_12_cols_7" id="rows_12_cols_7" readonly="" class="inputdata1" value="点击计算" onfocus="myaddvalue(this)"></td><td><input type="text" name="rows_12_cols_8" id="rows_12_cols_8" readonly="" class="inputdata1" value="点击计算" onfocus="myaddvalue(this)"></td><td>-</td><td>-</td><td>-</td><td>-</td></tr></tbody></table>
+ <input type="hidden" name="totalrows" id="totalrows" value="12">
+<input type="hidden" name="totalcols" id="totalcols" value="13">
+<input type="file" name="file" id="file" style="display:none">
+<input type="reset" name="myReset" value="Reset" style="display:none">
+
+</form>
+
+<script type="text/javascript">
+function get_rowindex_by_itemindex(itemindex)
+{
+  var row_num=parseInt($("#totalrows").val());
+  var row_index=-1;
+  for(var i=0;i<row_num;i++)
+  {
+     if($("#rows_"+i+"_cols_1").val()==itemindex)
+	 {
+	    row_index=i;
+		break;
+	 }
+  }
+  return row_index;
+}
+
+function show_itemindex_ptdata(itemindex,MethodIndex,method,methodOther,InstrumentIndex,ins,insOther,ReagentIndex,rea,reaOther,XzIndex,xz,xzOther)
+{
+   if($("#speciality").val()!="10")
+   {
+	   var col_num=parseInt($("#totalcols").val());
+	   var row_index=get_rowindex_by_itemindex(itemindex);
+	   $("#rows_"+row_index+"_cols_"+(col_num-4)+"_s").val(MethodIndex);
+	   $("#rows_"+row_index+"_cols_"+(col_num-4)+"_t").val(methodOther);
+	   $("#rows_"+row_index+"_cols_"+(col_num-4)).val(method);
+	   
+	   $("#rows_"+row_index+"_cols_"+(col_num-3)+"_s").val(InstrumentIndex);
+	   $("#rows_"+row_index+"_cols_"+(col_num-3)+"_t").val(insOther);
+	   $("#rows_"+row_index+"_cols_"+(col_num-3)).val(ins);
+	   
+	   $("#rows_"+row_index+"_cols_"+(col_num-2)+"_s").val(ReagentIndex);
+	   $("#rows_"+row_index+"_cols_"+(col_num-2)+"_t").val(reaOther);
+	   $("#rows_"+row_index+"_cols_"+(col_num-2)).val(rea);
+   
+   
+	   $("#rows_"+row_index+"_cols_"+(col_num-1)+"_s").val(XzIndex);
+	   $("#rows_"+row_index+"_cols_"+(col_num-1)+"_t").val(xzOther);
+	   $("#rows_"+row_index+"_cols_"+(col_num-1)).val(xz);
+   }
+}
+
+show_itemindex_ptdata('2101','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('21011','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('2102','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('21021','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('2103','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('21031','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('2104','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('21041','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('2107','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('21071','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('2113','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');show_itemindex_ptdata('21131','2117','电化学发光免疫试验（ECLA)','','215004','罗氏 Cobas e 601','','21082','罗氏（ROCHE）投资有限公司','','','','');
+</script>
+<table width="100%" border="0" cellspacing="1" cellpadding="0" style="margin-bottom:200px;">
+  <tbody><tr>
+    <td></td>
+  </tr>
+</tbody></table>
+<script language="javascript">
+<!--
+	var ztcolcount=report.totalcols.value;
+	var ztrowcount=report.totalrows.value;
+	
+    var the_row,the_cell;
+    the_row = -1;
+    var newrow=goodtable.insertRow(the_row);
+    $(function(){
+		  
+			  //for (var i=0;i<goodtable.rows[1].cells.length;i++) {
+			for (var i=0;i<$("#goodtable tr:eq(1)").find("td:not(:hidden)").size();i++) {
+				the_cell=newrow.insertCell(i);
+				if(i==0)
+				{
+				   the_cell.style.width="50px";
+				}
+				else if(i==1)
+				{
+				   the_cell.style.width="60px";
+				}
+				else if(i==2)
+				{
+				   the_cell.style.width="250px";
+				}
+				else if(i==3)
+				{
+				   the_cell.style.width="80px";
+				}
+				if ((i>3)&&(i<ztcolcount-4)){
+				  the_cell.innerHTML="<input type='text' name='rows_" + ztrowcount + "_cols_" + i + "' id='rows_" + ztrowcount + "_cols_" + i + "' readonly class=inputdata1 value='点击计算' onfocus='myaddvalue(this)'>";
+				}
+				else if (i<4){
+				  if (i!=2){
+					the_cell.innerHTML="<input type='text' readonly name='rows_" + ztrowcount + "_cols_" + i + "' style='border:none' class='inputitem'  value='-'>";
+				  }
+				  else{
+					the_cell.innerHTML="<input type='text' readonly name='rows_" + ztrowcount + "_cols_" + i + "' class='inputitem' value='校验和'>";
+				  }
+				}	
+				else {
+				  the_cell.innerHTML="-"
+				}
+			}
+		
+		});
+//-->
+</script>
+
+<div id="21" class="cao" style="font-size:12px;position:absolute;display:none;text-align:center;overflow:visible;height:auto">
+            
+            <table id="21_cao0" width="400" height="20" bgcolor="#9CB5F3" onmousemove="drag.dragStar('21_cao0','21'); " style="cursor:move;">
+            <tbody><tr align="center">
+            <td align="left"><font id="biao21" size="1">请双击选填</font><font color="#ffffff" size="2"><b>&nbsp;<span class="methodname">方法</span></b></font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+            <span style="cursor:pointer; color:#FFFFFF" onclick="noplayDiv('21')">×</span>
+            </td>
+            </tr>
+            </tbody></table>
+            <select id="selectff21" size="15" style="width:100%; border-width:0" onclick="setValue(this,'obj21','obj21s','obj21t')" ondblclick="setValue(this,'obj21','obj21s','obj21t');noplayDiv('21')"> 
+             <option readonly="" value="2101">2101|酶联免疫吸附试验（ELISA）</option><option readonly="" value="2102">2102|放射免疫试验（RIA）</option><option readonly="" value="2103">2103|间接免疫荧光试验（IFA）</option><option readonly="" value="2104">2104|单向(环状)免疫扩散法(SRID)</option><option readonly="" value="2105">2105|免疫透射比浊法(ITA)</option><option readonly="" value="2106">2106|免疫散射比浊法（INA)</option><option readonly="" value="2107">2107|乳胶凝集试验（LA）</option><option readonly="" value="2108">2108|免疫渗滤层析试验</option><option readonly="" value="2109">2109|快速血浆反应素环状卡片试验(RPR)</option><option readonly="" value="2110">2110|不加热血清反应素试验(USR)</option><option readonly="" value="2111">2111|螺旋体血球凝集试验(TPHA)</option><option readonly="" value="2112">2112|甲苯胺红不加热血清试验(TRUST)</option><option readonly="" value="2113">2113|明胶颗粒凝集试验(PA)</option><option readonly="" value="2114">2114|荧光偏振免疫试验(FPIA)</option><option readonly="" value="2115">2115|时间分辨荧光免疫试验（TR-FIA)</option><option readonly="" value="2116">2116|化学发光免疫实验（CLIA）</option><option readonly="" value="2117">2117|电化学发光免疫试验（ECLA)</option><option readonly="" value="2118">2118|化学发光酶免疫试验（CLEIA）</option><option readonly="" value="2119">2119|聚合酶链反应(PCR)</option><option readonly="" value="2120">2120|逆转录-聚合酶链反应(RT-PCR)</option><option readonly="" value="2121">2121|实时荧光PCR(定量)</option><option readonly="" value="2123">2123|转录基于的放大系统(NASBA)</option><option readonly="" value="2124">2124|连接酶链反应(LCR)</option><option readonly="" value="2125">2125|链替代放大系统(SDA)</option><option readonly="" value="2127">2127|bDNA信号放大系统(bDNA)</option><option readonly="" value="2128">2128|免疫印记（包括westernblot和RIBA等）</option><option readonly="" value="2129">2129|增强化学发光免疫试验</option><option readonly="" value="2130">2130|PCR ELISA 定量</option><option readonly="" value="2131">2131|PCR ELISA 定性</option><option readonly="" value="2133">2133|PCR-反向定点杂交法</option><option readonly="" value="2181">2181|透射比浊法</option><option readonly="" value="2182">2182|速率散射比浊法</option><option readonly="" value="2183">2183|微粒子酶免疫分析</option><option readonly="" value="2184">2184|单向（环状）免疫扩散法</option><option readonly="" value="2185">2185|散射比浊法（终点法）</option><option readonly="" value="2186">2186|免疫印迹</option><option readonly="" value="2187">2187|斑点法</option><option readonly="" value="2188">2188|酶免疫分析</option><option readonly="" value="2189">2189|扫描仪</option><option readonly="" value="2190">2190|吖啶酯直接化学发光</option><option readonly="" value="2191">2191|光激化学发光</option><option readonly="" value="2192">2192|鲁米诺/异鲁米诺化学发光</option><option readonly="" value="2199">2199|其它</option>
+            </select> 
+            <input type="hidden" id="obj21" value="">
+			 <input type="hidden" id="obj21s" value="">
+            <input type="hidden" id="obj21t" value="">
+            
+            <br>
+            <input type="button" id="qiehuan21" value="点此详述" style="" onclick="changeinputff('21','2','obj21t')" class="butt">
+            <input type="button" id="g21" class="butt1" onclick="noplayDiv('21')" value="确定">
+			<input type="button" id="copy21" style="margin-left:15px;background:none;" onclick="mycopycode_1('obj21','cao21')" value="复制代码到此处">
+             <input type="button" id="c21" style="margin-right:0px;background:none;" onclick="cle('obj21','selectff21')" value="清空">
+            
+            
+            <input type="text" id="text_21" style="width:80%;display:none" onkeydown="if(event.keyCode==13){setValue2('21','text_21','obj21','obj21s','obj21t');noplayDiv('21')}" class="td" value=""> 
+            <br> 
+            <br> 
+            <input type="button" id="q21" style="display:none" class="butt1" onclick="setValue2('21','text_21','obj21','obj21s','obj21t');noplayDiv('21')" value="确定">
+</div>
+
+
+<div id="cao2" class="cao" style="font-size:12px;position:absolute;display:none;text-align:center;overflow:visible;height:auto">
+            <table id="cao2_cao0" width="400" height="20" bgcolor="#9CB5F3" onmousemove="drag.dragStar('cao2_cao0','cao2'); " style="cursor:move;"> 
+            <tbody><tr align="center"> 
+            <td align="left"><font id="biao2" size="1">请双击选填</font><font color="#ffffff" size="2">&nbsp;<b>仪器</b></font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+            <span style="cursor:pointer; color:#FFFFFF" onclick="noplayDiv('cao2')">×</span> 
+            </td> 
+            </tr> 
+            </tbody></table> 
+           <select id="selecty" size="15" style="width:100%;  border-width:0" ondblclick="setValue(this,'obj2','obj2s','obj2t');noplayDiv('cao2')" onclick="setValue(this,'obj2','obj2s','obj2t')"><option readonly="" class="inputitem1" value="210000"> 210000|人眼判断</option> <option readonly="" class="inputitem1" value="211001"> 211001|AW I</option> <option readonly="" class="inputitem1" value="211002"> 211002|AW II</option> <option readonly="" class="inputitem1" value="211003"> 211003|Anthos 2001</option> <option readonly="" class="inputitem1" value="211004"> 211004|Anthos 2010 HT2改成</option> <option readonly="" class="inputitem1" value="211005"> 211005|Anthos HT3</option> <option readonly="" class="inputitem1" value="211006"> 211006|CliniBio 128</option> <option readonly="" class="inputitem1" value="211007"> 211007|CliniBio 128C</option> <option readonly="" class="inputitem1" value="211008"> 211008|DIAS+Vivace</option> <option readonly="" class="inputitem1" value="211009"> 211009|DV-990</option> <option readonly="" class="inputitem1" value="211010"> 211010|DigiScan</option> <option readonly="" class="inputitem1" value="211011"> 211011|EL-309</option> <option readonly="" class="inputitem1" value="211012"> 211012|EL-311</option> <option readonly="" class="inputitem1" value="211013"> 211013|EL-311s</option> <option readonly="" class="inputitem1" value="211014"> 211014|EL-312e</option> <option readonly="" class="inputitem1" value="211015"> 211015|EL-X800G</option> <option readonly="" class="inputitem1" value="211016"> 211016|EL-X800</option> <option readonly="" class="inputitem1" value="211017"> 211017|EL-X808</option> <option readonly="" class="inputitem1" value="211018"> 211018|FAME</option> <option readonly="" class="inputitem1" value="211019"> 211019|LP-400</option> <option readonly="" class="inputitem1" value="211020"> 211020|MR-4100</option> <option readonly="" class="inputitem1" value="211021"> 211021|MR-5000</option> <option readonly="" class="inputitem1" value="211022"> 211022|MRX</option> <option readonly="" class="inputitem1" value="211023"> 211023|MicroReader TM4</option> <option readonly="" class="inputitem1" value="211024"> 211024|Multiskan 352(MK352)</option> <option readonly="" class="inputitem1" value="211025"> 211025|Multiskan II(MK2)</option> <option readonly="" class="inputitem1" value="211026"> 211026|Multiskan III(MK3)</option> <option readonly="" class="inputitem1" value="211027"> 211027|Multiskan Mcc/340</option> <option readonly="" class="inputitem1" value="211028"> 211028|Multiskan Plus</option> <option readonly="" class="inputitem1" value="211029"> 211029|Organon Teknika Micr</option> <option readonly="" class="inputitem1" value="211031"> 211031|STAT FAX-2100</option> <option readonly="" class="inputitem1" value="211032"> 211032|Sigma 960</option> <option readonly="" class="inputitem1" value="211033"> 211033|Spectra Classic</option> <option readonly="" class="inputitem1" value="211035"> 211035|Spectra II</option> <option readonly="" class="inputitem1" value="211036"> 211036|Spectra III</option> <option readonly="" class="inputitem1" value="211037"> 211037|Wellscan</option> <option readonly="" class="inputitem1" value="211038"> 211038|伯乐3500</option> <option readonly="" class="inputitem1" value="211039"> 211039|伯乐3550</option> <option readonly="" class="inputitem1" value="211040"> 211040|伯乐450酶标仪</option> <option readonly="" class="inputitem1" value="211041"> 211041|伯乐550酶标仪</option> <option readonly="" class="inputitem1" value="211042"> 211042|伯乐Coda</option> <option readonly="" class="inputitem1" value="211044"> 211044|华东电子管厂GD-3021</option> <option readonly="" class="inputitem1" value="211045"> 211045|华东电子管厂GD-3022A</option> <option readonly="" class="inputitem1" value="211046"> 211046|Alisei全自动酶免分析仪</option> <option readonly="" class="inputitem1" value="211047"> 211047|普朗DNM9602酶标分析仪</option> <option readonly="" class="inputitem1" value="211048"> 211048|安图2010酶标仪</option> <option readonly="" class="inputitem1" value="211049"> 211049|Labsystem Multisckan Ascent</option> <option readonly="" class="inputitem1" value="211050"> 211050|TECAN Sunrise</option> <option readonly="" class="inputitem1" value="211051"> 211051|AT2000时间分辨检测系统</option> <option readonly="" class="inputitem1" value="211052"> 211052|伯乐680酶标仪</option> <option readonly="" class="inputitem1" value="211053"> 211053|罗氏 ELECSYS 2010</option> <option readonly="" class="inputitem1" value="211054"> 211054|变色龙酶免仪  TRITURUS</option> <option readonly="" class="inputitem1" value="211055"> 211055|宝灵曼ES-700全自动</option> <option readonly="" class="inputitem1" value="211056"> 211056|Anthos 340R</option> <option readonly="" class="inputitem1" value="211057"> 211057|Anthos 340RT</option> <option readonly="" class="inputitem1" value="211059"> 211059|AT-738半自动生化分析仪</option> <option readonly="" class="inputitem1" value="211060"> 211060|AT-838</option> <option readonly="" class="inputitem1" value="211061"> 211061|AFT212 FY1001</option> <option readonly="" class="inputitem1" value="211062"> 211062|ANSR</option> <option readonly="" class="inputitem1" value="211063"> 211063|ET-630G</option> <option readonly="" class="inputitem1" value="211064"> 211064|FG-2008G</option> <option readonly="" class="inputitem1" value="211065"> 211065|FJ-2003/50A</option> <option readonly="" class="inputitem1" value="211066"> 211066|FJ-2008</option> <option readonly="" class="inputitem1" value="211067"> 211067|FJ-2008G</option> <option readonly="" class="inputitem1" value="211068"> 211068|FJ-2008P</option> <option readonly="" class="inputitem1" value="211069"> 211069|FJ-2008PS</option> <option readonly="" class="inputitem1" value="211070"> 211070|FJ-2011</option> <option readonly="" class="inputitem1" value="211071"> 211071|FMJ-180</option> <option readonly="" class="inputitem1" value="211072"> 211072|FMJ-182</option> <option readonly="" class="inputitem1" value="211073"> 211073|FT-613</option> <option readonly="" class="inputitem1" value="211074"> 211074|FT-630G</option> <option readonly="" class="inputitem1" value="211075"> 211075|FT-646A</option> <option readonly="" class="inputitem1" value="211076"> 211076|GAMMA-C12</option> <option readonly="" class="inputitem1" value="211077"> 211077|GC-1200</option> <option readonly="" class="inputitem1" value="211078"> 211078|GC-400</option> <option readonly="" class="inputitem1" value="211079"> 211079|GC-911</option> <option readonly="" class="inputitem1" value="211080"> 211080|ISO-DATA</option> <option readonly="" class="inputitem1" value="211081"> 211081|SN-682</option> <option readonly="" class="inputitem1" value="211082"> 211082|SN-682B</option> <option readonly="" class="inputitem1" value="211083"> 211083|SN-682B2</option> <option readonly="" class="inputitem1" value="211084"> 211084|SN-695</option> <option readonly="" class="inputitem1" value="211085"> 211085|SN-695B</option> <option readonly="" class="inputitem1" value="211086"> 211086|TG-2003</option> <option readonly="" class="inputitem1" value="211087"> 211087|XH-6010</option> <option readonly="" class="inputitem1" value="211088"> 211088|贝克曼CX系列生化分析仪</option> <option readonly="" class="inputitem1" value="211089"> 211089|岛津CL系列生化分析仪</option> <option readonly="" class="inputitem1" value="211090"> 211090|日立 7060，7150，717</option> <option readonly="" class="inputitem1" value="211091"> 211091|意大利BT系列生化分析仪</option> <option readonly="" class="inputitem1" value="211092"> 211092|荷兰ISP系列生化分析仪</option> <option readonly="" class="inputitem1" value="211093"> 211093|Technicon RA50生化分析仪</option> <option readonly="" class="inputitem1" value="211094"> 211094|Technicon RA1000生化仪</option> <option readonly="" class="inputitem1" value="211095"> 211095|721或722型分光光度计</option> <option readonly="" class="inputitem1" value="211096"> 211096|HVK-60免疫比浊仪</option> <option readonly="" class="inputitem1" value="211097"> 211097|ASYS HITECH Gmbh</option> <option readonly="" class="inputitem1" value="211099"> 211099|罗氏 E170</option> <option readonly="" class="inputitem1" value="211100"> 211100|DENLEY DRAGON MK2</option> <option readonly="" class="inputitem1" value="211101"> 211101|DENLEY DRAGON MK3</option> <option readonly="" class="inputitem1" value="211102"> 211102|Bio-Rad iCycle</option> <option readonly="" class="inputitem1" value="211103"> 211103|Bio-Cell 2010</option> <option readonly="" class="inputitem1" value="211104"> 211104|Bio-Cell HT1</option> <option readonly="" class="inputitem1" value="211105"> 211105|Human</option> <option readonly="" class="inputitem1" value="211106"> 211106|Microplate Reader 318,318MC</option> <option readonly="" class="inputitem1" value="211107"> 211107|OPSYS MR CB-372</option> <option readonly="" class="inputitem1" value="211108"> 211108|Personal-LAB</option> <option readonly="" class="inputitem1" value="211109"> 211109|XD-711,711C</option> <option readonly="" class="inputitem1" value="211110"> 211110|XH-711</option> <option readonly="" class="inputitem1" value="211111"> 211111|RT-2100</option> <option readonly="" class="inputitem1" value="211112"> 211112|RT-2100C</option> <option readonly="" class="inputitem1" value="211113"> 211113|V-max</option> <option readonly="" class="inputitem1" value="211115"> 211115|上海新波</option> <option readonly="" class="inputitem1" value="211117"> 211117|Bio-RAD 680</option> <option readonly="" class="inputitem1" value="211118"> 211118|意大利 Alisei</option> <option readonly="" class="inputitem1" value="211119"> 211119|DNM-9602</option> <option readonly="" class="inputitem1" value="211120"> 211120|Emax</option> <option readonly="" class="inputitem1" value="211121"> 211121|BEP-2000</option> <option readonly="" class="inputitem1" value="213002"> 213002|雅培AXSYM 免疫分析仪</option> <option readonly="" class="inputitem1" value="213005"> 213005|Chiron ACS 180SE 全自动酶免分析系统</option> <option readonly="" class="inputitem1" value="213006"> 213006|强生OCD Vitros Eci</option> <option readonly="" class="inputitem1" value="213007"> 213007|雅培i2000/Alinity i</option> <option readonly="" class="inputitem1" value="213008"> 213008|亚斯特Personal LAB 全自动酶免分析仪</option> <option readonly="" class="inputitem1" value="213009"> 213009|亚斯特Nexgen Four 全自动酶免分析仪</option> <option readonly="" class="inputitem1" value="213010"> 213010|上海科华 ST-36W型酶标仪</option> <option readonly="" class="inputitem1" value="213019"> 213019|科美诊断chemclin600全自动化学发光仪</option> <option readonly="" class="inputitem1" value="213020"> 213020|科美诊断chemclin100半自动化学发光仪</option> <option readonly="" class="inputitem1" value="213021"> 213021|科美诊断chemclin1500全自动化学发光免疫分析仪</option> <option readonly="" class="inputitem1" value="215001"> 215001|雷杜RT-6000</option> <option readonly="" class="inputitem1" value="215002"> 215002|雷杜RT-6100</option> <option readonly="" class="inputitem1" value="215003"> 215003|罗氏 Cobas e 411</option> <option readonly="" class="inputitem1" value="215004"> 215004|罗氏 Cobas e 601</option> <option readonly="" class="inputitem1" value="215005"> 215005|HISCL-5000全自动免疫分析仪</option> <option readonly="" class="inputitem1" value="215006"> 215006|HISCL-800全自动免疫分析仪</option> <option readonly="" class="inputitem1" value="215007"> 215007|HISCL-2000i全自动免疫分析仪</option> <option readonly="" class="inputitem1" value="215008"> 215008|罗氏 Cobas e801</option> <option readonly="" class="inputitem1" value="217004"> 217004|OLYMPUS BX（BX50 BX60）显微镜</option> <option readonly="" class="inputitem1" value="217008"> 217008|OLYMPUS其他荧光显微镜</option> <option readonly="" class="inputitem1" value="217013"> 217013|NIKON Fluophoto显微镜</option> <option readonly="" class="inputitem1" value="217014"> 217014|NIKON其他荧光显微镜</option> <option readonly="" class="inputitem1" value="217018"> 217018|其他荧光显微镜</option> <option readonly="" class="inputitem1" value="218001"> 218001|ABI 2400 PCR 仪</option> <option readonly="" class="inputitem1" value="218002"> 218002|ABI 9600 PCR 仪</option> <option readonly="" class="inputitem1" value="218003"> 218003|ABI 9700 PCR 仪</option> <option readonly="" class="inputitem1" value="218004"> 218004|PTC-200 热循环仪</option> <option readonly="" class="inputitem1" value="218005"> 218005|PTC-100 热循环仪</option> <option readonly="" class="inputitem1" value="218011"> 218011|ABI 5700 荧光定量PCR仪</option> <option readonly="" class="inputitem1" value="218012"> 218012|ROCHE Lightcycler</option> <option readonly="" class="inputitem1" value="218013"> 218013|Bio-Rad iCycler</option> <option readonly="" class="inputitem1" value="218014"> 218014|Bio-Rad iCycler 480</option> <option readonly="" class="inputitem1" value="218019"> 218019|ABI 7700 荧光定量PCR仪</option> <option readonly="" class="inputitem1" value="218020"> 218020|ABI 7000 荧光定量PCR仪</option> <option readonly="" class="inputitem1" value="218021"> 218021|ABI 7900 荧光定量PCR仪</option> <option readonly="" class="inputitem1" value="218022"> 218022|COBAS AMPLICOR</option> <option readonly="" class="inputitem1" value="218023"> 218023|COBAS TaqMan</option> <option readonly="" class="inputitem1" value="218024"> 218024|ABI 7300 荧光定量PCR仪</option> <option readonly="" class="inputitem1" value="218025"> 218025|ABI 7500 荧光定量PCR仪</option> <option readonly="" class="inputitem1" value="218026"> 218026|Rotor Gene</option> <option readonly="" class="inputitem1" value="218027"> 218027|Line-Gene</option> <option readonly="" class="inputitem1" value="218028"> 218028|MJ Research Opticon II</option> <option readonly="" class="inputitem1" value="218029"> 218029|FTC 2000</option> <option readonly="" class="inputitem1" value="218030"> 218030|DA7600核酸扩增实时荧光检测系统</option> <option readonly="" class="inputitem1" value="218031"> 218031|科华FluoCycle 实时荧光定量PCR仪</option> <option readonly="" class="inputitem1" value="218032"> 218032|SLAN荧光定量PCR仪</option> <option readonly="" class="inputitem1" value="218099"> 218099|其它PCR仪</option> <option readonly="" class="inputitem1" value="218100"> 218100|医用核酸分子快速杂交仪HHM-2</option> <option readonly="" class="inputitem1" value="218101"> 218101|Luminex 100</option> <option readonly="" class="inputitem1" value="218102"> 218102|Luminex 200</option> <option readonly="" class="inputitem1" value="218103"> 218103|AM-1型全自动自身抗体分析仪</option> <option readonly="" class="inputitem1" value="218104"> 218104|EM-1型感染免疫分析仪</option> <option readonly="" class="inputitem1" value="218105"> 218105|Genelight 9800全自动医用PCR分析系统</option> <option readonly="" class="inputitem1" value="218106"> 218106|Genelight 2400全自动医用PCR分析系统</option> <option readonly="" class="inputitem1" value="218107"> 218107|伯乐CFX96实时定量PCR仪</option> <option readonly="" class="inputitem1" value="218108"> 218108|Liaison化学发光分析仪</option> <option readonly="" class="inputitem1" value="218109"> 218109|MiniVIDAS BLUE</option> <option readonly="" class="inputitem1" value="218110"> 218110|VIDAS 30 BLUE</option> <option readonly="" class="inputitem1" value="218111"> 218111|Auto lumiS 2000</option> <option readonly="" class="inputitem1" value="218112"> 218112|Auto lumiS 3000</option> <option readonly="" class="inputitem1" value="218113"> 218113|ADC ELISA</option> <option readonly="" class="inputitem1" value="218114"> 218114|迈克IS 1200全自动化学发光测定仪</option> <option readonly="" class="inputitem1" value="218115"> 218115|迈克i1000全自动化学发光测定仪</option> <option readonly="" class="inputitem1" value="218116"> 218116|迈克i3000全自动化学发光测定仪</option> <option readonly="" class="inputitem1" value="219010"> 219010|Beckman IMMAGE</option> <option readonly="" class="inputitem1" value="219020"> 219020|Dade Behring BNP</option> <option readonly="" class="inputitem1" value="219030"> 219030|Olympus AU2700</option> <option readonly="" class="inputitem1" value="219040"> 219040|欧蒙Scall</option> <option readonly="" class="inputitem1" value="219041"> 219041|欧蒙BX-51</option> <option readonly="" class="inputitem1" value="219042"> 219042|深圳迈瑞CL-900i/1000i/1200i/2000i/2200i/6000i/6200</option> <option readonly="" class="inputitem1" value="2190421"> 2190421|深圳迈瑞CL-8000i</option> <option readonly="" class="inputitem1" value="219043"> 219043|安图AutoLumo A2000</option> <option readonly="" class="inputitem1" value="219044"> 219044|安图AutoLumo A2000 Plus</option> <option readonly="" class="inputitem1" value="219045"> 219045|博奥赛斯（天津） Peteck 96-I</option> <option readonly="" class="inputitem1" value="219046"> 219046|博奥赛斯（天津） Axceed 200T/400T</option> <option readonly="" class="inputitem1" value="219047"> 219047|博奥赛斯（天津） Axceed 260/260X/260X1</option> <option readonly="" class="inputitem1" value="219048"> 219048|亚辉龙iFlash3000系列化学发光测定仪</option> <option readonly="" class="inputitem1" value="219049"> 219049|科美博阳LICA 500/LICA800/LICAsmart全自动化学发光仪</option> <option readonly="" class="inputitem1" value="219050"> 219050|日立</option> <option readonly="" class="inputitem1" value="219051"> 219051|四川沃文特LA3000/LA3000S</option> <option readonly="" class="inputitem1" value="219052"> 219052|厦门优迈科Caris200/Wan200/Wan100</option> <option readonly="" class="inputitem1" value="219053"> 219053|美康MS-i2280/3080</option> <option readonly="" class="inputitem1" value="219054"> 219054|中元汇吉EXI2400/8000</option> <option readonly="" class="inputitem1" value="219055"> 219055|深圳迈瑞 CL-9000i/9200i</option> <option readonly="" class="inputitem1" value="219056"> 219056|知微知微生物全自动核酸扩增分析仪（型号NAT-3000)</option> <option readonly="" class="inputitem1" value="219057"> 219057|知微生物全自动核酸扩增分析仪（型号NAT-3000 Pro-4)</option> <option readonly="" class="inputitem1" value="219058"> 219058|知微生物全自动核酸扩增分析仪（型号NAT-3000 Pro-8)</option> <option readonly="" class="inputitem1" value="219059"> 219059|知微生物全自动核酸扩增分析仪（型号NAT-3000 Pro-12)</option> <option readonly="" class="inputitem1" value="219060"> 219060|知微生物全自动核酸扩增分析仪（型号NAT-3000 Pro-16)</option> <option readonly="" class="inputitem1" value="219061"> 219061|新产业 Maglumi 全自动化学发光测定仪系列</option> <option readonly="" class="inputitem1" value="219999"> 219999|其它</option> <option readonly="" class="inputitem1" value="251003"> 251003|雷杜RT-2100C</option> 
+</select> 
+            <input type="hidden" id="obj2" value="">
+			 <input type="hidden" id="obj2s" value="">
+            <input type="hidden" id="obj2t" value="">
+            <br>
+            <input type="button" id="qiehuan2" value="点此详述" style="" onclick="changeInput('cao2','2','obj2t')" class="butt">
+            <input type="button" id="g2" class="butt1" onclick="noplayDiv('cao2')" value="确定">
+			
+			<input type="button" id="copy2" style="margin-left:15px;background:none;" onclick="mycopycode_1('obj2','cao2')" value="复制代码到此处">
+             <input type="button" id="c2" style="margin-right:0px;background:none;" onclick="cle('obj2','selecty')" value="清空">
+            
+            <input type="text" id="text_2" onkeydown="if(event.keyCode==13) setValue2('cao2','text_2','obj2','obj2s','obj2t')" style="width:80%;display:none" class="td" value=""> 
+            <br> 
+            <br>
+            <input type="button" id="q2" style="display:none" class="butt1" onclick="setValue3('text_2','obj2','obj2s','obj2t');noplayDiv('cao2')" value="确定">
+</div> 
+          
+<div id="cao3" class="cao" style="font-size:12px;position:absolute;display:none;text-align:center;overflow:visible;height:auto"> 
+             
+            <table id="cao3_cao0" style="width:100%;cursor:move;" height="20" bgcolor="#9CB5F3" onmousemove="drag.dragStar('cao3_cao0','cao3'); "> 
+            <tbody><tr align="center"> 
+            <td align="left"><font id="biao3" size="1">请双击选填</font><font color="#ffffff" size="2"><b>&nbsp;<span class="reaname">试剂</span></b></font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <span style="cursor:pointer;" onclick="noplayDiv('cao3')">×</span> 
+            </td> 
+            </tr> 
+            </tbody></table> 
+            <select id="selectf2" size="15" style="width:100%;border-width:0" onclick="setValue(this,'obj3','obj3s','obj3t')" ondblclick="setValue(this,'obj3','obj3s','obj3t');noplayDiv('cao3')"> 
+                <option readonly="" class="inputitem1" value="21001">21001|上海实业科华生物技术有限公司</option><option readonly="" class="inputitem1" value="21002">21002|华美生物工程公司</option><option readonly="" class="inputitem1" value="21003">21003|厦门新创科技有限公司</option><option readonly="" class="inputitem1" value="21004">21004|上海市传染病医院诊断试剂研制中心</option><option readonly="" class="inputitem1" value="21005">21005|北京科卫临床诊断试剂厂</option><option readonly="" class="inputitem1" value="21006">21006|上海华泰生物工程实业有限公司</option><option readonly="" class="inputitem1" value="21008">21008|北京美迪科生物技术有限责任公司（EIA)</option><option readonly="" class="inputitem1" value="21010">21010|北京北方免疫试剂研究所(EIA)</option><option readonly="" class="inputitem1" value="21011">21011|山东维坊3V诊断技术公司（EIA)</option><option readonly="" class="inputitem1" value="21013">21013|美国贝克曼公司</option><option readonly="" class="inputitem1" value="21015">21015|北京北方生物技术研究所(RIA)</option><option readonly="" class="inputitem1" value="21016">21016|华大GBI生物技术(北京)有限公司</option><option readonly="" class="inputitem1" value="21017">21017|美国万华普曼公司</option><option readonly="" class="inputitem1" value="21018">21018|美国雅培公司（AXSYM)</option><option readonly="" class="inputitem1" value="21019">21019|美国HELIX公司</option><option readonly="" class="inputitem1" value="21020">21020|强生ORTHO 有限公司（ECI）</option><option readonly="" class="inputitem1" value="21021">21021|生物梅里埃</option><option readonly="" class="inputitem1" value="21022">21022|荷兰阿克苏诺贝尔公司</option><option readonly="" class="inputitem1" value="21023">21023|法国赛诺菲公司</option><option readonly="" class="inputitem1" value="21024">21024|上海荣盛生物技术有限公司</option><option readonly="" class="inputitem1" value="21025">21025|美国GENBIO公司</option><option readonly="" class="inputitem1" value="21027">21027|德国欧润</option><option readonly="" class="inputitem1" value="21028">21028|德国埃天郎生物制品有限公司</option><option readonly="" class="inputitem1" value="21029">21029|美国Trinity公司</option><option readonly="" class="inputitem1" value="21030">21030|美国hope</option><option readonly="" class="inputitem1" value="21031">21031|郑州安图绿科生物工程有限公司</option><option readonly="" class="inputitem1" value="21032">21032|深圳华康生物工程有限公司</option><option readonly="" class="inputitem1" value="21033">21033|上海复星实业股份有限公司</option><option readonly="" class="inputitem1" value="21034">21034|天津新传生物技术有限公司</option><option readonly="" class="inputitem1" value="21035">21035|天津普生生物技术有限公司</option><option readonly="" class="inputitem1" value="21036">21036|山东维坊3V生物工程有限公司（RIA）</option><option readonly="" class="inputitem1" value="21037">21037|深圳月亮湾生物工程有限公司</option><option readonly="" class="inputitem1" value="21038">21038|广东中山生物工程公司</option><option readonly="" class="inputitem1" value="21043">21043|丽珠集团公司丽珠试剂厂</option><option readonly="" class="inputitem1" value="21044">21044|福盈生物工程有限公司</option><option readonly="" class="inputitem1" value="21046">21046|北京金豪制药股份有限公司</option><option readonly="" class="inputitem1" value="21050">21050|北京现代高达生物技术有限责任公司</option><option readonly="" class="inputitem1" value="21063">21063|北京新兴四寰生物技术有限公司</option><option readonly="" class="inputitem1" value="21064">21064|深圳迈瑞</option><option readonly="" class="inputitem1" value="21078">21078|达安基因诊断中心</option><option readonly="" class="inputitem1" value="21079">21079|美国BIOCHECK公司</option><option readonly="" class="inputitem1" value="21080">21080|上海复星医学科技发展有限公司（PCR）</option><option readonly="" class="inputitem1" value="21081">21081|北京万泰生物药业有限公司</option><option readonly="" class="inputitem1" value="21082">21082|罗氏（ROCHE）投资有限公司</option><option readonly="" class="inputitem1" value="21083">21083|厦门安普利生物工程公司</option><option readonly="" class="inputitem1" value="21086">21086|上海申友生物技术有限责任公司</option><option readonly="" class="inputitem1" value="21097">21097|深圳匹基生物技术有限公司</option><option readonly="" class="inputitem1" value="21098">21098|广东万孚</option><option readonly="" class="inputitem1" value="21099">21099|欧蒙实验免疫制品有限公司</option><option readonly="" class="inputitem1" value="21105">21105|兰州蓝十字生物技术有限公司</option><option readonly="" class="inputitem1" value="21106">21106|Labsystems公司</option><option readonly="" class="inputitem1" value="21107">21107|意大利索林（SORIN)公司</option><option readonly="" class="inputitem1" value="21108">21108|北京优耐特生物医学有限公司</option><option readonly="" class="inputitem1" value="21109">21109|上海飞龙医用诊断用品公司</option><option readonly="" class="inputitem1" value="21133">21133|北京协和医院</option><option readonly="" class="inputitem1" value="21138">21138|北京金伟凯医学生物技术有限公司</option><option readonly="" class="inputitem1" value="21143">21143|艾康生物技术（杭州）有限公司</option><option readonly="" class="inputitem1" value="21144">21144|苏州新波生物技术有限公司</option><option readonly="" class="inputitem1" value="21147">21147|美国雅培公司（i2000/Alinity i）</option><option readonly="" class="inputitem1" value="21161">21161|湖南圣湘生物科技有限公司</option><option readonly="" class="inputitem1" value="21162">21162|威海威高生物科技有限公司</option><option readonly="" class="inputitem1" value="21163">21163|北京源德生物医学工程有限公司</option><option readonly="" class="inputitem1" value="21164">21164|上海之江生物科技有限公司</option><option readonly="" class="inputitem1" value="21175">21175|科美诊断技术股份有限公司</option><option readonly="" class="inputitem1" value="21176">21176|日本希森美康</option><option readonly="" class="inputitem1" value="21177">21177|深圳市亚辉龙生物科技股份有限公司(化学发光)</option><option readonly="" class="inputitem1" value="21192">21192|北京雅康博生物科技有限公司</option><option readonly="" class="inputitem1" value="21193">21193|郑州安图生物工程股份有限公司</option><option readonly="" class="inputitem1" value="21901">21901|DADE</option><option readonly="" class="inputitem1" value="21902">21902|朗道</option><option readonly="" class="inputitem1" value="21903">21903|首医</option><option readonly="" class="inputitem1" value="21904">21904|天津博奥赛斯</option><option readonly="" class="inputitem1" value="21905">21905|科美博阳诊断技术技术（上海）有限公司</option><option readonly="" class="inputitem1" value="21906">21906|四川沃文特生物技术有限公司</option><option readonly="" class="inputitem1" value="21907">21907|厦门万泰凯瑞生物技术有限公司</option><option readonly="" class="inputitem1" value="21908">21908|美康生物</option><option readonly="" class="inputitem1" value="21909">21909|中元汇吉</option><option readonly="" class="inputitem1" value="21910">21910|知微生物（北京）医疗科技有限公司</option><option readonly="" class="inputitem1" value="21911">21911|深圳新产业</option><option readonly="" class="inputitem1" value="21999">21999|其它</option>
+            </select> 
+            <input type="hidden" id="obj3" value=""> 
+			 <input type="hidden" id="obj3s" value="">
+            <input type="hidden" id="obj3t" value="">
+            <br>
+            <input type="button" id="qiehuan3" value="点此详述" style="" onclick="changeInput('cao3','2','obj3t')" class="butt">
+            <input type="button" id="g3" class="butt1" onclick="noplayDiv('cao3')" value="确定">
+			
+			<input type="button" id="copy3" style="margin-left:15px;background:none; " onclick="mycopycode_1('obj3','cao3')" value="复制代码到此处">
+             <input type="button" id="c3" style=" width:28px;margin-right:0px;background:none;" onclick="cle('obj3','selectf2')" value="清空">
+            
+            <input type="text" id="text_3" style="width:80%;display:none" onkeydown="if(event.keyCode==13) setValue2('cao3','text_3','obj3','obj3s','obj3t')" class="td" value=""> 
+            <br> 
+            <br>
+                <input type="button" id="q3" style="display:none" class="butt1" onclick="setValue3('text_3','obj3','obj3s','obj3t');noplayDiv('cao3')" value="确定">
+          
+           
+</div>
+<div id="cao4" class="cao" style="font-size:12px;position:absolute; display:none;text-align:center;overflow:visible;height:auto"> 
+            
+            <table id="cao4_cao0" style="width:100%;cursor:move;" height="20" bgcolor="#9CB5F3" onmousemove="drag.dragStar('cao4_cao0','cao4'); "> 
+            <tbody><tr align="center"> 
+            <td align="left"><font id="biao4" size="1">请双击选填</font><font color="#ffffff" size="2"><b>&nbsp;<span class="xzname">校准物</span></b></font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <span style="cursor:pointer; color:#FFFFFF" onclick="noplayDiv('cao4')">×</span> 
+            </td> 
+            </tr> 
+            </tbody></table> 
+            <select id="selectf" size="15" style="width:100%; border-width:0" onclick="setValue(this,'obj4','obj4s','obj4t')" ondblclick="setValue(this,'obj4','obj4s','obj4t');noplayDiv('cao4')"> 
+            
+                <option readonly="" class="inputitem1" value="21001">21001|上海实业科华生物技术有限公司</option><option readonly="" class="inputitem1" value="21002">21002|华美生物工程公司</option><option readonly="" class="inputitem1" value="21003">21003|厦门新创科技有限公司</option><option readonly="" class="inputitem1" value="21004">21004|上海市传染病医院诊断试剂研制中心</option><option readonly="" class="inputitem1" value="21005">21005|北京科卫临床诊断试剂厂</option><option readonly="" class="inputitem1" value="21006">21006|上海华泰生物工程实业有限公司</option><option readonly="" class="inputitem1" value="21008">21008|北京美迪科生物技术有限责任公司（EIA)</option><option readonly="" class="inputitem1" value="21010">21010|北京北方免疫试剂研究所(EIA)</option><option readonly="" class="inputitem1" value="21011">21011|山东维坊3V诊断技术公司（EIA)</option><option readonly="" class="inputitem1" value="21013">21013|美国贝克曼公司</option><option readonly="" class="inputitem1" value="21015">21015|北京北方生物技术研究所(RIA)</option><option readonly="" class="inputitem1" value="21016">21016|华大GBI生物技术(北京)有限公司</option><option readonly="" class="inputitem1" value="21017">21017|美国万华普曼公司</option><option readonly="" class="inputitem1" value="21018">21018|美国雅培公司（AXSYM)</option><option readonly="" class="inputitem1" value="21019">21019|美国HELIX公司</option><option readonly="" class="inputitem1" value="21020">21020|强生ORTHO 有限公司（ECI）</option><option readonly="" class="inputitem1" value="21021">21021|生物梅里埃</option><option readonly="" class="inputitem1" value="21022">21022|荷兰阿克苏诺贝尔公司</option><option readonly="" class="inputitem1" value="21023">21023|法国赛诺菲公司</option><option readonly="" class="inputitem1" value="21024">21024|上海荣盛生物技术有限公司</option><option readonly="" class="inputitem1" value="21025">21025|美国GENBIO公司</option><option readonly="" class="inputitem1" value="21027">21027|德国欧润</option><option readonly="" class="inputitem1" value="21028">21028|德国埃天郎生物制品有限公司</option><option readonly="" class="inputitem1" value="21029">21029|美国Trinity公司</option><option readonly="" class="inputitem1" value="21030">21030|美国hope</option><option readonly="" class="inputitem1" value="21031">21031|郑州安图绿科生物工程有限公司</option><option readonly="" class="inputitem1" value="21032">21032|深圳华康生物工程有限公司</option><option readonly="" class="inputitem1" value="21033">21033|上海复星实业股份有限公司</option><option readonly="" class="inputitem1" value="21034">21034|天津新传生物技术有限公司</option><option readonly="" class="inputitem1" value="21035">21035|天津普生生物技术有限公司</option><option readonly="" class="inputitem1" value="21036">21036|山东维坊3V生物工程有限公司（RIA）</option><option readonly="" class="inputitem1" value="21037">21037|深圳月亮湾生物工程有限公司</option><option readonly="" class="inputitem1" value="21038">21038|广东中山生物工程公司</option><option readonly="" class="inputitem1" value="21043">21043|丽珠集团公司丽珠试剂厂</option><option readonly="" class="inputitem1" value="21044">21044|福盈生物工程有限公司</option><option readonly="" class="inputitem1" value="21046">21046|北京金豪制药股份有限公司</option><option readonly="" class="inputitem1" value="21050">21050|北京现代高达生物技术有限责任公司</option><option readonly="" class="inputitem1" value="21063">21063|北京新兴四寰生物技术有限公司</option><option readonly="" class="inputitem1" value="21064">21064|深圳迈瑞</option><option readonly="" class="inputitem1" value="21078">21078|达安基因诊断中心</option><option readonly="" class="inputitem1" value="21079">21079|美国BIOCHECK公司</option><option readonly="" class="inputitem1" value="21080">21080|上海复星医学科技发展有限公司（PCR）</option><option readonly="" class="inputitem1" value="21081">21081|北京万泰生物药业有限公司</option><option readonly="" class="inputitem1" value="21082">21082|罗氏（ROCHE）投资有限公司</option><option readonly="" class="inputitem1" value="21083">21083|厦门安普利生物工程公司</option><option readonly="" class="inputitem1" value="21086">21086|上海申友生物技术有限责任公司</option><option readonly="" class="inputitem1" value="21097">21097|深圳匹基生物技术有限公司</option><option readonly="" class="inputitem1" value="21098">21098|广东万孚</option><option readonly="" class="inputitem1" value="21099">21099|欧蒙实验免疫制品有限公司</option><option readonly="" class="inputitem1" value="21105">21105|兰州蓝十字生物技术有限公司</option><option readonly="" class="inputitem1" value="21106">21106|Labsystems公司</option><option readonly="" class="inputitem1" value="21107">21107|意大利索林（SORIN)公司</option><option readonly="" class="inputitem1" value="21108">21108|北京优耐特生物医学有限公司</option><option readonly="" class="inputitem1" value="21109">21109|上海飞龙医用诊断用品公司</option><option readonly="" class="inputitem1" value="21133">21133|北京协和医院</option><option readonly="" class="inputitem1" value="21138">21138|北京金伟凯医学生物技术有限公司</option><option readonly="" class="inputitem1" value="21143">21143|艾康生物技术（杭州）有限公司</option><option readonly="" class="inputitem1" value="21144">21144|苏州新波生物技术有限公司</option><option readonly="" class="inputitem1" value="21147">21147|美国雅培公司（i2000/Alinity i）</option><option readonly="" class="inputitem1" value="21161">21161|湖南圣湘生物科技有限公司</option><option readonly="" class="inputitem1" value="21162">21162|威海威高生物科技有限公司</option><option readonly="" class="inputitem1" value="21163">21163|北京源德生物医学工程有限公司</option><option readonly="" class="inputitem1" value="21164">21164|上海之江生物科技有限公司</option><option readonly="" class="inputitem1" value="21175">21175|科美诊断技术股份有限公司</option><option readonly="" class="inputitem1" value="21176">21176|日本希森美康</option><option readonly="" class="inputitem1" value="21177">21177|深圳市亚辉龙生物科技股份有限公司(化学发光)</option><option readonly="" class="inputitem1" value="21192">21192|北京雅康博生物科技有限公司</option><option readonly="" class="inputitem1" value="21193">21193|郑州安图生物工程股份有限公司</option><option readonly="" class="inputitem1" value="21901">21901|DADE</option><option readonly="" class="inputitem1" value="21902">21902|朗道</option><option readonly="" class="inputitem1" value="21903">21903|首医</option><option readonly="" class="inputitem1" value="21904">21904|天津博奥赛斯</option><option readonly="" class="inputitem1" value="21905">21905|科美博阳诊断技术技术（上海）有限公司</option><option readonly="" class="inputitem1" value="21906">21906|四川沃文特生物技术有限公司</option><option readonly="" class="inputitem1" value="21907">21907|厦门万泰凯瑞生物技术有限公司</option><option readonly="" class="inputitem1" value="21908">21908|美康生物</option><option readonly="" class="inputitem1" value="21909">21909|中元汇吉</option><option readonly="" class="inputitem1" value="21910">21910|知微生物（北京）医疗科技有限公司</option><option readonly="" class="inputitem1" value="21911">21911|深圳新产业</option><option readonly="" class="inputitem1" value="21999">21999|其它</option>
+            </select> 
+            <input type="hidden" id="obj4" value=""> 
+			 <input type="hidden" id="obj4s" value="">
+            <input type="hidden" id="obj4t" value="">
+            <br>
+            <input type="button" id="qiehuan4" value="点此详述" style="" onclick="changeInput('cao4','2','obj4t')" class="butt">
+            <input type="button" id="g4" class="butt1" onclick="noplayDiv('cao4')" value="确定">
+			
+			<input type="button" id="copy4" style="margin-left:15px;background:none;" onclick="mycopycode_1('obj4','cao4')" value="复制代码到此处">
+             <input type="button" id="c4" style="margin-right:0px;background:none;" onclick="cle('obj4','selectf')" value="清空">
+            
+            <input type="text" id="text_4" style="width:80%;display:none" onkeydown="if(event.keyCode==13){setValue2('cao4','text_4','obj4','obj4s','obj4t');}" class="td" value=""> 
+           <br> 
+            <br>
+                     <input type="button" id="q4" style="display:none" class="butt1" onclick="setValue3('text_4','obj4','obj4s','obj4t');noplayDiv('cao4')" value="确定">
+ </div>
+ <script type="text/javascript">
+   
+ </script>
+
+
+ 
+
+
+
+
+</body></html>

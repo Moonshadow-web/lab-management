@@ -1,0 +1,30 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+node_modules
+frontend/node_modules
+backend/__pycache__
+backend/**/__pycache__
+backend/data/app.db
+*.log
+.env
+.vscode
+.idea
+.workbuddy
+outputs
+_tmp_*
+*.xlsx
+*.pdf
+# 例外：EQA 质评报告 PDF 需随镜像备份，首次启动恢复到持久卷（修复线上预览 404）
+!data/eqa_reports/*.pdf
+# 例外：文档/仪器档案上传目录需随镜像备份，确保持久卷为空时也能恢复（不丢文档）
+!data/uploads/**
+chi_sim.traineddata
+apply_*.py
+check_*.py
+build_*.py
+compare_*.py
+_read_*.py
+backfill_*.py

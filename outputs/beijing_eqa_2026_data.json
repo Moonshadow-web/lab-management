@@ -1,0 +1,157 @@
+{
+  "year": 2026,
+  "missing_pages": [
+    {
+      "docx_group": "IL-6",
+      "docx_detail": "IL-6",
+      "category": "生化",
+      "reason": "在北京计划表第 3/4 页（未提供），未能找到时间安排"
+    },
+    {
+      "docx_group": "京津冀鲁盲样",
+      "docx_detail": "京津冀鲁盲样",
+      "category": "生化",
+      "reason": "在北京计划表第 3/4 页（未提供），未能找到时间安排"
+    }
+  ],
+  "plans": [
+    {
+      "org": "北京市",
+      "program": "生化",
+      "item": "临床常规化学",
+      "detail": "钾、钠、氯、钙、磷、血糖、尿素、肌酐、尿酸、总蛋白、白蛋白、总胆固醇、甘油三酯、丙氨酸氨基转移酶、天门冬氨酸氨基转移酶、乳酸脱氢酶、肌酸激酶、碱性磷酸酶、γ-谷氨酰基转移酶、总胆红素、淀粉酶、直接胆红素、铁、镁、胆碱酯酶、脂肪酶",
+      "rounds": [
+        {"round_no": "1", "sample_date": "2026-04-20", "due_date": "2026-04-29"},
+        {"round_no": "2", "sample_date": "2026-07-06", "due_date": "2026-07-17"},
+        {"round_no": "3", "sample_date": "2026-09-07", "due_date": "2026-09-18"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "生化",
+      "item": "糖化血清白蛋白",
+      "detail": "GA",
+      "rounds": [
+        {"round_no": "1", "sample_date": "2026-04-20", "due_date": "2026-04-29"},
+        {"round_no": "2", "sample_date": "2026-07-06", "due_date": "2026-07-17"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "生化",
+      "item": "凝血试验",
+      "detail": "PT、INR、APTT、Fbg、TT",
+      "rounds": [
+        {"round_no": "1", "sample_date": "2026-04-20", "due_date": "2026-04-29"},
+        {"round_no": "2", "sample_date": "2026-07-06", "due_date": "2026-07-17"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "生化",
+      "item": "D-二聚体和纤维蛋白(原)降解产物检测",
+      "detail": "DD、FDP",
+      "rounds": [
+        {"round_no": "待定", "sample_date": "待定", "due_date": "待定"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "生化",
+      "item": "血清降钙素原（PCT）",
+      "detail": "PCT",
+      "rounds": [
+        {"round_no": "1", "sample_date": "2026-04-20", "due_date": "2026-04-29"},
+        {"round_no": "2", "sample_date": "2026-07-06", "due_date": "2026-07-17"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "免疫",
+      "item": "感染性疾病抗原抗体快速检测（POCT）",
+      "detail": "HIV、HBsAg、TP、HCV（胶体金）",
+      "rounds": [
+        {"round_no": "2", "sample_date": "收到样本后", "due_date": "2026-07-17"},
+        {"round_no": "3", "sample_date": "收到样本后", "due_date": "2026-09-18"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "免疫",
+      "item": "内分泌",
+      "detail": "TT3、TT4、FT3、FT4、TSH、B12、叶酸、孕酮、雌二醇、PTH、皮质醇、胰岛素、C肽、VD",
+      "rounds": [
+        {"round_no": "1", "sample_date": "2026-04-20", "due_date": "2026-04-29"},
+        {"round_no": "2", "sample_date": "2026-07-06", "due_date": "2026-07-17"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "免疫",
+      "item": "感染性疾病血清学标志物系列B",
+      "detail": "HEV-IgM、HAV-IgM",
+      "rounds": [
+        {"round_no": "1", "sample_date": "2026-04-20", "due_date": "2026-04-29"},
+        {"round_no": "2", "sample_date": "2026-07-06", "due_date": "2026-07-17"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "免疫",
+      "item": "肝炎标志物",
+      "detail": "乙肝五项、HCVAb",
+      "rounds": [
+        {"round_no": "1", "sample_date": "2026-04-20", "due_date": "2026-04-29"},
+        {"round_no": "2", "sample_date": "2026-07-06", "due_date": "2026-07-17"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "免疫",
+      "item": "感染性疾病血清学标志物系列C",
+      "detail": "HIV、梅毒特异性抗体",
+      "rounds": [
+        {"round_no": "1", "sample_date": "2026-04-20", "due_date": "2026-04-29"},
+        {"round_no": "2", "sample_date": "2026-07-06", "due_date": "2026-07-17"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "免疫",
+      "item": "中孕期母血清产前筛查",
+      "detail": "AFP、βHCG、uE3",
+      "rounds": [
+        {"round_no": "1", "sample_date": "2026-04-20", "due_date": "2026-04-29"},
+        {"round_no": "2", "sample_date": "2026-07-06", "due_date": "2026-07-17"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "免疫",
+      "item": "肿瘤标志物",
+      "detail": "总βHCG、AFP、β2微球蛋白、铁蛋白、CEA、TPSA、FPSA",
+      "rounds": [
+        {"round_no": "1", "sample_date": "2026-04-20", "due_date": "2026-04-29"},
+        {"round_no": "2", "sample_date": "2026-07-06", "due_date": "2026-07-17"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "免疫",
+      "item": "结核感染T细胞γ-干扰素检测",
+      "detail": "结核感染T细胞检测",
+      "rounds": [
+        {"round_no": "待定", "sample_date": "待定", "due_date": "待定"}
+      ]
+    },
+    {
+      "org": "北京市",
+      "program": "免疫",
+      "item": "血清可溶性转铁蛋白受体",
+      "detail": "sTfR",
+      "rounds": [
+        {"round_no": "待定", "sample_date": "待定", "due_date": "待定"}
+      ]
+    }
+  ]
+}

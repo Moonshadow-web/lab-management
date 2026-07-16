@@ -1,0 +1,44 @@
+INFO:     Started server process [8692]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8123 (Press CTRL+C to quit)
+INFO:     127.0.0.1:4903 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4909 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4910 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4911 - "GET /api/v1/qc-summaries/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4912 - "GET /api/v1/instruments?page_size=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:26337 - "GET /api/v1/qc-records?page=1&page_size=20&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:26338 - "GET /api/v1/qc-summaries/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50833 - "GET /api/v1/qc-records?page=1&page_size=20&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50835 - "GET /api/v1/qc-summaries/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15344 - "GET /api/v1/instruments?page=1&page_size=20&status=%E5%9C%A8%E7%94%A8&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15346 - "GET /api/v1/instruments/archives/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15348 - "GET /api/v1/instruments/calibrations/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53304 - "GET /api/v1/qc-records?page=1&page_size=20&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53305 - "GET /api/v1/qc-summaries/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:26190 - "GET /api/v1/qc-summaries?year=2026&month=7&page_size=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:29811 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38443 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38449 - "GET /api/v1/qc-summaries/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37980 - "GET /api/v1/instruments?page=1&page_size=20&status=%E5%9C%A8%E7%94%A8&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37982 - "GET /api/v1/instruments/archives/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37984 - "GET /api/v1/instruments/calibrations/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37988 - "GET /api/v1/instruments?page=2&page_size=20&status=%E5%9C%A8%E7%94%A8&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37990 - "GET /api/v1/instruments/archives/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44934 - "GET /api/v1/instruments/calibrations/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:21538 - "GET /api/v1/instruments?page=1&page_size=20&status=%E5%9C%A8%E7%94%A8&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:23194 - "GET /api/v1/instruments/archives/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2830 - "GET /api/v1/instruments/calibrations/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6304 - "GET /api/v1/instruments?page=2&page_size=20&status=%E5%9C%A8%E7%94%A8&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11331 - "GET /api/v1/instruments/archives/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10218 - "GET /api/v1/instruments/calibrations/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:27863 - "GET /api/v1/instruments?page=1&page_size=20&status=%E5%9C%A8%E7%94%A8&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:20414 - "GET /api/v1/instruments/archives/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51991 - "GET /api/v1/instruments/calibrations/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:24621 - "PUT /api/v1/instruments/26 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1297 - "GET /api/v1/instruments?page=1&page_size=20&status=%E5%9C%A8%E7%94%A8&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56001 - "GET /api/v1/instruments/archives/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3064 - "GET /api/v1/instruments/calibrations/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12210 - "GET /api/v1/qc-summaries/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12209 - "GET /api/v1/qc-records?page=1&page_size=20&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33873 - "GET /api/v1/qc-summaries/instruments HTTP/1.1" 200 OK

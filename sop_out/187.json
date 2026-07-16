@@ -1,0 +1,11 @@
+{
+  "pid": 187,
+  "sop_title": "SM-SOP-513-安图AutolumoA2000检测系统IGRA法结核感染T细胞检测标准操作程序",
+  "reference_range": "判读（单位 IU/ml）：N≤10.0 且 (T-N<0.438 且 P-N≥0.625) 或 (T-N≥0.438且<25%N值 且 P-N≥0.625) → 阴性；N≤10.0 且 T-N≥0.438且≥25%N值 → 阳性；N≤10.0 且 T-N<0.438且P-N<0.625 或 T-N≥0.438且<25%N值且P-N<0.625 → 不确定；N>10.0 → 不确定",
+  "reportable_range": "未列出（定性检测，无线性/可报告范围；浓度>10.0 IU/mL为定标曲线外延计算）",
+  "unit": "IU/ml",
+  "traceability": "未列出",
+  "interference": "40mg/dL胆红素、3000mg/dL甘油三酯、125mg/dL血红蛋白无显著影响；40ng/mL的IL-1a/IL-1b/IL-1RA/IL-3/IL-5/IL-8(1-72)/IL-8(1-77)/IL-12、IFN-α、IFN-β对结果无显著影响",
+  "method": "IGRA（γ-干扰素释放试验，磁微粒化学发光法/体外释放免疫夹心法）",
+  "instrument": "AutoLumo A2000PLUS 化学发光检测仪"
+}

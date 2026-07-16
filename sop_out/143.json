@@ -1,0 +1,11 @@
+{
+  "pid": 143,
+  "sop_title": "SM-SOP-124  AU5800检测系统酶法血清尿素测定标准操作程序",
+  "reference_range": "血清：新生儿-5月 0.8-5.3 mmol/L；6月-11月 1.1-5.9mmol/L；1岁-23月 2.3-6.7mmol/L；男性 2岁-18岁 2.7-7.0mmol/L、19岁-59岁 3.1-8.0mmol/L、≥60岁 3.6-9.5mmol/L；女性 2岁-18岁 2.5-6.5mmol/L、19岁-59岁 2.6-7.5mmol/L、≥60岁 3.1-8.8mmol/L",
+  "reportable_range": "0.5-187.5mmol/L",
+  "unit": "mmol/L",
+  "traceability": "校准品溯源至国家标准品360012",
+  "interference": "总胆红素≤40μmol/L、血红蛋白≤4.5g/L、维生素C≤4g/L无显著干扰",
+  "method": "酶法（尿素酶-谷氨酸脱氢酶法）",
+  "instrument": "Beckman Coulter AU5800 全自动生化分析仪"
+}

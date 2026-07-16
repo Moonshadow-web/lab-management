@@ -1,0 +1,1132 @@
+
+<html>
+<head>
+<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=gb2312">
+<style type="text/css">
+fieldset{ padding:0; margin:0}
+</style>
+<script type="text/javascript" src="../../jsfile/jquery.1.9.1.min.js"></script>
+<script type="text/javascript">
+function CanDownLoadPdf(spec,year,times,country)
+{
+   if((spec=="30" || spec=="BD") && year==2019 && times==1 && country=="药敏结果")
+   {
+       var result=$.ajax({"url":"../app/MicoDC_index.asp","cache":false,"data":{"type":"LabHasReportMicoDC","years":year},"async":false}).responseText;
+	   if(result=="yes")
+	   {
+		 return true;
+	   }
+	   else
+	   {
+		 alert("请先上报"+year+"年微生物调查表");
+		 return false;
+	   }
+   }
+   else if(spec=="CO_" && times==1)
+   {
+       var result=$.ajax({"url":"../app/DmdDC_index.asp","cache":false,"data":{"type":"LabHasReportDmdDC","years":year},"async":false}).responseText;
+	   if(result=="yes")
+	   {
+		 return true;
+	   }
+	   else
+	   {
+		 alert("请先上报"+year+"年DMD基因检测调查表");
+		 return false;
+	   }
+   }
+   else if(spec=="56" && year==1019 && times==3)
+   {
+       var result=$.ajax({"url":"../app/QSX_index.asp","cache":false,"data":{"type":"LabHasReportQsxDC","years":year,"times":times},"async":false}).responseText;
+	   if(result=="yes")
+	   {
+		 return true;
+	   }
+	   else
+	   {
+		 alert("请先到“质评试验上报”处上报“临床用血质量控制指标”");
+		 return false;
+	   }
+   }
+   else if(spec=="30" && year==20244 && times==1)
+   {
+       if((window.JSON && typeof JSON.parse === 'function')==false)
+	   {
+	      alert("您的浏览器版本过低，请使用Chrome、edge或者火狐浏览器");
+		  return false;
+	   }
+	   
+	   var filename="101127_民航总医院检验科.zip"
+	   var filepath=spec+"/"+year+"_"+times+"/"+filename;
+	   var result=$.ajax({"url":"https://upload.app.clinet.cn/AjaxService.ashx?type=HasFile","cache":false,"type":"GET","dataType":"json","async":false,"data":{"file":filepath}}).responseText;
+	   var json=JSON.parse(result);
+	   if(json["code"]!=1)
+	   {
+	      alert("您还没有上传“原始实验记录”，请先到“室间质评数据上报”处上传“原始实验记录”");
+		  return false;
+	   }
+   }
+
+   return true;
+}
+</script>
+</head>
+<body topmargin="0" leftmargin="0">
+
+<fieldset style="BACKGROUND: buttonface;width:95%">
+<table cellspacing="0" border="0" cellPadding="0" width=100% style="font-size:9pt">
+<tr nowrap>
+    <td style="width:60%">项目名称</td>
+    <td style="width:20%">测定日期</td>
+    <td style="width:20%">统计日期</td>
+    
+</tr>
+</table>
+</fieldset><br>
+<table bgColor="silver" border="0" cellPadding="0" cellSpacing="0" width=95% style="font-size:9pt">
+
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('01',2026,2,'2021标准');" href="https://score.clinet.cn/clinet/PTScore2007/20260100_2026年全国常规化学A室间质量评价/2/定量/2021标准/10112758852664.pdf" target="_blank">
+2026年常规化学A第2次室间质评统计结果表2008(2021标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/4</TD>
+    <TD style="width:20%" height="20">2026/7/8 10:33:58</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="常规化学A" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20260100_2026%C4%EA%C8%AB%B9%FA%B3%A3%B9%E6%BB%AF%D1%A7A%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/2/%B6%A8%C1%BF/2021%B1%EA%D7%BC/10112758852664.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('39',2026,2,'');" href="https://score.clinet.cn/iqc/2026_39_iqc/2/101127.pdf" target="_blank">
+2026年便携式血糖检测仪2月份(室内)质控统计结果表
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/11 21:55:24</TD>
+    <TD style="width:20%" height="20">2026/5/11 21:55:24</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="便携式血糖检测仪" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/Clinet/PTScore2007/2026_39_iqc/2/101127.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('GU',2026,2,'2024标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026GU00_2026年全国糖化白蛋白室间质量评价/2/定量/2024标准/10112736602425.pdf" target="_blank">
+2026年糖化白蛋白第2次室间质评统计结果表2008(2024标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/8</TD>
+    <TD style="width:20%" height="20">2026/7/6 15:59:36</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="糖化白蛋白" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026GU00_2026%C4%EA%C8%AB%B9%FA%CC%C7%BB%AF%B0%D7%B5%B0%B0%D7%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/2/%B6%A8%C1%BF/2024%B1%EA%D7%BC/10112736602425.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('HH',2026,2,'2025标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026HH00_2026年全国脂类B室间质量评价/2/定量/2025标准/10112729570826.pdf" target="_blank">
+2026年脂类B第2次室间质评统计结果表2008(2025标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/8</TD>
+    <TD style="width:20%" height="20">2026/7/6 12:01:29</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="脂类B" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026HH00_2026%C4%EA%C8%AB%B9%FA%D6%AC%C0%E0B%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/2/%B6%A8%C1%BF/2025%B1%EA%D7%BC/10112729570826.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('01',2026,1,'2021标准');" href="https://score.clinet.cn/clinet/PTScore2007/20260100_2026年全国常规化学A室间质量评价/1/定量/2021标准/10112741852929.pdf" target="_blank">
+2026年常规化学A第1次室间质评统计结果表2008(2021标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/5</TD>
+    <TD style="width:20%" height="20">2026/6/30 13:24:41</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="常规化学A" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20260100_2026%C4%EA%C8%AB%B9%FA%B3%A3%B9%E6%BB%AF%D1%A7A%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2021%B1%EA%D7%BC/10112741852929.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('02',2026,1,'2021标准');" href="https://score.clinet.cn/clinet/PTScore2007/20260200_2026年全国血气和酸碱分析室间质量评价/1/定量/2021标准/10112700334581.pdf" target="_blank">
+2026年血气和酸碱分析第1次室间质评统计结果表2008(2021标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/9</TD>
+    <TD style="width:20%" height="20">2026/5/12 6:46:00</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="血气和酸碱分析" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20260200_2026%C4%EA%C8%AB%B9%FA%D1%AA%C6%F8%BA%CD%CB%E1%BC%EE%B7%D6%CE%F6%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2021%B1%EA%D7%BC/10112700334581.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('03',2026,1,'中国2024');" href="https://score.clinet.cn/clinet/PTScore2007/20260300_2026年全国血清治疗药物监测室间质量评价/1/定量/中国2024/10112747704224.pdf" target="_blank">
+2026年血清治疗药物监测第1次室间质评统计结果表2008(中国2024)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/5</TD>
+    <TD style="width:20%" height="20">2026/4/16 10:41:47</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="血清治疗药物监测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20260300_2026%C4%EA%C8%AB%B9%FA%D1%AA%C7%E5%D6%CE%C1%C6%D2%A9%CE%EF%BC%E0%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA2024/10112747704224.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('04',2026,1,'2026标准');" href="https://score.clinet.cn/clinet/PTScore2007/20260400_2026年全国内分泌室间质量评价/1/定量/2026标准/10112709786835.pdf" target="_blank">
+2026年内分泌第1次室间质评统计结果表2008(2026标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/16</TD>
+    <TD style="width:20%" height="20">2026/6/28 1:21:09</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="内分泌" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20260400_2026%C4%EA%C8%AB%B9%FA%C4%DA%B7%D6%C3%DA%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2026%B1%EA%D7%BC/10112709786835.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('05',2026,1,'中国3');" href="https://score.clinet.cn/clinet/PTScore2007/20260500_2026年全国肿瘤标志物A室间质量评价/1/定量/中国3/10112707505946.pdf" target="_blank">
+2026年肿瘤标志物A第1次室间质评统计结果表2008(中国3)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/10</TD>
+    <TD style="width:20%" height="20">2026/6/24 23:52:07</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="肿瘤标志物A" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20260500_2026%C4%EA%C8%AB%B9%FA%D6%D7%C1%F6%B1%EA%D6%BE%CE%EFA%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA3/10112707505946.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('08',2026,1,'2026标准');" href="https://score.clinet.cn/clinet/PTScore2007/20260800_2026年全国特殊蛋白室间质量评价/1/定量/2026标准/10112753860524.pdf" target="_blank">
+2026年特殊蛋白第1次室间质评统计结果表2008(2026标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/2</TD>
+    <TD style="width:20%" height="20">2026/5/11 22:39:53</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="特殊蛋白" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20260800_2026%C4%EA%C8%AB%B9%FA%CC%D8%CA%E2%B5%B0%B0%D7%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2026%B1%EA%D7%BC/10112753860524.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('09',2026,1,'2020中国');" href="https://score.clinet.cn/clinet/PTScore2007/20260900_2026年全国糖化血红蛋白室间质量评价/1/定量/2020中国/10112726614533.pdf" target="_blank">
+2026年糖化血红蛋白第1次室间质评统计结果表2008(2020中国)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/1/15</TD>
+    <TD style="width:20%" height="20">2026/6/28 11:48:26</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="糖化血红蛋白" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20260900_2026%C4%EA%C8%AB%B9%FA%CC%C7%BB%AF%D1%AA%BA%EC%B5%B0%B0%D7%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2020%D6%D0%B9%FA/10112726614533.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('11',2026,1,'中国');" href="https://score.clinet.cn/clinet/PTScore2007/20261100_2026年全国凝血试验室间质量评价/1/定量/中国/10112740962176.pdf" target="_blank">
+2026年凝血试验第1次室间质评统计结果表2008(中国)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/9</TD>
+    <TD style="width:20%" height="20">2026/7/6 18:30:40</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="凝血试验" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20261100_2026%C4%EA%C8%AB%B9%FA%C4%FD%D1%AA%CA%D4%D1%E9%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA/10112740962176.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('12',2026,1,'中国');" href="https://score.clinet.cn/clinet/PTScore2007/20261200_2026年全国尿液化学分析室间质量评价/1/定量/中国/10112718383077.pdf" target="_blank">
+2026年尿液化学分析第1次室间质评统计结果表2008(中国)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/19</TD>
+    <TD style="width:20%" height="20">2026/4/17 15:25:17</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="尿液化学分析" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20261200_2026%C4%EA%C8%AB%B9%FA%C4%F2%D2%BA%BB%AF%D1%A7%B7%D6%CE%F6%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA/10112718383077.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('12',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20261200_2026年全国尿液化学分析室间质量评价/1/定性/10112721767178.pdf" target="_blank">
+2026年尿液化学分析第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/19</TD>
+    <TD style="width:20%" height="20">2026/4/17 15:25:17</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="尿液化学分析" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20261200_2026%C4%EA%C8%AB%B9%FA%C4%F2%D2%BA%BB%AF%D1%A7%B7%D6%CE%F6%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112721767178.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('15',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20261500_2026年全国血细胞形态识别室间质量评价/1/定性/10112729974197.pdf" target="_blank">
+2026年血细胞形态识别第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/9</TD>
+    <TD style="width:20%" height="20">2026/6/25 9:17:29</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="血细胞形态识别" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20261500_2026%C4%EA%C8%AB%B9%FA%D1%AA%CF%B8%B0%FB%D0%CE%CC%AC%CA%B6%B1%F0%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112729974197.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('16',2026,1,'中国4');" href="https://score.clinet.cn/clinet/PTScore2007/20261600_2026年全国流式细胞术-淋巴细胞亚群测定室间质量评价/1/定量/中国4/10112750429469.pdf" target="_blank">
+2026年流式细胞分析-淋巴细胞亚群测定第1次室间质评统计结果表2008(中国4)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">1900/1/1</TD>
+    <TD style="width:20%" height="20">2026/7/10 10:18:50</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="流式细胞分析-淋巴细胞亚群测定" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20261600_2026%C4%EA%C8%AB%B9%FA%C1%F7%CA%BD%CF%B8%B0%FB%CA%F5-%C1%DC%B0%CD%CF%B8%B0%FB%D1%C7%C8%BA%B2%E2%B6%A8%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA4/10112750429469.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('18',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20261800_2026年全国血型室间质量评价/1/定性/10112715731047.pdf" target="_blank">
+2026年血型第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/9</TD>
+    <TD style="width:20%" height="20">2026/4/30 9:35:15</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="血型" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20261800_2026%C4%EA%C8%AB%B9%FA%D1%AA%D0%CD%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112715731047.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('19',2026,1,'中国1');" href="https://score.clinet.cn/clinet/PTScore2007/20261900_2026年全国中孕期母血清产前筛查室间质量评价/1/定量/中国1/10112748736315.pdf" target="_blank">
+2026年中孕期母血清产前筛查第1次室间质评统计结果表2008(中国1)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/9</TD>
+    <TD style="width:20%" height="20">2026/5/9 16:07:48</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="中孕期母血清产前筛查" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20261900_2026%C4%EA%C8%AB%B9%FA%D6%D0%D4%D0%C6%DA%C4%B8%D1%AA%C7%E5%B2%FA%C7%B0%C9%B8%B2%E9%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA1/10112748736315.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('22',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20262200_2026年优生优育免疫学检测室间质量评价/1/定性/10112701956631.pdf" target="_blank">
+2026年优生优育免疫学测定第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/26</TD>
+    <TD style="width:20%" height="20">2026/6/11 14:51:01</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="优生优育免疫学测定" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20262200_2026%C4%EA%D3%C5%C9%FA%D3%C5%D3%FD%C3%E2%D2%DF%D1%A7%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112701956631.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('24',2026,1,'2018标准');" href="https://score.clinet.cn/clinet/PTScore2007/20262400_2026年全国脂类A室间质量评价/1/定量/2018标准/10112708991160.pdf" target="_blank">
+2026年脂类A第1次室间质评统计结果表2008(2018标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/24</TD>
+    <TD style="width:20%" height="20">2026/6/24 15:12:08</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="脂类A" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20262400_2026%C4%EA%C8%AB%B9%FA%D6%AC%C0%E0A%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2018%B1%EA%D7%BC/10112708991160.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('25',2026,1,'2019标准');" href="https://score.clinet.cn/clinet/PTScore2007/20262500_2026年全国心肌标志物室间质量评价/1/定量/2019标准/10112718293656.pdf" target="_blank">
+2026年心肌标志物第1次室间质评统计结果表2008(2019标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/24</TD>
+    <TD style="width:20%" height="20">2026/6/25 20:52:18</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="心肌标志物" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20262500_2026%C4%EA%C8%AB%B9%FA%D0%C4%BC%A1%B1%EA%D6%BE%CE%EF%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2019%B1%EA%D7%BC/10112718293656.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('30',2026,1,'细菌鉴定');" href="https://score.clinet.cn/clinet/PTScore2007/20263000_2026年全国临床微生物学(高级）室间质量评价/1/细菌鉴定/10112750797828.pdf" target="_blank">
+2026年临床微生物学(高级）第1次室间质评统计结果表2008(细菌鉴定)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/7</TD>
+    <TD style="width:20%" height="20">2026/5/20 22:33:50</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="临床微生物学(高级）" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20263000_2026%C4%EA%C8%AB%B9%FA%C1%D9%B4%B2%CE%A2%C9%FA%CE%EF%D1%A7%28%B8%DF%BC%B6%A3%A9%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%CF%B8%BE%FA%BC%F8%B6%A8/10112750797828.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('30',2026,1,'药敏结果');" href="https://score.clinet.cn/clinet/PTScore2007/20263000_2026年全国临床微生物学(高级）室间质量评价/1/药敏结果/10112754832229.pdf" target="_blank">
+2026年临床微生物学(高级）第1次室间质评统计结果表2008(药敏结果)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/7</TD>
+    <TD style="width:20%" height="20">2026/5/20 22:33:50</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="临床微生物学(高级）" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20263000_2026%C4%EA%C8%AB%B9%FA%C1%D9%B4%B2%CE%A2%C9%FA%CE%EF%D1%A7%28%B8%DF%BC%B6%A3%A9%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%D2%A9%C3%F4%BD%E1%B9%FB/10112754832229.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('35',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20263500_2026年全国寄生虫形态学检查室间质量评价/1/定性/10112717932264.pdf" target="_blank">
+2026年寄生虫形态学检查第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/9</TD>
+    <TD style="width:20%" height="20">2026/6/25 15:36:17</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="寄生虫形态学检查" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20263500_2026%C4%EA%C8%AB%B9%FA%BC%C4%C9%FA%B3%E6%D0%CE%CC%AC%D1%A7%BC%EC%B2%E9%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112717932264.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('37',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20263700_2026年抗核抗体室间质量评价/1/定性/10112748956659.pdf" target="_blank">
+2026年抗核抗体第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/25</TD>
+    <TD style="width:20%" height="20">2026/4/30 19:03:47</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="抗核抗体" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20263700_2026%C4%EA%BF%B9%BA%CB%BF%B9%CC%E5%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112748956659.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('39',2026,1,'中国1');" href="https://score.clinet.cn/clinet/PTScore2007/20263900_2026年全国便携式血糖检测仪室间质量评价/1/定量/中国1/10112724867233.pdf" target="_blank">
+2026年便携式血糖检测仪第1次室间质评统计结果表2008(中国1)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/6</TD>
+    <TD style="width:20%" height="20">2026/6/27 5:02:24</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="便携式血糖检测仪" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20263900_2026%C4%EA%C8%AB%B9%FA%B1%E3%D0%AF%CA%BD%D1%AA%CC%C7%BC%EC%B2%E2%D2%C7%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA1/10112724867233.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('41',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20264100_2026年感染性疾病抗原抗体快速检测室间质量评价/1/定性/10112724874697.pdf" target="_blank">
+2026年感染性疾病抗原抗体快速检测第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/14</TD>
+    <TD style="width:20%" height="20">2026/6/24 9:27:24</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="感染性疾病抗原抗体快速检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20264100_2026%C4%EA%B8%D0%C8%BE%D0%D4%BC%B2%B2%A1%BF%B9%D4%AD%BF%B9%CC%E5%BF%EC%CB%D9%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112724874697.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('42',2026,1,'2024标准');" href="https://score.clinet.cn/clinet/PTScore2007/20264200_2026年全国脑脊液生化检测室间质量评价/1/定量/2024标准/10112749289221.pdf" target="_blank">
+2026年脑脊液生化检测第1次室间质评统计结果表2008(2024标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/26</TD>
+    <TD style="width:20%" height="20">2026/6/27 21:09:49</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="脑脊液生化检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20264200_2026%C4%EA%C8%AB%B9%FA%C4%D4%BC%B9%D2%BA%C9%FA%BB%AF%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2024%B1%EA%D7%BC/10112749289221.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('52',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20265200_2026年感染性疾病血清学标志物系列A室间质量评价/1/定性/10112713383808.pdf" target="_blank">
+2026年感染性疾病血清学标志物系列A第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/17</TD>
+    <TD style="width:20%" height="20">2026/3/31 18:36:12</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="感染性疾病血清学标志物系列A" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20265200_2026%C4%EA%B8%D0%C8%BE%D0%D4%BC%B2%B2%A1%D1%AA%C7%E5%D1%A7%B1%EA%D6%BE%CE%EF%CF%B5%C1%D0A%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112713383808.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('53',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20265300_2026年感染性疾病血清学标志物系列B室间质量评价/1/定性/10112728839608.pdf" target="_blank">
+2026年感染性疾病血清学标志物系列B第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/17</TD>
+    <TD style="width:20%" height="20">2026/4/1 4:51:28</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="感染性疾病血清学标志物系列B" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20265300_2026%C4%EA%B8%D0%C8%BE%D0%D4%BC%B2%B2%A1%D1%AA%C7%E5%D1%A7%B1%EA%D6%BE%CE%EF%CF%B5%C1%D0B%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112728839608.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('54',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20265400_2026年感染性疾病血清学标志物系列C室间质量评价/1/定性/10112743775327.pdf" target="_blank">
+2026年感染性疾病血清学标志物系列C第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/17</TD>
+    <TD style="width:20%" height="20">2026/3/31 9:44:43</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="感染性疾病血清学标志物系列C" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20265400_2026%C4%EA%B8%D0%C8%BE%D0%D4%BC%B2%B2%A1%D1%AA%C7%E5%D1%A7%B1%EA%D6%BE%CE%EF%CF%B5%C1%D0C%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112743775327.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('56',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20265600_2026年临床输血相容性检测室间质量评价/1/定性/10112741600368.pdf" target="_blank">
+2026年临床输血相容性检测第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/14</TD>
+    <TD style="width:20%" height="20">2026/5/20 9:41:38</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="临床输血相容性检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20265600_2026%C4%EA%C1%D9%B4%B2%CA%E4%D1%AA%CF%E0%C8%DD%D0%D4%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112741600368.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('68',2026,1,'2026标准');" href="https://score.clinet.cn/clinet/PTScore2007/20266800_2026年全国尿液定量生化室间质量评价/1/定量/2026标准/10112713047986.pdf" target="_blank">
+2026年尿液定量生化第1次室间质评统计结果表2008(2026标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/14</TD>
+    <TD style="width:20%" height="20">2026/6/11 9:35:12</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="尿液定量生化" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20266800_2026%C4%EA%C8%AB%B9%FA%C4%F2%D2%BA%B6%A8%C1%BF%C9%FA%BB%AF%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2026%B1%EA%D7%BC/10112713047986.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('69',2026,1,'中国1');" href="https://score.clinet.cn/clinet/PTScore2007/20266900_2026年全国心衰标志物室间质量评价/1/定量/中国1/10112708735837.pdf" target="_blank">
+2026年心衰标志物（原脑钠肽/N末端前脑钠肽）第1次室间质评统计结果表2008(中国1)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/13</TD>
+    <TD style="width:20%" height="20">2026/6/10 10:20:08</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="心衰标志物（原脑钠肽/N末端前脑钠肽）" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20266900_2026%C4%EA%C8%AB%B9%FA%D0%C4%CB%A5%B1%EA%D6%BE%CE%EF%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA1/10112708735837.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('87',2026,1,'2020标准');" href="https://score.clinet.cn/clinet/PTScore2007/20268700_2026年全国半胱氨酸蛋白酶抑制剂C室间质量评价/1/定量/2020标准/10112743794601.pdf" target="_blank">
+2026年半胱氨酸蛋白酶抑制剂C第1次室间质评统计结果表2008(2020标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/9</TD>
+    <TD style="width:20%" height="20">2026/5/7 16:58:43</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="半胱氨酸蛋白酶抑制剂C" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20268700_2026%C4%EA%C8%AB%B9%FA%B0%EB%EB%D7%B0%B1%CB%E1%B5%B0%B0%D7%C3%B8%D2%D6%D6%C6%BC%C1C%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2020%B1%EA%D7%BC/10112743794601.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('88',2026,1,'2022标准');" href="https://score.clinet.cn/clinet/PTScore2007/20268800_2026年全国血细胞计数正确度验证室间质量评价/1/定量/2022标准/10112743913232.pdf" target="_blank">
+2026年全血细胞计数正确度验证第1次室间质评统计结果表(2022标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/15</TD>
+    <TD style="width:20%" height="20">2026/6/11 19:09:43</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="全血细胞计数正确度验证" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20268800_2026%C4%EA%C8%AB%B9%FA%D1%AA%CF%B8%B0%FB%BC%C6%CA%FD%D5%FD%C8%B7%B6%C8%D1%E9%D6%A4%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2022%B1%EA%D7%BC/10112743913232.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('89',2026,1,'中国');" href="https://score.clinet.cn/clinet/PTScore2007/20268900_2026年全国血清蛋白电泳室间质量评价/1/定量/中国/10112738482298.pdf" target="_blank">
+2026年血清蛋白电泳第1次室间质评统计结果表2008(中国)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/4</TD>
+    <TD style="width:20%" height="20">2026/7/1 3:31:38</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="血清蛋白电泳" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20268900_2026%C4%EA%C8%AB%B9%FA%D1%AA%C7%E5%B5%B0%B0%D7%B5%E7%D3%BE%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA/10112738482298.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('89',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/20268900_2026年全国血清蛋白电泳室间质量评价/1/定性/10112742211755.pdf" target="_blank">
+2026年血清蛋白电泳第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/4</TD>
+    <TD style="width:20%" height="20">2026/7/1 3:31:38</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="血清蛋白电泳" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/20268900_2026%C4%EA%C8%AB%B9%FA%D1%AA%C7%E5%B5%B0%B0%D7%B5%E7%D3%BE%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112742211755.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('A1',2026,1,'中国');" href="https://score.clinet.cn/clinet/PTScore2007/2026A100_2026年全国D-二聚体检测室间质量评价/1/定量/中国/10112734074276.pdf" target="_blank">
+2026年D-二聚体检测第1次室间质评统计结果表2008(中国)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/5</TD>
+    <TD style="width:20%" height="20">2026/6/23 16:20:33</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="D-二聚体检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026A100_2026%C4%EA%C8%AB%B9%FAD-%B6%FE%BE%DB%CC%E5%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA/10112734074276.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('A3',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026A300_2026年全国人类白细胞抗原(HLA)B＊5801基因检测室间质量评价/1/定性/10112724657601.pdf" target="_blank">
+2026年人类白细胞抗原(HLA)B*58：01基因检测第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/8</TD>
+    <TD style="width:20%" height="20">2026/5/29 12:41:24</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="人类白细胞抗原(HLA)B*58：01基因检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026A300_2026%C4%EA%C8%AB%B9%FA%C8%CB%C0%E0%B0%D7%CF%B8%B0%FB%BF%B9%D4%AD%28HLA%29B%A3%AA5801%BB%F9%D2%F2%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112724657601.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('A8',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026A800_2026年抗环瓜氨酸肽（抗-CCP）抗体室间质量评价/1/定性/10112752865599.pdf" target="_blank">
+2026年抗环瓜氨酸肽（抗-CCP）抗体第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/2/27</TD>
+    <TD style="width:20%" height="20">2026/4/30 15:37:52</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="抗环瓜氨酸肽（抗-CCP）抗体" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026A800_2026%C4%EA%BF%B9%BB%B7%B9%CF%B0%B1%CB%E1%EB%C4%A3%A8%BF%B9-CCP%A3%A9%BF%B9%CC%E5%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112752865599.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('B0',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026B000_2026年巨细胞病毒核酸检测室间质量评价/1/定性/10112729521521.pdf" target="_blank">
+2026年巨细胞病毒核酸检测第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/20</TD>
+    <TD style="width:20%" height="20">2026/4/8 9:39:29</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="巨细胞病毒核酸检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026B000_2026%C4%EA%BE%DE%CF%B8%B0%FB%B2%A1%B6%BE%BA%CB%CB%E1%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112729521521.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('B9',2026,1,'中国');" href="https://score.clinet.cn/clinet/PTScore2007/2026B900_2026年氯吡格雷药物代谢基因（CYP2C19）多态性室间质量评价/1/定量/中国/10112711701924.pdf" target="_blank">
+2026年氯吡格雷药物代谢基因（CYP2C19）多态性第1次室间质评统计结果表2008(定性)(中国)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/13</TD>
+    <TD style="width:20%" height="20">2026/4/22 14:59:10</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="氯吡格雷药物代谢基因（CYP2C19）多态性" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026B900_2026%C4%EA%C2%C8%DF%C1%B8%F1%C0%D7%D2%A9%CE%EF%B4%FA%D0%BB%BB%F9%D2%F2%A3%A8CYP2C19%A3%A9%B6%E0%CC%AC%D0%D4%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA/10112711701924.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('BF',2026,1,'2026标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026BF00_2026年全国尿液蛋白标志物Ⅰ室间质量评价/1/定量/2026标准/10112716554192.pdf" target="_blank">
+2026年尿液蛋白标志物Ⅰ第1次室间质评统计结果表2008(2026标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/9</TD>
+    <TD style="width:20%" height="20">2026/5/7 21:54:16</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="尿液蛋白标志物Ⅰ" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026BF00_2026%C4%EA%C8%AB%B9%FA%C4%F2%D2%BA%B5%B0%B0%D7%B1%EA%D6%BE%CE%EF%A2%F1%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2026%B1%EA%D7%BC/10112716554192.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('BK',2026,1,'2024标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026BK00_2026年全国血清降钙素原室间质量评价/1/定量/2024标准/10112720589591.pdf" target="_blank">
+2026年血清降钙素原第1次室间质评统计结果表2008(2024标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/9</TD>
+    <TD style="width:20%" height="20">2026/5/11 15:35:20</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="血清降钙素原" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026BK00_2026%C4%EA%C8%AB%B9%FA%D1%AA%C7%E5%BD%B5%B8%C6%CB%D8%D4%AD%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2024%B1%EA%D7%BC/10112720589591.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('BO',2026,1,'中国');" href="https://score.clinet.cn/clinet/PTScore2007/2026BO00_2026年抗凝蛋白检测室间质量评价/1/定量/中国/10112730477238.pdf" target="_blank">
+2026年抗凝蛋白检测第1次室间质评统计结果表2008(中国)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/5</TD>
+    <TD style="width:20%" height="20">2026/6/23 23:51:30</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="抗凝蛋白检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026BO00_2026%C4%EA%BF%B9%C4%FD%B5%B0%B0%D7%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA/10112730477238.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('BU',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026BU00_2026年他莫昔芬药物代谢基因(CYP2D6)多态性室间质量评价/1/定性/10112743097794.pdf" target="_blank">
+2026年他莫昔芬药物代谢基因（CYP2D6）多态性第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/9</TD>
+    <TD style="width:20%" height="20">2026/5/27 9:36:43</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="他莫昔芬药物代谢基因（CYP2D6）多态性" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026BU00_2026%C4%EA%CB%FB%C4%AA%CE%F4%B7%D2%D2%A9%CE%EF%B4%FA%D0%BB%BB%F9%D2%F2%28CYP2D6%29%B6%E0%CC%AC%D0%D4%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112743097794.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('BV',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026BV00_2026年EB病毒核酸检测（PCR-EBV）室间质量评价/1/定性/10112735478481.pdf" target="_blank">
+2026年EB病毒核酸检测（PCR-EBV）第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/12</TD>
+    <TD style="width:20%" height="20">2026/4/8 11:22:35</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="EB病毒核酸检测（PCR-EBV）" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026BV00_2026%C4%EAEB%B2%A1%B6%BE%BA%CB%CB%E1%BC%EC%B2%E2%A3%A8PCR-EBV%A3%A9%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112735478481.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('CI',2026,1,'2022标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026CI00_2026年全国抗缪勒管激素检测室间质量评价/1/定量/2022标准/10112730015335.pdf" target="_blank">
+2026年抗缪勒管激素第1次室间质评统计结果表2008(2022标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/25</TD>
+    <TD style="width:20%" height="20">2026/6/8 11:50:29</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="抗缪勒管激素" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026CI00_2026%C4%EA%C8%AB%B9%FA%BF%B9%E7%D1%C0%D5%B9%DC%BC%A4%CB%D8%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2022%B1%EA%D7%BC/10112730015335.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('CJ',2026,1,'2026标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026CJ00_2026年全国血清淀粉样蛋白A检测室间质量评价/1/定量/2026标准/10112745539394.pdf" target="_blank">
+2026年血清淀粉样蛋白A第1次室间质评统计结果表2008(2026标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/9</TD>
+    <TD style="width:20%" height="20">2026/5/15 10:00:45</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="血清淀粉样蛋白A" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026CJ00_2026%C4%EA%C8%AB%B9%FA%D1%AA%C7%E5%B5%ED%B7%DB%D1%F9%B5%B0%B0%D7A%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2026%B1%EA%D7%BC/10112745539394.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('DY',2026,1,'2020标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026DY00_2026年全国常规化学B室间质量评价/1/定量/2020标准/10112756024892.pdf" target="_blank">
+2026年常规化学B第1次室间质评统计结果表2008(2020标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/5</TD>
+    <TD style="width:20%" height="20">2026/6/27 10:26:55</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="常规化学B" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026DY00_2026%C4%EA%C8%AB%B9%FA%B3%A3%B9%E6%BB%AF%D1%A7B%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2020%B1%EA%D7%BC/10112756024892.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('EE',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026EE00_2026年叶酸代谢基因（MTHFR）多态性室间质量评价/1/定性/10112729504708.pdf" target="_blank">
+2026年叶酸代谢基因（MTHFR）多态性第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/20</TD>
+    <TD style="width:20%" height="20">2026/5/27 10:29:29</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="叶酸代谢基因（MTHFR）多态性" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026EE00_2026%C4%EA%D2%B6%CB%E1%B4%FA%D0%BB%BB%F9%D2%F2%A3%A8MTHFR%A3%A9%B6%E0%CC%AC%D0%D4%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112729504708.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('EJ',2026,1,'2023标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026EJ00_2026年全国细胞因子室间质量评价/1/定量/2023标准/10112714902499.pdf" target="_blank">
+2026年细胞因子第1次室间质评统计结果表2008(2023标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/9</TD>
+    <TD style="width:20%" height="20">2026/5/7 12:00:14</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="细胞因子" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026EJ00_2026%C4%EA%C8%AB%B9%FA%CF%B8%B0%FB%D2%F2%D7%D3%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2023%B1%EA%D7%BC/10112714902499.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('EL',2026,1,'2025标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026EL00_2026年全国肝纤维化血清学指标室间质量评价/1/定量/2025标准/10112753314792.pdf" target="_blank">
+2026年肝纤维化血清学指标第1次室间质评统计结果表2008(2025标准)
+	</a>
+    
+    <br/><span style="color:#FF0000">
+	您没有上报【2月份的室内质控】，请继续上报！
+    </span>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/10</TD>
+    <TD style="width:20%" height="20">2026/6/27 18:44:53</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="肝纤维化血清学指标" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026EL00_2026%C4%EA%C8%AB%B9%FA%B8%CE%CF%CB%CE%AC%BB%AF%D1%AA%C7%E5%D1%A7%D6%B8%B1%EA%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2025%B1%EA%D7%BC/10112753314792.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('EM',2026,1,'2024标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026EM00_2026年全国骨代谢标志物室间质量评价/1/定量/2024标准/10112709055376.pdf" target="_blank">
+2026年骨代谢标志物第1次室间质评统计结果表2008(2024标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/10</TD>
+    <TD style="width:20%" height="20">2026/6/17 15:26:08</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="骨代谢标志物" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026EM00_2026%C4%EA%C8%AB%B9%FA%B9%C7%B4%FA%D0%BB%B1%EA%D6%BE%CE%EF%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2024%B1%EA%D7%BC/10112709055376.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('ET',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026ET00_2026年新型冠状病毒核酸检测室间质量评价/1/定性/10112740371930.pdf" target="_blank">
+2026年新型冠状病毒核酸检测第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/10</TD>
+    <TD style="width:20%" height="20">2026/3/26 14:57:39</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="新型冠状病毒核酸检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026ET00_2026%C4%EA%D0%C2%D0%CD%B9%DA%D7%B4%B2%A1%B6%BE%BA%CB%CB%E1%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%D0%D4/10112740371930.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('FK',2026,1,'2026新');" href="https://score.clinet.cn/CLinet/PTScore2007/2026_FK_web_page_pdf/1/219ac176-0cee-4d85-8ad8-ad447674c41a.pdf" target="_blank">
+2026年临床检验常规化学专业患者数据实验室间比对1月份室间质评统计结果表(2026新)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20"></TD>
+    <TD style="width:20%" height="20">2026/5/8 12:57:01</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="临床检验常规化学专业患者数据实验室间比对" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/CLinet/PTScore2007/2026_FK_web_page_pdf/1/219ac176-0cee-4d85-8ad8-ad447674c41a.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('GH',2026,1,'中国1');" href="https://score.clinet.cn/clinet/PTScore2007/2026GH00_2026年全国纤维蛋白（原）降解产物检测室间质量评价/1/定量/中国1/10112745444756.pdf" target="_blank">
+2026年纤维蛋白（原）降解产物检测第1次室间质评统计结果表2008(中国1)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/6/5</TD>
+    <TD style="width:20%" height="20">2026/6/24 1:26:45</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="纤维蛋白（原）降解产物检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026GH00_2026%C4%EA%C8%AB%B9%FA%CF%CB%CE%AC%B5%B0%B0%D7%A3%A8%D4%AD%A3%A9%BD%B5%BD%E2%B2%FA%CE%EF%BC%EC%B2%E2%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/%D6%D0%B9%FA1/10112745444756.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('GU',2026,1,'2024标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026GU00_2026年全国糖化白蛋白室间质量评价/1/定量/2024标准/10112749712812.pdf" target="_blank">
+2026年糖化白蛋白第1次室间质评统计结果表2008(2024标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/5</TD>
+    <TD style="width:20%" height="20">2026/6/28 18:34:49</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="糖化白蛋白" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026GU00_2026%C4%EA%C8%AB%B9%FA%CC%C7%BB%AF%B0%D7%B5%B0%B0%D7%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2024%B1%EA%D7%BC/10112749712812.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('HD',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026HD00_2026年真菌感染检测项目：G试验（1,3-β-D葡聚糖试验）/1/定性/10112739213351.pdf" target="_blank">
+2026年真菌感染检测项目：G试验（1,3-β-D葡聚糖试验）第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/1</TD>
+    <TD style="width:20%" height="20">2026/6/18 10:36:38</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="真菌感染检测项目：G试验（1,3-β-D葡聚糖试验）" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026HD00_2026%C4%EA%D5%E6%BE%FA%B8%D0%C8%BE%BC%EC%B2%E2%CF%EE%C4%BF%A3%BAG%CA%D4%D1%E9%A3%A81%2C3-%A6%C2-D%C6%CF%BE%DB%CC%C7%CA%D4%D1%E9%A3%A9/1/%B6%A8%D0%D4/10112739213351.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('HE',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026HE00_2026年真菌感染检测项目：GM试验（半乳甘露聚糖试验）/1/定性/10112709229280.pdf" target="_blank">
+2026年真菌感染检测项目：GM试验（半乳甘露聚糖试验）第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/1</TD>
+    <TD style="width:20%" height="20">2026/6/18 12:51:08</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="真菌感染检测项目：GM试验（半乳甘露聚糖试验）" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026HE00_2026%C4%EA%D5%E6%BE%FA%B8%D0%C8%BE%BC%EC%B2%E2%CF%EE%C4%BF%A3%BAGM%CA%D4%D1%E9%A3%A8%B0%EB%C8%E9%B8%CA%C2%B6%BE%DB%CC%C7%CA%D4%D1%E9%A3%A9/1/%B6%A8%D0%D4/10112709229280.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('HG',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026HG00_2026年肺炎支原体核酸及其耐药基因检测/1/定性/10112755826226.pdf" target="_blank">
+2026年肺炎支原体核酸及其耐药基因检测第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/2/2</TD>
+    <TD style="width:20%" height="20">2026/3/12 9:50:55</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="肺炎支原体核酸及其耐药基因检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026HG00_2026%C4%EA%B7%CE%D1%D7%D6%A7%D4%AD%CC%E5%BA%CB%CB%E1%BC%B0%C6%E4%C4%CD%D2%A9%BB%F9%D2%F2%BC%EC%B2%E2/1/%B6%A8%D0%D4/10112755826226.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('HH',2026,1,'2025标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026HH00_2026年全国脂类B室间质量评价/1/定量/2025标准/10112740173651.pdf" target="_blank">
+2026年脂类B第1次室间质评统计结果表2008(2025标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/3/5</TD>
+    <TD style="width:20%" height="20">2026/4/7 10:47:39</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="脂类B" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026HH00_2026%C4%EA%C8%AB%B9%FA%D6%AC%C0%E0B%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2025%B1%EA%D7%BC/10112740173651.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('HK',2026,1,'2026标准');" href="https://score.clinet.cn/clinet/PTScore2007/2026HK00_2026年全国甲状腺功能室间质量评价/1/定量/2026标准/10112723179624.pdf" target="_blank">
+2026年甲状腺功能检测第1次室间质评统计结果表2008(2026标准)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/24</TD>
+    <TD style="width:20%" height="20">2026/5/18 14:15:20</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="甲状腺功能检测" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026HK00_2026%C4%EA%C8%AB%B9%FA%BC%D7%D7%B4%CF%D9%B9%A6%C4%DC%CA%D2%BC%E4%D6%CA%C1%BF%C6%C0%BC%DB/1/%B6%A8%C1%BF/2026%B1%EA%D7%BC/10112723179624.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('HL',2026,1,'细菌鉴定');" href="https://score.clinet.cn/clinet/PTScore2007/2026HL00_2026年酵母样真菌鉴定及药敏试验/1/细菌鉴定/10112737032322.pdf" target="_blank">
+2026年酵母样真菌鉴定及药敏试验第1次室间质评统计结果表2008(细菌鉴定)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/12</TD>
+    <TD style="width:20%" height="20">2026/6/23 11:29:36</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="酵母样真菌鉴定及药敏试验" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026HL00_2026%C4%EA%BD%CD%C4%B8%D1%F9%D5%E6%BE%FA%BC%F8%B6%A8%BC%B0%D2%A9%C3%F4%CA%D4%D1%E9/1/%CF%B8%BE%FA%BC%F8%B6%A8/10112737032322.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('HL',2026,1,'药敏结果');" href="https://score.clinet.cn/clinet/PTScore2007/2026HL00_2026年酵母样真菌鉴定及药敏试验/1/药敏结果/10112740707164.pdf" target="_blank">
+2026年酵母样真菌鉴定及药敏试验第1次室间质评统计结果表2008(药敏结果)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/5/12</TD>
+    <TD style="width:20%" height="20">2026/6/23 11:29:36</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="酵母样真菌鉴定及药敏试验" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026HL00_2026%C4%EA%BD%CD%C4%B8%D1%F9%D5%E6%BE%FA%BC%F8%B6%A8%BC%B0%D2%A9%C3%F4%CA%D4%D1%E9/1/%D2%A9%C3%F4%BD%E1%B9%FB/10112740707164.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#ffffff" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('HV',2026,1,'中国');" href="https://score.clinet.cn/clinet/PTScore2007/2026HV00_2026年外周血u骨髓涂片细胞分类形态学检查/1/定量/中国/10112728113569.pdf" target="_blank">
+2026年外周血/骨髓涂片细胞分类形态学检查第1次室间质评统计结果表2008(中国)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/9</TD>
+    <TD style="width:20%" height="20">2026/5/13 13:58:28</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="外周血/骨髓涂片细胞分类形态学检查" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026HV00_2026%C4%EA%CD%E2%D6%DC%D1%AA%A8u%B9%C7%CB%E8%CD%BF%C6%AC%CF%B8%B0%FB%B7%D6%C0%E0%D0%CE%CC%AC%D1%A7%BC%EC%B2%E9/1/%B6%A8%C1%BF/%D6%D0%B9%FA/10112728113569.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+    <tr bgcolor="#cccccc" nowrap>
+    <td width="60%" height="20" ><font color="#000099">◆</font><a onClick="return CanDownLoadPdf('HV',2026,1,'');" href="https://score.clinet.cn/clinet/PTScore2007/2026HV00_2026年外周血u骨髓涂片细胞分类形态学检查/1/定性/10112731659852.pdf" target="_blank">
+2026年外周血/骨髓涂片细胞分类形态学检查第1次室间质评统计结果表2008(定性)
+	</a>
+    
+    </td>
+    <TD  style="width:20%" height="20">2026/4/9</TD>
+    <TD style="width:20%" height="20">2026/5/13 13:58:28</TD>   
+    
+		 <td width="15%">&nbsp;</td>
+		      
+     <input type="hidden" value="外周血/骨髓涂片细胞分类形态学检查" name="cname" id="cname"> 
+     <!--TD style="width:5%"><a href="../data/clinet/PTScore2007/2026HV00_2026%C4%EA%CD%E2%D6%DC%D1%AA%A8u%B9%C7%CB%E8%CD%BF%C6%AC%CF%B8%B0%FB%B7%D6%C0%E0%D0%CE%CC%AC%D1%A7%BC%EC%B2%E9/1/%B6%A8%D0%D4/10112731659852.pdf" target="_blank">打印</a></TD-->
+    </tr>
+	
+</table>
+</p>
+
+<!--<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+var pageTracker = _gat._getTracker("UA-5095323-1");
+pageTracker._initData();
+pageTracker._trackPageview();
+//var  cname=document . getElementById("cname");
+//
+//alert(cname);
+</script>-->
+</body>
+</html>
+ 
+
+
+

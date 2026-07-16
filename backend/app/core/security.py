@@ -48,9 +48,47 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 
+# 详细组织角色码 → 中文标签（用于展示与审计）。
+# 一人可兼任多角色（如吕文娟=质控管理员+继教管理员），用逗号存于 users.roles。
+ROLE_LABELS = {
+    "admin": "管理员",
+    "director": "主任",
+    "deputy_director": "副主任",
+    "quality_manager": "质量负责人",
+    "specialty_leader": "专业组长",
+    "qc_manager": "质控管理员",
+    "reagent_manager": "试剂管理员",
+    "training_manager": "继教管理员",
+    "biosafety_officer": "生物安全员",
+    "it_manager": "信息管理员",
+    "staff": "职工",
+}
+
+
+def user_roles_list(user: User) -> list[str]:
+    """返回用户拥有的全部角色码（粗粒度 role + 详细 roles 合并去重）。"""
+    owned = set()
+    if user.role:
+        owned.add(user.role)
+    if user.roles:
+        owned.update(r for r in user.roles.split(",") if r)
+    return sorted(owned)
+
+
 def require_roles(*roles: str):
+    """权限校验：用户只要拥有 roles 中的任意一个角色即通过。
+
+    兼容旧的单一 role 字段与新的多角色 roles 字段——两者任一命中即可。
+    admin 角色始终自动通过（超级管理员兜底）。
+    """
+
     def dependency(current_user: User = Depends(get_current_user)):
-        if roles and current_user.role not in roles:
+        if not roles:
+            return current_user
+        owned = set(user_roles_list(current_user))
+        if "admin" in owned:
+            return current_user
+        if not owned.intersection(set(roles)):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="权限不足")
         return current_user
 

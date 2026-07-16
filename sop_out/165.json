@@ -1,0 +1,11 @@
+{
+  "pid": 165,
+  "sop_title": "SM-SOP-179- 西门子RapidPoint血气分析仪动脉血气分析标准操作程序",
+  "reference_range": "pH 7.35-7.45；pO₂ 80-100 mmHg；pCO₂ 35-45 mmHg；K+ 3.5-5.0 mmol/L；Na+ 135-145 mmol/L；Ca2+ 1.12-1.32 mmol/L；Cl- 96-106 mmol/L",
+  "reportable_range": "pH 6.80–7.80；PO₂ 5–800 mmHg；PCO₂ 5–150 mmHg（线性范围）",
+  "unit": "pH / mmHg / mmol/L（多参数）",
+  "traceability": "未列出",
+  "interference": "血红蛋白≤15 g/dL、胆红素≤20 mg/dL、脂血（TG≤1000 mg/dL）无显著干扰。",
+  "method": "pH/PCO₂/PO₂电化学传感器直接测量；电解质离子选择性电极（ISE）法；乳酸乳酸氧化酶电化学法；血红蛋白分光光度法",
+  "instrument": "西门子RapidPoint血气分析仪"
+}

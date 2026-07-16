@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -8,7 +9,7 @@ from sqlalchemy import or_, case
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .security import get_current_user
+from .security import get_current_user, require_roles
 from ..models.audit_log import AuditLog
 from ..models.user import User
 
@@ -41,9 +42,20 @@ def make_router(
     UpdateSchema: type[BaseModel],
     search_fields: list[str],
     filter_fields: list[str] | None = None,
+    order_by: list | None = None,
     prefix: str = "",
+    after_write: Callable | None = None,
+    write_roles: tuple[str, ...] | None = None,
 ):
-    """通用 CRUD 路由工厂：分页/搜索、get、create、update、delete，并统一写审计日志。"""
+    """通用 CRUD 路由工厂：分页/搜索、get、create、update、delete，并统一写审计日志。
+
+    权限模型：
+    - 查（list/get）：所有登录用户可访问
+    - 改（create/update/delete）：需要 write_roles 中的任一角色；admin 自动通过
+    - write_roles=None 时不做角色限制（向后兼容，仅要求登录）
+    """
+    # 写权限依赖：有 write_roles 则校验角色，否则仅要求登录
+    WriteDep = require_roles(*write_roles) if write_roles else get_current_user
     router = APIRouter(prefix=prefix, tags=[Model.__name__])
 
     @router.get("")
@@ -83,7 +95,10 @@ def make_router(
             if val is not None and hasattr(Model, f):
                 query = query.filter(getattr(Model, f) == val)
         if not (q and search_fields):
-            query = query.order_by(Model.id.desc())
+            if order_by:
+                query = query.order_by(*order_by)
+            else:
+                query = query.order_by(Model.id.desc())
         return paginate(query, page, page_size)
 
     @router.get("/{item_id}", response_model=ReadSchema)
@@ -98,7 +113,7 @@ def make_router(
         item: CreateSchema,
         request: Request,
         db: Session = Depends(get_db),
-        user: User = Depends(get_current_user),
+        user: User = Depends(WriteDep),
     ):
         data = item.model_dump()
         obj = Model(**data)
@@ -106,6 +121,8 @@ def make_router(
         db.commit()
         db.refresh(obj)
         write_audit(db, user, "create", Model.__tablename__, obj.id, data, _ip(request))
+        if after_write:
+            after_write(db, "create", obj)
         return obj
 
     @router.put("/{item_id}", response_model=ReadSchema)
@@ -114,7 +131,7 @@ def make_router(
         item: UpdateSchema,
         request: Request,
         db: Session = Depends(get_db),
-        user: User = Depends(get_current_user),
+        user: User = Depends(WriteDep),
     ):
         obj = db.get(Model, item_id)
         if not obj:
@@ -127,6 +144,8 @@ def make_router(
         db.commit()
         db.refresh(obj)
         write_audit(db, user, "update", Model.__tablename__, item_id, changes, _ip(request))
+        if after_write:
+            after_write(db, "update", obj)
         return obj
 
     @router.delete("/{item_id}")
@@ -134,7 +153,7 @@ def make_router(
         item_id: int,
         request: Request,
         db: Session = Depends(get_db),
-        user: User = Depends(get_current_user),
+        user: User = Depends(WriteDep),
     ):
         obj = db.get(Model, item_id)
         if not obj:
@@ -142,6 +161,8 @@ def make_router(
         db.delete(obj)
         db.commit()
         write_audit(db, user, "delete", Model.__tablename__, item_id, "", _ip(request))
+        if after_write:
+            after_write(db, "delete", obj)
         return {"ok": True}
 
     return router

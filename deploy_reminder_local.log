@@ -1,0 +1,65 @@
+INFO:     Started server process [37568]
+INFO:     Waiting for application startup.
+[EMAIL-DEGRADED] to=815268425@qq.com subject=【检验科生免组实验室管理系统】实验室待办提醒（17 条）
+【检验科生免组实验室管理系统】待办提醒
+
+· 室间质评上报提醒：北京市 常规化学A 第2次（截止 2026-07-17）
+    将于 2026-07-17 上报截止（剩 1 天）
+· 室间质评上报提醒：北京市 血清降钙素原 第2次（截止 2026-07-17）
+    将于 2026-07-17 上报截止（剩 1 天）
+· 室间质评上报提醒：北京市 糖化白蛋白 第2次（截止 2026-07-17）
+    将于 2026-07-17 上报截止（剩 1 天）
+· 室间质评上报提醒：北京市 凝血试验 第2次（截止 2026-07-17）
+    将于 2026-07-17 上报截止（剩 1 天）
+· 室间质评上报提醒：北京市 细胞因子 第2次（截止 2026-07-17）
+    将于 2026-07-17 上报截止（剩 1 天）
+· 室间质评上报提醒：卫健委 甲功相关项目检测及正确度验证 第1次（截止 2026-04-30）
+    上报已逾期（应 2026-04-30 前上报）
+· 室间质评上报提醒：北京市 中孕期母血清产前筛查 第2次（截止 2026-07-17）
+    将于 2026-07-17 上报截止（剩 1 天）
+· 全自动生化分析仪（贝克曼AU5800急诊）校准提醒（截止 2026-06-12）
+    校准已逾期（应 2026-06-12 前完成）
+· 凝血分析仪（TOP700A）校准提醒（截止 2026-05-06）
+    校准已逾期（应 2026-05-06 前完成）
+· 凝血分析仪（TOP700B）校准提醒（截止 2026-05-06）
+    校准已逾期（应 2026-05-06 前完成）
+· 凝血分析仪（TOP700C）校准提醒（截止 2026-07-10）
+    校准已逾期（应 2026-07-10 前完成）
+· 全自动生化分析仪（日立HT7600）校准提醒（截止 2026-05-23）
+    校准已逾期（应 2026-05-23 前完成）
+· 毛细管电泳仪（Capillarys 3 OCTA）校准提醒（截止 2026-08-01）
+    将于 2026-08-01 到期（剩 16 天）
+· 全自动凝胶电泳仪（Hydrasys 2）校准提醒（截止 2026-08-01）
+    将于 2026-08-01 到期（剩 16 天）
+· 凝血分析仪（CompactMax）校准提醒（截止 2026-04-05）
+    校准已逾期（应 2026-04-05 前完成）
+· 高速低温离心机A（Fresc021）校准提醒（截止 2025-11-01）
+    校准已逾期（应 2025-11-01 前完成）
+· 高速低温离心机B（5424R）校准提醒（截止 2025-11-01）
+    校准已逾期（应 2025-11-01 前完成）
+
+（此邮件由系统自动发送，请勿直接回复）
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8137 (Press CTRL+C to quit)
+INFO:     127.0.0.1:33498 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33499 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33502 - "GET /api/v1/reminders/rules HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33503 - "GET /api/v1/reminders/recipients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4682 - "POST /api/v1/auth/login HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:4683 - "POST /api/v1/reminders/run?dry_run=true HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:4684 - "POST /api/v1/reminders/run HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:4685 - "POST /api/v1/reminders/run HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:4686 - "GET /api/v1/reminders/send-log?limit=5 HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:17684 - "POST /api/v1/auth/login HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:17686 - "POST /api/v1/reminders/run?dry_run=true HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:17687 - "GET /api/v1/reminders/send-log?limit=5 HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:17781 - "POST /api/v1/auth/login HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:17782 - "POST /api/v1/auth/login HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:17839 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17852 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17853 - "POST /api/v1/reminders/run?dry_run=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17854 - "POST /api/v1/reminders/run HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17855 - "POST /api/v1/reminders/run HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17856 - "POST /api/v1/reminders/run?dry_run=true&as_of=2026-08-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17857 - "GET /api/v1/reminders/send-log?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40880 - "GET /health HTTP/1.1" 200 OK

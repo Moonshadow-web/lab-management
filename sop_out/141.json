@@ -1,0 +1,11 @@
+{
+  "pid": 141,
+  "sop_title": "SM-SOP-134  AU5800检测系统离子选择电极法氯离子测定标准操作程序",
+  "reference_range": "血清(浆)氯化物 96-108mmol/L；脑脊液 120-132mmol/L；尿 170-250mmol/24hr",
+  "reportable_range": "血清(浆)氯化物 45-210mmol/L；尿氯化物 10-320mmol/L",
+  "unit": "mmol/L",
+  "traceability": "校准品：美国贝克曼公司多点定标液(贝克曼公司)",
+  "interference": "严重溶血时由于稀释原因也可降低氯水平",
+  "method": "离子选择电极法",
+  "instrument": "日立HT7600全自动生化分析仪、Beckman Coulter5800全自动生化分析仪"
+}

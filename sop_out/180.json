@@ -1,0 +1,11 @@
+{
+  "pid": 180,
+  "sop_title": "SM-SOP-559-罗氏Cobas检测系统电化学发光法血清弓形虫Tox IgM测定标准操作程序",
+  "reference_range": "结果解释：无反应 < 0.8 COI；不确定 0.8-1.0 COI；有反应 ≥ 1.0 COI（定性阈值，文档无数值生物参考区间）",
+  "reportable_range": "未列出（定性检测，文档无线性范围/可报告范围段落）",
+  "unit": "COI",
+  "traceability": "未列出",
+  "interference": "不受黄疸（胆红素<25mg/dl）、溶血（血红蛋白<2.4 g/dl）、脂血（脂质<1500mg/dl）、生物素<50ng/ml干扰；接受高剂量生物素（>5mg/天）治疗者须末次摄入8小时后采血；不受类风湿因子（1500U/ml）和透析干扰",
+  "method": "μ捕获法（电化学发光法）",
+  "instrument": "罗氏 Elecsys e601 全自动电化学发光免疫自动分析仪"
+}

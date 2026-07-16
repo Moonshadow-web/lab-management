@@ -10,4 +10,5 @@ router = make_router(
     search_fields=["person", "title", "category", "organizer", "certificate_no"],
     filter_fields=["category", "status", "person"],
     prefix="/training-records",
+    write_roles=("admin", "training_manager"),
 )

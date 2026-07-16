@@ -1,0 +1,141 @@
+[
+  {
+    "spec": "21",
+    "program": "肝炎标志物",
+    "status": "skipped",
+    "reason": "form not present (maybe already reported)"
+  },
+  {
+    "spec": "86",
+    "program": "感染性疾病血清学标志物系列B",
+    "verify": [
+      {
+        "name": "抗-HAV IgM",
+        "vals": [
+          "+",
+          "+",
+          "-",
+          "+",
+          "-"
+        ]
+      },
+      {
+        "name": "抗-HBc IgM",
+        "vals": [
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      {
+        "name": "抗-HEV IgM",
+        "vals": [
+          "+",
+          "-",
+          "+",
+          "-",
+          "-"
+        ]
+      }
+    ],
+    "postText": "",
+    "status": "sent",
+    "reportedCheck": {
+      "found": false
+    }
+  },
+  {
+    "spec": "87",
+    "program": "感染性疾病血清学标志物系列C",
+    "verify": [
+      {
+        "name": "抗-HIV",
+        "vals": [
+          "+",
+          "-",
+          "+",
+          "+",
+          "-"
+        ]
+      },
+      {
+        "name": "抗-TP(特异）",
+        "vals": [
+          "-",
+          "-",
+          "+",
+          "+",
+          "+"
+        ]
+      },
+      {
+        "name": "抗-TP(非特异）",
+        "vals": [
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      }
+    ],
+    "postText": "",
+    "status": "sent",
+    "reportedCheck": {
+      "found": false
+    }
+  },
+  {
+    "spec": "88",
+    "program": "感染性疾病抗原抗体快速检测",
+    "verify": [
+      {
+        "name": "HBsAg",
+        "vals": [
+          "+",
+          "-",
+          "-",
+          "+",
+          "-"
+        ]
+      },
+      {
+        "name": "抗-HCV",
+        "vals": [
+          "+",
+          "-",
+          "+",
+          "-",
+          "+"
+        ]
+      },
+      {
+        "name": "抗-HIV",
+        "vals": [
+          "-",
+          "+",
+          "+",
+          "-",
+          "+"
+        ]
+      },
+      {
+        "name": "抗-TP",
+        "vals": [
+          "-",
+          "-",
+          "+",
+          "+",
+          "-"
+        ]
+      }
+    ],
+    "postText": "",
+    "status": "sent",
+    "reportedCheck": {
+      "found": false
+    }
+  }
+]

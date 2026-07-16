@@ -1,0 +1,12 @@
+{
+  "pid": 202,
+  "sop_title": "PHI临床应用进展.pptx（知识库未收录P2PSA专用试剂说明书/参考范围）",
+  "reference_range": "未找到（需人工补充）",
+  "reportable_range": "未列出",
+  "unit": "pg/mL（罗氏Cobas；据PHI资料p2PSA数值）",
+  "traceability": "未列出",
+  "interference": "未列出",
+  "method": "电化学发光法（罗氏Cobas e601，依据同平台FPSA/TPSA SOP）",
+  "instrument": "罗氏Cobas e601电化学发光免疫分析仪",
+  "data_source": "未找到（需人工补充）"
+}

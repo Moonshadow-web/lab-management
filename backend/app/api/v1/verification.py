@@ -10,4 +10,5 @@ router = make_router(
     search_fields=["test_item", "verify_type", "instrument", "operator", "criteria"],
     filter_fields=["verify_type", "conclusion", "instrument"],
     prefix="/verification-records",
+    write_roles=("admin", "specialty_leader"),
 )

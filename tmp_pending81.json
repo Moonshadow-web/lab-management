@@ -1,0 +1,569 @@
+[
+ {
+  "id": 125,
+  "name": "凝血酶原时间",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 126,
+  "name": "活化部分凝血活酶时间",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 127,
+  "name": "凝血酶时间",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 128,
+  "name": "纤维蛋白原",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 129,
+  "name": "血浆D-二聚体",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 130,
+  "name": "纤维蛋白（原）降解产物",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 131,
+  "name": "抗凝血酶III",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 132,
+  "name": "血浆蛋白C活性",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 133,
+  "name": "血浆蛋白S活性",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 134,
+  "name": "血浆纤溶酶原活性",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 135,
+  "name": "狼疮抗凝物SCT试验",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 136,
+  "name": "狼疮抗凝物DRVVT试验",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 137,
+  "name": "抗Xa活性",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 138,
+  "name": "vWF因子",
+  "aliases": "",
+  "category": "其他",
+  "specimen": "血浆"
+ },
+ {
+  "id": 139,
+  "name": "钠（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 140,
+  "name": "钾（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 141,
+  "name": "氯（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 142,
+  "name": "葡萄糖（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 143,
+  "name": "尿素（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 144,
+  "name": "肌酐（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 145,
+  "name": "尿酸（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 146,
+  "name": "总钙（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 147,
+  "name": "镁（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 148,
+  "name": "磷（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 149,
+  "name": "淀粉酶（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 150,
+  "name": "微量总蛋白（尿液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "尿液"
+ },
+ {
+  "id": 151,
+  "name": "微量总蛋白（脑脊液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "脑脊液"
+ },
+ {
+  "id": 152,
+  "name": "氯（脑脊液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "脑脊液"
+ },
+ {
+  "id": 153,
+  "name": "葡萄糖（脑脊液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "脑脊液"
+ },
+ {
+  "id": 154,
+  "name": "总蛋白（胸腹水）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "胸腹水"
+ },
+ {
+  "id": 155,
+  "name": "白蛋白（胸腹水）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "胸腹水"
+ },
+ {
+  "id": 156,
+  "name": "腺苷脱氨酶（胸腹水）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "胸腹水"
+ },
+ {
+  "id": 157,
+  "name": "乳酸脱氢酶（胸腹水）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "胸腹水"
+ },
+ {
+  "id": 158,
+  "name": "葡萄糖（胸腹水）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "胸腹水"
+ },
+ {
+  "id": 159,
+  "name": "糖化血红蛋白",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 160,
+  "name": "β2-微球蛋白",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 161,
+  "name": "血氨",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 162,
+  "name": "17-羟类固醇",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 163,
+  "name": "17-酮类固醇",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 164,
+  "name": "香草扁桃酸",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 165,
+  "name": "血气和酸碱分析（pH、PO2、PCO2、K、Na、Cl、Ca）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "动脉血"
+ },
+ {
+  "id": 166,
+  "name": "血清蛋白电泳",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 167,
+  "name": "免疫固定电泳",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 168,
+  "name": "IgG4",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 169,
+  "name": "三型前胶原N末端肽",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 170,
+  "name": "四型胶原",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 171,
+  "name": "透明质酸",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 172,
+  "name": "层粘连蛋白",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 173,
+  "name": "抗梅毒螺旋体非特异性抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 174,
+  "name": "癌胚抗原（胸腹水）",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "胸腹水"
+ },
+ {
+  "id": 175,
+  "name": "甲型肝炎病毒IgM抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 176,
+  "name": "风疹病毒IgM抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 177,
+  "name": "巨细胞病毒IgM抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 178,
+  "name": "巨细胞病毒IgG抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 179,
+  "name": "风疹病毒IgG抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 180,
+  "name": "弓形虫IgM抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 181,
+  "name": "弓形虫IgG抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 182,
+  "name": "I型单纯疱疹病毒IgG抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 183,
+  "name": "II型单纯疱疹病毒IgG抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 184,
+  "name": "β胶原特殊序列",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 185,
+  "name": "戊肝抗体IgG抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 186,
+  "name": "戊肝抗体IgM抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 187,
+  "name": "结核感染T细胞检测",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 188,
+  "name": "血管紧张素Ⅱ",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 189,
+  "name": "醛固酮",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 190,
+  "name": "促肾上腺皮质激素（ACTH）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 191,
+  "name": "肾素",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 192,
+  "name": "皮质醇",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 193,
+  "name": "游离皮质醇（尿液）",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "尿液"
+ },
+ {
+  "id": 194,
+  "name": "快速抗HIV抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 195,
+  "name": "快速抗梅毒螺旋体抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 196,
+  "name": "快速乙型肝炎病毒表面抗原",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 197,
+  "name": "快速抗丙型肝炎病毒抗体(仅复检）",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 198,
+  "name": "I型单纯疱疹病毒IgM抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 199,
+  "name": "II型单纯疱疹病毒IgM抗体",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 200,
+  "name": "肺癌自身抗体检测（七项）",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 201,
+  "name": "EPO",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 202,
+  "name": "P2PSA",
+  "aliases": "",
+  "category": "免疫",
+  "specimen": "血清"
+ },
+ {
+  "id": 203,
+  "name": "ST2",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "血清"
+ },
+ {
+  "id": 204,
+  "name": "腺苷脱氨酶（脑脊液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "脑脊液"
+ },
+ {
+  "id": 205,
+  "name": "乳酸脱氢酶（脑脊液）",
+  "aliases": "",
+  "category": "生化",
+  "specimen": "脑脊液"
+ }
+]

@@ -1,0 +1,11 @@
+{
+  "pid": 145,
+  "sop_title": "SM-SOP-125  AU5800检测系统酶法血清尿酸测定标准操作程序-",
+  "reference_range": "血清：男 208-422 umol/L；女 149-387 umol/L",
+  "reportable_range": "6-5950umol/L",
+  "unit": "umol/L",
+  "traceability": "校准品溯源至国家标准品360012",
+  "interference": "坏血酸≤0.3mmol/L、血红蛋白≤1.0g/L、胆红素≤250μmol/L无显著干扰；脂血影响测定结果",
+  "method": "酶法（尿酸酶法）",
+  "instrument": "Beckman Coulter AU5800 全自动生化分析仪"
+}

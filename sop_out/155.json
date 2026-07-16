@@ -1,0 +1,11 @@
+{
+  "pid": 155,
+  "sop_title": "SM-SOP-111  AU5800检测系统溴甲酚绿法血清白蛋白测定标准操作程序",
+  "reference_range": "血清：新生儿-5月 35-50g/L；6月-12岁 39-54g/L；13岁-18岁 42-56g/L；≥19岁 40-55g/L",
+  "reportable_range": "2-300 g/L",
+  "unit": "g/L",
+  "traceability": "校准品溯源至国家标准物GBW(E)090619",
+  "interference": "甘油三酯≤500 mmol/L、总胆红素≤40μmol/L、血红蛋白≤4g/L、维生素C≤300mg/L 无显著干扰。",
+  "method": "溴甲酚绿法",
+  "instrument": "Beckman Coulter AU5800 全自动生化分析仪"
+}

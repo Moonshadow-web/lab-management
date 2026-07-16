@@ -1,0 +1,1 @@
+{"pid": 127, "sop_title": "SM-SOP-163  沃芬ACL TOP Family检测系统凝固法血浆凝血酶时间测定标准操作程序", "reference_range": "12-18秒", "reportable_range": "5-300秒", "unit": "秒 (S)", "traceability": "未列出", "interference": "溶血和/或脂血标本不适合用于该测试；低于以下水平的物质不产生干扰：血红蛋白500 mg/dL、胆红素24/13/7 mg/dL（依试剂准备量）；TT结果受许多常用治疗药物影响", "method": "凝固法", "instrument": "ACL TOP700单机及ACL TOP700系列流水线"}

@@ -1,0 +1,11 @@
+{
+  "pid": 182,
+  "sop_title": "SM-SOP-556-罗氏Cobas检测系统电化学发光法血清单纯疱疹病毒1型 HSV-1 IgG测定标准操作程序",
+  "reference_range": "结果解释：无反应 < 0.6 COI；不确定 ≥0.6-<1 COI；有反应 ≥ 1 COI（定性阈值，文档无数值生物参考区间）",
+  "reportable_range": "未列出（定性检测，文档无线性范围/可报告范围段落）",
+  "unit": "COI",
+  "traceability": "未列出",
+  "interference": "不受黄疸（胆红素<1130μmol/L或<66mg/dL）、溶血（血红蛋白<0.621mmol/L或<1.0g/dL）、脂血（脂肪乳剂<2000mg/dL）、生物素<205nmol/L或<50ng/mL干扰；接受高剂量生物素（>5mg/天）治疗者须末次摄入8小时后采血；类风湿因子≤1500IU/mL无影响",
+  "method": "双抗原夹心法（电化学发光法）",
+  "instrument": "罗氏 Elecsys e601 全自动电化学发光免疫自动分析仪"
+}

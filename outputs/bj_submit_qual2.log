@@ -1,0 +1,36 @@
+[*] refresh login (clean context)...
+  [fill] submitted on https://www.clinet.com.cn/passport/login.asp?type=loginform&tpl=login_
+  LANDED: true final: https://www.clinet.com.cn/clinetbusiness/hospital/main.asp?checksso=true
+[*] saved fresh auth state
+
+===== SPEC 21 -> skipped =====
+
+[86] form submitted
+[86] testdate=2026-07-15
+[86] filled: 抗-HAV IgM col4=__+ | 抗-HAV IgM col5=__+ | 抗-HAV IgM col6=__- | 抗-HAV IgM col7=__+ | 抗-HAV IgM col8=__- | 抗-HEV IgM col4=__+ | 抗-HEV IgM col5=__- | 抗-HEV IgM col6=__+ | 抗-HEV IgM col7=__- | 抗-HEV IgM col8=__-
+[86] verify: [{"name":"抗-HAV IgM","vals":["+","+","-","+","-"]},{"name":"抗-HBc IgM","vals":["","","","",""]},{"name":"抗-HEV IgM","vals":["+","-","+","-","-"]}]
+[86] post-send text: 
+[86] SENT
+
+===== SPEC 86 -> sent =====
+
+[87] form submitted
+[87] testdate=2026-07-15
+[87] filled: 抗-HIV col4=__+ | 抗-HIV col5=__- | 抗-HIV col6=__+ | 抗-HIV col7=__+ | 抗-HIV col8=__- | 抗-TP(特异） col4=__- | 抗-TP(特异） col5=__- | 抗-TP(特异） col6=__+ | 抗-TP(特异） col7=__+ | 抗-TP(特异） col8=__+
+[87] verify: [{"name":"抗-HIV","vals":["+","-","+","+","-"]},{"name":"抗-TP(特异）","vals":["-","-","+","+","+"]},{"name":"抗-TP(非特异）","vals":["","","","",""]}]
+[87] post-send text: 
+[87] SENT
+
+===== SPEC 87 -> sent =====
+
+[88] form submitted
+[88] testdate=2026-07-15
+[88] filled: HBsAg col4=__+ | HBsAg col5=__- | HBsAg col6=__- | HBsAg col7=__+ | HBsAg col8=__- | 抗-HCV col4=__+ | 抗-HCV col5=__- | 抗-HCV col6=__+ | 抗-HCV col7=__- | 抗-HCV col8=__+ | 抗-HIV col4=__- | 抗-HIV col5=__+ | 抗-HIV col6=__+ | 抗-HIV col7=__- | 抗-HIV col8=__+ | 抗-TP col4=__- | 抗-TP col5=__- | 抗-TP col6=__+ | 抗-TP col7=__+ | 抗-TP col8=__-
+[88] verify: [{"name":"HBsAg","vals":["+","-","-","+","-"]},{"name":"抗-HCV","vals":["+","-","+","-","+"]},{"name":"抗-HIV","vals":["-","+","+","-","+"]},{"name":"抗-TP","vals":["-","-","+","+","-"]}]
+[88] post-send text: 
+[88] SENT
+
+===== SPEC 88 -> sent =====
+
+
+ALL DONE. results in bj_submit_qual2_result.json

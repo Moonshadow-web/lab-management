@@ -1,0 +1,11 @@
+{
+  "pid": 160,
+  "sop_title": "SM-SOP-129  AU5800检测系统免疫比浊法血清β2-微球蛋白测定标准操作程序",
+  "reference_range": "血清：1～2 mg/L；血浆：1-2 mg/L；尿液：0.1-0.3 mg/L",
+  "reportable_range": "3-8000 mg/L",
+  "unit": "mg/L",
+  "traceability": "未列出",
+  "interference": "血红蛋白浓度≤500mg/dl、乳糜（添加10%乳糜5%）、胆红素浓度≤30mg/dl时对测试结果无明显影响。",
+  "method": "免疫比浊法",
+  "instrument": "日立HT7600全自动生化分析仪；Beckman Coulter AU5800 全自动生化分析仪"
+}

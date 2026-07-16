@@ -1,0 +1,11 @@
+{
+  "pid": 138,
+  "sop_title": "SM-SOP-183  Stago检测系统发色底物法血浆血管性血友病vWF因子抗原测定标准操作程序",
+  "reference_range": "50-160%",
+  "reportable_range": "3%-105%",
+  "unit": "%",
+  "traceability": "未列出",
+  "interference": "血红蛋白(<5 g/L)、胆红素(<150 mg/L)、未组分肝素(<2IU/mL)、低分子量肝素(<2 anti-Xa IU/mL)不敏感",
+  "method": "乳胶免疫比浊法",
+  "instrument": "Stago CompactMax凝血分析仪"
+}

@@ -1,0 +1,32 @@
+INFO:     Started server process [15308]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8123 (Press CTRL+C to quit)
+INFO:     127.0.0.1:37971 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37972 - "GET /api/v1/reminders/rules HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37973 - "POST /api/v1/reminders/recipients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37974 - "POST /api/v1/reminders/recipients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37975 - "POST /api/v1/reminders/recipients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37976 - "POST /api/v1/reminders/run?dry_run=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37977 - "DELETE /api/v1/reminders/recipients/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37978 - "DELETE /api/v1/reminders/recipients/3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37979 - "DELETE /api/v1/reminders/recipients/4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5079 - "GET /api/v1/qc-summaries/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44902 - "GET /api/v1/documents?page=1&page_size=20&category=&hide_invalid=false&q= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:22687 - "GET /api/v1/documents?page=1&page_size=20&category=&hide_invalid=false&q=%E6%AF%94%E5%AF%B9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:31982 - "GET /api/v1/test-items/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:31977 - "GET /api/v1/eqa-associations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:31983 - "GET /api/v1/test-items?page=1&page_size=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:31981 - "GET /api/v1/documents/project-manuals HTTP/1.1" 200 OK
+INFO:     127.0.0.1:31980 - "GET /api/v1/instruments/family-map HTTP/1.1" 200 OK
+INFO:     127.0.0.1:23949 - "GET /api/v1/test-items?page=1&page_size=10&q=%E7%94%B2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:31984 - "GET /api/v1/test-items?page=1&page_size=10&q=%E6%A2%85%E6%AF%92 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15459 - "GET /api/v1/test-items?page=1&page_size=10&q=TP HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6940 - "GET /api/v1/test-items?page=1&page_size=10&q=ckm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1480 - "GET /api/v1/test-items?page=1&page_size=10&q=inr HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7642 - "GET /api/v1/test-items?page=1&page_size=10&q=PT HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49071 - "GET /api/v1/test-items?page=1&page_size=10&q=PT&category=%E5%87%9D%E8%A1%80 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33820 - "GET /api/v1/test-items?page=1&page_size=10&category=%E5%87%9D%E8%A1%80 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54137 - "GET /api/v1/test-items?page=1&page_size=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5565 - "GET /api/v1/test-items?page=1&page_size=10&q=%E8%9B%8B%E7%99%BDC HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33220 - "GET /api/v1/test-items?page=1&page_size=10&q=tg HTTP/1.1" 200 OK

@@ -1,0 +1,11 @@
+{
+  "pid": 151,
+  "sop_title": "SM-SOP-127  AU5800检测系统邻苯三酚红钼法尿或脑脊液总蛋白测定标准操作程序",
+  "reference_range": "尿液：0.3-12 U/L",
+  "reportable_range": "0-200 U/L",
+  "unit": "U/L",
+  "traceability": "校准品量值溯源至公司内部工作校准品，并与北京九强生物技术股份有限公司生产的N-乙酰-β-D-氨基葡萄糖苷酶测定试剂盒（MPT底物法）比对验证。",
+  "interference": "抗坏血酸≤0.6g/L、胆红素≤205μmol/L、白蛋白≤1g/L、尿素≤999mmol/L 对试剂无明显干扰。",
+  "method": "邻苯三酚红钼法",
+  "instrument": "日立7600全自动生化分析仪"
+}

@@ -1,0 +1,37 @@
+INFO:     Started server process [11640]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8123 (Press CTRL+C to quit)
+INFO:     127.0.0.1:15643 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15643 - "GET /api/v1/comparison/groups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15643 - "POST /api/v1/comparison/plans HTTP/1.1" 201 Created
+INFO:     127.0.0.1:15643 - "PUT /api/v1/comparison/plans/3/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15643 - "GET /api/v1/comparison/plans/3/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15643 - "POST /api/v1/comparison/plans/3/report/generate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15643 - "GET /api/v1/comparison/plans/3/report/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15643 - "GET /api/v1/comparison/plans/3/report HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15643 - "POST /api/v1/comparison/plans HTTP/1.1" 201 Created
+INFO:     127.0.0.1:15643 - "PUT /api/v1/comparison/plans/4/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15643 - "POST /api/v1/comparison/plans/4/report/generate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15643 - "GET /api/v1/comparison/plans/4/report/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:25612 - "GET /api/v1/test-items?page=1&page_size=10&q=igg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34356 - "GET /api/v1/documents/project-manuals HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8576 - "GET /api/v1/test-items/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34354 - "GET /api/v1/eqa-associations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9955 - "GET /api/v1/test-items?page=1&page_size=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34352 - "GET /api/v1/instruments/family-map HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45352 - "GET /api/v1/test-items/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59066 - "GET /api/v1/eqa-associations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45353 - "GET /api/v1/test-items?page=1&page_size=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45349 - "GET /api/v1/documents/project-manuals HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33660 - "GET /api/v1/instruments/family-map HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39377 - "GET /api/v1/test-items/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39375 - "GET /api/v1/test-items?page=1&page_size=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39374 - "GET /api/v1/documents/project-manuals HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39373 - "GET /api/v1/eqa-associations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39372 - "GET /api/v1/instruments/family-map HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6034 - "GET /api/v1/qc-summaries/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2979 - "GET /api/v1/eqa-plans/alerts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2981 - "GET /api/v1/eqa-plans/summary-by-category?year=2026&half=1&category=%E7%94%9F%E5%8C%96%2B%E5%87%9D%E8%A1%80&department=%E5%8D%AB%E5%81%A5%E5%A7%94 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2978 - "GET /api/v1/eqa-plans?year=2026&page_size=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13892 - "GET /api/v1/eqa-plans/summary-text?year=2026&half=1&category=%E7%94%9F%E5%8C%96%2B%E5%87%9D%E8%A1%80&department=%E5%8D%AB%E5%81%A5%E5%A7%94 HTTP/1.1" 200 OK

@@ -1,0 +1,11 @@
+{
+  "pid": 188,
+  "sop_title": "SM-SOP-518-安图AutolumoA2000检测系统化学发光法血浆血管紧张素II测定标准操作程序",
+  "reference_range": "卧位 25pg/ml～129pg/ml；站位 49pg/ml～252pg/ml（95%正常参考范围）",
+  "reportable_range": "线性 10pg/ml～1000pg/ml（r≥0.9900）；>1000pg/ml为定标曲线外延计算，最大稀释比例1:7",
+  "unit": "pg/ml",
+  "traceability": "未列出",
+  "interference": "20mg/dL胆红素、200mg/dL血红蛋白、2000mg/dL甘油三酯无显著影响；异嗜性抗体或类风湿因子可能干扰；严重溶血、脂血或浑浊样本可能造成不正确结果",
+  "method": "竞争法化学发光法",
+  "instrument": "AutoLumo A2000PLUS 化学发光检测仪"
+}

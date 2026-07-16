@@ -1,0 +1,11 @@
+{
+  "pid": 144,
+  "sop_title": "SM-SOP-123  AU5800检测系统酶法血清肌酐测定标准操作程序",
+  "reference_range": "血清：2岁-5岁 15-44umol/L；6岁-12岁 27-66umol/L；男性 13岁-15岁 37-93umol/L、16岁-18岁 52-101umol/L、19岁-59岁 57-97umol/L、≥60岁 57-111umol/L；女性 13岁-15岁 33-75umol/L、16岁-18岁 39-76umol/L、19岁-59岁 41-73umol/L、≥60岁 41-81umol/L",
+  "reportable_range": "5.6-7500umol/L",
+  "unit": "umol/L",
+  "traceability": "校准品溯源至国际参考物SRM909(NIST)",
+  "interference": "胆红素≤684umol/L、血红蛋白≤4.0g/L、甘油三酯≤20mmol/L、VC≤0.5g/L无明显干扰",
+  "method": "酶法（肌氨酸氧化酶法）",
+  "instrument": "Beckman Coulter AU5800 全自动生化分析仪"
+}

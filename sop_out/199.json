@@ -1,0 +1,12 @@
+{
+  "pid": 199,
+  "sop_title": "磁微粒单纯疱疹病毒2型IgM项目—郑州安图溯源报告—产品校准品",
+  "reference_range": "定性判读（引自同方法学/同仪器安图IgM试剂盒：<6 AU/mL 阴性；6–10 AU/mL 可疑；≥10 AU/mL 阳性）。溯源报告本身未列临床参考范围，需人工核对HSV-2 IgM判读标准",
+  "reportable_range": "线性范围 6–240 AU/mL（溯源报告校准范围）；>240 AU/mL 建议1:10稀释重测",
+  "unit": "AU/mL",
+  "traceability": "郑州安图生物工程股份有限公司；产品校准品S0–S5；溯源链：企业一级校准品→企业常设测量程序→产品校准品→用户常规测量程序",
+  "interference": "1000 mg/dL血红蛋白、20 mg/dL胆红素、3000 mg/dL甘油三酯无显著影响；与TOX/RF/CMV/HSV-2/VZV/EBV/B19等IgM无交叉反应（引自同平台HSV-1 IgM SOP）",
+  "method": "磁微粒化学发光法（捕获法）",
+  "instrument": "安图生物全自动免疫分析仪（Autolumo A2000）",
+  "data_source": "溯源报告（安图）+ 同平台HSV-1 IgM SOP判读"
+}

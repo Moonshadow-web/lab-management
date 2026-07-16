@@ -27,6 +27,7 @@ class TestItem(Base):
     diluent: Mapped[str] = mapped_column(String(100), default="")
     calibrator: Mapped[str] = mapped_column(String(100), default="")
     traceability: Mapped[str] = mapped_column(String(200), default="")
+    brand: Mapped[str] = mapped_column(String(50), default="")  # 品牌标识（显式存储，优先于从校准品推导）
     last_update: Mapped[str] = mapped_column(String(50), default="")
     interference_hemolysis: Mapped[str] = mapped_column(String(100), default="")
     interference_bilirubin: Mapped[str] = mapped_column(String(100), default="")

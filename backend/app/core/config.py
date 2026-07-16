@@ -5,8 +5,13 @@ from pathlib import Path
 #   parents[0]=core, [1]=app, [2]=backend, [3]=项目根
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_DIR.parent
-DATA_DIR = PROJECT_ROOT / "data"
-UPLOAD_ROOT = DATA_DIR / "uploads"
+
+# 数据目录与上传目录：支持环境变量覆盖（容器/云环境）
+# 本地默认在项目根 data/；Docker 中通过 ENV DATA_DIR=/app/data 覆盖
+_data_dir_env = os.getenv("DATA_DIR")
+DATA_DIR = Path(_data_dir_env) if _data_dir_env else PROJECT_ROOT / "data"
+_upload_env = os.getenv("UPLOAD_ROOT")
+UPLOAD_ROOT = Path(_upload_env) if _upload_env else DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "app.db"
 
 # 确保数据目录存在（本地运行用；上云时由云存储替代）
@@ -19,10 +24,20 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 # 安全
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-prod-9f2a7b3c")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 12 * 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 2 * 60  # 2 小时，会话超时短过期
 
 # 前端源（CORS）
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 
 # 存储后端：local（本地磁盘）/ cloud（云存储，阶段5实现 CloudStorageBackend）
 STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local")
+
+# 邮件发送（SMTP）：配置后真正发信；未配置时降级为本地日志（便于开发/上云前验证流程）。
+# 例如 QQ 邮箱：SMTP_HOST=smtp.qq.com SMTP_PORT=465 SMTP_USER=你的邮箱 SMTP_PASS=授权码（非登录密码）
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+SMTP_TLS = os.getenv("SMTP_TLS", "true").lower() in ("1", "true", "yes", "y")
+MAIL_FROM = os.getenv("MAIL_FROM", SMTP_USER or "noreply@localhost")
+SYSTEM_NAME = os.getenv("SYSTEM_NAME", "检验科生免组实验室管理系统")

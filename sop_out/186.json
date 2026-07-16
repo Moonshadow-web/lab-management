@@ -1,0 +1,11 @@
+{
+  "pid": 186,
+  "sop_title": "SM-SOP-511-安图AutolumoA2000检测系统化学发光法血清戊型肝炎病毒IgM抗体测定标准操作程序",
+  "reference_range": "0-1 S/CO（阴性）",
+  "reportable_range": "S/CO < 1：阴性；S/CO ≥ 1.0：阳性",
+  "unit": "S/CO",
+  "traceability": "未列出",
+  "interference": "黄疸（胆红素≤708umol/L）、溶血（血红蛋白≤5g/L）、脂血（甘油三酯≤50g/L）无干扰；高滴度HEV-IgM未发现钩状效应；异嗜性抗体或类风湿因子可能干扰；严重溶血、脂血、黄疸或浑浊样本可能造成不正确结果",
+  "method": "捕获法化学发光法",
+  "instrument": "AutoLumo A2000PLUS 化学发光检测仪"
+}

@@ -1,0 +1,1 @@
+{"pid": 168, "sop_title": "SM-SOP-594- AU5800检测系统免疫比浊法血清免疫球蛋白IgG4测定标准操作程序", "reference_range": "≤2.000 g/L", "reportable_range": "0.4-4.2 g/L", "unit": "g/L", "traceability": "校准周期14天（试剂批号改变、质控值显著变化、重要维护或更换关键部件后重新校准）", "interference": "血红蛋白≤3.0 g/L、胆红素≤342 μmol/L、甘油三酯≤11.3 mmol/L、抗RF≤500 IU/ml", "method": "胶乳免疫比浊法", "instrument": "Beckman Coulter AU5800 全自动生化分析仪"}

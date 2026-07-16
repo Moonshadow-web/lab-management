@@ -1,0 +1,11 @@
+{
+  "pid": 149,
+  "sop_title": "SM-SOP-130  AU5800检测系统EPS底物法血清尿液α-淀粉酶测定标准操作程序",
+  "reference_range": "血清：35-135 U/L；血浆：0-220 U/L",
+  "reportable_range": "5-10000 U/L",
+  "unit": "U/L",
+  "traceability": "校准品溯源至国家标准物GBW(E)090593",
+  "interference": "EDTA 严重干扰测定，枸椽酸盐、草酸盐、氟化物使测定值偏低；血红蛋白≤0.2g/L、总胆红素≤170μmol/L、葡萄糖≤100μmol/L、抗坏血酸≤1mmol/L 无显著干扰。",
+  "method": "EPS底物法",
+  "instrument": "Beckman Coulter AU5800 全自动生化分析仪"
+}

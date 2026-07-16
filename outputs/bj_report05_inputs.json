@@ -1,0 +1,2012 @@
+[
+  {
+    "name": "labindex",
+    "value": "01110025",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "ccldir",
+    "value": "clinet_beijing",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "team_id",
+    "value": "9239",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "member_id",
+    "value": "33925",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "nickname",
+    "value": "01110025",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "cclindex",
+    "value": "4731",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "speciality",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "specname",
+    "value": "肿瘤标志物",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "year",
+    "value": "2026",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "times",
+    "value": "2",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "cenhidden",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "material0",
+    "value": "202621",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "material1",
+    "value": "202622",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "material2",
+    "value": "202623",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "material3",
+    "value": "202624",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "material4",
+    "value": "202625",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_0",
+    "value": "0 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_1",
+    "value": "0501",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_2",
+    "value": "甲胎蛋白",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_3",
+    "value": "ng/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_9",
+    "value": "微粒子化学发光-AMPPD标记",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_9_s",
+    "value": "0512",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_10",
+    "value": "Beckman DXI 600,DXI 800",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_10_s",
+    "value": "0536",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_11",
+    "value": "Beckman",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_11_s",
+    "value": "0503",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_12",
+    "value": "Beckman",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_12_s",
+    "value": "0503",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_0",
+    "value": "1 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_1",
+    "value": "0502",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_2",
+    "value": "癌胚抗原",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_3",
+    "value": "ng/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_9",
+    "value": "电化学发光（ECL）",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_9_s",
+    "value": "0505",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_10",
+    "value": "Roche Cobas e411",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_10_s",
+    "value": "0556",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_11",
+    "value": "Roche",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_11_s",
+    "value": "0504",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_12",
+    "value": "Roche",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_12_s",
+    "value": "0504",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_0",
+    "value": "2 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_1",
+    "value": "0504",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_2",
+    "value": "CA125",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_3",
+    "value": "U/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_9",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_9_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_10",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_10_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_11",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_11_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_12",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_12_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_2_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_0",
+    "value": "3 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_1",
+    "value": "0505",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_2",
+    "value": "CA15-3",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_3",
+    "value": "U/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_9",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_9_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_10",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_10_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_11",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_11_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_12",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_12_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_3_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_0",
+    "value": "4 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_1",
+    "value": "0506",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_2",
+    "value": "CA19-9",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_3",
+    "value": "U/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_9",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_9_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_10",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_10_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_11",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_11_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_12",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_12_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_4_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_0",
+    "value": "5 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_1",
+    "value": "0507",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_2",
+    "value": "铁蛋白",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_3",
+    "value": "ng/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_9",
+    "value": "微粒子化学发光-AMPPD标记",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_9_s",
+    "value": "0512",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_10",
+    "value": "Beckman DXI 600,DXI 800",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_10_s",
+    "value": "0536",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_11",
+    "value": "Beckman",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_11_s",
+    "value": "0503",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_12",
+    "value": "Beckman",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_12_s",
+    "value": "0503",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_5_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_0",
+    "value": "6 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_1",
+    "value": "0510",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_2",
+    "value": "B2-微球蛋白",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_3",
+    "value": "μg/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_9",
+    "value": "乳胶增强免疫比浊法",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_9_s",
+    "value": "0514",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_10",
+    "value": "BECKMAN AU400/640/2700/5400/5431",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_10_s",
+    "value": "0547",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_11",
+    "value": "日本生研",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_11_s",
+    "value": "0562",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_12",
+    "value": "日本生研",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_12_s",
+    "value": "0562",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_6_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_0",
+    "value": "7 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_1",
+    "value": "0511",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_2",
+    "value": "前列腺特异性抗原",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_3",
+    "value": "ng/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_9",
+    "value": "微粒子化学发光-AMPPD标记",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_9_s",
+    "value": "0512",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_10",
+    "value": "Beckman DXI 600,DXI 800",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_10_s",
+    "value": "0536",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_11",
+    "value": "Beckman",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_11_s",
+    "value": "0503",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_12",
+    "value": "Beckman",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_12_s",
+    "value": "0503",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_7_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_0",
+    "value": "8 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_1",
+    "value": "0512",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_2",
+    "value": "总B-HCG",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_3",
+    "value": "IU/L",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_9",
+    "value": "微粒子化学发光-AMPPD标记",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_9_s",
+    "value": "0512",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_10",
+    "value": "Beckman DXI 600,DXI 800",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_10_s",
+    "value": "0536",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_11",
+    "value": "Beckman",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_11_s",
+    "value": "0503",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_12",
+    "value": "Beckman",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_12_s",
+    "value": "0503",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_8_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_0",
+    "value": "9 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_1",
+    "value": "0513",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_2",
+    "value": "游离PSA",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_3",
+    "value": "ng/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_9",
+    "value": "微粒子化学发光-AMPPD标记",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_9_s",
+    "value": "0512",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_10",
+    "value": "Beckman DXI 600,DXI 800",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_10_s",
+    "value": "0536",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_11",
+    "value": "Beckman",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_11_s",
+    "value": "0503",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_12",
+    "value": "Beckman",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_12_s",
+    "value": "0503",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_9_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_0",
+    "value": "10 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_1",
+    "value": "0514",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_2",
+    "value": "人绒毛膜促性腺素",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_3",
+    "value": "IU/L",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_9",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_9_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_10",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_10_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_11",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_11_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_12",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_12_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_10_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_0",
+    "value": "11 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_1",
+    "value": "0515",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_2",
+    "value": "CA72-4",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_3",
+    "value": "U/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_9",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_9_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_10",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_10_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_11",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_11_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_12",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_12_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_11_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_0",
+    "value": "12 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_1",
+    "value": "0516",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_2",
+    "value": "血清骨胶素CYFRA21-1",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_3",
+    "value": "ng/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_9",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_9_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_10",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_10_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_11",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_11_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_12",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_12_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_12_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_0",
+    "value": "13 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_1",
+    "value": "0517",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_2",
+    "value": "神经元烯醇化酶",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_3",
+    "value": "ng/ml",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_9",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_9_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_fangfa",
+    "value": "05",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_10",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_10_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_11",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_11_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_12",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_12_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_13_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_14_cols_0",
+    "value": "-",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_14_cols_1",
+    "value": "-",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_14_cols_2",
+    "value": "校验和",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_14_cols_3",
+    "value": "-",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_14_cols_4",
+    "value": "点击计算",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_14_cols_5",
+    "value": "点击计算",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_14_cols_6",
+    "value": "点击计算",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_14_cols_7",
+    "value": "点击计算",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_14_cols_8",
+    "value": "点击计算",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "totalrows",
+    "value": "14",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "totalcols",
+    "value": "13",
+    "type": "hidden",
+    "ph": ""
+  }
+]

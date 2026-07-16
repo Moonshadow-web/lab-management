@@ -1,0 +1,3413 @@
+{
+  "need_rewrite": [
+    {
+      "plan_id": 1,
+      "program": "糖化血红蛋白",
+      "token": "HbA1c",
+      "canonical": "糖化血红蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 2,
+      "program": "心肌标志物",
+      "token": "肌酸激酶-MB",
+      "canonical": "肌酸激酶",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 2,
+      "program": "心肌标志物",
+      "token": "肌钙蛋白-I",
+      "canonical": "超敏肌钙蛋白Ⅰ",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 3,
+      "program": "心肌标志物",
+      "token": "肌酸激酶-MB",
+      "canonical": "肌酸激酶",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 3,
+      "program": "心肌标志物",
+      "token": "肌钙蛋白-I",
+      "canonical": "超敏肌钙蛋白Ⅰ",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 4,
+      "program": "脂类A",
+      "token": "脂蛋白（a）",
+      "canonical": "脂蛋白a",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 5,
+      "program": "脂类A",
+      "token": "脂蛋白（a）",
+      "canonical": "脂蛋白a",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 6,
+      "program": "血气和酸碱分析",
+      "token": "Ph",
+      "canonical": "血气和酸碱分析-pH",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": true
+    },
+    {
+      "plan_id": 6,
+      "program": "血气和酸碱分析",
+      "token": "pCO2",
+      "canonical": "血气和酸碱分析-PCO2",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": true
+    },
+    {
+      "plan_id": 6,
+      "program": "血气和酸碱分析",
+      "token": "PO2",
+      "canonical": "血气和酸碱分析-PO2",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": true
+    },
+    {
+      "plan_id": 6,
+      "program": "血气和酸碱分析",
+      "token": "离子钙",
+      "canonical": "血气和酸碱分析-Ca",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": true
+    },
+    {
+      "plan_id": 7,
+      "program": "血气和酸碱分析",
+      "token": "Ph",
+      "canonical": "血气和酸碱分析-pH",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 7,
+      "program": "血气和酸碱分析",
+      "token": "pCO2",
+      "canonical": "血气和酸碱分析-PCO2",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 7,
+      "program": "血气和酸碱分析",
+      "token": "PO2",
+      "canonical": "血气和酸碱分析-PO2",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 7,
+      "program": "血气和酸碱分析",
+      "token": "离子钙",
+      "canonical": "血气和酸碱分析-Ca",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 8,
+      "program": "血气和酸碱分析",
+      "token": "Ph",
+      "canonical": "血气和酸碱分析-pH",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 8,
+      "program": "血气和酸碱分析",
+      "token": "pCO2",
+      "canonical": "血气和酸碱分析-PCO2",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 8,
+      "program": "血气和酸碱分析",
+      "token": "PO2",
+      "canonical": "血气和酸碱分析-PO2",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 8,
+      "program": "血气和酸碱分析",
+      "token": "离子钙",
+      "canonical": "血气和酸碱分析-Ca",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 9,
+      "program": "心衰标志物",
+      "token": "BNP",
+      "canonical": "B型钠尿肽",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 10,
+      "program": "尿液定量生化",
+      "token": "钙",
+      "canonical": "总钙",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 10,
+      "program": "尿液定量生化",
+      "token": "磷",
+      "canonical": "无机磷",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 10,
+      "program": "尿液定量生化",
+      "token": "微量白蛋白",
+      "canonical": "尿微量白蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 11,
+      "program": "尿液蛋白标志物Ⅰ",
+      "token": "免疫球蛋白轻链κ（尿液）",
+      "canonical": "尿κ轻链",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 11,
+      "program": "尿液蛋白标志物Ⅰ",
+      "token": "免疫球蛋白轻链λ（尿液）",
+      "canonical": "尿λ轻链",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 12,
+      "program": "尿液蛋白标志物Ⅰ",
+      "token": "免疫球蛋白轻链κ（尿液）",
+      "canonical": "尿κ轻链",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 12,
+      "program": "尿液蛋白标志物Ⅰ",
+      "token": "免疫球蛋白轻链λ（尿液）",
+      "canonical": "尿λ轻链",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 13,
+      "program": "血清淀粉样蛋白A",
+      "token": "SAA",
+      "canonical": "血清淀粉样蛋白A",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 14,
+      "program": "血清淀粉样蛋白A",
+      "token": "SAA",
+      "canonical": "血清淀粉样蛋白A",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 15,
+      "program": "半胱氨酸蛋白酶抑制剂C",
+      "token": "Cys-C",
+      "canonical": "胱抑素C",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 16,
+      "program": "血清降钙素原",
+      "token": "PCT",
+      "canonical": "降钙素原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 17,
+      "program": "血清降钙素原",
+      "token": "PCT",
+      "canonical": "降钙素原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 18,
+      "program": "脑脊液生化",
+      "token": "微量总蛋白",
+      "canonical": "总蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 18,
+      "program": "脑脊液生化",
+      "token": "微量白蛋白",
+      "canonical": "尿微量白蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 19,
+      "program": "凝血试验",
+      "token": "PT",
+      "canonical": "凝血酶原时间",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 19,
+      "program": "凝血试验",
+      "token": "INR",
+      "canonical": "可溶性转铁蛋白受体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 19,
+      "program": "凝血试验",
+      "token": "APTT",
+      "canonical": "活化部分凝血活酶时间",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 19,
+      "program": "凝血试验",
+      "token": "FIB",
+      "canonical": "纤维蛋白原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 19,
+      "program": "凝血试验",
+      "token": "TT",
+      "canonical": "凝血酶时间",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 20,
+      "program": "凝血试验",
+      "token": "PT",
+      "canonical": "凝血酶原时间",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 20,
+      "program": "凝血试验",
+      "token": "INR",
+      "canonical": "可溶性转铁蛋白受体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 20,
+      "program": "凝血试验",
+      "token": "APTT",
+      "canonical": "活化部分凝血活酶时间",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 20,
+      "program": "凝血试验",
+      "token": "FIB",
+      "canonical": "纤维蛋白原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 20,
+      "program": "凝血试验",
+      "token": "TT",
+      "canonical": "凝血酶时间",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 23,
+      "program": "D-二聚体检测",
+      "token": "D-Dimer",
+      "canonical": "血浆D-二聚体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 24,
+      "program": "D-二聚体检测",
+      "token": "D-Dimer",
+      "canonical": "血浆D-二聚体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 25,
+      "program": "常规化学B",
+      "token": "腺苷脱氨酶",
+      "canonical": "腺苷脱氨酶（胸腹水）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 25,
+      "program": "常规化学B",
+      "token": "碳酸氢根",
+      "canonical": "二氧化碳",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 26,
+      "program": "常规化学B",
+      "token": "腺苷脱氨酶",
+      "canonical": "腺苷脱氨酶（胸腹水）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 26,
+      "program": "常规化学B",
+      "token": "碳酸氢根",
+      "canonical": "二氧化碳",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 27,
+      "program": "常规化学A",
+      "token": "钙",
+      "canonical": "总钙",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 27,
+      "program": "常规化学A",
+      "token": "磷",
+      "canonical": "无机磷",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 27,
+      "program": "常规化学A",
+      "token": "血糖",
+      "canonical": "葡萄糖",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 27,
+      "program": "常规化学A",
+      "token": "γ-谷氨酸氨基转移酶",
+      "canonical": "γ-谷氨酰基转移酶",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 27,
+      "program": "常规化学A",
+      "token": "总铁结合力",
+      "canonical": "不饱和铁结合力/总铁结合力",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 27,
+      "program": "常规化学A",
+      "token": "铜离子",
+      "canonical": "铜",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 27,
+      "program": "常规化学A",
+      "token": "血清锌",
+      "canonical": "锌",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 28,
+      "program": "常规化学A",
+      "token": "钙",
+      "canonical": "总钙",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 28,
+      "program": "常规化学A",
+      "token": "磷",
+      "canonical": "无机磷",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 28,
+      "program": "常规化学A",
+      "token": "血糖",
+      "canonical": "葡萄糖",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 28,
+      "program": "常规化学A",
+      "token": "γ-谷氨酸氨基转移酶",
+      "canonical": "γ-谷氨酰基转移酶",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 28,
+      "program": "常规化学A",
+      "token": "总铁结合力",
+      "canonical": "不饱和铁结合力/总铁结合力",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 28,
+      "program": "常规化学A",
+      "token": "铜离子",
+      "canonical": "铜",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 28,
+      "program": "常规化学A",
+      "token": "血清锌",
+      "canonical": "锌",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 29,
+      "program": "常规化学A",
+      "token": "钙",
+      "canonical": "总钙",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 29,
+      "program": "常规化学A",
+      "token": "磷",
+      "canonical": "无机磷",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 29,
+      "program": "常规化学A",
+      "token": "血糖",
+      "canonical": "葡萄糖",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 29,
+      "program": "常规化学A",
+      "token": "γ-谷氨酸氨基转移酶",
+      "canonical": "γ-谷氨酰基转移酶",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 29,
+      "program": "常规化学A",
+      "token": "总铁结合力",
+      "canonical": "不饱和铁结合力/总铁结合力",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 29,
+      "program": "常规化学A",
+      "token": "铜离子",
+      "canonical": "铜",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 29,
+      "program": "常规化学A",
+      "token": "血清锌",
+      "canonical": "锌",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 30,
+      "program": "特殊蛋白",
+      "token": "IgA",
+      "canonical": "免疫球蛋白A",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 30,
+      "program": "特殊蛋白",
+      "token": "IgG",
+      "canonical": "抗精子抗体IgG",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 30,
+      "program": "特殊蛋白",
+      "token": "IgM",
+      "canonical": "抗精子抗体IgM",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 30,
+      "program": "特殊蛋白",
+      "token": "C3",
+      "canonical": "补体C3",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 30,
+      "program": "特殊蛋白",
+      "token": "C4",
+      "canonical": "补体C4",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 30,
+      "program": "特殊蛋白",
+      "token": "CRP",
+      "canonical": "超敏C反应蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 30,
+      "program": "特殊蛋白",
+      "token": "RF",
+      "canonical": "类风湿因子",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 30,
+      "program": "特殊蛋白",
+      "token": "ASO",
+      "canonical": "抗链球菌溶血素O",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 30,
+      "program": "特殊蛋白",
+      "token": "免疫球蛋白轻链κ",
+      "canonical": "κ轻链（血清）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 30,
+      "program": "特殊蛋白",
+      "token": "免疫球蛋白轻链λ",
+      "canonical": "λ轻链（血清）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 31,
+      "program": "特殊蛋白",
+      "token": "IgA",
+      "canonical": "免疫球蛋白A",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 31,
+      "program": "特殊蛋白",
+      "token": "IgG",
+      "canonical": "抗精子抗体IgG",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 31,
+      "program": "特殊蛋白",
+      "token": "IgM",
+      "canonical": "抗精子抗体IgM",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 31,
+      "program": "特殊蛋白",
+      "token": "C3",
+      "canonical": "补体C3",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 31,
+      "program": "特殊蛋白",
+      "token": "C4",
+      "canonical": "补体C4",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 31,
+      "program": "特殊蛋白",
+      "token": "CRP",
+      "canonical": "超敏C反应蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 31,
+      "program": "特殊蛋白",
+      "token": "RF",
+      "canonical": "类风湿因子",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 31,
+      "program": "特殊蛋白",
+      "token": "ASO",
+      "canonical": "抗链球菌溶血素O",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 31,
+      "program": "特殊蛋白",
+      "token": "免疫球蛋白轻链κ",
+      "canonical": "κ轻链（血清）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 31,
+      "program": "特殊蛋白",
+      "token": "免疫球蛋白轻链λ",
+      "canonical": "λ轻链（血清）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 32,
+      "program": "抗凝蛋白",
+      "token": "蛋白C",
+      "canonical": "铜蓝蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 32,
+      "program": "抗凝蛋白",
+      "token": "蛋白S",
+      "canonical": "血浆蛋白S活性",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 33,
+      "program": "抗凝蛋白",
+      "token": "蛋白C",
+      "canonical": "铜蓝蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 33,
+      "program": "抗凝蛋白",
+      "token": "蛋白S",
+      "canonical": "血浆蛋白S活性",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 34,
+      "program": "抗凝血因子Xa活性检测",
+      "token": "抗FXa活性",
+      "canonical": "抗Xa活性",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 35,
+      "program": "血管性血友病因子抗原检测",
+      "token": "vWF",
+      "canonical": "vWF因子",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 36,
+      "program": "细胞因子",
+      "token": "IL-6",
+      "canonical": "白介素-6",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 37,
+      "program": "细胞因子",
+      "token": "IL-6",
+      "canonical": "白介素-6",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 40,
+      "program": "常规化学A",
+      "token": "钙",
+      "canonical": "总钙",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 40,
+      "program": "常规化学A",
+      "token": "磷",
+      "canonical": "无机磷",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 40,
+      "program": "常规化学A",
+      "token": "血糖",
+      "canonical": "葡萄糖",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 40,
+      "program": "常规化学A",
+      "token": "铜离子",
+      "canonical": "铜",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 40,
+      "program": "常规化学A",
+      "token": "血清锌",
+      "canonical": "锌",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 41,
+      "program": "常规化学A",
+      "token": "钙",
+      "canonical": "总钙",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 41,
+      "program": "常规化学A",
+      "token": "磷",
+      "canonical": "无机磷",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 41,
+      "program": "常规化学A",
+      "token": "血糖",
+      "canonical": "葡萄糖",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 41,
+      "program": "常规化学A",
+      "token": "铜离子",
+      "canonical": "铜",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 41,
+      "program": "常规化学A",
+      "token": "血清锌",
+      "canonical": "锌",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 43,
+      "program": "常规化学A",
+      "token": "钙",
+      "canonical": "总钙",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 43,
+      "program": "常规化学A",
+      "token": "磷",
+      "canonical": "无机磷",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 43,
+      "program": "常规化学A",
+      "token": "血糖",
+      "canonical": "葡萄糖",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 43,
+      "program": "常规化学A",
+      "token": "铜离子",
+      "canonical": "铜",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 43,
+      "program": "常规化学A",
+      "token": "血清锌",
+      "canonical": "锌",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 44,
+      "program": "D-二聚体和纤维蛋白降解产物检测",
+      "token": "D-Dimer",
+      "canonical": "血浆D-二聚体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 44,
+      "program": "D-二聚体和纤维蛋白降解产物检测",
+      "token": "FDP",
+      "canonical": "纤维蛋白（原）降解产物",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 45,
+      "program": "D-二聚体和纤维蛋白降解产物检测",
+      "token": "D-Dimer",
+      "canonical": "血浆D-二聚体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 45,
+      "program": "D-二聚体和纤维蛋白降解产物检测",
+      "token": "FDP",
+      "canonical": "纤维蛋白（原）降解产物",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 46,
+      "program": "血清降钙素原",
+      "token": "PCT",
+      "canonical": "降钙素原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 47,
+      "program": "血清降钙素原",
+      "token": "PCT",
+      "canonical": "降钙素原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 48,
+      "program": "糖化白蛋白",
+      "token": "GA",
+      "canonical": "糖化白蛋白",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 49,
+      "program": "糖化白蛋白",
+      "token": "GA",
+      "canonical": "糖化白蛋白",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 50,
+      "program": "凝血试验",
+      "token": "PT",
+      "canonical": "凝血酶原时间",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 50,
+      "program": "凝血试验",
+      "token": "INR",
+      "canonical": "可溶性转铁蛋白受体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 50,
+      "program": "凝血试验",
+      "token": "APTT",
+      "canonical": "活化部分凝血活酶时间",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 50,
+      "program": "凝血试验",
+      "token": "FIB",
+      "canonical": "纤维蛋白原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 50,
+      "program": "凝血试验",
+      "token": "TT",
+      "canonical": "凝血酶时间",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 51,
+      "program": "凝血试验",
+      "token": "PT",
+      "canonical": "凝血酶原时间",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 51,
+      "program": "凝血试验",
+      "token": "INR",
+      "canonical": "可溶性转铁蛋白受体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 51,
+      "program": "凝血试验",
+      "token": "APTT",
+      "canonical": "活化部分凝血活酶时间",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 51,
+      "program": "凝血试验",
+      "token": "FIB",
+      "canonical": "纤维蛋白原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 51,
+      "program": "凝血试验",
+      "token": "TT",
+      "canonical": "凝血酶时间",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 52,
+      "program": "细胞因子",
+      "token": "IL-6",
+      "canonical": "白介素-6",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 53,
+      "program": "细胞因子",
+      "token": "IL-6",
+      "canonical": "白介素-6",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 56,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HBsAg",
+      "canonical": "乙型肝炎病毒表面抗原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 56,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HBsAb",
+      "canonical": "乙型肝炎病毒表面抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 56,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HBeAg",
+      "canonical": "乙型肝炎病毒e抗原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 56,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HBeAb",
+      "canonical": "乙型肝炎病毒e抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 56,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HBcAb",
+      "canonical": "乙型肝炎病毒核心抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 56,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HCVAb",
+      "canonical": "丙型肝炎病毒抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 57,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HBsAg",
+      "canonical": "乙型肝炎病毒表面抗原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 57,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HBsAb",
+      "canonical": "乙型肝炎病毒表面抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 57,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HBeAg",
+      "canonical": "乙型肝炎病毒e抗原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 57,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HBeAb",
+      "canonical": "乙型肝炎病毒e抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 57,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HBcAb",
+      "canonical": "乙型肝炎病毒核心抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 57,
+      "program": "感染性疾病血清学标志物系列A",
+      "token": "HCVAb",
+      "canonical": "丙型肝炎病毒抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 58,
+      "program": "感染性疾病血清学标志物系列B",
+      "token": "HEV-IgM",
+      "canonical": "戊肝抗体IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 59,
+      "program": "感染性疾病血清学标志物系列B",
+      "token": "HEV-IgM",
+      "canonical": "戊肝抗体IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 60,
+      "program": "感染性疾病血清学标志物系列C",
+      "token": "HIV",
+      "canonical": "人类免疫缺陷病毒抗原及抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 60,
+      "program": "感染性疾病血清学标志物系列C",
+      "token": "TPAb",
+      "canonical": "梅毒螺旋体抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 60,
+      "program": "感染性疾病血清学标志物系列C",
+      "token": "TRUST",
+      "canonical": "抗梅毒螺旋体非特异性抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 61,
+      "program": "感染性疾病血清学标志物系列C",
+      "token": "HIV",
+      "canonical": "人类免疫缺陷病毒抗原及抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 61,
+      "program": "感染性疾病血清学标志物系列C",
+      "token": "TPAb",
+      "canonical": "梅毒螺旋体抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 61,
+      "program": "感染性疾病血清学标志物系列C",
+      "token": "TRUST",
+      "canonical": "抗梅毒螺旋体非特异性抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 62,
+      "program": "中孕期母血清产前筛查",
+      "token": "AFP",
+      "canonical": "甲胎蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 62,
+      "program": "中孕期母血清产前筛查",
+      "token": "βHCG",
+      "canonical": "β人绒毛膜促性腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 62,
+      "program": "中孕期母血清产前筛查",
+      "token": "uE3",
+      "canonical": "非结合型雌三醇",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 63,
+      "program": "中孕期母血清产前筛查",
+      "token": "AFP",
+      "canonical": "甲胎蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 63,
+      "program": "中孕期母血清产前筛查",
+      "token": "βHCG",
+      "canonical": "β人绒毛膜促性腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 63,
+      "program": "中孕期母血清产前筛查",
+      "token": "uE3",
+      "canonical": "非结合型雌三醇",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 64,
+      "program": "中孕期母血清产前筛查",
+      "token": "AFP",
+      "canonical": "甲胎蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 64,
+      "program": "中孕期母血清产前筛查",
+      "token": "βHCG",
+      "canonical": "β人绒毛膜促性腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 64,
+      "program": "中孕期母血清产前筛查",
+      "token": "uE3",
+      "canonical": "非结合型雌三醇",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第3次",
+      "has_result": false
+    },
+    {
+      "plan_id": 65,
+      "program": "内分泌",
+      "token": "游离T3",
+      "canonical": "游离三碘甲状腺原氨酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 65,
+      "program": "内分泌",
+      "token": "总T3",
+      "canonical": "三碘甲状腺原氨酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 65,
+      "program": "内分泌",
+      "token": "游离T4",
+      "canonical": "游离甲状腺素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 65,
+      "program": "内分泌",
+      "token": "总T4",
+      "canonical": "甲状腺素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 65,
+      "program": "内分泌",
+      "token": "TSH",
+      "canonical": "促甲状腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 65,
+      "program": "内分泌",
+      "token": "Tg",
+      "canonical": "甘油三酯",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 65,
+      "program": "内分泌",
+      "token": "B12",
+      "canonical": "维生素B12",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 65,
+      "program": "内分泌",
+      "token": "PTH",
+      "canonical": "甲状旁腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 65,
+      "program": "内分泌",
+      "token": "ACTH",
+      "canonical": "促肾上腺皮质激素（ACTH）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 65,
+      "program": "内分泌",
+      "token": "VD",
+      "canonical": "维生素D",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 66,
+      "program": "内分泌",
+      "token": "游离T3",
+      "canonical": "游离三碘甲状腺原氨酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 66,
+      "program": "内分泌",
+      "token": "总T3",
+      "canonical": "三碘甲状腺原氨酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 66,
+      "program": "内分泌",
+      "token": "游离T4",
+      "canonical": "游离甲状腺素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 66,
+      "program": "内分泌",
+      "token": "总T4",
+      "canonical": "甲状腺素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 66,
+      "program": "内分泌",
+      "token": "TSH",
+      "canonical": "促甲状腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 66,
+      "program": "内分泌",
+      "token": "Tg",
+      "canonical": "甘油三酯",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 66,
+      "program": "内分泌",
+      "token": "B12",
+      "canonical": "维生素B12",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 66,
+      "program": "内分泌",
+      "token": "PTH",
+      "canonical": "甲状旁腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 66,
+      "program": "内分泌",
+      "token": "ACTH",
+      "canonical": "促肾上腺皮质激素（ACTH）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 66,
+      "program": "内分泌",
+      "token": "VD",
+      "canonical": "维生素D",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 69,
+      "program": "肝纤维化血清学指标",
+      "token": "层粘连蛋白(LN)",
+      "canonical": "层粘连蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 69,
+      "program": "肝纤维化血清学指标",
+      "token": "三型前胶原N末端肽(PⅢNP)",
+      "canonical": "三型前胶原N末端肽",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 69,
+      "program": "肝纤维化血清学指标",
+      "token": "四型胶原(CIV)",
+      "canonical": "四型胶原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 69,
+      "program": "肝纤维化血清学指标",
+      "token": "透明质酸(HA)",
+      "canonical": "透明质酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 70,
+      "program": "肝纤维化血清学指标",
+      "token": "层粘连蛋白(LN)",
+      "canonical": "层粘连蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 70,
+      "program": "肝纤维化血清学指标",
+      "token": "三型前胶原N末端肽(PⅢNP)",
+      "canonical": "三型前胶原N末端肽",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 70,
+      "program": "肝纤维化血清学指标",
+      "token": "四型胶原(CIV)",
+      "canonical": "四型胶原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 70,
+      "program": "肝纤维化血清学指标",
+      "token": "透明质酸(HA)",
+      "canonical": "透明质酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 72,
+      "program": "甲功相关项目检测及正确度验证",
+      "token": "游离T3",
+      "canonical": "游离三碘甲状腺原氨酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 72,
+      "program": "甲功相关项目检测及正确度验证",
+      "token": "总T3",
+      "canonical": "三碘甲状腺原氨酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 72,
+      "program": "甲功相关项目检测及正确度验证",
+      "token": "游离T4",
+      "canonical": "游离甲状腺素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 72,
+      "program": "甲功相关项目检测及正确度验证",
+      "token": "总T4",
+      "canonical": "甲状腺素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 72,
+      "program": "甲功相关项目检测及正确度验证",
+      "token": "TSH",
+      "canonical": "促甲状腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 74,
+      "program": "抗缪勒管激素",
+      "token": "AMH",
+      "canonical": "抗缪勒管激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 75,
+      "program": "抗缪勒管激素",
+      "token": "AMH",
+      "canonical": "抗缪勒管激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 76,
+      "program": "优生优育免疫学测定",
+      "token": "HSV-1 M",
+      "canonical": "I型单纯疱疹病毒IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 76,
+      "program": "优生优育免疫学测定",
+      "token": "HSV-1 G",
+      "canonical": "I型单纯疱疹病毒IgG抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 76,
+      "program": "优生优育免疫学测定",
+      "token": "HSV-2 M",
+      "canonical": "II型单纯疱疹病毒IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 76,
+      "program": "优生优育免疫学测定",
+      "token": "HSV-2 G",
+      "canonical": "II型单纯疱疹病毒IgG抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 76,
+      "program": "优生优育免疫学测定",
+      "token": "TOX M",
+      "canonical": "弓形虫IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 76,
+      "program": "优生优育免疫学测定",
+      "token": "TOX G",
+      "canonical": "弓形虫IgG抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 76,
+      "program": "优生优育免疫学测定",
+      "token": "CMV M",
+      "canonical": "巨细胞病毒IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 76,
+      "program": "优生优育免疫学测定",
+      "token": "CMV G",
+      "canonical": "巨细胞病毒IgG抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 76,
+      "program": "优生优育免疫学测定",
+      "token": "RV M",
+      "canonical": "风疹病毒IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 76,
+      "program": "优生优育免疫学测定",
+      "token": "RV G",
+      "canonical": "风疹病毒IgG抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 77,
+      "program": "优生优育免疫学测定",
+      "token": "HSV-1 M",
+      "canonical": "I型单纯疱疹病毒IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 77,
+      "program": "优生优育免疫学测定",
+      "token": "HSV-1 G",
+      "canonical": "I型单纯疱疹病毒IgG抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 77,
+      "program": "优生优育免疫学测定",
+      "token": "HSV-2 M",
+      "canonical": "II型单纯疱疹病毒IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 77,
+      "program": "优生优育免疫学测定",
+      "token": "HSV-2 G",
+      "canonical": "II型单纯疱疹病毒IgG抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 77,
+      "program": "优生优育免疫学测定",
+      "token": "TOX M",
+      "canonical": "弓形虫IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 77,
+      "program": "优生优育免疫学测定",
+      "token": "TOX G",
+      "canonical": "弓形虫IgG抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 77,
+      "program": "优生优育免疫学测定",
+      "token": "CMV M",
+      "canonical": "巨细胞病毒IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 77,
+      "program": "优生优育免疫学测定",
+      "token": "CMV G",
+      "canonical": "巨细胞病毒IgG抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 77,
+      "program": "优生优育免疫学测定",
+      "token": "RV M",
+      "canonical": "风疹病毒IgM抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 77,
+      "program": "优生优育免疫学测定",
+      "token": "RV G",
+      "canonical": "风疹病毒IgG抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 78,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HIV（胶体金）",
+      "canonical": "快速抗HIV抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 78,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HBsAg（胶体金）",
+      "canonical": "快速乙型肝炎病毒表面抗原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 78,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "TP（胶体金）",
+      "canonical": "快速抗梅毒螺旋体抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 78,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HCV（胶体金）",
+      "canonical": "快速抗丙型肝炎病毒抗体(仅复检）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 79,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HIV（胶体金）",
+      "canonical": "快速抗HIV抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 79,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HBsAg（胶体金）",
+      "canonical": "快速乙型肝炎病毒表面抗原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 79,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "TP（胶体金）",
+      "canonical": "快速抗梅毒螺旋体抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 79,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HCV（胶体金）",
+      "canonical": "快速抗丙型肝炎病毒抗体(仅复检）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 80,
+      "program": "肿瘤标志物A",
+      "token": "总βHCG",
+      "canonical": "β人绒毛膜促性腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 80,
+      "program": "肿瘤标志物A",
+      "token": "AFP",
+      "canonical": "甲胎蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 80,
+      "program": "肿瘤标志物A",
+      "token": "β2微球蛋白",
+      "canonical": "β2-微球蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 80,
+      "program": "肿瘤标志物A",
+      "token": "CEA",
+      "canonical": "癌胚抗原（胸腹水）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 80,
+      "program": "肿瘤标志物A",
+      "token": "TPSA",
+      "canonical": "总前列腺特异性抗原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 80,
+      "program": "肿瘤标志物A",
+      "token": "FPSA",
+      "canonical": "游离前列腺特异性抗原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 81,
+      "program": "肿瘤标志物A",
+      "token": "总βHCG",
+      "canonical": "β人绒毛膜促性腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 81,
+      "program": "肿瘤标志物A",
+      "token": "AFP",
+      "canonical": "甲胎蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 81,
+      "program": "肿瘤标志物A",
+      "token": "β2微球蛋白",
+      "canonical": "β2-微球蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 81,
+      "program": "肿瘤标志物A",
+      "token": "CEA",
+      "canonical": "癌胚抗原（胸腹水）",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 81,
+      "program": "肿瘤标志物A",
+      "token": "TPSA",
+      "canonical": "总前列腺特异性抗原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 81,
+      "program": "肿瘤标志物A",
+      "token": "FPSA",
+      "canonical": "游离前列腺特异性抗原",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 82,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HIV（胶体金）",
+      "canonical": "快速抗HIV抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 82,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HBsAg（胶体金）",
+      "canonical": "快速乙型肝炎病毒表面抗原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 82,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "TP（胶体金）",
+      "canonical": "快速抗梅毒螺旋体抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 82,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HCV（胶体金）",
+      "canonical": "快速抗丙型肝炎病毒抗体(仅复检）",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 83,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HIV（胶体金）",
+      "canonical": "快速抗HIV抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 83,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HBsAg（胶体金）",
+      "canonical": "快速乙型肝炎病毒表面抗原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 83,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "TP（胶体金）",
+      "canonical": "快速抗梅毒螺旋体抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 83,
+      "program": "感染性疾病抗原抗体快速检测",
+      "token": "HCV（胶体金）",
+      "canonical": "快速抗丙型肝炎病毒抗体(仅复检）",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 84,
+      "program": "内分泌",
+      "token": "TT3",
+      "canonical": "三碘甲状腺原氨酸",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 84,
+      "program": "内分泌",
+      "token": "TT4",
+      "canonical": "甲状腺素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 84,
+      "program": "内分泌",
+      "token": "FT3",
+      "canonical": "游离三碘甲状腺原氨酸",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 84,
+      "program": "内分泌",
+      "token": "FT4",
+      "canonical": "游离甲状腺素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 84,
+      "program": "内分泌",
+      "token": "TSH",
+      "canonical": "促甲状腺激素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 84,
+      "program": "内分泌",
+      "token": "B12",
+      "canonical": "维生素B12",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 84,
+      "program": "内分泌",
+      "token": "PTH",
+      "canonical": "甲状旁腺激素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 85,
+      "program": "内分泌",
+      "token": "TT3",
+      "canonical": "三碘甲状腺原氨酸",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 85,
+      "program": "内分泌",
+      "token": "TT4",
+      "canonical": "甲状腺素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 85,
+      "program": "内分泌",
+      "token": "FT3",
+      "canonical": "游离三碘甲状腺原氨酸",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 85,
+      "program": "内分泌",
+      "token": "FT4",
+      "canonical": "游离甲状腺素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 85,
+      "program": "内分泌",
+      "token": "TSH",
+      "canonical": "促甲状腺激素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 85,
+      "program": "内分泌",
+      "token": "B12",
+      "canonical": "维生素B12",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 85,
+      "program": "内分泌",
+      "token": "PTH",
+      "canonical": "甲状旁腺激素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 86,
+      "program": "感染性疾病血清学标志物系列B",
+      "token": "HEV-IgM",
+      "canonical": "戊肝抗体IgM抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 86,
+      "program": "感染性疾病血清学标志物系列B",
+      "token": "HAV-IgM",
+      "canonical": "抗精子抗体IgM",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 87,
+      "program": "感染性疾病血清学标志物系列B",
+      "token": "HEV-IgM",
+      "canonical": "戊肝抗体IgM抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 87,
+      "program": "感染性疾病血清学标志物系列B",
+      "token": "HAV-IgM",
+      "canonical": "抗精子抗体IgM",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 88,
+      "program": "肝炎标志物",
+      "token": "HBsAg",
+      "canonical": "乙型肝炎病毒表面抗原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 88,
+      "program": "肝炎标志物",
+      "token": "HBsAb",
+      "canonical": "乙型肝炎病毒表面抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 88,
+      "program": "肝炎标志物",
+      "token": "HBeAg",
+      "canonical": "乙型肝炎病毒e抗原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 88,
+      "program": "肝炎标志物",
+      "token": "HBeAb",
+      "canonical": "乙型肝炎病毒e抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 88,
+      "program": "肝炎标志物",
+      "token": "HBcAb",
+      "canonical": "乙型肝炎病毒核心抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 88,
+      "program": "肝炎标志物",
+      "token": "HCVAb",
+      "canonical": "丙型肝炎病毒抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 89,
+      "program": "肝炎标志物",
+      "token": "HBsAg",
+      "canonical": "乙型肝炎病毒表面抗原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 89,
+      "program": "肝炎标志物",
+      "token": "HBsAb",
+      "canonical": "乙型肝炎病毒表面抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 89,
+      "program": "肝炎标志物",
+      "token": "HBeAg",
+      "canonical": "乙型肝炎病毒e抗原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 89,
+      "program": "肝炎标志物",
+      "token": "HBeAb",
+      "canonical": "乙型肝炎病毒e抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 89,
+      "program": "肝炎标志物",
+      "token": "HBcAb",
+      "canonical": "乙型肝炎病毒核心抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 89,
+      "program": "肝炎标志物",
+      "token": "HCVAb",
+      "canonical": "丙型肝炎病毒抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 90,
+      "program": "感染性疾病血清学标志物系列C",
+      "token": "HIV",
+      "canonical": "人类免疫缺陷病毒抗原及抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 90,
+      "program": "感染性疾病血清学标志物系列C",
+      "token": "梅毒特异性抗体",
+      "canonical": "梅毒特异性抗体（仅孕妇）",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 91,
+      "program": "感染性疾病血清学标志物系列C",
+      "token": "HIV",
+      "canonical": "人类免疫缺陷病毒抗原及抗体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 91,
+      "program": "感染性疾病血清学标志物系列C",
+      "token": "梅毒特异性抗体",
+      "canonical": "梅毒特异性抗体（仅孕妇）",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 92,
+      "program": "中孕期母血清产前筛查",
+      "token": "AFP",
+      "canonical": "甲胎蛋白",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 92,
+      "program": "中孕期母血清产前筛查",
+      "token": "βHCG",
+      "canonical": "β人绒毛膜促性腺激素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 92,
+      "program": "中孕期母血清产前筛查",
+      "token": "uE3",
+      "canonical": "非结合型雌三醇",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 93,
+      "program": "中孕期母血清产前筛查",
+      "token": "AFP",
+      "canonical": "甲胎蛋白",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 93,
+      "program": "中孕期母血清产前筛查",
+      "token": "βHCG",
+      "canonical": "β人绒毛膜促性腺激素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 93,
+      "program": "中孕期母血清产前筛查",
+      "token": "uE3",
+      "canonical": "非结合型雌三醇",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 94,
+      "program": "肿瘤标志物A",
+      "token": "总βHCG",
+      "canonical": "β人绒毛膜促性腺激素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 94,
+      "program": "肿瘤标志物A",
+      "token": "AFP",
+      "canonical": "甲胎蛋白",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 94,
+      "program": "肿瘤标志物A",
+      "token": "β2微球蛋白",
+      "canonical": "β2-微球蛋白",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 94,
+      "program": "肿瘤标志物A",
+      "token": "CEA",
+      "canonical": "癌胚抗原（胸腹水）",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 94,
+      "program": "肿瘤标志物A",
+      "token": "TPSA",
+      "canonical": "总前列腺特异性抗原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 94,
+      "program": "肿瘤标志物A",
+      "token": "FPSA",
+      "canonical": "游离前列腺特异性抗原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 95,
+      "program": "肿瘤标志物A",
+      "token": "总βHCG",
+      "canonical": "β人绒毛膜促性腺激素",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 95,
+      "program": "肿瘤标志物A",
+      "token": "AFP",
+      "canonical": "甲胎蛋白",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 95,
+      "program": "肿瘤标志物A",
+      "token": "β2微球蛋白",
+      "canonical": "β2-微球蛋白",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 95,
+      "program": "肿瘤标志物A",
+      "token": "CEA",
+      "canonical": "癌胚抗原（胸腹水）",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 95,
+      "program": "肿瘤标志物A",
+      "token": "TPSA",
+      "canonical": "总前列腺特异性抗原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 95,
+      "program": "肿瘤标志物A",
+      "token": "FPSA",
+      "canonical": "游离前列腺特异性抗原",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 97,
+      "program": "sTfR",
+      "token": "sTfR",
+      "canonical": "可溶性转铁蛋白受体",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 100,
+      "program": "代谢物、总蛋白正确度验证",
+      "token": "总蛋白正确度",
+      "canonical": "总蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 101,
+      "program": "C肽和胰岛素检测及正确度验证",
+      "token": "C肽和胰岛素正确度",
+      "canonical": "C肽",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 104,
+      "program": "血清蛋白电泳",
+      "token": "血清蛋白电泳-清蛋白",
+      "canonical": "血清蛋白电泳-白蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 104,
+      "program": "血清蛋白电泳",
+      "token": "血清蛋白电泳-β球蛋白",
+      "canonical": "血清蛋白电泳-β1球蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 104,
+      "program": "血清蛋白电泳",
+      "token": "M蛋白",
+      "canonical": "血清蛋白电泳-M蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 104,
+      "program": "血清蛋白电泳",
+      "token": "M蛋白定性",
+      "canonical": "血清蛋白电泳-M蛋白定性",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 105,
+      "program": "血清蛋白电泳",
+      "token": "血清蛋白电泳-清蛋白",
+      "canonical": "血清蛋白电泳-白蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 105,
+      "program": "血清蛋白电泳",
+      "token": "血清蛋白电泳-β球蛋白",
+      "canonical": "血清蛋白电泳-β1球蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 105,
+      "program": "血清蛋白电泳",
+      "token": "M蛋白",
+      "canonical": "血清蛋白电泳-M蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 105,
+      "program": "血清蛋白电泳",
+      "token": "M蛋白定性",
+      "canonical": "血清蛋白电泳-M蛋白定性",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 106,
+      "program": "脂类B",
+      "token": "sdLDL",
+      "canonical": "小而密低密度脂蛋白胆固醇",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 107,
+      "program": "脂类B",
+      "token": "sdLDL",
+      "canonical": "小而密低密度脂蛋白胆固醇",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 108,
+      "program": "甲状腺功能检测",
+      "token": "游离T3",
+      "canonical": "游离三碘甲状腺原氨酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 108,
+      "program": "甲状腺功能检测",
+      "token": "总T3",
+      "canonical": "三碘甲状腺原氨酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 108,
+      "program": "甲状腺功能检测",
+      "token": "游离T4",
+      "canonical": "游离甲状腺素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 108,
+      "program": "甲状腺功能检测",
+      "token": "总T4",
+      "canonical": "甲状腺素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 108,
+      "program": "甲状腺功能检测",
+      "token": "TSH",
+      "canonical": "促甲状腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 108,
+      "program": "甲状腺功能检测",
+      "token": "TgAb",
+      "canonical": "抗甲状腺球蛋白抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 108,
+      "program": "甲状腺功能检测",
+      "token": "TPOAb",
+      "canonical": "抗甲状腺过氧化物酶抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 108,
+      "program": "甲状腺功能检测",
+      "token": "TRAb",
+      "canonical": "促甲状腺激素受体抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 109,
+      "program": "甲状腺功能检测",
+      "token": "游离T3",
+      "canonical": "游离三碘甲状腺原氨酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 109,
+      "program": "甲状腺功能检测",
+      "token": "总T3",
+      "canonical": "三碘甲状腺原氨酸",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 109,
+      "program": "甲状腺功能检测",
+      "token": "游离T4",
+      "canonical": "游离甲状腺素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 109,
+      "program": "甲状腺功能检测",
+      "token": "总T4",
+      "canonical": "甲状腺素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 109,
+      "program": "甲状腺功能检测",
+      "token": "TSH",
+      "canonical": "促甲状腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 109,
+      "program": "甲状腺功能检测",
+      "token": "TgAb",
+      "canonical": "抗甲状腺球蛋白抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 109,
+      "program": "甲状腺功能检测",
+      "token": "TPOAb",
+      "canonical": "抗甲状腺过氧化物酶抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 109,
+      "program": "甲状腺功能检测",
+      "token": "TRAb",
+      "canonical": "促甲状腺激素受体抗体",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": false
+    },
+    {
+      "plan_id": 110,
+      "program": "骨代谢标志物",
+      "token": "PTH",
+      "canonical": "甲状旁腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 110,
+      "program": "骨代谢标志物",
+      "token": "TP1NP",
+      "canonical": "总蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 110,
+      "program": "骨代谢标志物",
+      "token": "VD",
+      "canonical": "维生素D",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 111,
+      "program": "骨代谢标志物",
+      "token": "PTH",
+      "canonical": "甲状旁腺激素",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 111,
+      "program": "骨代谢标志物",
+      "token": "TP1NP",
+      "canonical": "总蛋白",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 111,
+      "program": "骨代谢标志物",
+      "token": "VD",
+      "canonical": "维生素D",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    },
+    {
+      "plan_id": 112,
+      "program": "纤维蛋白（原）降解产物检测",
+      "token": "FDP",
+      "canonical": "纤维蛋白（原）降解产物",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次",
+      "has_result": false
+    },
+    {
+      "plan_id": 113,
+      "program": "纤维蛋白（原）降解产物检测",
+      "token": "FDP",
+      "canonical": "纤维蛋白（原）降解产物",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第2次",
+      "has_result": true
+    }
+  ],
+  "unmatched": [
+    {
+      "plan_id": 54,
+      "program": "京津冀鲁盲样",
+      "token": "京津冀鲁盲样",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第1次"
+    },
+    {
+      "plan_id": 55,
+      "program": "京津冀鲁盲样",
+      "token": "京津冀鲁盲样",
+      "org": "北京市",
+      "year": 2026,
+      "round_no": "第2次"
+    },
+    {
+      "plan_id": 73,
+      "program": "醛固酮和肾素",
+      "token": "血管紧张素II",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次"
+    },
+    {
+      "plan_id": 98,
+      "program": "酶学正确度验证",
+      "token": "酶学正确度",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次"
+    },
+    {
+      "plan_id": 99,
+      "program": "电解质正确度验证",
+      "token": "电解质正确度",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次"
+    },
+    {
+      "plan_id": 100,
+      "program": "代谢物、总蛋白正确度验证",
+      "token": "代谢物",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次"
+    },
+    {
+      "plan_id": 102,
+      "program": "脂类正确度验证",
+      "token": "脂类正确度",
+      "org": "卫健委",
+      "year": 2026,
+      "round_no": "第1次"
+    }
+  ],
+  "already_ok_count": 249
+}

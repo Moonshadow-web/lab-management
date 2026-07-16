@@ -5,6 +5,8 @@
       :columns="columns"
       :fetch="fetch"
       search-placeholder="搜索标题 / 描述 / 责任人 / 纠正措施..."
+      :show-add="auth.canWrite('iso15189')"
+      :can-write="auth.canWrite('iso15189')"
       @add="onAdd"
       @edit="onEdit"
       @delete="onDelete"
@@ -27,8 +29,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../components/CrudTable.vue'
 import EditDialog from '../../components/EditDialog.vue'
 import { listNC, createNC, updateNC, deleteNC } from '../../api/nonconformity'
+import { useAuthStore } from '../../store/auth'
 
 const crud = ref(null)
+const auth = useAuthStore()
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const submitting = ref(false)

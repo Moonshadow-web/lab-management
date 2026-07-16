@@ -1,0 +1,242 @@
+/* 移动端适配（≤768px）：统一修复 Element Plus 组件在窄屏下的“反人类”排版
+ * 在 main.js 中于 element-plus 样式之后引入，确保覆盖默认样式。
+ * 仅针对窄屏生效，桌面端（>768px）完全不受影响。 */
+
+@media (max-width: 768px) {
+  /* ===== 弹窗：改为接近全宽，可滚动，不再超出屏幕 ===== */
+  .el-dialog {
+    width: 92vw !important;
+    max-width: 92vw !important;
+    margin: 5vh auto 5vh !important;
+  }
+  .el-dialog__header {
+    padding: 14px 14px 10px;
+  }
+  .el-dialog__title {
+    font-size: 16px;
+  }
+  .el-dialog__body {
+    padding: 12px 14px 16px;
+    max-height: 76vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .el-dialog__footer {
+    padding: 10px 14px 14px;
+  }
+
+  /* ===== 表单：label 改为顶部排列，输入框占满整行 ===== */
+  .el-form-item {
+    display: block;
+    margin-bottom: 16px;
+  }
+  .el-form-item__label {
+    display: block;
+    float: none !important;
+    text-align: left !important;
+    line-height: 1.4;
+    padding: 0 0 6px !important;
+    font-size: 14px;
+    color: #333;
+  }
+  .el-form-item__content {
+    margin-left: 0 !important;
+    line-height: normal;
+  }
+  .el-form-item__error {
+    padding-top: 4px;
+  }
+  /* 让所有表单控件在窄屏占满 */
+  .el-input,
+  .el-select,
+  .el-date-editor,
+  .el-input-number {
+    width: 100% !important;
+  }
+
+  /* ===== Tab 标签：可横向滚动，不折叠成箭头 ===== */
+  .el-tabs__nav-wrap.is-scrollable {
+    padding: 0;
+  }
+  .el-tabs__nav-prev,
+  .el-tabs__nav-next {
+    display: none;
+  }
+  .el-tabs__nav {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .el-tabs__nav::-webkit-scrollbar {
+    display: none;
+  }
+  .el-tabs__item {
+    flex-shrink: 0;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  /* ===== 表格：字号放大、横向滚动，避免列被压成竖条 ===== */
+  .el-table {
+    font-size: 13px;
+  }
+  .el-table .cell {
+    line-height: 1.5;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .el-table th.el-table__cell > .cell {
+    font-size: 12px;
+  }
+  .el-table .el-table__cell {
+    min-width: 56px;
+  }
+  /* 表格容器横向滚动 */
+  .crud-table,
+  .el-table__body-wrapper,
+  .page > .el-table {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .crud-table .el-table,
+  .page > .el-table {
+    min-width: 760px !important;
+  }
+  /* 表格操作列的 link 按钮改为竖排，不挤 */
+  .el-table .el-button.is-link,
+  .el-table .el-button--text {
+    display: block;
+    margin: 2px 0;
+    padding: 4px 0;
+    line-height: 1.4;
+    text-align: center;
+  }
+
+  /* ===== 表格工具栏：移动端纵向排列，元素占满宽度 ===== */
+  .crud-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px;
+  }
+  .crud-toolbar .el-input {
+    width: 100% !important;
+    order: -1;
+  }
+  .crud-toolbar .spacer {
+    display: none;
+  }
+  .crud-toolbar > * {
+    width: 100%;
+  }
+  .crud-toolbar .el-switch__core {
+    margin-right: 8px;
+  }
+
+  .crud-pagination {
+    justify-content: center;
+    overflow-x: auto;
+  }
+  .el-pagination {
+    white-space: normal !important;
+    text-align: center;
+    font-size: 12px;
+  }
+  .el-pagination .el-pagination__total,
+  .el-pagination .el-pagination__sizes,
+  .el-pagination .el-pagination__jump {
+    display: block;
+    text-align: center;
+    margin: 0 0 4px 0;
+  }
+  .el-pagination .el-pager {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* ===== 卡片：内边距收敛 ===== */
+  .el-card__body {
+    padding: 12px !important;
+  }
+  /* ===== 卡片头部：标题与按钮纵向排列 ===== */
+  .app-card-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px;
+  }
+  .app-card-header .el-button {
+    width: 100%;
+  }
+
+  /* ===== 全局字号与点击区域 ===== */
+  body {
+    font-size: 14px;
+  }
+  .el-button {
+    padding: 8px 14px;
+  }
+  .el-button--small {
+    padding: 6px 10px;
+  }
+  /* 表格操作列的 link 按钮加大点击区域 */
+  .el-table .el-button.is-link {
+    padding: 6px 8px;
+  }
+
+  /* ===== 标题栏字号 ===== */
+  .title {
+    font-size: 16px;
+  }
+
+  /* ===== Dashboard 统计卡：4列改2列，数字不挤 ===== */
+  .dashboard .el-col {
+    max-width: 50% !important;
+    flex: 0 0 50% !important;
+  }
+  .dashboard .stat .num {
+    font-size: 26px;
+  }
+  .dashboard .mini {
+    min-width: 100px;
+    flex: 1 1 30%;
+  }
+  .dashboard .mini-num {
+    font-size: 22px;
+  }
+
+  /* ===== 主内容区内边距收敛 ===== */
+  .el-main {
+    padding: 10px !important;
+  }
+
+  /* ===== 抽屉：移动端占满全屏，不再溢出 ===== */
+  .el-drawer {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .el-drawer__header {
+    margin-bottom: 12px;
+    padding: 16px 16px 0;
+  }
+  .el-drawer__title {
+    font-size: 16px;
+  }
+  .el-drawer__body {
+    padding: 12px 14px 24px;
+  }
+  /* 抽屉内表格横向滚动，不被压扁 */
+  .el-drawer__body .el-table {
+    min-width: 540px;
+  }
+  .el-drawer__body .el-table__body-wrapper,
+  .el-drawer__body .el-table__header-wrapper {
+    overflow-x: auto !important;
+  }
+  /* 抽屉内描述列表的标签/内容字号收敛 */
+  .el-drawer__body .el-descriptions__label,
+  .el-drawer__body .el-descriptions__content {
+    font-size: 13px;
+    padding: 8px 10px !important;
+  }
+}

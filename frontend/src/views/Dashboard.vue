@@ -54,6 +54,13 @@
 
     <AppCard title="提醒事项" class="mt">
       <template #header-extra>
+        <el-button
+          v-if="notices.length"
+          size="small"
+          type="primary"
+          :loading="sending"
+          @click="onSendEmail"
+        >发送提醒邮件</el-button>
         <el-button v-if="notices.length" size="small" @click="onReadAll">全部已读</el-button>
       </template>
       <el-empty v-if="!notices.length" description="暂无提醒" />
@@ -85,7 +92,7 @@ import AppCard from '../components/AppCard.vue'
 import { listTestItems } from '../api/testItems'
 import { listInstruments } from '../api/instruments'
 import { listDocuments } from '../api/documents'
-import { listNotifications, markRead, markAllRead } from '../api/notifications'
+import { listNotifications, markRead, markAllRead, sendNotificationEmails } from '../api/notifications'
 import { listQC } from '../api/qc'
 import { listReagents } from '../api/reagents'
 import { listTraining } from '../api/training'
@@ -98,6 +105,7 @@ const stats = ref({
   qc: '-', reagents: '-', training: '-', verification: '-', nc: '-',
 })
 const notices = ref([])
+const sending = ref(false)
 
 function levelType(level) {
   if (level === 'danger') return 'danger'
@@ -157,6 +165,26 @@ async function onReadAll() {
   ElMessage.success('已全部标记已读')
   loadNotices()
   loadStats()
+}
+
+async function onSendEmail() {
+  sending.value = true
+  try {
+    const res = await sendNotificationEmails()
+    if (res.sent > 0) {
+      ElMessage.success(`已发送邮件给 ${res.sent} 位接收人`)
+    } else if (res.logged > 0) {
+      ElMessage.warning('SMTP 未配置，已记录到服务端日志（降级模式）。请在环境变量配置 SMTP_HOST/USER/PASS 后重试。')
+    } else if (res.detail) {
+      ElMessage.info(res.detail)
+    } else {
+      ElMessage.info('当前没有未读提醒')
+    }
+  } catch (e) {
+    ElMessage.error('发送失败：' + (e?.response?.data?.detail || e.message))
+  } finally {
+    sending.value = false
+  }
 }
 
 onMounted(() => {

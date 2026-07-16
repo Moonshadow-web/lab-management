@@ -1,0 +1,11 @@
+{
+  "pid": 189,
+  "sop_title": "SM-SOP-517-安图AutolumoA2000检测系统化学发光法血浆醛固酮测定标准操作程序",
+  "reference_range": "立位 40pg/ml～310pg/ml；卧位 10pg/ml～160pg/ml（95%正常参考范围）",
+  "reportable_range": "检测范围 10～1000pg/ml（r≥0.9900）；>1000pg/ml需稀释，最大稀释比例1:9",
+  "unit": "pg/ml",
+  "traceability": "未列出",
+  "interference": "异嗜性抗体或类风湿因子可能干扰；严重溶血、脂血或浑浊样本可能造成不正确结果",
+  "method": "竞争法化学发光法",
+  "instrument": "AutoLumo A2000PLUS 化学发光检测仪"
+}

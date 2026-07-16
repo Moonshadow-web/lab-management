@@ -1,0 +1,296 @@
+[
+  {
+    "name": "labindex",
+    "value": "01110025",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "ccldir",
+    "value": "clinet_beijing",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "team_id",
+    "value": "9239",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "member_id",
+    "value": "33925",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "nickname",
+    "value": "01110025",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "cclindex",
+    "value": "4731",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "speciality",
+    "value": "95",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "specname",
+    "value": "EB病毒核酸检测",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "year",
+    "value": "2026",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "times",
+    "value": "2",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "cenhidden",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "material0",
+    "value": "202621",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "material1",
+    "value": "202622",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "material2",
+    "value": "202623",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "material3",
+    "value": "202624",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "material4",
+    "value": "202625",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_0",
+    "value": "0 ",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_1",
+    "value": "95",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_2",
+    "value": "EB病毒核酸",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_3",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_4",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_5",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_6",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_7",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_8",
+    "value": "",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_9",
+    "value": "实时荧光PCR(定量)",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_9_s",
+    "value": "2121",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_9_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_fangfa",
+    "value": "21",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_10",
+    "value": "其它PCR仪",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_10_s",
+    "value": "218099",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_10_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_11",
+    "value": "湖南圣湘生物科技有限公司",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_11_s",
+    "value": "21161",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_11_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_12",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_12_s",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_0_cols_12_t",
+    "value": "",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_0",
+    "value": "-",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_1",
+    "value": "-",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_2",
+    "value": "校验和",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_3",
+    "value": "-",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_4",
+    "value": "点击计算",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_5",
+    "value": "点击计算",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_6",
+    "value": "点击计算",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_7",
+    "value": "点击计算",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "rows_1_cols_8",
+    "value": "点击计算",
+    "type": "text",
+    "ph": ""
+  },
+  {
+    "name": "totalrows",
+    "value": "1",
+    "type": "hidden",
+    "ph": ""
+  },
+  {
+    "name": "totalcols",
+    "value": "13",
+    "type": "hidden",
+    "ph": ""
+  }
+]

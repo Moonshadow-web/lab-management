@@ -1,0 +1,11 @@
+{
+  "pid": 163,
+  "sop_title": "SM-SOP-174  日立7600检测系统均相酶免疫法尿液17-酮类固醇（17-KS）测定操作标准程序",
+  "reference_range": "男：5.0~30.0 mg/24h；女：2.0~20.0 mg/24h",
+  "reportable_range": "2-800.0 mg/L",
+  "unit": "mg/24h",
+  "traceability": "17-酮类固醇校准品可溯源至西格玛奥德里奇公司（Sigma-Aldrich）的17-酮类固醇超纯物质。",
+  "interference": "胆红素≤50mg/L、血红蛋白≤1000mg/L、白蛋白≤100g/L、抗坏血酸≤176 mg/dL 对测定结果无影响。",
+  "method": "均相酶免疫法",
+  "instrument": "日立7600全自动生化分析仪"
+}

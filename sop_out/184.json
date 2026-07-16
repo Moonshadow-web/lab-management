@@ -1,0 +1,11 @@
+{
+  "pid": 184,
+  "sop_title": "SM-SOP-540-罗氏Cobas检测系统电化学发光法血清β-胶原特殊序列β-CTx测定标准操作程序",
+  "reference_range": "男性 0-1.01 ng/ml；女性 0-0.85 ng/ml",
+  "reportable_range": "线性范围 0.01-6.00 ng/ml；低于下限报 <0.01 ng/ml，高于上限报 >6.00 ng/ml；检测范围广，不需稀释",
+  "unit": "ng/ml",
+  "traceability": "未列出（使用 Elecsys β-CrossLaps CalSet 校准品，文档无溯源性章节）",
+  "interference": "不受黄疸（胆红素<65mg/dl）、溶血（Hb<0.5g/dl）、脂血（脂质<1500mg/dl）、生物素<30ng/ml干扰；接受高剂量生物素（>5mg/天）治疗者须末次摄入8小时后采血；不受1500U/ml类风湿因子干扰；17种常用药物无干扰；β-CTx高达150ng/ml无钩状效应；接受过小鼠单抗治疗或体内诊断者可能出现假阳性",
+  "method": "双抗体夹心法（电化学发光法）",
+  "instrument": "罗氏 Cobas e601 电化学发光免疫分析仪"
+}

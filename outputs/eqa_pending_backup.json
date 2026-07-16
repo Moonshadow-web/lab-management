@@ -1,0 +1,7 @@
+{
+  "ids": [
+    74,
+    80
+  ],
+  "note": "原 score/result/qualified 均为空，回退即 UPDATE ... SET result='',score='',qualified=0 WHERE id IN (ids)"
+}

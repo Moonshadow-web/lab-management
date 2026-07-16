@@ -1,0 +1,11 @@
+{
+  "pid": 158,
+  "sop_title": "SM-SOP-101  AU5800检测系统酶法血清葡萄糖测定标准操作程序",
+  "reference_range": "血清：空腹3.9-6.1mmol/L；1h 3.9-11.1mmol/L；2h 3.9-7.8mmol/L；3h 3.9-6.1mmol/L。血浆：空腹3.9-6.1mmol/L。",
+  "reportable_range": "0.1-125.0mmol/L",
+  "unit": "mmol/L",
+  "traceability": "校准品溯源至国家标准物GBW(E)090544/GBW(E)090545/GBW(E)090546",
+  "interference": "甘油三酯≤30mmol/L、抗坏血酸≤10mg/dL、血红蛋白≤0.3g/L、胆红素≤250μmol/L无显著干扰；服用/输入Vc类还原物质使血糖假性偏低",
+  "method": "酶法（葡萄糖氧化酶法）",
+  "instrument": "Beckman Coulter AU5800 全自动生化分析仪"
+}

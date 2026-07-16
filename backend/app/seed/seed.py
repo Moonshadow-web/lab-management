@@ -7,8 +7,11 @@ from ..core.config import PROJECT_ROOT, UPLOAD_ROOT
 from ..core.security import hash_password
 from ..models.document import Document, DocumentVersion
 from ..models.instrument import Instrument
+from ..models.instrument_family import InstrumentFamily, InstrumentFamilyMember
 from ..models.test_item import TestItem
 from ..models.user import User
+from .seed_users import seed_users
+
 
 SEED_JSON = Path(__file__).resolve().parent / "seed_data.json"
 FILES_DIR = PROJECT_ROOT / "files"
@@ -100,6 +103,8 @@ def run_seed(db):
                 password_hash=hash_password("admin123"),
                 role="admin",
                 department="生免组",
+                email="815268425@qq.com",
+                notify_email=True,
                 is_active=True,
             )
         )
@@ -124,3 +129,91 @@ def run_seed(db):
         for it in data["manualData"]:
             _seed_document(db, it)
         db.commit()
+
+    seed_families(db)
+    seed_token_families(db)
+    seed_users(db)
+
+
+# 原写死在 core/instrument_link.FAMILY_MAP 的「总型号 → 仪器」关系，迁移为数据库关联表。
+# 按仪器 name/model 子串匹配，对 id 变化不敏感；按 name 去重，可重复执行。
+_FAMILY_SEED = [
+    ("罗氏 Cobas6000", ["e601", "e602", "e411"]),
+    ("AU生化仪", ["AU5822", "AU5800", "AU5821"]),
+    ("DxI800", ["DXI800", "DxI800"]),
+    ("日立HT7600", ["HT7600"]),
+    ("安图A6200", ["A6200"]),
+    ("ACL TOP700", ["TOP700"]),
+    ("胶体金法", []),  # 纯手工快速法，无仪器
+    ("Stago CompactMax", ["CompactMax"]),
+    ("东曹HLC-723 G8", ["HLC-723G8"]),
+    ("FUJI FILM DRI-CHEM", ["DRI-CHEN", "DRI-CHEM"]),
+    ("西门子RapidPoint血气分析仪", ["RapidPoint"]),
+    ("Sebia Capillarys 3 OCTA毛细管电泳仪", ["Capillarys"]),
+    ("Sebia HYDRASYS免疫固定电泳仪", ["Hydrasys"]),
+    ("爱林-数显混匀器 ORBITAL SHAKER TA-2000A", ["数显混匀器"]),
+    ("爱康全自动酶联免疫仪", ["URANUS"]),
+]
+
+# 仪器组精确关联：用户在项目「仪器组」里写的就是具体机号 / 总型号缩写，
+# 直接一一对应到具体仪器档案（不再按总型号模糊匹配）。
+# 键 = 仪器组 token（与 test_items.instrument_group 中以 '/' 分隔的片段一致），
+# 值 = 具体仪器 id 列表（已逐一核对档案，均为在用）。
+#   AU58-1 → AU5821 A(id67)；AU58-2 → AU5821 B(id68)；AU5800 → AU5800急诊(id5)
+#   HT7600 → 日立HT7600(id12)
+#   ①号机 → DXI800 1(id69)；②号机 → DXI800 2(id70)；③号机 → DXI800 3(id71)；④号机 → DXI800 4(id72)
+#   e601/e602/e411 → 罗氏 e601/e602/e411 (id14/15/16)
+#   急诊 → 贝克曼DXI800急(id73)；唐筛 → 贝克曼DXI800唐(id74)
+_TOKEN_FAMILY_SEED = [
+    ("AU58-1", [67]),
+    ("AU58-2", [68]),
+    ("AU5800", [5]),
+    ("HT7600", [12]),
+    ("①号机", [69]),
+    ("②号机", [70]),
+    ("③号机", [71]),
+    ("④号机", [72]),
+    ("e601", [14]),
+    ("e602", [15]),
+    ("e411", [16]),
+    ("急诊", [73]),
+    ("唐筛", [74]),
+]
+
+
+def seed_families(db):
+    instruments = db.query(Instrument).all()
+    for name, keys in _FAMILY_SEED:
+        if db.query(InstrumentFamily).filter(InstrumentFamily.name == name).first():
+            continue
+        fam = InstrumentFamily(name=name)
+        db.add(fam)
+        db.flush()
+        if keys:
+            matched = set()
+            for inst in instruments:
+                hay = (inst.name or "") + " " + (inst.model or "")
+                hay_l = hay.lower()
+                for k in keys:
+                    if k.lower() in hay_l:
+                        matched.add(inst.id)
+                        break
+            for iid in sorted(matched):
+                db.add(InstrumentFamilyMember(family_id=fam.id, instrument_id=iid))
+    db.commit()
+
+
+def seed_token_families(db):
+    """写入「仪器组 token → 具体仪器」的精确关联（幂等，按 name 去重）。"""
+    existing = {f.name for f in db.query(InstrumentFamily).all()}
+    valid_ids = {i.id for i in db.query(Instrument.id).all()}
+    for name, ids in _TOKEN_FAMILY_SEED:
+        if name in existing:
+            continue
+        fam = InstrumentFamily(name=name)
+        db.add(fam)
+        db.flush()
+        for iid in ids:
+            if iid in valid_ids:
+                db.add(InstrumentFamilyMember(family_id=fam.id, instrument_id=iid))
+    db.commit()

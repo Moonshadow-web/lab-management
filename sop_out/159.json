@@ -1,0 +1,11 @@
+{
+  "pid": 159,
+  "sop_title": "SM-SOP-156  HLC-732G8检测系统HPLC法全血糖化血红蛋白测定标准操作程序",
+  "reference_range": "4-6 ％",
+  "reportable_range": "3.1-15.9 ％",
+  "unit": "％",
+  "traceability": "未列出",
+  "interference": "溶血、浑浊、严重血脂样本不宜用；游离胆红素≤18mg/dl、结合胆红素≤20mg/dl、乳糜≤2860浊度、阿司匹林≤50mg/dl、抗坏血酸≤50mg/dl、尿酸≤50mg/dl时对结果影响不大。",
+  "method": "HPLC法",
+  "instrument": "全自动糖化分析仪HLC-723 G8"
+}

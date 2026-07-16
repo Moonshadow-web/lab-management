@@ -5,6 +5,8 @@
       :columns="columns"
       :fetch="fetch"
       search-placeholder="搜索名称 / 批号 / 厂家 / 供应商..."
+      :show-add="auth.canWrite('reagents')"
+      :can-write="auth.canWrite('reagents')"
       @add="onAdd"
       @edit="onEdit"
       @delete="onDelete"
@@ -27,8 +29,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../components/CrudTable.vue'
 import EditDialog from '../../components/EditDialog.vue'
 import { listReagents, createReagent, updateReagent, deleteReagent } from '../../api/reagents'
+import { useAuthStore } from '../../store/auth'
 
 const crud = ref(null)
+const auth = useAuthStore()
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const submitting = ref(false)

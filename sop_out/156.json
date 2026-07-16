@@ -1,0 +1,11 @@
+{
+  "pid": 156,
+  "sop_title": "SM-SOP-121  AU5800检测系统过氧化物酶法胸腹水腺苷脱氨酶测定标准操作程序",
+  "reference_range": "0-40 U/L（取自结果报告方式表；生物参考区间正文未列具体数值）",
+  "reportable_range": "1-1000 U/L",
+  "unit": "U/L",
+  "traceability": "校准品溯源至国际参考物质BCR-647",
+  "interference": "样本中如有乳酸脱氢酶、丙酮酸及氨等可能产生干扰，需保证试剂1与样本有足≥5分钟孵育期使其消耗完全。",
+  "method": "过氧化物酶法",
+  "instrument": "Beckman Coulter AU5800 全自动生化分析仪"
+}

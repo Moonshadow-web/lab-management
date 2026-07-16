@@ -1,0 +1,786 @@
+[
+ {
+  "title": "SM-SOP-012 生化免疫组定性检验方法性能验证作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_0f8b0ff8de3d98fec4ab4bd300ebc3527445972045036619"
+ },
+ {
+  "title": "SM-SOP-011生化免疫组定量检验方法性能验证、确认作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_427445b62e9ef0ae4a8ce54ee283d0267445972045036619"
+ },
+ {
+  "title": "SM-SOP-013 生化免疫组室内质量控制作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_543ec39363ca39496c6a75dfa9611f007445972045036619"
+ },
+ {
+  "title": "SM-SOP-176  AU5800检测系统PAPS 显色法血清锌测定测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_5b09dd6c1e6fef31fc9e78279ac7d9677445972045036619"
+ },
+ {
+  "title": "SM-SOP-185-AU5800检测系统免疫比浊法血清尿液轻链λ测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_bfb6e9fc35ce5cefa6e492a03ff032e57445972045036619"
+ },
+ {
+  "title": "SM-SOP-121  AU5800检测系统过氧化物酶法腺苷脱氨酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_39d9e87545500f391b1983f3e1b9ec927445972045036619"
+ },
+ {
+  "title": "SM-SOP-015 生化免疫组室内比对作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_971d6e092c66a457613cff772897a9a17445972045036619"
+ },
+ {
+  "title": "SM-SOP-134  AU5800检测系统离子选择电极法氯离子测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_0ddd89d1df85799353cdaad153f4a4367445972045036619"
+ },
+ {
+  "title": "SM-SOP-1008-贝克曼IMMAGE800特种蛋白仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_68fa36df2e6e32b794a89423a6fbb3a57445972045036619"
+ },
+ {
+  "title": "SM-SOP-139  AU5800检测系统乳酸氧化酶法血清脑脊液乳酸测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_9e461e26c9b4f97f06955c4655cc985e7445972045036619"
+ },
+ {
+  "title": "SM-SOP-105  AU5800检测系统盒直接法-表面活性剂清除法血清低密度脂蛋白胆固醇测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_1d86200259baef957def4db5a6d1a5a17445972045036619"
+ },
+ {
+  "title": "SM-SOP-017 生化免疫组测量结果计量溯源作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_ec64ccaf5f3533c6b824acf7246d42f47445972045036619"
+ },
+ {
+  "title": "SM-SOP-019 生化免疫组报告管理作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_9887207d59f3a05beeb5a887f5fcbd3f7445972045036619"
+ },
+ {
+  "title": "SM-SOP-110  AU5800检测系统免疫比浊法前白蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_ab8eeee2390aa959803a7c45da0a9f567445972045036619"
+ },
+ {
+  "title": "SM-SOP-122  AU5800检测系统丁酰硫代胆碱底物法胆碱酯酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_9d49d78d8b30f4150e24840d4aaecaf77445972045036619"
+ },
+ {
+  "title": "SM-SOP-157  AU5800检测系统胶乳免疫比浊法血清淀粉样蛋白A测定标准操作程序 ",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_40a6274a90ff12448c654094f7b880b87445972045036619"
+ },
+ {
+  "title": "SM-SOP-138  AU5800检测系统酶法血清尿液总钙测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_e1d8217ff92fea47c493b06db6bb98fc7445972045036619"
+ },
+ {
+  "title": "SM-SOP-517-安图AutolumoA2000检测系统化学发光法血浆醛固酮测定标准操作程序 ",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_a8c9c042ed01b2ff060d118930d7b93b7445972045036619"
+ },
+ {
+  "title": "SM-SOP-567-日立HT7600检测系统免疫比浊法尿液微量白蛋白MA测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_f627ce0bce5f076287c74af274642d137445972045036619"
+ },
+ {
+  "title": "SM-SOP-184-AU5800检测系统免疫比浊法血清尿液轻链κ测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_690607e4d79dbe1892ba89fe87451ae17445972045036619"
+ },
+ {
+  "title": "SM-SOP-171  沃芬ACL TOP Family检测系统血浆发色底物法蛋白C测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_15af3c862cfa5df0465d0ae33c17ad247445972045036619"
+ },
+ {
+  "title": "SM-SOP-131  AU5800检测系统甲基试卤灵底物法血清尿液脂肪酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_53a5ca428320fc638caf97516306b9827445972045036619"
+ },
+ {
+  "title": "SM-SOP-161  沃芬ACL TOP Family检测系统凝固法血浆凝血酶原时间测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_f8f4235a97c4e5698c33fec12d155ef97445972045036619"
+ },
+ {
+  "title": "SM-SOP-163  沃芬ACL TOP Family检测系统凝固法血浆凝血酶时间测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b7a9d898e03f2d8e84879046f5052d0a7445972045036619"
+ },
+ {
+  "title": "SM-SOP-167  沃芬ACL TOP Family检测系统发色底物法血浆抗凝血酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_1f98025b91a664c90cb7ff209e9d0bb87445972045036619"
+ },
+ {
+  "title": "SM-SOP-162  沃芬ACL TOP Family检测系统凝固法血浆活化部分凝血活酶时间测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_c01e12325e7dc16a84270f5099b6bea67445972045036619"
+ },
+ {
+  "title": "SM-SOP-172  沃芬ACL TOP Family检测系统发色底物法血浆纤溶酶原测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_69e9c5f88b892155a785ebfd985ee8c97445972045036619"
+ },
+ {
+  "title": "SM-SOP-1010-沃芬TOP700A凝血分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b5eda7f6af04c3c5a8c509670192880b7445972045036619"
+ },
+ {
+  "title": "SM-SOP-1011-沃芬TOP700B凝血分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_8199dfa318fb713f9fe3cd646edd24e87445972045036619"
+ },
+ {
+  "title": "SM-SOP-509-荣盛梅毒甲苯胺红不加热血清试验TRUST血清梅毒非特异性抗体测定标准操作规程",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_e20964eab1f59d543c19f51aa86fc9057445972045036619"
+ },
+ {
+  "title": "SM-SOP-1009-沃芬HemoCELL凝血流水线操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b59959fbc5c15e7d179388d7a2ff85d07445972045036619"
+ },
+ {
+  "title": "SM-SOP-1010-沃芬TOP700A凝血分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_a1c29753c37a5b353ffb0848b603c6d17445972045036619"
+ },
+ {
+  "title": "SM-SOP-1009-沃芬HemoCELL凝血流水线操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_ad09aad156fd4763c2b7f5a758d06b657445972045036619"
+ },
+ {
+  "title": "SM-SOP-1011-沃芬TOP700B凝血分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_1ebdfb3efe897ca188fa77fd7f562ef37445972045036619"
+ },
+ {
+  "title": "SM-SOP-1028-Stago CompactMax凝血分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_aa30b159acf07318d92bb514b31324137445972045036619"
+ },
+ {
+  "title": "SM-SOP-1012-沃芬TOP700C凝血分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_e30f604059a21b21c67bcbfaa938a7fd7445972045036619"
+ },
+ {
+  "title": "SM-SOP-1012-沃芬TOP700C凝血分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_fe7d2a31b1a7d88c49c3cd98482384d17445972045036619"
+ },
+ {
+  "title": "SM-SOP-182  Stago检测系统发色底物法血浆抗Xa活性测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_73a1bf141366e7fc06f33d5a42527d9c7445972045036619"
+ },
+ {
+  "title": "SM-SOP-181  免疫固定电泳标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_5cd2531bf73e86235fbd2751204bad5b7445972045036619"
+ },
+ {
+  "title": "SM-SOP-170  沃芬ACL  TOP Family检测系统凝固法血浆蛋白S测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_57bebc037042746b5af1df444dc3354a7445972045036619"
+ },
+ {
+  "title": "SM-SOP-124  AU5800检测系统酶法血清尿素测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_2c522cfc276e627c0a19d72d3abc20947445972045036619"
+ },
+ {
+  "title": "SM-SOP-118  AU5800检测系统酶法直接胆红素测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_669e2c6b1b557bac674dae61583532b17445972045036619"
+ },
+ {
+  "title": "SM-SOP-145  AU5800检测系统亚铁嗪法血清铁测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_d9390a8699244a22a6e340234919180a7445972045036619"
+ },
+ {
+  "title": "SM-SOP-117  AU5800检测系统酶法总胆红素测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_8c5709b9918acc37889037736834c8d37445972045036619"
+ },
+ {
+  "title": "SM-SOP-137  AU5800检测系统磷钼酸盐法血清磷测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_e39d4ddbb17ee4812e550897b6d163697445972045036619"
+ },
+ {
+  "title": "SM-SOP-113  AU5800检测系统底物法血清谷丙转氨酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_062460abae2b07879f9e14bb4ade2ce47445972045036619"
+ },
+ {
+  "title": "SM-SOP-125  AU5800检测系统酶法血清尿酸测定标准操作程序-",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_08a6c7822c0a7d40825cb2f1f273b5707445972045036619"
+ },
+ {
+  "title": "SM-SOP-180  Sebia毛细管电泳仪血清蛋白电泳标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_42a374bbcd36be28574118ca247131207445972045036619"
+ },
+ {
+  "title": "SM-SOP-114  AU5800检测系统底物法血清谷草转氨酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_0b31c5a2ee9c9df11694bc9dcd45d1c37445972045036619"
+ },
+ {
+  "title": "SM-SOP-141  AU5800检测系统乳酸底物法乳酸脱氢酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_bd61278c826ea9df8623612ad0a67a877445972045036619"
+ },
+ {
+  "title": "SM-SOP-175  日立7600检测系统均相酶免疫法尿液香草扁桃酸VMA测定操作标准程序 ",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_93f0fde5fef0d4244b440458375c96e87445972045036619"
+ },
+ {
+  "title": "SM-SOP-136  AU5800检测系统酶法血清尿液镁测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_03c5acf2f3b77f79c1979fcae9fc9bff7445972045036619"
+ },
+ {
+  "title": "SM-SOP-123  AU5800检测系统酶法血清肌酐测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_094fee00de316daa7fb6715e91b575547445972045036619"
+ },
+ {
+  "title": "SM-SOP-142  AU5800检测系统酶法糖化白蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_565f47518fd32f752be847507b67d9767445972045036619"
+ },
+ {
+  "title": "SM-SOP-119  AU5800检测系统循环酶法总胆汁酸测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_e7c3e4517b77b2a4807e7fa407dfa6837445972045036619"
+ },
+ {
+  "title": "SM-SOP-164  沃芬ACL TOP Family检测系统凝固法血浆纤维蛋白原测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_a4fb81c4ed293f4b14c37e01e9ed70f27445972045036619"
+ },
+ {
+  "title": "SM-SOP-102  AU5800检测系统CHOD-PAP 法血清总胆固醇测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_1b691ba624a51727a4b2e4707b8984237445972045036619"
+ },
+ {
+  "title": "SM-SOP-146  AU5800检测系统Ferene法血清不饱和铁结合力测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_6be66dce79edb21ca0d3cb14cf4c7ced7445972045036619"
+ },
+ {
+  "title": "SM-SOP-101  AU5800检测系统酶法血清葡萄糖测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_76b7700ffd9b9aa22b4e5736a6c180dc7445972045036619"
+ },
+ {
+  "title": "SM-SOP-566-日立HT7600检测系统免疫比浊法尿液IgG IGU测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_7fcb0b99b5690f92e1c85c97f0fe0bc97445972045036619"
+ },
+ {
+  "title": "SM-SOP-143  AU5800检测系统循环酶法血清同型半胱氨酸测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_9f5b5ccb1763a9f5ffdc87f2616585767445972045036619"
+ },
+ {
+  "title": "SM-SOP-140  AU5800检测系统磷酸肌酸底物法肌酸激酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_9b20c695f2242815459f4b914a10ade97445972045036619"
+ },
+ {
+  "title": "SM-SOP-572-艾博生物胶体金法血清乙肝表面抗原HBsAg测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_1e15c87c6541a91ad7eded77e91908787445972045036619"
+ },
+ {
+  "title": "SM-SOP-179- 西门子RapidPoint血气分析仪动脉血气分析标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_d7f36710ff576ba07dd7e0e54e8380517445972045036619"
+ },
+ {
+  "title": "SM-SOP-132  AU5800检测系统离子选择电极法钾离子测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_c7c499b83b0056ce42fabc4b01ddb3e07445972045036619"
+ },
+ {
+  "title": "SM-SOP-133  AU5800检测系统离子选择电极法钠离子测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_d6d214cdaa9d5af4ef24bcc1552fde5b7445972045036619"
+ },
+ {
+  "title": "SM-SOP-152  AU5800检测系统免疫比浊法血清免疫球蛋白A测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_18a95acaece34cd9d1d2513d6dee78d67445972045036619"
+ },
+ {
+  "title": "SM-SOP-107  AU5800检测系统免疫透射比浊法载脂蛋白A测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_4f6d97e86ce799216bd06ddcf3a2484e7445972045036619"
+ },
+ {
+  "title": "SM-SOP-153  AU5800检测系统免疫比浊法血清补体C4测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_fa42f6c6a194cd83622f67866ab458337445972045036619"
+ },
+ {
+  "title": "SM-SOP-505-罗氏Cobas检测系统电化学发光法血清乙肝核心抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_fd072568ff339c30075964c4f35a447b7445972045036619"
+ },
+ {
+  "title": "SM-SOP-573-英科新创胶体金法血清丙型肝炎病毒抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_41d8c4877b2d2f26a647d211794d7edc7445972045036619"
+ },
+ {
+  "title": "SM-SOP-569-英科新创胶体金法血清人类免疫缺陷病毒抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b4ee80be0a44f3a6cbd9c8a1378b81977445972045036619"
+ },
+ {
+  "title": "SM-SOP-128  AU5800检测系统免疫比浊法尿微量白蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_0613be9003527a399a7a863925fc52f87445972045036619"
+ },
+ {
+  "title": "SM-SOP-130  AU5800检测系统EPS底物法血清尿液α-淀粉酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_9ae7146a9a5cd55537d1c24a872884057445972045036619"
+ },
+ {
+  "title": "SM-SOP-111  AU5800检测系统溴甲酚绿法血清白蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_240df7a82742e0c1133156a2a7fe5f297445972045036619"
+ },
+ {
+  "title": "SM-SOP-103  AU5800检测系统GPO-PAP 法血清甘油三酯测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_e3c05f763d12ca15de76e76704da55757445972045036619"
+ },
+ {
+  "title": "SM-SOP-540-罗氏Cobas检测系统电化学发光法血清β-胶原特殊序列β-CTx测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_406bb339df4ad5307f07bae9ae3ac9a57445972045036619"
+ },
+ {
+  "title": "SM-SOP-571-艾博生物胶体金法血清梅毒特异性抗体金测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_a21a57c8b41b1bea97a209e4f3dca2757445972045036619"
+ },
+ {
+  "title": "SM-SOP-151  AU5800检测系统免疫比浊法血清免疫球蛋白G测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_2412a849738a1dbae1232b72d4a685157445972045036619"
+ },
+ {
+  "title": "SM-SOP-568-爱康酶标仪ELISA法血清人类免疫缺陷病毒测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_4bbcf94ef428304637844dd219829a627445972045036619"
+ },
+ {
+  "title": "SM-SOP-178- AU5800检测系统脱氢酶法血清β羟丁酸测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_ec4df7dc88f0d0bb42b3544a20ed67427445972045036619"
+ },
+ {
+  "title": "SM-SOP-144  AU5800检测系统免疫比浊法血清C反应蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_87fda6144c3d3190c05184889ddb95207445972045036619"
+ },
+ {
+  "title": "SM-SOP-177- AU5800检测系统免疫比浊法血清触珠蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_46f27aa0df53cf94fe1abac00c2f607b7445972045036619"
+ },
+ {
+  "title": "SM-SOP-565-日立HT7600检测系统免疫比浊法尿液转铁蛋白TRU测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_a5168bf5ac1658c24aaaca6e1b685da57445972045036619"
+ },
+ {
+  "title": "SM-SOP-106  AU5800检测系统免疫透射比浊法载脂蛋白B测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_9b87fa299397149092481941504409747445972045036619"
+ },
+ {
+  "title": "SM-SOP-173  日立7600检测系统均相酶免疫法尿液17-羟类固醇（17-OH）测定操作标准程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_209e9e7a38ee4fd3166e12eb5b41cd8c7445972045036619"
+ },
+ {
+  "title": "SM-SOP-513-安图AutolumoA2000检测系统IGRA法结核感染T细胞检测标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_9b1688308c1a4cbd121266a2a76b78937445972045036619"
+ },
+ {
+  "title": "SM-SOP-504-罗氏Cobas检测系统电化学发光法血清乙肝e抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_c38ee92108f821e90676bad92635a0e37445972045036619"
+ },
+ {
+  "title": "SM-SOP-174  日立7600检测系统均相酶免疫法尿液17-酮类固醇（17-KS）测定操作标准程序 ",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_5f1fc3fc993369c34a7b6c72301638bd7445972045036619"
+ },
+ {
+  "title": "SM-SOP-154  AU5800检测系统免疫比浊法血清补体C3测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_c833bbea8ed70a342a9386b02bf4bafd7445972045036619"
+ },
+ {
+  "title": "SM-SOP-502-罗氏Cobas检测系统电化学发光法血清乙肝表面抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_f629c2f58d9146d9fda2d8fe52f5fd6c7445972045036619"
+ },
+ {
+  "title": "SM-SOP-525-贝克曼DXI800检测系统化学发光法血清孕酮测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_790d962cfe5daae355e03960b64c4e2c7445972045036619"
+ },
+ {
+  "title": "SM-SOP-148  AU5800检测系统免疫比浊法血清类风湿因子测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_e864c56ccca132c4f7386a1cfbb50df17445972045036619"
+ },
+ {
+  "title": "SM-SOP-150  AU5800检测系统免疫比浊法血清免疫球蛋白M测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_8ade5cf2bcd596bc23f06c75218389477445972045036619"
+ },
+ {
+  "title": "SM-SOP-112  AU5800检测系统双缩脲法血清总蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_f5130cb03ef81cf0a46c2333344f311d7445972045036619"
+ },
+ {
+  "title": "SM-SOP-168  沃芬ACL TOP Family检测系统凝固法血浆狼疮抗凝物SCT测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_c024263ed368b513498c57974f1510e47445972045036619"
+ },
+ {
+  "title": "SM-SOP-516-安图AutolumoA2000检测系统化学发光法血浆肾素测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b029c6b550d04cd3087bfd43179f200f7445972045036619"
+ },
+ {
+  "title": "SM-SOP-577-罗氏Cobas检测系统电化学发光法血清甲状腺球蛋白Tg测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_d3796b51e06b95e1af62e35db75ea2367445972045036619"
+ },
+ {
+  "title": "SM-SOP-591-凯保罗酶联免疫吸附法血清七种肺癌自身抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_3830d3915c3d94b33ee321d9a5245ec07445972045036619"
+ },
+ {
+  "title": "SM-SOP-547-罗氏Cobas检测系统电化学发光法血清地高辛测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_63715e4462d387fe114ea276c96533a67445972045036619"
+ },
+ {
+  "title": "SM-SOP-583-贝克曼DXI800检测系统化学发光法血清降钙素测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_278c39686326bdb8df812154f086f9117445972045036619"
+ },
+ {
+  "title": "SM-SOP-120  AU5800检测系统胶乳免疫比浊法胱抑素C测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_35e3a65f59d33ab5a9f70e41712837d57445972045036619"
+ },
+ {
+  "title": "SM-SOP-115  AU5800检测系统GCANA底物法血清γ-谷氨酰基转肽酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_8889f60851e6404c31cc3f51020d7bd87445972045036619"
+ },
+ {
+  "title": "SM-SOP-519-安图AutolumoA2000检测系统化学发光法血浆皮质醇测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_7fbbef10a86142d8b3e71bc74f82a37c7445972045036619"
+ },
+ {
+  "title": "SM-SOP-156  HLC-732G8检测系统HPLC法全血糖化血红蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_e4b721a9f84aa13843bbd1299f88690e7445972045036619"
+ },
+ {
+  "title": "SM-SOP-129  AU5800检测系统 免疫比浊法 β2-微球蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b23795d31b14bd0a7bc1e9ad6e498bde7445972045036619"
+ },
+ {
+  "title": "SM-SOP-549-罗氏Cobas检测系统电化学发光法胸腹水癌胚抗原CEA测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_4de0563e448bcebbef0cecd137ebbfb87445972045036619"
+ },
+ {
+  "title": "SM-SOP-570-艾博生物胶体金法血清人类免疫缺陷病毒抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b7fe776d3c3cb331671283493f39c5bd7445972045036619"
+ },
+ {
+  "title": "SM-SOP-538-罗氏Cobas检测系统电化学发光法血清骨钙素测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_f452739682c129971183604b36fcd6f47445972045036619"
+ },
+ {
+  "title": "SM-SOP-593- AU5800检测系统FAPGG底物法血清血管紧张素转化酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_0b46a0f62062c4e0668a45beafd4e9967445972045036619"
+ },
+ {
+  "title": "SM-SOP-135  AU5800检测系统PEPC酶法二氧化碳测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_5afa14c259686cdb4a308c1f9fb402d37445972045036619"
+ },
+ {
+  "title": "SM-SOP-149  AU5800检测系统速率法血清肿瘤特异性生长因子测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_f8b9ee5863108367673bf79ab05840d27445972045036619"
+ },
+ {
+  "title": "SM-SOP-501-罗氏Cobas检测系统电化学发光法血清乙肝表面抗原测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_7a88a44f61d8e125bccc54240c26a4ff7445972045036619"
+ },
+ {
+  "title": "SM-SOP-503-罗氏Cobas检测系统电化学发光法血清乙肝e抗原测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b250c9f54144cc96b7486384483bb6dc7445972045036619"
+ },
+ {
+  "title": "SM-SOP-559-罗氏Cobas检测系统电化学发光法血清弓形虫Tox IgM测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_0009b029b705fc57d8ae951210822d087445972045036619"
+ },
+ {
+  "title": "SM-SOP-515-贝克曼DXI800检测系统化学发光法血清血浆白介素6测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_87b0c73a7055f5faf9897c24841d09127445972045036619"
+ },
+ {
+  "title": "SM-SOP-518-安图AutolumoA2000检测系统化学发光法血浆血管紧张素II测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_231f721489d270888fccc8187af9eb117445972045036619"
+ },
+ {
+  "title": "SM-SOP-587-贝克曼DXI800检测系统化学发光法血清抗卵巢抗体IgM测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_8871d4a16de19af13e51daa557357e637445972045036619"
+ },
+ {
+  "title": "SM-SOP-562-罗氏Cobas检测系统电化学发光法血清巨细胞病毒CMV IgG测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b7504e37c67e59fbe5b5a90d6d8cfc6f7445972045036619"
+ },
+ {
+  "title": "SM-SOP-512-安图AutolumoA2000检测系统化学发光法血清戊型肝炎病毒IgG抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b9cb68a600948eee379a3d43dcbc97637445972045036619"
+ },
+ {
+  "title": "SM-SOP-520-安图AutolumoA2000检测系统化学发光法尿液游离皮质醇测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_7dd780eb2e7abc93a7fdd3f6116b8eb87445972045036619"
+ },
+ {
+  "title": "SM-SOP-534-贝克曼DXI800检测系统化学发光法血清血浆叶酸FLOW测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_22d51d724b046f15576171025da270867445972045036619"
+ },
+ {
+  "title": "SM-SOP-183  Stago检测系统发色底物法血浆血管性血友病vWF因子抗原测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_bd29e86ddf06cd432b39d0f9890bf4b07445972045036619"
+ },
+ {
+  "title": "SM-SOP-510-罗氏Cobas检测系统电化学发光法血清甲型肝炎病毒IgM抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_45dc494813f18fb23e80024a352dcb957445972045036619"
+ },
+ {
+  "title": "SM-SOP-508-罗氏Cobas检测系统电化学发光法血清梅毒特异性抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_9de9ec768be182fd98eff0a9fca379a87445972045036619"
+ },
+ {
+  "title": "SM-SOP-541-迈瑞CL-6000i检测系统化学发光法血清胰岛素测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_6ecad05fee75390ab52cfb7c0d97b8107445972045036619"
+ },
+ {
+  "title": "SM-SOP-514-贝克曼DXI800检测系统化学发光法血清血浆降钙素原测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_85cd7ca4bbd5f21ee7696e2a563793d77445972045036619"
+ },
+ {
+  "title": "SM-SOP-155  FUJI FILM DRI-CHEM血氨分析仪终点法全血血氨测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_bc8cfa35ad1c010200e186b36ab711487445972045036619"
+ },
+ {
+  "title": "SM-SOP-169  沃芬ACL TOP Family检测系统凝固法血浆狼疮抗凝物dRVVT测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_50a0e345b9f0197831d44bf57cd128c37445972045036619"
+ },
+ {
+  "title": "SM-SOP-552-迈瑞CL-6000i检测系统化学发光法血清透明质酸HA测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_09cc2e2c2dc0a786e990b8e457dd2bee7445972045036619"
+ },
+ {
+  "title": "SM-SOP-554-迈瑞CL-6000i检测系统化学发光法血清III型前胶原氨基端肽PIIINP测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_5d60b5dd691207b387fcab9b4de667417445972045036619"
+ },
+ {
+  "title": "SM-SOP-539-罗氏Cobas检测系统电化学发光法血清总I型前胶原氨基端延长肽TP1NP测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_2f0a4db74698acd577a39f175987db5f7445972045036619"
+ },
+ {
+  "title": "SM-SOP-166  沃芬ACL TOP Family检测系统免疫比浊法血浆纤维蛋白及纤维蛋白原降解产物测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_de692dc062cca351b37355d8f8e75f7a7445972045036619"
+ },
+ {
+  "title": "SM-SOP-555-迈瑞CL-6000i检测系统化学发光法血清IV型胶原C-IV测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_6e473d3c791866b152271d7c20831a3d7445972045036619"
+ },
+ {
+  "title": "SM-SOP-553-迈瑞CL-6000i检测系统化学发光法血清层粘联蛋白LN测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_741f272397aa5cd6ab26df3be5b8b6257445972045036619"
+ },
+ {
+  "title": "SM-SOP-108  AU5800检测系统乳胶比浊法脂蛋白a测定标准测定程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_d4829e0a14410d62ceb1e2cec9a0191f7445972045036619"
+ },
+ {
+  "title": "SM-SOP-1008-贝克曼IMMAGE800特种蛋白仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b748f383f7e6bf874fcf0061dd8f1b0e7445972045036619"
+ },
+ {
+  "title": "SM-SOP-544-贝克曼DXI800检测系统化学发光法血清血浆肌红蛋白MYO测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_aed9cc4eb7384c7a4c15a087f71625b37445972045036619"
+ },
+ {
+  "title": "SM-SOP-594- AU5800检测系统免疫比浊法血清免疫球蛋白IgG4测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_849b1b7e7c7edd898a470cf501cfdb5a7445972045036619"
+ },
+ {
+  "title": "SM-SOP-127  AU5800检测系统邻苯三酚红钼法尿或脑脊液总蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_eb3b47ef3fdf35d5164da25e64a97a307445972045036619"
+ },
+ {
+  "title": "SM-SOP-531-贝克曼DXI800检测系统化学发光法血清血浆铁蛋白测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_10f26ce6f5073b082cedf5b6f92851447445972045036619"
+ },
+ {
+  "title": "SM-SOP-548-贝克曼DXI800检测系统化学发光法血清甲胎蛋白AFP测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_344e41d6bab999b0e718fe7db09b34307445972045036619"
+ },
+ {
+  "title": "SM-SOP-564-日立HT7600检测系统免疫比浊法尿液α1微球蛋白A1M测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_cb409ca65b879034490b85c6bf7c76d97445972045036619"
+ },
+ {
+  "title": "SM-SOP-545-贝克曼DXI800检测系统化学发光法血清血浆超敏肌钙蛋白I测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_ae3b62b21d431412a60e4cfb888f817d7445972045036619"
+ },
+ {
+  "title": "SM-SOP-578-贝克曼DXI800检测系统化学发光法血清甲状腺球蛋白抗体TgAb测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_c0d5f25b7e115a5dc7192b44a5d0de887445972045036619"
+ },
+ {
+  "title": "SM-SOP-532-贝克曼DXI800检测系统化学发光法血清血浆可溶性转铁蛋白受体sTfR测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_f83b294f543c3d50f637dd43b35577e87445972045036619"
+ },
+ {
+  "title": "SM-SOP-109  AU5800检测系统过氧化氢酶法小而密低密度脂蛋白胆固醇测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_4fda49118826ea407c71ff776f7c49d67445972045036619"
+ },
+ {
+  "title": "SM-SOP-1020-迈瑞CL6000i免疫分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_dc064294b7b25e4ffe0aff175452f1ee7445972045036619"
+ },
+ {
+  "title": "SM-SOP-104  AU5800检测系统盒直接法-过氧化氢酶清除法血清高密度脂蛋白胆固醇测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_dee0b1093353f9e0624c96dd8462e0f97445972045036619"
+ },
+ {
+  "title": "SM-SOP-1020-迈瑞CL6000i免疫分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_f1a1d8efa92ef6a13fab0a2fe826ee367445972045036619"
+ },
+ {
+  "title": "SM-SOP-521-安图AutolumoA2000检测系统化学发光法血浆促肾上腺皮质激素ACTH测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_3ead9460cc89f7ade7d1d8f8a88fb73e7445972045036619"
+ },
+ {
+  "title": "SM-SOP-530-贝克曼DXI800检测系统化学发光法血清促甲状腺激素TSH测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_43b282a4ddab7c7eb801b4055be450197445972045036619"
+ },
+ {
+  "title": "SM-SOP-576-罗氏Cobas检测系统电化学发光法血清促甲状腺激素受体抗体TRAb测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_8fb201945decfc0940718359f9191cbf7445972045036619"
+ },
+ {
+  "title": "SM-SOP-592-贝克曼DXI800检测系统化学发光法血清促红细胞生成素EPO测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_560ce47015ad9d4fa5518550405cf48e7445972045036619"
+ },
+ {
+  "title": "SM-SOP-1014-SPIFE 3000全自动电泳分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_63ce35f3d00c85284cc79be65ab7848d7445972045036619"
+ },
+ {
+  "title": "SM-SOP-1014-SPIFE 3000全自动电泳分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_6c70b3fdae0c009e9807ec27226fbb147445972045036619"
+ },
+ {
+  "title": "SM-SOP-1027-Sebia Hydrasys 2全自动电泳仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_8ca43bc7526f45fb2a3673f45ab4bf917445972045036619"
+ },
+ {
+  "title": "SM-SOP-522-贝克曼DXI800检测系统化学发光法血清总β-人绒毛膜促性腺激素β-HCG测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_e86bf661e578878115cb3ce1d5be8cdd7445972045036619"
+ },
+ {
+  "title": "SM-SOP-1026-Sebia Capillarys 3 OCTA毛细管电泳仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_6cd4aca955b0aa887949ceaa54ae11477445972045036619"
+ },
+ {
+  "title": "SM-SOP-575-贝克曼DXI800检测系统化学发光法血清抗缪勒管激素AMH测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_2c924b4167a3622391384dbf0d47723b7445972045036619"
+ },
+ {
+  "title": "SM-SOP-536-迈瑞CL-6000i检测系统化学发光法血清总25-羟维生素D测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_a6c8931af158c940073c4447cf361ef07445972045036619"
+ },
+ {
+  "title": "SM-SOP-537-贝克曼DXI800检测系统化学发光法血清全段甲状旁腺激素iPTH测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_c72e9b83458053af7c354e40d0dd77457445972045036619"
+ },
+ {
+  "title": "SM-SOP-581-安图AutolumoA2000检测系统化学发光法血清单纯疱疹病毒1型IgM抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_1728c4794a7a3db61045cf104eb779cf7445972045036619"
+ },
+ {
+  "title": "SM-SOP-563-罗氏Cobas检测系统电化学发光法血清巨细胞病毒CMV IgM测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_f25dcd146caf2748c1cafc1105fd6d937445972045036619"
+ },
+ {
+  "title": "SM-SOP-511-安图AutolumoA2000检测系统化学发光法血清戊型肝炎病毒IgM抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_2f1ed38a50a588903a6fe3d3161ceb847445972045036619"
+ },
+ {
+  "title": "SM-SOP-557-罗氏Cobas检测系统电化学发光法血清单纯疱疹病毒2型HSV-2 IgG测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_762ec0c68ebf36c2fced1db366f3398a7445972045036619"
+ },
+ {
+  "title": "SM-SOP-556-罗氏Cobas检测系统电化学发光法血清单纯疱疹病毒1型HSV-1 IgG测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_431479274294ae7cb5a981bbf7e15c977445972045036619"
+ },
+ {
+  "title": "SM-SOP-582-安图AutolumoA2000检测系统化学发光法血清单纯庖疹病毒2型IgM抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_81f2f718ed7d17bbe02e4c39116178867445972045036619"
+ },
+ {
+  "title": "SM-SOP-561-罗氏Cobas检测系统电化学发光法血清风疹病毒Rub IgM测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b1dbd03fbb16634f36c5acf425da2fbd7445972045036619"
+ },
+ {
+  "title": "SM-SOP-558-罗氏Cobas检测系统电化学发光法血清弓形虫Tox IgG测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_bf83b39f7c28c55084f78c3437bca4f07445972045036619"
+ },
+ {
+  "title": "SM-SOP-560-罗氏Cobas检测系统电化学发光法血清风疹病毒Rub IgG测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_1d9865ab3fb8312282def6d5626c19ef7445972045036619"
+ },
+ {
+  "title": "SM-SOP-703-迈瑞CL-6000i检测系统化学发光法血清丙型肝炎病毒抗体定量测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_b6a8654db939241602e882ae7a3512987445972045036619"
+ },
+ {
+  "title": "SM-SOP-506-罗氏Cobas检测系统电化学发光法血清丙型肝炎病毒抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_02a2c8bbc1160db121e13450995bbfec7445972045036619"
+ },
+ {
+  "title": "SM-SOP-585-贝克曼DXI800检测系统化学发光法血清抗精子抗体IgM测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_a78819b5080297e4f31cba14ade1598d7445972045036619"
+ },
+ {
+  "title": "SM-SOP-589-贝克曼DXI800检测系统化学发光法血清抗子宫内膜抗体IgM测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_03c581fcd709888a88eed948868e12187445972045036619"
+ },
+ {
+  "title": "SM-SOP-507-罗氏Cobas检测系统电化学发光法血清人类免疫缺陷病毒测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_f39062eaff29cd3b21c33a8259c826157445972045036619"
+ },
+ {
+  "title": "SM-SOP-701-迈瑞CL-6000i检测系统化学发光法血清人类免疫缺陷病毒测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_da62e201a5a1c52777f73b284df3d5bf7445972045036619"
+ },
+ {
+  "title": "SM-SOP-586-贝克曼DXI800检测系统化学发光法血清抗卵巢抗体IgG测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_568fe40dc2f80c675140071b5b710ac87445972045036619"
+ },
+ {
+  "title": "SM-SOP-584-贝克曼DXI800检测系统化学发光法血清抗精子抗体IgG测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_a9a3a691a3b7249bdb60b3395f2d3c997445972045036619"
+ },
+ {
+  "title": "SM-SOP-588-贝克曼DXI800检测系统化学发光法血清抗子宫内膜抗体IgG测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_62da18d90aca2c36215b77fbb39491097445972045036619"
+ },
+ {
+  "title": "SM-SOP-1022-FUJI DRI-CHEM 100型血氨分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_db39d59a061c497595b822a86694ab0f7445972045036619"
+ },
+ {
+  "title": "SM-SOP-543-贝克曼DXI800检测系统化学发光法血清血浆B型钠尿肽BNP测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_22a6cf56e193cb504a132119421cff917445972045036619"
+ },
+ {
+  "title": "SM-SOP-1022-FUJI DRI-CHEM 100型血氨分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_a95a245b62102828dd50ddef04f400dd7445972045036619"
+ },
+ {
+  "title": "SM-SOP-1007-贝克曼DXI800唐筛化学发光仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_7c60a3fd66a889c0205e9d0534ac65387445972045036619"
+ },
+ {
+  "title": "SM-SOP-1007-贝克曼DXI800唐筛化学发光仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_2fbff46f73724c0e6a58f5dff47d09d27445972045036619"
+ },
+ {
+  "title": "SM-SOP-165  沃芬ACL TOP Family检测系统免疫比浊法血浆D-二聚体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_ce3e41e98d10e4d186e2fcb9c9b947827445972045036619"
+ },
+ {
+  "title": "SM-SOP-126  AU5800检测系统MPT底物法N-乙酰-β-D-氨基葡萄糖苷酶测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_80ed0d9eee223166f24987ec72e35d0a7445972045036619"
+ },
+ {
+  "title": "SM-SOP-574-赛乐迪亚梅毒螺旋体明胶颗粒凝集试验TPPA血清梅毒螺旋体抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_50bec67bb09845a06031968d431cdc097445972045036619"
+ },
+ {
+  "title": "SM-SOP-551-罗氏Cobas检测系统电化学发光法血清游离前列腺特异性抗原FPSA测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_4ba8165e0d88ff56d1676317f3cf4f6f7445972045036619"
+ },
+ {
+  "title": "SM-SOP-550-罗氏Cobas检测系统电化学发光法血清总前列腺特异性抗原TPSA测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_76f3b2296651b0bb991132a37ac7ade17445972045036619"
+ },
+ {
+  "title": "SM-SOP-529-贝克曼DXI800检测系统化学发光法血清游离甲状腺素FT4测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_3bf564bdaf287b477c0e430afa5be7e67445972045036619"
+ },
+ {
+  "title": "SM-SOP-528-贝克曼DXI800检测系统化学发光法血清游离三碘甲状腺原氨酸FT3测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_4f2563b9ac1d1867b078db35ef98972a7445972045036619"
+ },
+ {
+  "title": "SM-SOP-702-迈瑞CL-6000i检测系统化学发光法血清梅毒特异性抗体测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_32ab69a5ba1b4603e2925c28c055dab27445972045036619"
+ },
+ {
+  "title": "SM-SOP-580-迈瑞CL-6000i检测系统化学发光法血清乙肝表面抗原HBsAg定量测定标准操作程序",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_ffbad20555263eaa92b81c9e973016347445972045036619"
+ },
+ {
+  "title": "SM-SOP-1016-罗氏e601免疫分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_a86c6936e0dec0aefba388fd7c63ac647445972045036619"
+ },
+ {
+  "title": "SM-SOP-1016-罗氏e601免疫分析仪操作作业指导书",
+  "media_id": "word_5571f0261bc2f80c97cbc240f18334b0_7e8d1ef5c16602fa75e12c007de5f7d77445972045036619"
+ }
+]

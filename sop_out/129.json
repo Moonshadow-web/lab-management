@@ -1,0 +1,1 @@
+{"pid": 129, "sop_title": "SM-SOP-165  沃芬ACL TOP Family检测系统免疫比浊法血浆D-二聚体测定标准操作程序", "reference_range": "0-0.24mg/L", "reportable_range": "0.15-69mg/L", "unit": "mg/L", "traceability": "未列出", "interference": "血红蛋白<500 mg/dL、胆红素<18 mg/dL、甘油三酯<1327 mg/dL、类风湿因子<1400IU/ml时不受影响；纯化的降解片断D和E浓度高于20 ug/mL时可观察到较低交叉反应", "method": "免疫比浊法 (胶乳)", "instrument": "ACL TOP700单机及ACL TOP700系列流水线"}

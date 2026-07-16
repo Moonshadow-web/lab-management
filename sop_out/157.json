@@ -1,0 +1,11 @@
+{
+  "pid": 157,
+  "sop_title": "SM-SOP-141  AU5800检测系统乳酸底物法乳酸脱氢酶测定标准操作程序",
+  "reference_range": "血：114-240 U/L；胸腹水：0-90 U/L",
+  "reportable_range": "6-8800 U/L",
+  "unit": "U/L",
+  "traceability": "未列出",
+  "interference": "内源性干扰物溶血≤1000mg/ml、脂血≤2000mg/ml、黄疸≤30mg/ml、抗坏血酸≤300mg/ml对测试结果无明显影响。",
+  "method": "乳酸底物法",
+  "instrument": "日立7600全自动生化分析仪；Beckman Coulter AU5800 全自动生化分析仪"
+}

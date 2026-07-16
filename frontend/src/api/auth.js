@@ -12,3 +12,10 @@ export function login(username, password) {
 export function getMe() {
   return request.get('/api/v1/auth/me')
 }
+
+export function changePassword(oldPassword, newPassword) {
+  return request.post('/api/v1/auth/change-password', {
+    old_password: oldPassword,
+    new_password: newPassword,
+  })
+}

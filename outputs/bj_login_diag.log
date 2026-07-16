@@ -1,0 +1,6 @@
+1) goto www passport login
+  [fill] submitted on https://www.clinet.com.cn/passport/login.asp?type=loginform&tpl=login_
+  t+0s url: https://www.clinet.com.cn/ClinetBusiness/login2.asp?u=01110025&url=%2Fclinetbusiness%2Fhos
+  t+4s url: https://www.clinet.com.cn/clinetbusiness/hospital/main1.asp
+LANDED: true final: https://www.clinet.com.cn/clinetbusiness/hospital/main1.asp
+saved auth state

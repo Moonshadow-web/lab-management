@@ -1,0 +1,11 @@
+{
+  "pid": 161,
+  "sop_title": "SM-SOP-155  FUJI FILM DRI-CHEM血氨分析仪终点法全血血氨测定标准操作程序",
+  "reference_range": "<75 ug/dl",
+  "reportable_range": "10-400 ug/dl",
+  "unit": "ug/dl",
+  "traceability": "未列出",
+  "interference": "血红蛋白<10g/L时试纸不受溶血影响；严重溶血、非肝素抗凝、红细胞比容过低、与蛋白质水平成负相关、胆红素>684µmol/L时对结果均产生影响。",
+  "method": "终点法",
+  "instrument": "便携式血氨分析仪（FUJI FILM DRI-CHEM）"
+}

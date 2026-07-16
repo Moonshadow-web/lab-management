@@ -1,0 +1,50 @@
+TOP frame url: https://www.clinet.com.cn/clinetbusiness/hospital/desktop/Downloadreporttop.asp
+TITLE frame url: https://www.clinet.com.cn/clinetbusiness/hospital/desktop/Downloadreporttitle.asp
+TOP len: 3118 snippet: 
+
+<table border="0" cellspacing="0" cellpadding="0" class="inner" bordercolor="#E1E6E1" background="../images/TitleBack.gif">
+  <tbody><tr> 
+    <td nowrap="" valign="middle" height="23" style="padding-right:20px;"><img src="../images/b_Head.gif" width="15" height="17" align="absmiddle">选择临检中心：　 
+      <select id="select" name="select" language="javascript" onchange="return select_onchange()">
+        <option></option>
+		 <option value="4731">北京市临床检验中心</option><option value="7286">贵州省临床检验中心</option>
+      </select> </td>
+    <td nowrap="" height="23" style="padding-right:20px;display:none"><span id="spansort" style="display:none"><img src="../images/b_Head.gif" width="15" height="17" align="absmiddle">排序： 
+      <select style="font-size:9pt" id="sltsort" name="sltsort" language="javascript" onchange="return sltsort_onchange()">
+        <option value="1" selected="">按年、次数排序</option>
+        <option value="2">按年、专业排序</option>
+      </select>
+      </span></td>
+    <td nowrap="" height="23" style="padding-right:20px;display:none"><img src="../images/b_Head.gif" width="15" height="17" align="absmiddle">筛选： 
+      <select style="font-size:9pt" id="sltfilter" name="sltfilter" language="javascript" onchange="return sltfilter_onchange()">
+        <option value="1">全部记录</option>
+        <option value="2" selected="">按年筛选</option>
+        <option value="3">按专业筛选</option>
+      </select></td>
+    <td nowrap="" height="23" style="padding-right:20px;"><span id="spanyear" style="display:bl
+TOP script[0]: 
+TOP script[1]: 
+<!--
+function select_onchange() {
+	var va1=select.options[select.selectedIndex].value;
+	var va2=select.options[select.selectedIndex].text;
+	if(va1!=""){
+		parent.frames["DataArea"].location.href="downloadreporttitle.asp?t_id="+va1+"&cclname="+va2+"&SpecType=";
+		setTimeout(function(){parent.frames[
+TITLE len: 181 snippet: 
+
+<!--aaa-->
+<iframe id="hiddenframe" name="hiddenframe" style="HEIGHT:0px; VISIBILITY: inherit; WIDTH: 0px; Z-INDEX: 2" frameborder="1" src="../keepsession.asp"></iframe> 
+
+
+ 
+
+
+
+
+
+
+--- NETWORK (report/download/admin) ---
+200 https://www.clinet.com.cn/clinetbusiness/hospital/desktop/DataAdminArea1.asp
+200 https://www.clinet.com.cn/clinetbusiness/hospital/desktop/Downloadreporttop.asp
+200 https://www.clinet.com.cn/clinetbusiness/hospital/desktop/Downloadreporttitle.asp

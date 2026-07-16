@@ -1,0 +1,78 @@
+
+> lab-management-frontend@0.1.0 build
+> vite build
+
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+node_modules/@vueuse/core/dist/index.js (3362:0): A comment
+
+"/* #__PURE__ */"
+
+in "node_modules/@vueuse/core/dist/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@vueuse/core/dist/index.js (5780:22): A comment
+
+"/* #__PURE__ */"
+
+in "node_modules/@vueuse/core/dist/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+[32m✓[39m 2143 modules transformed.
+rendering chunks...
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) D:/workbuddyprojects/网页版-生免速查工具/frontend/src/router/index.js is dynamically imported by D:/workbuddyprojects/网页版-生免速查工具/frontend/src/utils/request.js but also statically imported by D:/workbuddyprojects/网页版-生免速查工具/frontend/src/main.js, dynamic import will not move module into another chunk.
+[39m
+computing gzip size...
+[2mdist/[22m[32mindex.html                                    [39m[1m[2m    0.40 kB[22m[1m[22m[2m │ gzip:   0.32 kB[22m
+[2mdist/[22m[35massets/ReagentList-DtQbzhZ_.css               [39m[1m[2m    0.04 kB[22m[1m[22m[2m │ gzip:   0.06 kB[22m
+[2mdist/[22m[35massets/TrainingList-D5o_4Tv9.css              [39m[1m[2m    0.04 kB[22m[1m[22m[2m │ gzip:   0.06 kB[22m
+[2mdist/[22m[35massets/VerificationList-C-hMF0_G.css          [39m[1m[2m    0.04 kB[22m[1m[22m[2m │ gzip:   0.06 kB[22m
+[2mdist/[22m[35massets/NonconformityList-CD5hLme7.css         [39m[1m[2m    0.04 kB[22m[1m[22m[2m │ gzip:   0.06 kB[22m
+[2mdist/[22m[35massets/UserList-CGwcJXuP.css                  [39m[1m[2m    0.09 kB[22m[1m[22m[2m │ gzip:   0.10 kB[22m
+[2mdist/[22m[35massets/ReminderSettings-CSq8LHOF.css          [39m[1m[2m    0.09 kB[22m[1m[22m[2m │ gzip:   0.11 kB[22m
+[2mdist/[22m[35massets/AuditLogList-DzD-TK60.css              [39m[1m[2m    0.21 kB[22m[1m[22m[2m │ gzip:   0.15 kB[22m
+[2mdist/[22m[35massets/Login-DvRfk-on.css                     [39m[1m[2m    0.39 kB[22m[1m[22m[2m │ gzip:   0.25 kB[22m
+[2mdist/[22m[35massets/InstrumentFamilyManage-BRIJP5j6.css    [39m[1m[2m    0.55 kB[22m[1m[22m[2m │ gzip:   0.30 kB[22m
+[2mdist/[22m[35massets/EqaAssociationManage-DCWA7Fmd.css      [39m[1m[2m    0.63 kB[22m[1m[22m[2m │ gzip:   0.32 kB[22m
+[2mdist/[22m[35massets/CrudTable-Cq8nbyGS.css                 [39m[1m[2m    0.65 kB[22m[1m[22m[2m │ gzip:   0.31 kB[22m
+[2mdist/[22m[35massets/Comparison-D4Et2acF.css                [39m[1m[2m    0.71 kB[22m[1m[22m[2m │ gzip:   0.34 kB[22m
+[2mdist/[22m[35massets/InstrumentList-YV7InW1b.css            [39m[1m[2m    0.83 kB[22m[1m[22m[2m │ gzip:   0.37 kB[22m
+[2mdist/[22m[35massets/Dashboard-DHT12kDG.css                 [39m[1m[2m    1.06 kB[22m[1m[22m[2m │ gzip:   0.45 kB[22m
+[2mdist/[22m[35massets/DocumentList-DVBR6P7Y.css              [39m[1m[2m    1.07 kB[22m[1m[22m[2m │ gzip:   0.49 kB[22m
+[2mdist/[22m[35massets/QCList-CaEVcCPk.css                    [39m[1m[2m    6.01 kB[22m[1m[22m[2m │ gzip:   1.41 kB[22m
+[2mdist/[22m[35massets/TestItemList-Bngj8RAG.css              [39m[1m[2m    7.29 kB[22m[1m[22m[2m │ gzip:   1.69 kB[22m
+[2mdist/[22m[35massets/index-6_u4PcF-.css                     [39m[1m[2m  362.09 kB[22m[1m[22m[2m │ gzip:  48.93 kB[22m
+[2mdist/[22m[36massets/_commonjs-dynamic-modules-TDtrdbi3.js  [39m[1m[2m    0.24 kB[22m[1m[22m[2m │ gzip:   0.19 kB[22m
+[2mdist/[22m[36massets/reagents-BnfYfzmP.js                   [39m[1m[2m    0.29 kB[22m[1m[22m[2m │ gzip:   0.18 kB[22m
+[2mdist/[22m[36massets/nonconformity-1xDVQEci.js              [39m[1m[2m    0.32 kB[22m[1m[22m[2m │ gzip:   0.19 kB[22m
+[2mdist/[22m[36massets/training-DGFO-Puy.js                   [39m[1m[2m    0.33 kB[22m[1m[22m[2m │ gzip:   0.19 kB[22m
+[2mdist/[22m[36massets/verification-D1CuGxan.js               [39m[1m[2m    0.34 kB[22m[1m[22m[2m │ gzip:   0.19 kB[22m
+[2mdist/[22m[36massets/notifications-Z_f7iEbb.js              [39m[1m[2m    0.40 kB[22m[1m[22m[2m │ gzip:   0.21 kB[22m
+[2mdist/[22m[36massets/testItems-BJ13qSxI.js                  [39m[1m[2m    0.57 kB[22m[1m[22m[2m │ gzip:   0.27 kB[22m
+[2mdist/[22m[36massets/documents-D1ZKSgj1.js                  [39m[1m[2m    1.30 kB[22m[1m[22m[2m │ gzip:   0.52 kB[22m
+[2mdist/[22m[36massets/qc-4Se-A0-a.js                         [39m[1m[2m    1.31 kB[22m[1m[22m[2m │ gzip:   0.46 kB[22m
+[2mdist/[22m[36massets/eqa-BfJbPf9G.js                        [39m[1m[2m    2.05 kB[22m[1m[22m[2m │ gzip:   0.78 kB[22m
+[2mdist/[22m[36massets/instruments-Bi2YlhAy.js                [39m[1m[2m    2.20 kB[22m[1m[22m[2m │ gzip:   0.60 kB[22m
+[2mdist/[22m[36massets/EditDialog-_1za9TJf.js                 [39m[1m[2m    2.57 kB[22m[1m[22m[2m │ gzip:   1.04 kB[22m
+[2mdist/[22m[36massets/TrainingList-G5gS1NiY.js               [39m[1m[2m    2.58 kB[22m[1m[22m[2m │ gzip:   1.48 kB[22m
+[2mdist/[22m[36massets/VerificationList-CCkSkZGY.js           [39m[1m[2m    2.68 kB[22m[1m[22m[2m │ gzip:   1.54 kB[22m
+[2mdist/[22m[36massets/ReagentList-BtKedwiq.js                [39m[1m[2m    2.69 kB[22m[1m[22m[2m │ gzip:   1.53 kB[22m
+[2mdist/[22m[36massets/NonconformityList-DuMQtphg.js          [39m[1m[2m    2.72 kB[22m[1m[22m[2m │ gzip:   1.56 kB[22m
+[2mdist/[22m[36massets/CrudTable-DaUmRFsO.js                  [39m[1m[2m    3.09 kB[22m[1m[22m[2m │ gzip:   1.57 kB[22m
+[2mdist/[22m[36massets/Login-CwyQ126g.js                      [39m[1m[2m    3.68 kB[22m[1m[22m[2m │ gzip:   1.76 kB[22m
+[2mdist/[22m[36massets/AuditLogList-DrcgaZBG.js               [39m[1m[2m    3.88 kB[22m[1m[22m[2m │ gzip:   1.76 kB[22m
+[2mdist/[22m[36massets/EqaAssociationManage-Dkyymnd-.js       [39m[1m[2m    4.97 kB[22m[1m[22m[2m │ gzip:   2.41 kB[22m
+[2mdist/[22m[36massets/InstrumentFamilyManage-DDd_ROR3.js     [39m[1m[2m    5.32 kB[22m[1m[22m[2m │ gzip:   2.55 kB[22m
+[2mdist/[22m[36massets/Dashboard-BrrymEyn.js                  [39m[1m[2m    5.94 kB[22m[1m[22m[2m │ gzip:   2.57 kB[22m
+[2mdist/[22m[36massets/UserList-ChVWSVtj.js                   [39m[1m[2m   10.75 kB[22m[1m[22m[2m │ gzip:   3.64 kB[22m
+[2mdist/[22m[36massets/ReminderSettings-CLaCz1xN.js           [39m[1m[2m   14.08 kB[22m[1m[22m[2m │ gzip:   4.62 kB[22m
+[2mdist/[22m[36massets/DocumentList-CJipSYui.js               [39m[1m[2m   19.71 kB[22m[1m[22m[2m │ gzip:   6.39 kB[22m
+[2mdist/[22m[36massets/TestItemList-Bkiq3C4J.js               [39m[1m[2m   20.24 kB[22m[1m[22m[2m │ gzip:   7.33 kB[22m
+[2mdist/[22m[36massets/InstrumentList-CmIOJKu6.js             [39m[1m[2m   21.66 kB[22m[1m[22m[2m │ gzip:   7.37 kB[22m
+[2mdist/[22m[36massets/Comparison-CEfYvF9x.js                 [39m[1m[2m   26.99 kB[22m[1m[22m[2m │ gzip:   8.27 kB[22m
+[2mdist/[22m[36massets/index-8hepEsG1.js                      [39m[1m[2m  494.63 kB[22m[1m[22m[2m │ gzip: 129.64 kB[22m
+[2mdist/[22m[36massets/QCList-DkSM1scy.js                     [39m[1m[33m  994.63 kB[39m[22m[2m │ gzip: 290.31 kB[22m
+[2mdist/[22m[36massets/index-CDG07BKQ.js                      [39m[1m[33m1,243.52 kB[39m[22m[2m │ gzip: 403.20 kB[22m
+[33m
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[32m✓ built in 12.57s[39m

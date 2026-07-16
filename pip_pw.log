@@ -1,0 +1,42 @@
+Collecting playwright
+  Downloading playwright-1.61.0-py3-none-win_amd64.whl.metadata (3.3 kB)
+Collecting pyee<14,>=13 (from playwright)
+  Using cached pyee-13.0.1-py3-none-any.whl.metadata (3.0 kB)
+Collecting greenlet<4.0.0,>=3.1.1 (from playwright)
+  Downloading greenlet-3.5.3-cp313-cp313-win_amd64.whl.metadata (3.9 kB)
+Requirement already satisfied: typing-extensions in C:\Users\81526\.workbuddy\binaries\python\versions\3.13.12\Lib\site-packages (from pyee<14,>=13->playwright) (4.16.0)
+Downloading playwright-1.61.0-py3-none-win_amd64.whl (37.8 MB)
+   ---------------------------------------- 37.8/37.8 MB 100.3 kB/s  0:14:44
+Downloading greenlet-3.5.3-cp313-cp313-win_amd64.whl (239 kB)
+Using cached pyee-13.0.1-py3-none-any.whl (15 kB)
+Installing collected packages: pyee, greenlet, playwright
+  WARNING: The script playwright.exe is installed in 'C:\Users\81526\.workbuddy\binaries\python\versions\3.13.12\Scripts' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+
+Successfully installed greenlet-3.5.3 playwright-1.61.0 pyee-13.0.1
+Downloading Chrome for Testing 149.0.7827.55 (playwright chromium v1228)[2m from https://cdn.playwright.dev/builds/cft/149.0.7827.55/win64/chrome-win64.zip[22m
+|                                                                                |   0% of 183.6 MiB
+|■■■■■■■■                                                                        |  10% of 183.6 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 183.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 183.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 183.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 183.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 183.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 183.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 183.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 183.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 183.6 MiB
+Chrome for Testing 149.0.7827.55 (playwright chromium v1228) downloaded to C:\Users\81526\AppData\Local\ms-playwright\chromium-1228
+Downloading Chrome Headless Shell 149.0.7827.55 (playwright chromium-headless-shell v1228)[2m from https://cdn.playwright.dev/builds/cft/149.0.7827.55/win64/chrome-headless-shell-win64.zip[22m
+|                                                                                |   0% of 113.6 MiB
+|■■■■■■■■                                                                        |  10% of 113.6 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 113.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 113.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 113.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 113.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 113.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 113.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 113.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 113.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 113.6 MiB
+Chrome Headless Shell 149.0.7827.55 (playwright chromium-headless-shell v1228) downloaded to C:\Users\81526\AppData\Local\ms-playwright\chromium_headless_shell-1228

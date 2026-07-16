@@ -1,0 +1,27 @@
+goto login page...
+login form found in frame: https://www.clinet.com.cn/passport/login.asp?type=loginform&tpl=login_beijing
+filled user into username
+filled pwd into password
+clicked submit
+after login url: https://www.clinet.com.cn/clinetbusiness/hospital/main1.asp
+saved auth state
+title forms appeared after re-login: false
+FRAMES: [
+  {
+    "n": "",
+    "u": "https://www.clinet.com.cn/clinetbusiness/hospital/desktop/DataAdminArea1.asp"
+  },
+  {
+    "n": "DataTitle",
+    "u": "https://www.clinet.com.cn/clinetbusiness/hospital/desktop/Downloadreporttop.asp"
+  },
+  {
+    "n": "DataArea",
+    "u": "https://www.clinet.com.cn/clinetbusiness/hospital/desktop/Downloadreporttitle.asp"
+  },
+  {
+    "n": "hiddenframe",
+    "u": "https://www.clinet.com.cn/clinetbusiness/hospital/keepsession.asp"
+  }
+]
+EXIT=0

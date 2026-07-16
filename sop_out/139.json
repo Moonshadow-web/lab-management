@@ -1,0 +1,11 @@
+{
+  "pid": 139,
+  "sop_title": "SM-SOP-133  AU5800检测系统离子选择电极法血清钠离子测定标准操作程序",
+  "reference_range": "血清钠 136.0-145.0mmol/L；尿钠 130-260mmol/24h",
+  "reportable_range": "血钠 95-210mmol/L；尿钠 5.0-330mmol/L",
+  "unit": "mmol/L",
+  "traceability": "校准品：美国贝克曼公司多点定标液(贝克曼公司)",
+  "interference": "严重溶血使血清钠结果降低；全血样本也可应用某些分析仪器",
+  "method": "离子选择电极法",
+  "instrument": "日立HT7600全自动生化分析仪、Beckman Coulter5800全自动生化分析仪"
+}

@@ -1,0 +1,11 @@
+{
+  "pid": 140,
+  "sop_title": "SM-SOP-132  AU5800检测系统离子选择电极法钾离子测定标准操作程序",
+  "reference_range": "血清钾 3.5-5.3mmol/L；尿钾 25-100mmol/24h",
+  "reportable_range": "血钾 0.7-16mmol/L；尿钾 1-330mmol/L",
+  "unit": "mmol/L",
+  "traceability": "校准品：美国贝克曼公司多点定标液(贝克曼公司)",
+  "interference": "溶血使血清钾升高；止血带扎紧/握拳使钾释放进血浆；血清钾较血浆钾高0.1-0.5mmol/L",
+  "method": "离子选择电极法",
+  "instrument": "日立HT7600全自动生化分析仪、Beckman Coulter5800全自动生化分析仪"
+}

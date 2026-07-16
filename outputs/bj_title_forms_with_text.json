@@ -1,0 +1,107 @@
+[
+  {
+    "spec": "95",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_95.asp",
+    "prevText": "2026年EB病毒核酸检测第2次质评上报表",
+    "parentText": "◆\n\t2026年EB病毒核酸检测第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "E7",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_E7.asp",
+    "prevText": "2026年白细胞介素6第2次质评上报表",
+    "parentText": "◆\n\t2026年白细胞介素6第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "21",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_21.asp",
+    "prevText": "2026年肝炎标志物第2次质评上报表",
+    "parentText": "◆\n\t2026年肝炎标志物第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "88",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_88.asp",
+    "prevText": "2026年感染性疾病抗原抗体快速检测(POCT)第2次质评上报表",
+    "parentText": "◆\n\t2026年感染性疾病抗原抗体快速检测(POCT)第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "86",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_86.asp",
+    "prevText": "2026年感染性疾病血清学标志物系列B第2次质评上报表",
+    "parentText": "◆\n\t2026年感染性疾病血清学标志物系列B第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "87",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_87.asp",
+    "prevText": "2026年感染性疾病血清学标志物系列C第2次质评上报表",
+    "parentText": "◆\n\t2026年感染性疾病血清学标志物系列C第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "20",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_20.asp",
+    "prevText": "2026年核酸检测（病毒学）（PCR-Virology）第2次质评上报表",
+    "parentText": "◆\n\t2026年核酸检测（病毒学）（PCR-Virology）第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "28",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_28.asp",
+    "prevText": "2026年核酸检测（非病毒）（PCR-TB,CT,NG）第2次质评上报表",
+    "parentText": "◆\n\t2026年核酸检测（非病毒）（PCR-TB,CT,NG）第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "B0",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_B0.asp",
+    "prevText": "2026年巨细胞病毒核酸检测（CMV DNA）第2次质评上报表",
+    "parentText": "◆\n\t2026年巨细胞病毒核酸检测（CMV DNA）第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "30",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_30.asp",
+    "prevText": "2026年临床微生物学第2次质评上报表",
+    "parentText": "◆\n\t2026年临床微生物学第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "12",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_12.asp",
+    "prevText": "2026年尿液化学分析第2次质评上报表",
+    "parentText": "◆\n\t2026年尿液化学分析第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "11",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_11.asp",
+    "prevText": "2026年凝血试验第2次质评上报表",
+    "parentText": "◆\n\t2026年凝血试验第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "D2",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_D2.asp",
+    "prevText": "2026年新型冠状病毒核酸检测第2次质评上报表",
+    "parentText": "◆\n\t2026年新型冠状病毒核酸检测第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "D3",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_D3.asp",
+    "prevText": "2026年中孕期母血清产前筛查第2次质评上报表",
+    "parentText": "◆\n\t2026年中孕期母血清产前筛查第2次质评上报表",
+    "buttonText": ""
+  },
+  {
+    "spec": "05",
+    "action": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_05.asp",
+    "prevText": "2026年肿瘤标志物第2次质评上报表",
+    "parentText": "◆\n\t2026年肿瘤标志物第2次质评上报表",
+    "buttonText": ""
+  }
+]

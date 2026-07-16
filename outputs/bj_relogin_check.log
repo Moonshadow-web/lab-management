@@ -1,0 +1,17 @@
+1) goto login
+login frame: https://www.clinet.com.cn/passport/login.asp?type=loginform&tpl=login_beijing
+user-> username
+pwd-> password
+clicked login
+after login url: https://www.clinet.com.cn/clinetbusiness/hospital/main1.asp
+www cookies after login: [
+  '%5FCLINETFORMS',
+  '%5FCLINETFORMS',
+  'ASPSESSIONIDQESTQDAQ',
+  'ASPSESSIONIDCETQQACS'
+]
+2) goto DataAdminArea1
+TITLE bodyLen: 181
+FORM COUNT after fresh re-login: 0
+FORMS: []
+saved fresh auth state

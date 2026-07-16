@@ -5,6 +5,8 @@
       :columns="columns"
       :fetch="fetch"
       search-placeholder="搜索项目 / 类型 / 仪器 / 操作者..."
+      :show-add="auth.canWrite('verification')"
+      :can-write="auth.canWrite('verification')"
       @add="onAdd"
       @edit="onEdit"
       @delete="onDelete"
@@ -27,8 +29,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../components/CrudTable.vue'
 import EditDialog from '../../components/EditDialog.vue'
 import { listVerification, createVerification, updateVerification, deleteVerification } from '../../api/verification'
+import { useAuthStore } from '../../store/auth'
 
 const crud = ref(null)
+const auth = useAuthStore()
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const submitting = ref(false)

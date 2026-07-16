@@ -10,4 +10,5 @@ router = make_router(
     search_fields=["test_item", "level", "lot_no", "instrument", "operator", "rule_violated"],
     filter_fields=["status", "instrument", "level"],
     prefix="/qc-records",
+    write_roles=("admin", "qc_manager"),
 )

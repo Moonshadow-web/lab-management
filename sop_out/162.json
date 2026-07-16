@@ -1,0 +1,11 @@
+{
+  "pid": 162,
+  "sop_title": "SM-SOP-173  日立7600检测系统均相酶免疫法尿液17-羟类固醇（17-OH）测定操作标准程序",
+  "reference_range": "男：2.0~10.0 mg/24h；女：2.0~8.0 mg/24h",
+  "reportable_range": "1.0-400.0 mg/L",
+  "unit": "mg/24h",
+  "traceability": "17-羟类固醇校准品可溯源至西格玛奥德里奇公司（Sigma-Aldrich）的17-羟类固醇超纯物质。",
+  "interference": "胆红素≤50mg/L、血红蛋白≤1000mg/L、白蛋白≤100g/L、抗坏血酸≤176 mg/dL 对测定结果无影响。",
+  "method": "均相酶免疫法",
+  "instrument": "日立7600全自动生化分析仪"
+}

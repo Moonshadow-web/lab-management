@@ -1,0 +1,11 @@
+{
+  "pid": 147,
+  "sop_title": "SM-SOP-136  AU5800检测系统酶法血清尿液镁测定标准操作程序",
+  "reference_range": "血清：0.75-1.02 mmol/L",
+  "reportable_range": "0.2-8.20 mmol/L",
+  "unit": "mmol/L",
+  "traceability": "校准品溯源至国家标准品360018",
+  "interference": "甘油三酯≤22.6 mmol/L、总胆红素≤684μmol/L、血红蛋白≤5g/L、维生素C≤0.4g/L无显著干扰",
+  "method": "染料法（Calmagite法）",
+  "instrument": "Beckman Coulter AU5800 全自动生化分析仪"
+}

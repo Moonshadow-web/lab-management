@@ -1,0 +1,184 @@
+[
+  {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/main1.asp",
+    "links": []
+  },
+  {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/navi.asp",
+    "links": [
+      {
+        "txt": "留言信箱",
+        "href": "javascript:frameNavigate('/message/lab_index.asp','top1.asp?pagetitle=消息中心')"
+      },
+      {
+        "txt": "质评活动",
+        "href": "#"
+      },
+      {
+        "txt": "室间质评申请",
+        "href": "javascript:frameNavigate('desktop/DataAdminArea6.asp','top.asp?pagetitle=室间质评申请')"
+      },
+      {
+        "txt": "医疗机构绩效考核",
+        "href": "javascript:open_jx2();"
+      },
+      {
+        "txt": "发票下载（北京）",
+        "href": "javascript:frameNavigate('https://a.clinet.com.cn/fapiao/download.aspx?labindex=01110025&cclindex=4731','top.a"
+      },
+      {
+        "txt": "质控品订购",
+        "href": "#"
+      },
+      {
+        "txt": "增加订单",
+        "href": "javascript:frameNavigate('desktop/DataAdminArea_zhikongpin_add.asp','top.asp?pagetitle=增加订单')"
+      },
+      {
+        "txt": "订单列表",
+        "href": "javascript:frameNavigate('desktop/DataAdminArea_zhikongpin_list.asp','top.asp?pagetitle=订单列表')"
+      },
+      {
+        "txt": "室间质评",
+        "href": "#"
+      },
+      {
+        "txt": "质评试验上报",
+        "href": "javascript:frameNavigate('desktop/DataAdminArea1.asp','top.asp?pagetitle=质评试验上报')"
+      },
+      {
+        "txt": "已上报数据",
+        "href": "javascript:frameNavigate('desktop/DataAdminArea2.asp','top.asp?pagetitle=已上报数据')"
+      },
+      {
+        "txt": "质评成绩回报(pdf)",
+        "href": "javascript:frameNavigate('desktop/DataAdminArea4.asp','top.asp?pagetitle=质评成绩回报(pdf)')"
+      },
+      {
+        "txt": "室间质评证书(pdf)",
+        "href": "javascript:frameNavigate('desktop/dataadminarea_zhengshu.asp','top.asp?pagetitle=室间质评证书(pdf)');"
+      },
+      {
+        "txt": "北京市2025年度能力验证计划满意度调查表",
+        "href": "http://corelab.clinet.com.cn/BcclMYD/Report/ReportData.aspx?year=2025"
+      },
+      {
+        "txt": "各省参考区间",
+        "href": "#"
+      },
+      {
+        "txt": "质评试验上报",
+        "href": "javascript:frameNavigate('desktop/DataAdminArea_quanguo.asp','top.asp?pagetitle=质评试验上报')"
+      },
+      {
+        "txt": "已上报数据",
+        "href": "javascript:frameNavigate('desktop/DataAdminArea2_quanguo.asp','top.asp?pagetitle=已上报数据')"
+      },
+      {
+        "txt": "质评成绩回报(pdf)",
+        "href": "javascript:frameNavigate('desktop/DataAdminArea4_quanguo.asp','top.asp?pagetitle=质评成绩回报(pdf)')"
+      },
+      {
+        "txt": "系统管理",
+        "href": "#"
+      },
+      {
+        "txt": "成员管理",
+        "href": "javascript:frameNavigate('membermanage.asp','top.asp?pagetitle=成员管理')"
+      },
+      {
+        "txt": "个人信息管理",
+        "href": "javascript:frameNavigate('personinfomanage.asp','top.asp?pagetitle=个人信息管理')"
+      },
+      {
+        "txt": "临检中心数据分析",
+        "href": "#"
+      },
+      {
+        "txt": "原始数据统计",
+        "href": "javascript:frameNavigate('desktop/StatisticAll.asp','top.asp?pagetitle=原始数据统计')"
+      },
+      {
+        "txt": "按方法统计",
+        "href": "javascript:frameNavigate('desktop/StatisticMethod.asp','top.asp?pagetitle=按方法统计')"
+      },
+      {
+        "txt": "按仪器统计",
+        "href": "javascript:frameNavigate('desktop/StatisticInstrument.asp','top.asp?pagetitle=按仪器统计')"
+      },
+      {
+        "txt": "按试剂统计",
+        "href": "javascript:frameNavigate('desktop/StatisticReagent.asp','top.asp?pagetitle=按试剂统计')"
+      },
+      {
+        "txt": "按校准物统计",
+        "href": "javascript:frameNavigate('desktop/StatisticXz.asp','top.asp?pagetitle=按校准物统计')"
+      },
+      {
+        "txt": "分组统计",
+        "href": "javascript:frameNavigate('desktop/StatisticGroup.asp','top.asp?pagetitle=分组统计')"
+      },
+      {
+        "txt": "PT及格率",
+        "href": "javascript:frameNavigate('desktop/StatisticPT.asp','top.asp?pagetitle=PT及格率')"
+      },
+      {
+        "txt": "",
+        "href": "#"
+      },
+      {
+        "txt": "临检中心公告栏",
+        "href": "javascript:frameNavigate('index.asp','top.asp?pagetitle=临检中心公告栏')"
+      },
+      {
+        "txt": "",
+        "href": "#"
+      },
+      {
+        "txt": "能力验证报告",
+        "href": "javascript:frameNavigate('desktop/DataAdminArea8.asp','top.asp?pagetitle=能力验证报告');"
+      },
+      {
+        "txt": "",
+        "href": "#"
+      },
+      {
+        "txt": "标准化的西格玛性能验证图",
+        "href": "https://a.clinet.com.cn/SigmaPV/Index.aspx"
+      }
+    ]
+  },
+  {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/welcome1.asp",
+    "links": []
+  },
+  {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/Top1.asp",
+    "links": []
+  },
+  {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/index.asp",
+    "links": [
+      {
+        "txt": "",
+        "href": "../../lab/eqaexplain1.htm"
+      }
+    ]
+  },
+  {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/keepsession.asp",
+    "links": []
+  },
+  {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/indexiframe0.asp",
+    "links": []
+  },
+  {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/indexiframe1.asp",
+    "links": []
+  },
+  {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/indexiframe2.asp",
+    "links": []
+  }
+]

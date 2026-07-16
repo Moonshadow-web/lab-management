@@ -1,0 +1,42 @@
+{
+  "spec21": {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_21.asp",
+    "title": "500 - 内部服务器错误。",
+    "statusText": "",
+    "testdate": "",
+    "director": "",
+    "rows": [],
+    "selects": [],
+    "inputs": []
+  },
+  "spec86": {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_86.asp",
+    "title": "500 - 内部服务器错误。",
+    "statusText": "",
+    "testdate": "",
+    "director": "",
+    "rows": [],
+    "selects": [],
+    "inputs": []
+  },
+  "spec87": {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_87.asp",
+    "title": "500 - 内部服务器错误。",
+    "statusText": "",
+    "testdate": "",
+    "director": "",
+    "rows": [],
+    "selects": [],
+    "inputs": []
+  },
+  "spec88": {
+    "url": "https://www.clinet.com.cn/clinetbusiness/hospital/data/clinet_beijing/PTDownloadReport/Report_2026_2_88.asp",
+    "title": "500 - 内部服务器错误。",
+    "statusText": "",
+    "testdate": "",
+    "director": "",
+    "rows": [],
+    "selects": [],
+    "inputs": []
+  }
+}

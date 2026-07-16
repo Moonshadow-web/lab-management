@@ -1,0 +1,11 @@
+{
+  "pid": 137,
+  "sop_title": "SM-SOP-182  Stago检测系统发色底物法血浆抗Xa活性测定标准操作程序",
+  "reference_range": "正常人血浆无肝素（<0.10IU/mL）",
+  "reportable_range": "0.10-1.10IU/mL（普通肝素）；0.10-2.00IU/mL（低分子肝素）",
+  "unit": "IU/mL",
+  "traceability": "未列出",
+  "interference": "UFH和LMWH检测：血红蛋白(≤1.5g/L)、结合胆红素(≤288mg/L/342 μmol/L)、游离胆红素(≤138 mg/L/236 μmol/L)、甘油三酯(≤6.9g/L)不造成干扰",
+  "method": "发色底物法",
+  "instrument": "Stago CompactMax凝血分析仪"
+}

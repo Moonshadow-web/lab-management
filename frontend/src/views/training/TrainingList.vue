@@ -5,6 +5,8 @@
       :columns="columns"
       :fetch="fetch"
       search-placeholder="搜索人员 / 主题 / 组织方..."
+      :show-add="auth.canWrite('training')"
+      :can-write="auth.canWrite('training')"
       @add="onAdd"
       @edit="onEdit"
       @delete="onDelete"
@@ -27,8 +29,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../components/CrudTable.vue'
 import EditDialog from '../../components/EditDialog.vue'
 import { listTraining, createTraining, updateTraining, deleteTraining } from '../../api/training'
+import { useAuthStore } from '../../store/auth'
 
 const crud = ref(null)
+const auth = useAuthStore()
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const submitting = ref(false)

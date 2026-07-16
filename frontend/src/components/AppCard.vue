@@ -25,4 +25,11 @@ defineProps({
 .app-card-title {
   font-weight: 600;
 }
+@media (max-width: 768px) {
+  .app-card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+}
 </style>

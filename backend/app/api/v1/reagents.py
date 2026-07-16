@@ -10,4 +10,5 @@ router = make_router(
     search_fields=["name", "brand", "spec", "lot_no", "supplier", "operator"],
     filter_fields=["status", "brand"],
     prefix="/reagents",
+    write_roles=("admin", "reagent_manager"),
 )

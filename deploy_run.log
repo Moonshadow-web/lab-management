@@ -1,0 +1,11 @@
+CloudBase CLI 3.6.2
+Try the tcb ai command to start your AI full-stack development experience
+- Loading data...
+i Current Environment ID: cloud1-0gjhamv53ff2298d
+? Enable gray deployment? (Use arrow keys)
+> No (automatically switch traffic to new version after successful release) 
+  Yes (manually switch traffic to new version after successful release) [72D[72C[2K[1A[2K[1A[2K[G? Enable gray deployment? No (automatically switch traffic to new version after 
+successful release)[1A[19D[99C
+[1Bi Submitting Container-based cloud hosting lab-management, please wait...
+i Container-based cloud hosting lab-management submission completed!
+i Please open the link to view deployment status: https://tcb.cloud.tencent.com/dev?envId=cloud1-0gjhamv53ff2298d#/platform-run/service/detail?serverName=lab-management&tabId=deploy&envId=cloud1-0gjhamv53ff2298d

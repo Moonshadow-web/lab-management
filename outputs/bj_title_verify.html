@@ -1,0 +1,897 @@
+<html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=gb2312">
+<style type="text/css">
+fieldset{ margin-left:0; padding:0}
+</style>
+<script type="text/javascript" src="../../jsfile/jquery.1.9.1.min.js"></script>
+<script language="JavaScript">
+<!--
+	/*function hidden_zt(sel){
+	var aa=eval(sel);
+	aa.submit();
+	}*/
+	
+	function hidden_zt(sel)
+	{
+	   var aa=eval(sel);
+	   var speciality=$(aa).find("input[name=speciality]").val();
+	   var year=$(aa).find("input[name=year]").val();
+	   var times=$(aa).find("input[name=times]").val();
+	   var action=$(aa).attr("action").toLowerCase();
+	   var jsccl=action.indexOf("clinet_jiangsu")!=-1?true:false;
+	   var henan=action.indexOf("clinet_henan")!=-1?true:false;
+	   var shandong=action.indexOf("clinet_shandong")!=-1?true:false;
+	   var zhejiang=action.indexOf("clinet_zhejiang")!=-1?true:false;
+	   var shan3xi=action.indexOf("clinet_shan3xi")!=-1?true:false;
+	   var guizhou=action.indexOf("clinet_guizhou")!=-1?true:false;
+	   var anhui=action.indexOf("clinet_anhui")!=-1?true:false;
+	   var xinjiang_bt=action.indexOf("clinet_xinjiang_bt")!=-1?true:false;
+	   var xinjiang= !xinjiang_bt && action.indexOf("clinet_xinjiang")!=-1?true:false;
+	   var gzb=false;
+	   
+	   
+	   
+	   //if(((henan && (speciality=="01" || speciality=="10" || speciality=="21")) || guizhou && speciality!="76" || jsccl && times=="1" || anhui) && !(speciality=="B8" || speciality=="C1" || speciality=="C2" || speciality=="C3" || speciality=="T1" || speciality=="T2" || speciality=="T3"))
+	   if((guizhou && year=="2025_" || jsccl && year=="2026" && times=="1" || anhui || shandong && year=="2025_") && !(speciality=="P8" || speciality=="C1" || speciality=="C2" || speciality=="C3" || speciality=="T1" || speciality=="T2" || speciality=="T3"))
+	   {
+	       var times_B8="1";
+		   if(times=="2" || times=="3")
+		   {
+		      times_B8="2";
+		   }
+		   
+		   $.ajax({"url":"../app/index.asp","async":false,"cache":false,"data":{"type":"IsLabHasReport","speciality":"P8","years":year,"stimes":"0"},
+			   "success":function(str)
+			   {
+				   if(str=="yes")
+				   {
+				      
+					  if(guizhou)
+					  {
+					     if(speciality=="01" && year=="2019" && times=="2")
+						 {
+						    $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReportGzLabinfo","years":year},
+								   "success":function(str)
+								   {
+									   if(str=="yes")
+									   {
+										  aa.submit();
+									   }
+									   else if(str=="NotReport")
+									   {
+										  alert("请先上报实验室基本信息调查表");
+									   }
+								   },
+								   "error":function(str)
+								   {
+									  alert("与服务器通信失败，请重试或者联系我们。");
+								   }
+							   });
+						 }
+						 else
+						 {
+						    aa.submit();
+						 }
+					  }
+					  else
+					  {
+					    aa.submit();
+					  }
+					  
+					  
+				   }
+				   else if(str=="NotReport")
+				   {
+					  alert("请先上报"+year+"年已经下发且未上报的临床检验医疗质量控制指标室间质量评价");
+				   }
+			   },
+			   "error":function(str)
+			   {
+				  alert("与服务器通信失败，请重试或者联系我们。");
+			   }
+		   });
+	   }
+	   else if(jsccl && year=="2020" && times=="2" && (speciality!="B8" && speciality!="C1" && speciality!="C2" && speciality!="C3" && speciality!="T1" && speciality!="T2" && speciality!="T3"))
+	   {
+	     //console.log(speciality!="B8" || speciality!="C1" || speciality!="C2" || speciality!="C3" || speciality!="T1" || speciality!="T2" || speciality!="T3");
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasApply","years":"2021"},
+		 "context":aa,"success":fapp,"error":fe});
+	   }
+	   else if(jsccl && year=="2021" && times=="2" && (speciality!="B8" && speciality!="C1" && speciality!="C2" && speciality!="C3" && speciality!="T1" && speciality!="T2" && speciality!="T3"))
+	   {
+	     //console.log(speciality!="B8" || speciality!="C1" || speciality!="C2" || speciality!="C3" || speciality!="T1" || speciality!="T2" || speciality!="T3");
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasApply","years":"2022"},
+		 "context":aa,"success":fapp,"error":fe});
+	   }
+	   else if(jsccl && year=="2023" && times=="2" && (speciality!="B8" && speciality!="P8" &&  speciality!="C1" && speciality!="C2" && speciality!="C3" && speciality!="T1" && speciality!="T2" && speciality!="T3"))
+	   {
+	     //console.log(speciality!="B8" || speciality!="C1" || speciality!="C2" || speciality!="C3" || speciality!="T1" || speciality!="T2" || speciality!="T3");
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasApply","years":"2024"},
+		 "context":aa,"success":fapp,"error":fe});
+	   }
+	   else if(jsccl && year=="2024" && times=="2" && (speciality!="B8" && speciality!="P8" &&  speciality!="C1" && speciality!="C2" && speciality!="C3" && speciality!="T1" && speciality!="T2" && speciality!="T3"))
+	   {
+	     //console.log(speciality!="B8" || speciality!="C1" || speciality!="C2" || speciality!="C3" || speciality!="T1" || speciality!="T2" || speciality!="T3");
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasApply","years":"2025"},
+		 "context":aa,"success":fapp,"error":fe});
+	   }
+	   else if(jsccl && year=="2025" && times=="2" && (speciality!="B8" && speciality!="P8" &&  speciality!="C1" && speciality!="C2" && speciality!="C3" && speciality!="T1" && speciality!="T2" && speciality!="T3"))
+	   {
+	     //console.log(speciality!="B8" || speciality!="C1" || speciality!="C2" || speciality!="C3" || speciality!="T1" || speciality!="T2" || speciality!="T3");
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasApply","years":"2026"},
+		 "context":aa,"success":fapp,"error":fe});
+	   }
+	   else if(shan3xi && year=="2024" && speciality!="P8")
+	   {
+	     
+		 $.ajax({"url":"../app/index.asp","async":false,"cache":false,"data":{"type":"IsLabHasReportWenjuan","years":year,"wno":"03"},
+			   "success":function(str)
+			   {
+				   if(str=="yes")
+				   {
+					  aa.submit();
+				   }
+				   else if(str=="NotReport")
+				   {
+					  alert("请先上报《陕西省临床实验室质控品使用情况调查问卷》");
+				   }
+			   },
+			   "error":function(str)
+			   {
+				  alert("与服务器通信失败，请重试或者联系我们。");
+			   }
+		   });
+	   }
+	   else if(guizhou && year=="2025" && speciality=="10" && times=="2" && $.trim($("#is_guizhou_wj_ptlab").val())=="true")
+	   {
+	     
+		 $.ajax({"url":"../app/index.asp","async":false,"cache":false,"data":{"type":"IsLabHasReportWenjuan","years":year,"wno":"01"},
+			   "success":function(str)
+			   {
+				   if(str=="yes")
+				   {
+					  aa.submit();
+				   }
+				   else if(str=="NotReport")
+				   {
+					  alert("请先上报《2025贵州省临床检验中心开展室间质评项目数》");
+				   }
+			   },
+			   "error":function(str)
+			   {
+				  alert("与服务器通信失败，请重试或者联系我们。");
+			   }
+		   });
+	   }
+	   else
+	   {
+	       aa.submit();
+	   }
+	   
+	   
+	   
+	   
+	   /*if(guizhou && gzb && speciality=="01" && year=="2019" && times=="2")
+	   {
+	       $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReportGzLabinfo","years":year},
+			   "success":function(str)
+			   {
+				   if(str=="yes")
+				   {
+				      aa.submit();
+				   }
+				   else if(str=="NotReport")
+				   {
+					  alert("请先上报实验室基本信息调查表");
+				   }
+			   },
+			   "error":function(str)
+			   {
+				  alert("与服务器通信失败，请重试或者联系我们。");
+			   }
+		   });
+	   }*/
+	   
+	   /*
+	   if(jsccl && year=="2017" && times=="2" && (speciality!="B8" && speciality!="C1" && speciality!="C2" && speciality!="C3" && speciality!="T1" && speciality!="T2" && speciality!="T3"))
+	   {
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReportEqaAndApplyEqa"},
+		 "context":aa,"success":fs,"error":fe});
+	   }
+	   else if(jsccl && year=="2018" && times=="2" && (speciality!="B8" && speciality!="C1" && speciality!="C2" && speciality!="C3" && speciality!="T1" && speciality!="T2" && speciality!="T3"))
+	   {
+	     //console.log(speciality!="B8" || speciality!="C1" || speciality!="C2" || speciality!="C3" || speciality!="T1" || speciality!="T2" || speciality!="T3");
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasApply","years":"2019"},
+		 "context":aa,"success":fapp,"error":fe});
+	   }
+	   else if(jsccl && year=="2017" && times=="2" && speciality!="B8")
+	   {
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReport","speciality":"B8","years":year,"stimes":times},
+		 "context":aa,"success":f_b8,"error":fe});
+	   }
+	   else if(jsccl && year=="2018" && times=="10" && speciality!="B8")
+	   {
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReport","speciality":"B8","years":year,"stimes":times},
+		 "context":aa,"success":f_b8_1,"error":fe});
+	   }
+	   else if(jsccl && year=="2016" && times=="1" && speciality!="B8")
+	   {
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReport","speciality":"B8","years":year,"stimes":times},
+		 "context":aa,"success":fs,"error":fe});
+	   }
+	   else if(henan && year=="2016" && times=="1" && speciality=="01")
+	   {
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReport","speciality":"B8","years":year,"stimes":times},
+		 "context":aa,"success":fs,"error":fe});
+	   }
+	   else if(henan && year=="2018" && times=="3" && speciality=="01")
+	   {
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReport","speciality":"B8","years":2018,"stimes":2},
+		 "context":aa,"success":f_b8,"error":fe});
+	   }
+	   else if(anhui && year=="2019" && times=="1" && speciality!="B8")
+	   {
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReport","speciality":"B8","years":2019,"stimes":1},
+		 "context":aa,"success":f_b8_1,"error":fe});
+	   }
+	   else if(zhejiang && year=="2013" && times=="1" && speciality!="B8")
+	   {
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReport","speciality":"B8","years":year,"stimes":times},
+		 "context":aa,"success":f_b8,"error":fe});
+	   }
+	   else if(henan && year=="2017" && times=="3" && speciality=="01")
+	   {
+	     $.ajax({"url":"../app/index.asp","cache":false,"data":{"type":"IsLabHasReport","speciality":"B8","years":year,"stimes":2},
+		 "context":aa,"success":f_b8,"error":fe});
+	   }
+	   else if(guizhou && year=="2017" && times=="1" && speciality=="10")
+	   {
+	        var diaocha_id="27";
+	        var result=$.ajax({"url":"../app/labinfocoll/index.asp","cache":false,"data":{"diaocha":diaocha_id},"async":false}).responseText;
+			if(result=="yes")
+			{
+			   aa.submit();
+			}
+		    else
+		    {
+			 if(diaocha_id=="27")
+			 {
+			   alert("请先上报贵州省检验结果互认实验室信息调查表");
+			 }
+			 
+		    }
+	   }
+	   else
+	   {
+	     aa.submit();
+	   }
+	   */
+	   
+	}
+	
+	function fs(str)
+	{
+	   if(str=="yes")
+	   {
+	      this.submit();
+	   }
+	   else if(str=="NotApply")
+	   {
+	           alert("请点击【质评活动】->【室间质评申请】，申请2018年的临床检验室间质量评价，才能报第2次的结果");
+	   }
+	   else if(str=="NotReport")
+	   {
+	           alert("请先上报"+$(this).find("input[name=year]").val()+"年临床检验医疗质量控制指标，危急值，TAT质评报表");
+	   }
+	}
+	
+	function f_b8(str)
+	{
+	   if(str=="yes")
+	   {
+	      this.submit();
+	   }
+	   else if(str=="NotReport")
+	   {
+	           alert("请先上报"+$(this).find("input[name=year]").val()+"年第2次临床检验医疗质量控制指标室间质量评价");
+	   }
+	}
+	function f_b8_1(str)
+	{
+	   if(str=="yes")
+	   {
+	      this.submit();
+	   }
+	   else if(str=="NotReport")
+	   {
+	           alert("请先上报"+$(this).find("input[name=year]").val()+"年第1次临床检验医疗质量控制指标室间质量评价");
+	   }
+	}
+	function f_ct(str)
+	{
+	   if(str=="yes")
+	   {
+	      this.submit();
+	   }
+	   else if(str=="NotReport")
+	   {
+	           alert("请先上报危急值和TAT质评上报表");
+	   }
+	}
+	
+	function fapp(str)
+	{
+	   if(str=="yes")
+	   {
+	      this.submit();
+	   }
+	   else if(str=="NotApply")
+	   {
+	           alert("请点击【质评活动】->【室间质评申请】，申请"+(parseInt($(this).find("input[name=year]").val())+1)+"年的临床检验室间质量评价，才能报第"+$(this).find("input[name=times]").val()+"次的结果");
+	   }
+	   
+	}
+	
+	function fe(str)
+	{
+	   alert("与服务器通信失败【调查表】，请重试或者联系我们。");
+	}
+	
+//-->
+</script>
+</head>
+<body topmargin="0" leftmargin="0">
+
+<fieldset style="BACKGROUND: buttonface;width:600">
+<table cellspacing="0" border="0" cellpadding="0" width="600" style="font-size:9pt">
+<tbody><tr nowrap="">
+    <td style="width:455">项目名称</td>
+    <td>上报情况</td>
+</tr>
+</tbody></table>
+</fieldset><br>
+
+
+<table bgcolor="silver" border="0" cellpadding="0" cellspacing="0" width="602" style="font-size:9pt">
+
+	
+    <tbody><tr bgcolor="#ffffff">
+    
+	
+    <td style="width:455" height="20"><font color="#000099">◆</font>
+	<span onclick="hidden_zt('myforum0')" style="cursor:pointer"><font color="#0000ff" style="text-decoration: underline;">2026年EB病毒核酸检测第2次质评上报表</font></span>
+    <form action="../data/clinet_beijing/PTDownloadReport/Report_2026_2_95.asp" method="post" name="myforum0" id="myforum0" target="_blank" style="padding:0; margin:0; display:inline">
+	<input name="labindex" value="01110025" type="hidden">
+	<input name="labname" value="民航总医院检验科" type="hidden">
+	<input name="speciality" value="95" type="hidden">
+	<input name="year" value="2026" type="hidden">
+	<input name="times" value="2" type="hidden">
+    </form>
+	</td>
+	
+    
+    <td valign="top">未上报</td>
+	   
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    
+	
+    <td style="width:455" height="20"><font color="#000099">◆</font>
+	<span onclick="hidden_zt('myforum1')" style="cursor:pointer"><font color="#0000ff" style="text-decoration: underline;">2026年白细胞介素6第2次质评上报表</font></span>
+    <form action="../data/clinet_beijing/PTDownloadReport/Report_2026_2_E7.asp" method="post" name="myforum1" id="myforum1" target="_blank" style="padding:0; margin:0; display:inline">
+	<input name="labindex" value="01110025" type="hidden">
+	<input name="labname" value="民航总医院检验科" type="hidden">
+	<input name="speciality" value="E7" type="hidden">
+	<input name="year" value="2026" type="hidden">
+	<input name="times" value="2" type="hidden">
+    </form>
+	</td>
+	
+    
+    <td valign="top">未上报</td>
+	   
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年粪便隐血试验第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年肝炎标志物第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年感染性疾病抗原抗体快速检测(POCT)第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年感染性疾病血清学标志物系列B第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年感染性疾病血清学标志物系列C第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    
+	
+    <td style="width:455" height="20"><font color="#000099">◆</font>
+	<span onclick="hidden_zt('myforum7')" style="cursor:pointer"><font color="#0000ff" style="text-decoration: underline;">2026年核酸检测（病毒学）（PCR-Virology）第2次质评上报表</font></span>
+    <form action="../data/clinet_beijing/PTDownloadReport/Report_2026_2_20.asp" method="post" name="myforum7" id="myforum7" target="_blank" style="padding:0; margin:0; display:inline">
+	<input name="labindex" value="01110025" type="hidden">
+	<input name="labname" value="民航总医院检验科" type="hidden">
+	<input name="speciality" value="20" type="hidden">
+	<input name="year" value="2026" type="hidden">
+	<input name="times" value="2" type="hidden">
+    </form>
+	</td>
+	
+    
+    <td valign="top">未上报</td>
+	   
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    
+	
+    <td style="width:455" height="20"><font color="#000099">◆</font>
+	<span onclick="hidden_zt('myforum8')" style="cursor:pointer"><font color="#0000ff" style="text-decoration: underline;">2026年核酸检测（非病毒）（PCR-TB,CT,NG）第2次质评上报表</font></span>
+    <form action="../data/clinet_beijing/PTDownloadReport/Report_2026_2_28.asp" method="post" name="myforum8" id="myforum8" target="_blank" style="padding:0; margin:0; display:inline">
+	<input name="labindex" value="01110025" type="hidden">
+	<input name="labname" value="民航总医院检验科" type="hidden">
+	<input name="speciality" value="28" type="hidden">
+	<input name="year" value="2026" type="hidden">
+	<input name="times" value="2" type="hidden">
+    </form>
+	</td>
+	
+    
+    <td valign="top">未上报</td>
+	   
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    
+	
+    <td style="width:455" height="20"><font color="#000099">◆</font>
+	<span onclick="hidden_zt('myforum9')" style="cursor:pointer"><font color="#0000ff" style="text-decoration: underline;">2026年巨细胞病毒核酸检测（CMV DNA）第2次质评上报表</font></span>
+    <form action="../data/clinet_beijing/PTDownloadReport/Report_2026_2_B0.asp" method="post" name="myforum9" id="myforum9" target="_blank" style="padding:0; margin:0; display:inline">
+	<input name="labindex" value="01110025" type="hidden">
+	<input name="labname" value="民航总医院检验科" type="hidden">
+	<input name="speciality" value="B0" type="hidden">
+	<input name="year" value="2026" type="hidden">
+	<input name="times" value="2" type="hidden">
+    </form>
+	</td>
+	
+    
+    <td valign="top">未上报</td>
+	   
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年快速C-反应蛋白检测第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    
+	
+    <td style="width:455" height="20"><font color="#000099">◆</font>
+	<span onclick="hidden_zt('myforum11')" style="cursor:pointer"><font color="#0000ff" style="text-decoration: underline;">2026年临床微生物学第2次质评上报表</font></span>
+    <form action="../data/clinet_beijing/PTDownloadReport/Report_2026_2_30.asp" method="post" name="myforum11" id="myforum11" target="_blank" style="padding:0; margin:0; display:inline">
+	<input name="labindex" value="01110025" type="hidden">
+	<input name="labname" value="民航总医院检验科" type="hidden">
+	<input name="speciality" value="30" type="hidden">
+	<input name="year" value="2026" type="hidden">
+	<input name="times" value="2" type="hidden">
+    </form>
+	</td>
+	
+    
+    <td valign="top">未上报</td>
+	   
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年内分泌第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年尿HCG第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年尿液沉渣形态学检查第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    
+	
+    <td style="width:455" height="20"><font color="#000099">◆</font>
+	<span onclick="hidden_zt('myforum15')" style="cursor:pointer"><font color="#0000ff" style="text-decoration: underline;">2026年尿液化学分析第2次质评上报表</font></span>
+    <form action="../data/clinet_beijing/PTDownloadReport/Report_2026_2_12.asp" method="post" name="myforum15" id="myforum15" target="_blank" style="padding:0; margin:0; display:inline">
+	<input name="labindex" value="01110025" type="hidden">
+	<input name="labname" value="民航总医院检验科" type="hidden">
+	<input name="speciality" value="12" type="hidden">
+	<input name="year" value="2026" type="hidden">
+	<input name="times" value="2" type="hidden">
+    </form>
+	</td>
+	
+    
+    <td valign="top">未上报</td>
+	   
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    
+	
+    <td style="width:455" height="20"><font color="#000099">◆</font>
+	<span onclick="hidden_zt('myforum16')" style="cursor:pointer"><font color="#0000ff" style="text-decoration: underline;">2026年凝血试验第2次质评上报表</font></span>
+    <form action="../data/clinet_beijing/PTDownloadReport/Report_2026_2_11.asp" method="post" name="myforum16" id="myforum16" target="_blank" style="padding:0; margin:0; display:inline">
+	<input name="labindex" value="01110025" type="hidden">
+	<input name="labname" value="民航总医院检验科" type="hidden">
+	<input name="speciality" value="11" type="hidden">
+	<input name="year" value="2026" type="hidden">
+	<input name="times" value="2" type="hidden">
+    </form>
+	</td>
+	
+    
+    <td valign="top">未上报</td>
+	   
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年全血细胞计数正确度验证第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    
+	
+    <td style="width:455" height="20"><font color="#000099">◆</font>
+	<span onclick="hidden_zt('myforum18')" style="cursor:pointer"><font color="#0000ff" style="text-decoration: underline;">2026年新型冠状病毒核酸检测第2次质评上报表</font></span>
+    <form action="../data/clinet_beijing/PTDownloadReport/Report_2026_2_D2.asp" method="post" name="myforum18" id="myforum18" target="_blank" style="padding:0; margin:0; display:inline">
+	<input name="labindex" value="01110025" type="hidden">
+	<input name="labname" value="民航总医院检验科" type="hidden">
+	<input name="speciality" value="D2" type="hidden">
+	<input name="year" value="2026" type="hidden">
+	<input name="times" value="2" type="hidden">
+    </form>
+	</td>
+	
+    
+    <td valign="top">未上报</td>
+	   
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年血细胞形态学检查第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    
+	
+    <td style="width:455" height="20"><font color="#000099">◆</font>
+	<span onclick="hidden_zt('myforum20')" style="cursor:pointer"><font color="#0000ff" style="text-decoration: underline;">2026年中孕期母血清产前筛查第2次质评上报表</font></span>
+    <form action="../data/clinet_beijing/PTDownloadReport/Report_2026_2_D3.asp" method="post" name="myforum20" id="myforum20" target="_blank" style="padding:0; margin:0; display:inline">
+	<input name="labindex" value="01110025" type="hidden">
+	<input name="labname" value="民航总医院检验科" type="hidden">
+	<input name="speciality" value="D3" type="hidden">
+	<input name="year" value="2026" type="hidden">
+	<input name="times" value="2" type="hidden">
+    </form>
+	</td>
+	
+    
+    <td valign="top">未上报</td>
+	   
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年肿瘤标志物第2次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年EB病毒核酸检测第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年白细胞介素6第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年粪便形态学检查第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年粪便隐血试验第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年肝炎标志物第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年感染性疾病抗原抗体快速检测(POCT)第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年感染性疾病血清学标志物系列B第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年感染性疾病血清学标志物系列C第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年核酸检测（病毒学）（PCR-Virology）第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年核酸检测（非病毒）（PCR-TB,CT,NG）第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年京津冀鲁盲样测试常规化学第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年京津冀鲁盲样测试全血细胞计数第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年京津冀鲁盲样测试糖化血红蛋白第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年京津冀鲁盲样测试特殊蛋白第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年京津冀鲁盲样测试肿标内分泌+PCT第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年巨细胞病毒核酸检测（CMV DNA）第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年快速C-反应蛋白检测第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年临床常规化学第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年临床检验医疗质量控制指标质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年临床微生物学第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年流式细胞分析-淋巴细胞亚群测定第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年内分泌第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年尿HCG第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年尿液沉渣形态学检查第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年尿液化学分析第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年凝血试验第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年全血细胞计数第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年全血细胞计数正确度验证第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年糖化血清白蛋白第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年新型冠状病毒核酸检测第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年血清降钙素原(PCT)第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年血细胞形态学检查第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年血型第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#cccccc">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年中孕期母血清产前筛查第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+	
+    <tr bgcolor="#ffffff">
+    <td style="width:455" height="20"><font color="#000099">◆</font>2026年肿瘤标志物第1次质评上报表</td>
+    <td valign="top">已上报</td>
+    
+    </tr>
+			
+</tbody></table>
+
+<!--aaa4731-->
+<iframe id="hiddenframe" name="hiddenframe" style="HEIGHT:0px; VISIBILITY: inherit; WIDTH: 0px; Z-INDEX: 2" frameborder="1" src="../keepsession.asp"></iframe> 
+
+
+ 
+
+
+
+
+</body></html>

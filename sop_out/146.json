@@ -1,0 +1,11 @@
+{
+  "pid": 146,
+  "sop_title": "SM-SOP-138  AU5800检测系统酶法血清尿液总钙测定标准操作程序",
+  "reference_range": "血清：28日-18岁 2.1-2.8 mmol/L；≥19岁 2.11-2.52 mmol/L",
+  "reportable_range": "0.24-21.25 mmol/L",
+  "unit": "mmol/L",
+  "traceability": "校准品溯源至国家标准物GBW09152",
+  "interference": "甘油三酯≤450mg/dl、胆红素≤80mg/dl、血红蛋白≤500mg/dl、抗坏血酸≤60mg/dl无显著干扰",
+  "method": "偶氮砷Ⅲ法",
+  "instrument": "Beckman Coulter AU5800 全自动生化分析仪"
+}

@@ -1,0 +1,11 @@
+{
+  "pid": 148,
+  "sop_title": "SM-SOP-137  AU5800检测系统磷钼酸盐法血清尿液磷测定标准操作程序",
+  "reference_range": "血清：新生儿-5月 1.60-2.51 mmol/L；6月-11月 1.48-2.20mmol/L；1岁-23月 1.42-2.13 mmol/L；2岁-5岁 1.37-1.99 mmol/L；6岁-11岁 1.25-1.93mmol/L；12-14岁（男）1.05-2.01mmol/L、（女）1.03-1.86mmol/L；15岁-18岁（男）0.84-1.71mmol/L、（女）0.93-1.61mmol/L；≥19岁（男）0.96-1.62mmol/L、（女）0.85-1.51mmol/L",
+  "reportable_range": "0.32-32.5 mmol/L",
+  "unit": "mmol/L",
+  "traceability": "校准品溯源至国家标准物GBW(E)080186",
+  "interference": "甘油三酯≤22.6mmol/L、胆红素≤342μmol/L、血红蛋白≤1.5g/L、维生素C≤0.5g/L无显著干扰",
+  "method": "磷钼酸盐法",
+  "instrument": "Beckman Coulter AU5800 全自动生化分析仪"
+}
