@@ -116,13 +116,8 @@ def candidate_projects(db, instrument_id: int):
             run_ids |= fam_lut.get(tok, set())
         if not run_ids:
             run_ids |= fam_lut.get((ti.instrument or "").strip(), set())
-        # 扩展到同家族全部仪器（含 indirect family）
-        expanded = set(run_ids)
-        for rid in list(run_ids):
-            for fid in inst_families.get(rid, set()):
-                fn = fam_ids_names.get(fid, "")
-                if fn:
-                    expanded |= fam_lut.get(fn, set())
+        # 精确匹配：不做跨家族扩展。例：instrument_group='④号机'→仅 DXI800 4 号。
+        expanded = run_ids
         # 是否命中本仪器
         hit = (instrument_id in expanded) \
             or any(fn in _split_tokens(ti.instrument_group) for fn in fam_names) \
@@ -165,18 +160,15 @@ def mandatory_projects(db):
         hi = getattr(ti, "has_interlab", None)
         if hi is not None and int(hi) != 1:
             continue
-        # 解析所属仪器（扩展到同家族）
+        # 解析所属仪器（精确匹配：不做跨家族扩展）
+        # 例：instrument_group='④号机' 只关联到 DXI800 4 号(id=72)，
+        # 不扩展到整个 DxI800 族（那样会把不承载项目的 1/2/3/唐筛也列出来）。
         run_ids = set()
         for tok in _split_tokens(ti.instrument_group):
             run_ids |= fam_lut.get(tok, set())
         if not run_ids:
             run_ids |= fam_lut.get((ti.instrument or "").strip(), set())
-        expanded = set(run_ids)
-        for rid in list(run_ids):
-            for fid in inst_families.get(rid, set()):
-                fn = fam_id_to_name.get(fid, "")
-                if fn:
-                    expanded |= fam_lut.get(fn, set())
+        expanded = run_ids
         insts = []
         for iid in sorted(expanded):
             inst = inst_lut.get(iid)
