@@ -132,51 +132,10 @@ def _migrate_schema():
         except Exception:
             pass
 
-    # ---------------------------------------------------------------------------
-    # 室间比对 / 室间质评 标记（部署幂等、自修复）
-    # 规则：
-    #   ① 每个项目是否参加 EQA 由 EQA 关联自动判定（复用 eqa_associations 匹配逻辑，
-    #      与「项目库↔室间质评关联查询」页面一致；标本变体靠 _MANUAL_ASSOCIATIONS 兜底）
-    #   ② 16 个例外项目（无 EQA，但实验室决定不做室间比对）→ has_interlab=0
-    #   ③ 有 EQA → 无需室间比对 has_interlab=0
-    #   ④ 无 EQA 且不在例外 → 需做室间比对 has_interlab=1
-    # 说明：has_eqa 用 ORM 会话写（依赖 eqa_plans 数据）；has_interlab 用纯 SQL 重算，
-    #      因此即使手动改过列值，每次启动都会回到与 EQA 关联一致的正确状态。
-    # ---------------------------------------------------------------------------
-    EXCLUDE_INTERLAB_NAMES = (
-        '乙型肝炎病毒表面抗原定量', '可溶性生长刺激表达基因2蛋白', '抑制素B',
-        '抗精子抗体IgG', '抗精子抗体IgM', '抗卵巢抗体IgG', '抗卵巢抗体IgM',
-        '抗子宫内膜抗体IgG', '抗子宫内膜抗体IgM', '血管紧张素转化酶', '血氨',
-        '17-羟类固醇', '17-酮类固醇', '香草扁桃酸', '肺癌自身抗体检测（七项）',
-        'N-乙酰-β-D-氨基葡萄糖苷酶（尿液）',
-    )
-    try:
-        from .api.v1.eqa_associations import _compute_associations
-        with SessionLocal() as db:
-            for r in _compute_associations(db):
-                ti = db.get(TestItem, r.id)
-                if ti is None:
-                    continue
-                ti.has_eqa = 1 if r.has_eqa else 0
-            db.commit()
-    except Exception:
-        pass
-    try:
-        with engine.begin() as conn2:
-            # 有 EQA → 无室间比对
-            conn2.exec_driver_sql("UPDATE test_items SET has_interlab=0 WHERE has_eqa=1")
-            # 16 个例外（无 EQA 但不做室间比对）→ 无室间比对
-            conn2.exec_driver_sql(
-                "UPDATE test_items SET has_interlab=0 WHERE name IN (%s)"
-                % ",".join("'%s'" % n for n in EXCLUDE_INTERLAB_NAMES)
-            )
-            # 其余无 EQA → 需做室间比对
-            conn2.exec_driver_sql(
-                "UPDATE test_items SET has_interlab=1 WHERE has_eqa=0 AND name NOT IN (%s)"
-                % ",".join("'%s'" % n for n in EXCLUDE_INTERLAB_NAMES)
-            )
-    except Exception:
-        pass
+    # 室间比对 / 室间质评 标记（has_eqa / has_interlab）计算较重（需遍历 215 个项目
+    # 与 EQA 计划做关联匹配，且在 CFS 网络盘上偏慢），放到后台初始化（见
+    # _recompute_interlab_tags），避免拖慢启动导致 CloudBase 就绪探针超时 →
+    # 容器被标记异常 → 503。
 
     # 室内质控受控仪器白名单（月结下拉限定）：AU×3 / DXI800 1·3·4·急·唐 / 罗氏×3 /
     # TOP×3 / 血气×2 / 日立 / 东曹G8 / 爱康 / Stago(CompactMax) / 安图A6200
@@ -192,26 +151,32 @@ def _migrate_schema():
         26,                   # Stago CompactMax
         75,                   # 安图 A6200
     ]
-    with SessionLocal() as db:
-        from .models.instrument import Instrument
-        db.query(Instrument).filter(Instrument.id.in_(QC_INSTRUMENT_IDS)).update(
-            {Instrument.qc_instrument: True}, synchronize_session=False
-        )
-        db.commit()
+    try:
+        with SessionLocal() as db:
+            from .models.instrument import Instrument
+            db.query(Instrument).filter(Instrument.id.in_(QC_INSTRUMENT_IDS)).update(
+                {Instrument.qc_instrument: True}, synchronize_session=False
+            )
+            db.commit()
+    except Exception:
+        pass
 
     # 用户邮箱字段回填：管理员账号录入默认邮箱（仅当为空时，幂等，不覆盖人工修改）；
     # 历史行 notify_email 可能为 NULL，统一回填为 1（开启邮件通知）。
     ADMIN_DEFAULT_EMAIL = "815268425@qq.com"
-    with SessionLocal() as db:
-        from .models.user import User
+    try:
+        with SessionLocal() as db:
+            from .models.user import User
 
-        admin = db.query(User).filter(User.username == "admin").first()
-        if admin and not admin.email:
-            admin.email = ADMIN_DEFAULT_EMAIL
-        db.query(User).filter(User.notify_email.is_(None)).update(
-            {User.notify_email: True}, synchronize_session=False
-        )
-        db.commit()
+            admin = db.query(User).filter(User.username == "admin").first()
+            if admin and not admin.email:
+                admin.email = ADMIN_DEFAULT_EMAIL
+            db.query(User).filter(User.notify_email.is_(None)).update(
+                {User.notify_email: True}, synchronize_session=False
+            )
+            db.commit()
+    except Exception:
+        pass
 
 
 async def _reminder_scheduler():
@@ -230,33 +195,89 @@ async def _reminder_scheduler():
             logger.error("reminder scheduler error: %s", e)
 
 
+def _recompute_interlab_tags(db):
+    """重算 has_eqa / has_interlab（部署幂等、自修复）。较重，放后台执行。"""
+    EXCLUDE_INTERLAB_NAMES = (
+        '乙型肝炎病毒表面抗原定量', '可溶性生长刺激表达基因2蛋白', '抑制素B',
+        '抗精子抗体IgG', '抗精子抗体IgM', '抗卵巢抗体IgG', '抗卵巢抗体IgM',
+        '抗子宫内膜抗体IgG', '抗子宫内膜抗体IgM', '血管紧张素转化酶', '血氨',
+        '17-羟类固醇', '17-酮类固醇', '香草扁桃酸', '肺癌自身抗体检测（七项）',
+        'N-乙酰-β-D-氨基葡萄糖苷酶（尿液）',
+    )
+    try:
+        from .api.v1.eqa_associations import _compute_associations
+        for r in _compute_associations(db):
+            ti = db.get(TestItem, r.id)
+            if ti is None:
+                continue
+            ti.has_eqa = 1 if r.has_eqa else 0
+        db.commit()
+    except Exception as e:  # noqa: BLE001
+        logger.error("recompute has_eqa failed (non-fatal): %s", e)
+    try:
+        with engine.begin() as conn2:
+            # 有 EQA → 无室间比对
+            conn2.exec_driver_sql("UPDATE test_items SET has_interlab=0 WHERE has_eqa=1")
+            # 16 个例外（无 EQA 但不做室间比对）→ 无室间比对
+            conn2.exec_driver_sql(
+                "UPDATE test_items SET has_interlab=0 WHERE name IN (%s)"
+                % ",".join("'%s'" % n for n in EXCLUDE_INTERLAB_NAMES)
+            )
+            # 其余无 EQA → 需做室间比对
+            conn2.exec_driver_sql(
+                "UPDATE test_items SET has_interlab=1 WHERE has_eqa=0 AND name NOT IN (%s)"
+                % ",".join("'%s'" % n for n in EXCLUDE_INTERLAB_NAMES)
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.error("recompute has_interlab failed (non-fatal): %s", e)
+
+
+async def _background_init():
+    """后台初始化：重活不阻塞就绪探针，避免容器被标记异常 → 503。
+
+    数据库已在 CFS 持久卷上保留了上一轮的数据（首次运行由镜像备份恢复），
+    因此重启时这些步骤多为幂等空操作；放后台执行仅影响冷启动后极短窗口内的标签，
+    不影响既有服务可用性。
+    """
+    try:
+        with SessionLocal() as db:
+            _recompute_interlab_tags(db)
+            run_seed(db)
+            refresh_calibration_notifications(db)
+            refresh_eqa_notifications(db)
+            ensure_reminder_defaults(db)
+            ensure_comparison_defaults(db)
+            # 质控品主数据：补齐预设（如「伯乐免疫多项」），仅当不存在时插入，幂等
+            from .models.qc_material import QcMaterial as _QM
+            for _pn in ["生化多项质控品", "伯乐免疫多项", "昆涞免疫多项"]:
+                if not db.query(_QM).filter(_QM.name == _pn).first():
+                    db.add(_QM(name=_pn, items_json="[]"))
+            db.commit()
+            # 升级兼容：已有接收人若未配置订阅分类，默认订阅全部现有规则
+            from .models.reminder import NotifyRecipient as _NR, ReminderRule as _RR
+            _cats = [r.category for r in db.query(_RR).all() if r.category]
+            if _cats:
+                _csv = ",".join(_cats)
+                for _rec in db.query(_NR).filter(
+                    (_NR.rule_categories.is_(None)) | (_NR.rule_categories == "")
+                ).all():
+                    _rec.rule_categories = _csv
+                db.commit()
+            run_reminders(db)
+    except Exception as e:  # noqa: BLE001
+        logger.error("background init error (non-fatal, skipped): %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    _migrate_schema()
-    with SessionLocal() as db:
-        run_seed(db)
-        refresh_calibration_notifications(db)
-        refresh_eqa_notifications(db)
-        ensure_reminder_defaults(db)
-        ensure_comparison_defaults(db)
-        # 质控品主数据：补齐预设（如「伯乐免疫多项」），仅当不存在时插入，幂等
-        from .models.qc_material import QcMaterial as _QM
-        for _pn in ["生化多项质控品", "伯乐免疫多项", "昆涞免疫多项"]:
-            if not db.query(_QM).filter(_QM.name == _pn).first():
-                db.add(_QM(name=_pn, items_json="[]"))
-        db.commit()
-        # 升级兼容：已有接收人若未配置订阅分类，默认订阅全部现有规则（避免升级后收不到提醒）
-        from .models.reminder import NotifyRecipient as _NR, ReminderRule as _RR
-        _cats = [r.category for r in db.query(_RR).all() if r.category]
-        if _cats:
-            _csv = ",".join(_cats)
-            for _rec in db.query(_NR).filter(
-                (_NR.rule_categories.is_(None)) | (_NR.rule_categories == "")
-            ).all():
-                _rec.rule_categories = _csv
-            db.commit()
-        run_reminders(db)
+    # 同步、轻量初始化：建表 + 迁移补列（快，不阻塞就绪探针）
+    try:
+        Base.metadata.create_all(bind=engine)
+        _migrate_schema()
+    except Exception as e:  # noqa: BLE001
+        logger.error("init error (create_all/migrate): %s", e)
+    # 重活放后台：关联打标 / 种子 / 刷新通知 / 提醒，避免启动过慢导致探针超时
+    asyncio.create_task(_background_init())
     asyncio.create_task(_reminder_scheduler())
     yield
 
