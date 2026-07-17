@@ -294,7 +294,7 @@ def build_html(plan, data: dict, instrument_name: str, ref_lab: str):
             html.append(f'<p style="margin:8px 0 2px;font-weight:bold;">项目：{proj["item"]}（单位：{proj["unit"]}，允许TE：{proj["te"]}{"%" if proj["mode"]=="relative" else ""}）</p>')
             html.append('<table><thead><tr>'
                         '<th>水平</th><th>参比值Y</th>'
-                        '<th>我室值(X)</th>'
+                        '<th>本实验室值(X)</th>'
                         '<th>偏倚</th><th>相对偏倚</th><th>是否合格</th>'
                         '</tr></thead><tbody>')
             ok_count = 0
@@ -465,7 +465,7 @@ def build_docx(db, plan, data: dict, out_path: str, instrument_name: str, ref_la
             t.style = "Table Grid"
             t.alignment = WD_TABLE_ALIGNMENT.CENTER
             hdr = t.rows[0].cells
-            for i, ht in enumerate(["水平", "参比值Y", "我室值(X)", "偏倚", "相对偏倚", "是否合格"]):
+            for i, ht in enumerate(["水平", "参比值Y", "本实验室值(X)", "偏倚", "相对偏倚", "是否合格"]):
                 _fill(hdr[i], ht, bold=True)
 
             ok_count = 0
