@@ -22,7 +22,21 @@ def _doc_number_sort(s):
 
 @event.listens_for(engine, "connect")
 def _register_sqlite_functions(dbapi_conn, conn_record):
+    # 注册自定义排序函数
     dbapi_conn.create_function("doc_number_sort", 1, _doc_number_sort)
+    # 以下 PRAGMA 优化 SQLite 在 CFS（网络文件系统）上的并发与稳定性：
+    #
+    # 1. WAL（Write-Ahead Logging）：读不阻塞写、写不阻塞读，大幅减少锁冲突。
+    #    在 CFS 上 rollback journal 的锁经常超时卡死，WAL 模式显著改善。
+    # 2. busy_timeout=5000：数据库被锁时最多等 5 秒再报错，避免瞬间 500。
+    # 3. synchronous=NORMAL：WAL 模式下 crash-safe，比 FULL 少一次 fsync，
+    #    对 CFS 网络盘性能有明显改善（且安全性足够）。
+    try:
+        dbapi_conn.execute("PRAGMA journal_mode=WAL")
+        dbapi_conn.execute("PRAGMA busy_timeout=5000")
+        dbapi_conn.execute("PRAGMA synchronous=NORMAL")
+    except Exception:
+        pass
 
 
 def get_db():
