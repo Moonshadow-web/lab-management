@@ -743,8 +743,9 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
 _EXCEL_KEYWORDS = {"允许TE%", "允许TE", "偏倚%", "是否允许", "是否允许Y/N", "TE%", "偏倚"}
 
 
-def _norm_token(s: str) -> str:
-    return _re.sub(r"[^a-z0-9]", "", (s or "").lower())
+def _norm_token(s):
+    """规范化字符串：去除非字母数字字符、转小写。安全处理 int/float。"""
+    return _re.sub(r"[^a-z0-9]", "", str(s or "").lower())
 
 
 def _is_instr_header(v):
@@ -771,7 +772,7 @@ def _match_instrument(header, instruments):
     """header: Excel 列头（如 AU5821-B / 5811-急诊 / AU5822(标准) / HT7600）；
     instruments: [{id,name,model,is_reference}]。
     返回匹配到的系统仪器 id，或 None。"""
-    h = (header or "").strip()
+    h = str(header or "").strip()
     if not h:
         return None
     hn = _norm_token(h)
@@ -867,7 +868,7 @@ def _resolve_te(it: dict):
 def _match_item(name, items):
     """name: Excel 项目名；items: [{name,label,...}]（系统分组项目）。按规范化代码匹配，
     并支持 QUANT_SYNONYMS 同义缩写。"""
-    h = (name or "").strip()
+    h = str(name or "").strip()
     if not h:
         return None
     hn = _norm_token(h)
