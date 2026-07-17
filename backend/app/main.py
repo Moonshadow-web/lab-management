@@ -126,15 +126,18 @@ def _migrate_schema():
         except Exception:
             pass
         # 2026-07-17：interlab_items 表结构变更——移除 our_value/ref_value（改为 InterlabLevel 表）。
-        # 因 SQLite 不支持 DROP COLUMN，且本模块无正式数据，直接删表重建。
+        # SQLite 不支持 DROP COLUMN，采用删表重建。
+        # 关键修复：原代码 CREATE_ALL 用 bind=engine 另开连接，DROP 在 conn 未提交事务中
+        # 对新连接不可见 → 误以为表还在而跳过建表 → 提交后表消失 → 写入 500(no such table)。
+        # 现改为 (1) 用同一个连接 conn 建表；(2) 仅当检测到「旧结构」(our_value/ref_value 列)
+        # 才删表重建，避免每次容器重启都清空已有比对结果（生产数据安全）。
         try:
-            conn.exec_driver_sql("DROP TABLE IF EXISTS interlab_levels")
-            conn.exec_driver_sql("DROP TABLE IF EXISTS interlab_items")
-        except Exception:
-            pass
-        # 删表后让 create_all 重新建表
-        try:
-            Base.metadata.create_all(bind=engine)
+            res = conn.exec_driver_sql("PRAGMA table_info(interlab_items)")
+            cols = {row[1] for row in res}
+            if "our_value" in cols or "ref_value" in cols:
+                conn.exec_driver_sql("DROP TABLE IF EXISTS interlab_levels")
+                conn.exec_driver_sql("DROP TABLE IF EXISTS interlab_items")
+                Base.metadata.create_all(bind=conn)
         except Exception:
             pass
         # 仪器替代关系：停用仪器不再作为任何家族成员（项目应挂在替代机而非停用机）。
