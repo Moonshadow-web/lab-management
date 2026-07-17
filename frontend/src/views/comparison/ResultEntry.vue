@@ -4,9 +4,9 @@
     <div v-if="loading" v-loading="true" style="height:300px" />
     <template v-else>
       <el-alert v-if="category === '定量'" type="info" :closable="false" show-icon
-        title="录入参照仪器与各比对仪器的检测值，偏倚%与是否允许自动计算。" style="margin-bottom:8px" />
+        title="录入靶机（参照仪器）与各比对仪器的检测值，偏倚%与是否允许自动计算。" style="margin-bottom:8px" />
       <el-alert v-else type="info" :closable="false" show-icon
-        title="逐台仪器录入5例样本阴/阳性（P/N），符合率自动计算（以参照仪器为基准）。" style="margin-bottom:8px" />
+        title="逐台仪器录入5例样本阴/阳性（P/N），符合率自动计算（以靶机为基准）。" style="margin-bottom:8px" />
       <el-alert v-if="plan?.only_uncompared" type="warning" :closable="false" show-icon
         title="本计划为同半年补录：仅列出本期尚未比对的项目，已做项目不显示。" style="margin-bottom:8px" />
 
@@ -45,7 +45,10 @@
             </el-tabs>
             <el-table :data="quantDisplay" size="small" border max-height="460">
               <el-table-column prop="item" label="项目" min-width="120" fixed />
-              <el-table-column label="参照值" width="110">
+              <el-table-column label="参照值" width="120">
+                <template #header>
+                  <span>靶机：{{ refInst?.name || '参照值' }}</span>
+                </template>
                 <template #default="{ row }">
                   <el-input v-model="row.reference_value" size="small" @input="onEdit" />
                 </template>
@@ -76,7 +79,10 @@
           <template v-else>
             <el-table :data="qualDisplay" size="small" border max-height="460">
               <el-table-column prop="item" label="项目" min-width="140" fixed />
-              <el-table-column v-for="ins in allInstruments" :key="ins.id" :label="ins.name + (ins.is_reference ? '（参照）' : '')">
+              <el-table-column v-for="ins in allInstruments" :key="ins.id">
+                <template #header>
+                  <span>{{ ins.name }}{{ ins.is_reference ? '（靶机）' : '' }}</span>
+                </template>
                 <template #default="{ row }">
                   <div v-if="!isApplicable(row.item, ins.id)" class="masked" title="该项目不在此仪器上开展">/</div>
                   <template v-else>
@@ -141,6 +147,7 @@ const allItemNames = ref([])        // 分组全量项目名
 const scopeItems = ref(null)        // plan.only_uncompared 时=本期未比对项目名；否则 null(全量)
 
 const compared = computed(() => allInstruments.value.filter((i) => !i.is_reference))
+const refInst = computed(() => allInstruments.value.find((i) => i.is_reference))
 
 const isDone = (name) => savedItems.value.has(name)
 const scopeSet = computed(() => (scopeItems.value ? new Set(scopeItems.value) : null))
