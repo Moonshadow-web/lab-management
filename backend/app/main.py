@@ -72,6 +72,9 @@ def _migrate_schema():
             "level": "INTEGER",
             "qc_material_id": "INTEGER",
         },
+        "qc_target_results": {
+            "manual": "BOOLEAN",
+        },
     }
     with engine.begin() as conn:
         for table, cols in alters.items():

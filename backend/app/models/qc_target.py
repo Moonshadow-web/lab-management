@@ -63,6 +63,7 @@ class QCTargetResult(Base):
     si_lower: Mapped[float] = mapped_column(Float, default=0.0)  # 即刻法：本次 SI下限
     status: Mapped[str] = mapped_column(String(20), default="累计中")  # 累计中/在控/警告/失控
     is_out: Mapped[bool] = mapped_column(default=False)  # 失控标记（保留，人工决定）
+    manual: Mapped[bool] = mapped_column(Boolean, default=False)  # 人工覆盖标记：用户手动标回在控后设为 True，后续不再被自动判失控
     operator: Mapped[str] = mapped_column(String(100), default="")
     remark: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

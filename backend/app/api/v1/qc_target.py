@@ -123,14 +123,26 @@ for _r in batch_router.routes:
 # 统计辅助
 # ---------------------------------------------------------------------------
 def _active_values(db, batch_id, analyte):
+    """返回参与靶值累计的测定值：
+    - is_out=False（在控）
+    - 或 manual=True（人工确认）
+    """
     rows = (
         db.query(QCTargetResult)
         .filter(QCTargetResult.batch_id == batch_id, QCTargetResult.analyte == analyte,
-                QCTargetResult.is_out == False)
+                (QCTargetResult.is_out == False) | (QCTargetResult.manual == True))
         .order_by(QCTargetResult.id)
         .all()
     )
     return [r.value for r in rows]
+
+
+def _has_manual(db, batch_id, analyte):
+    """该分析物是否有任何人工确认的记录。"""
+    return db.query(QCTargetResult).filter(
+        QCTargetResult.batch_id == batch_id, QCTargetResult.analyte == analyte,
+        QCTargetResult.manual == True
+    ).first() is not None
 
 
 def _build_stats(db, batch):
@@ -144,6 +156,10 @@ def _build_stats(db, batch):
     for a in analytes:
         vals = _active_values(db, batch.id, a)
         per[a] = svc.compute_analyte(vals, batch.method, batch.established)
+        # 人工确认覆盖自动判定
+        if _has_manual(db, batch.id, a):
+            per[a]["status"] = "在控(人工)"
+            per[a]["manual"] = True
     # 批次级状态
     has_out = any(r.is_out for r in results)
     if batch.mode == "archive":
@@ -205,10 +221,16 @@ def add_result(
     active = _active_values(db, batch_id, analyte)
     new_vals = active + [payload.value]
 
+    manual_atomic = _has_manual(db, batch_id, analyte)
+
     si_up = si_lo = None
     status = "累计中"
     is_out = False
-    if batch.method == "immediate":
+    if manual_atomic:
+        # 已有手工确认记录 → 跳过自动判定，新值直接纳入
+        status = "累计中"
+        si_up = si_lo = None
+    elif batch.method == "immediate":
         info = svc.classify_immediate(new_vals)
         status = info["status"]
         si_up = info.get("si_upper")
@@ -283,18 +305,25 @@ def delete_result(batch_id: int, rid: int, request: Request, db: Session = Depen
 
 @router.post("/{batch_id}/results/{rid}/toggle", response_model=None)
 def toggle_out(batch_id: int, rid: int, request: Request, db: Session = Depends(get_db), user: User = Depends(WRITE)):
-    """切换失控标记：人工决定把失控值重新纳入（is_out=False）或标回失控。"""
+    """切换失控/人工标记：
+    - 失控→在控：设为 manual=True（人工确认），is_out=False，系统不再自动判失控
+    - 在控→失控：取消 manual，设为 is_out=True
+    """
     row = db.get(QCTargetResult, rid)
     if not row or row.batch_id != batch_id:
         raise HTTPException(status_code=404, detail="结果不存在")
-    row.is_out = not row.is_out
-    # 同步 status 文案
     if row.is_out:
-        row.status = "失控"
+        # 失控→人工认领
+        row.is_out = False
+        row.manual = True
+        row.status = "在控(人工)"
     else:
-        row.status = "在控" if row.status in ("失控",) else row.status
+        # 在控→标回失控
+        row.is_out = True
+        row.manual = False
+        row.status = "失控"
     db.commit()
-    write_audit(db, user, "update", "qc_target_results", rid, {"is_out": row.is_out}, _ip(request))
+    write_audit(db, user, "update", "qc_target_results", rid, {"is_out": row.is_out, "manual": row.manual}, _ip(request))
     batch = db.get(QCTargetBatch, batch_id)
     return {"row": _ser_result(row), "stats": _build_stats(db, batch)}
 
@@ -367,7 +396,9 @@ def _ser_result(r: QCTargetResult):
     return {
         "id": r.id, "batch_id": r.batch_id, "analyte": r.analyte, "value": r.value,
         "qc_date": r.qc_date, "seq": r.seq, "si_upper": r.si_upper, "si_lower": r.si_lower,
-        "status": r.status, "is_out": r.is_out, "operator": r.operator, "remark": r.remark,
+        "status": r.status, "is_out": r.is_out, "manual": r.manual,
+        "operator": r.operator, "remark": r.remark,
+        "created_at": r.created_at,
         "created_at": r.created_at,
     }
 

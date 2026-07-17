@@ -155,7 +155,10 @@
           <!-- 各项目累计统计卡 -->
           <div class="ana-cards">
             <div class="ana-card" v-for="a in stats.analytes" :key="a">
-              <div class="ana-name">{{ a }}</div>
+              <div class="ana-name">
+                {{ a }}
+                <el-tag v-if="stats.per_analyte[a].manual" size="small" type="success" style="margin-left:4px">手动</el-tag>
+              </div>
               <div class="ana-row"><span>次数</span><b>{{ stats.per_analyte[a].n }}</b></div>
               <div class="ana-row"><span>均值</span><b>{{ stats.per_analyte[a].mean }}</b></div>
               <div class="ana-row"><span>SD</span><b>{{ stats.per_analyte[a].sd }}</b></div>
@@ -203,11 +206,19 @@
                 <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" min-width="150" v-if="auth.canWrite('qc')">
+            <el-table-column label="操作" min-width="170" v-if="auth.canWrite('qc')">
               <template #default="{ row }">
-                <el-button link type="warning" size="small" @click="toggleRow(row)">
-                  {{ row.is_out ? '标回在控' : '标记失控' }}
-                </el-button>
+                <template v-if="row.is_out">
+                  <el-button link type="success" size="small" @click="toggleRow(row)">人工确认</el-button>
+                  <el-tag size="small" type="danger">失控</el-tag>
+                </template>
+                <template v-else-if="row.manual">
+                  <el-button link type="warning" size="small" @click="toggleRow(row)">取消确认</el-button>
+                  <el-tag size="small" type="success">人工确认</el-tag>
+                </template>
+                <template v-else>
+                  <el-button link type="warning" size="small" @click="toggleRow(row)">标记失控</el-button>
+                </template>
                 <el-button link type="danger" size="small" @click="delRow(row)">删除</el-button>
               </template>
             </el-table-column>
@@ -328,7 +339,7 @@ async function loadMaterials() {
 }
 
 function statusType(s) {
-  if (s === '已确立' || s === '在控') return 'success'
+  if (s === '已确立' || s === '在控' || s === '在控(人工)') return 'success'
   if (s === '警告' || s === '可暂定' || s === '可确立') return 'warning'
   if (s === '失控' || s === '有失控') return 'danger'
   return 'info'
@@ -527,6 +538,9 @@ async function submitResult() {
     if (detailRow.value.method === 'immediate' && r.si_upper != null) {
       lastNote.value = `本次（n=${per.n}）：SI上限=${r.si_upper}，SI下限=${r.si_lower}；查表 2s=${per.n2s} 3s=${per.n3s} → ${r.status}`
       lastNoteType.value = r.status === '失控' ? 'error' : (r.status === '警告' ? 'warning' : 'success')
+    } else if (per.manual) {
+      lastNote.value = `该项目已有手动确认记录，新值直接纳入累计（跳过自动判定）`
+      lastNoteType.value = 'success'
     } else if (detailRow.value.method === 'conventional' && per.n < 20 && per.n < 10) {
       lastNote.value = `已累计 ${per.n} 次（常规法需≥10可暂定、≥20确立）`
       lastNoteType.value = 'info'
