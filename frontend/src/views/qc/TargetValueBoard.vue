@@ -53,9 +53,10 @@
           <el-tag :type="statusType(row._status)">{{ row._status || '—' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="200" fixed="right">
+      <el-table-column label="操作" min-width="240" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row)">查看/录入</el-button>
+          <el-button v-if="auth.canWrite('qc')" link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button v-if="row.archive_filename" link type="success" @click="previewArchive(row)">预览存档</el-button>
           <el-button v-if="auth.canWrite('qc')" link type="danger" @click="removeBatch(row)">删除</el-button>
         </template>
@@ -67,7 +68,7 @@
     </div>
 
     <!-- 新建/编辑对话框 -->
-    <el-dialog v-model="editVisible" :title="editForm.id ? '编辑批号' : '新建批号累积靶值'" width="560px" append-to-body>
+    <el-dialog v-model="editVisible" :title="editForm.id ? '编辑质控品换批号累靶' : '新建质控品换批号累靶'" width="560px" append-to-body>
       <el-form label-width="92px">
         <el-form-item label="质控品" required>
           <div class="mat-pick">
@@ -121,9 +122,19 @@
     </el-dialog>
 
     <!-- 详情/录入对话框 -->
-    <el-dialog v-model="detailVisible" :title="`批号累积靶值 - ${detailRow?.qc_material || ''} ${detailRow?.lot_no || ''}`"
+    <el-dialog v-model="detailVisible" :title="`质控品换批号累靶 - ${detailRow?.qc_material || ''} ${detailRow?.lot_no || ''}`"
       width="92%" top="3vh" append-to-body @close="onDetailClose">
-      <div v-if="detailRow" v-loading="detailLoading">
+      <div v-if="detailRow" v-loading="detailLoading" class="d-body">
+        <!-- 左侧项目列表 -->
+        <div class="d-left">
+          <div class="d-left-title">项目</div>
+          <div class="proj-list">
+            <div v-for="p in leftProjects" :key="p.name" class="proj-item" :class="{ entered: p.entered }" :title="p.name">{{ p.name }}</div>
+            <div v-if="!leftProjects.length" class="lv-muted">尚未录入</div>
+          </div>
+        </div>
+        <!-- 右侧内容 -->
+        <div class="d-right">
         <div class="d-info">
           <span>水平：<b v-if="detailRow.level && detailRow.level > 0">{{ detailRow.level }}</b><span v-else>—</span></span>
           <span>仪器：{{ detailRow.instrument || '—' }}</span>
@@ -224,6 +235,7 @@
             </el-table-column>
           </el-table>
         </template>
+        </div>
       </div>
     </el-dialog>
 
@@ -367,6 +379,21 @@ function openNew() {
   Object.assign(editForm, { id: null, qc_material: '', qc_material_id: null, lot_no: '', level: 0, instrument: '', method: 'conventional', note: '' })
   archiveFile.value = null
   currentArchive.value = ''
+  editVisible.value = true
+}
+function openEdit(row) {
+  Object.assign(editForm, {
+    id: row.id,
+    qc_material: row.qc_material || '',
+    qc_material_id: row.qc_material_id || null,
+    lot_no: row.lot_no || '',
+    level: row.level || 0,
+    instrument: row.instrument || '',
+    method: row.mode === 'archive' ? '' : (row.method || 'conventional'),
+    note: row.note || '',
+  })
+  archiveFile.value = null
+  currentArchive.value = row.archive_filename || ''
   editVisible.value = true
 }
 function onArchivePick(e) {
@@ -517,6 +544,16 @@ async function refreshDetail() {
   Object.assign(stats, d.stats)
 }
 
+// 左侧项目列表：质控品项目 + 已录入分析物合并；长名称截断，悬停显示完整
+const leftProjects = computed(() => {
+  const anaSet = new Set(stats.analytes || [])
+  const matList = stats.material_items || []
+  const out = []
+  for (const m of matList) out.push({ name: m, entered: anaSet.has(m) })
+  for (const a of (stats.analytes || [])) if (!matList.includes(a)) out.push({ name: a, entered: true })
+  return out
+})
+
 async function submitResult() {
   if (!resultForm.analyte || resultForm.value === '' || resultForm.value === null) {
     ElMessage.warning('请填写项目与测定值')
@@ -647,4 +684,15 @@ async function uploadDetailArchive() {
 .entry { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
 .mat-pick { display: flex; gap: 8px; align-items: center; width: 100%; }
 .mat-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.d-body { display: flex; gap: 14px; align-items: flex-start; }
+.d-left { flex: 0 0 190px; width: 190px; border-right: 1px solid #ebeef5; padding-right: 10px; max-height: 72vh; overflow: auto; }
+.d-left-title { font-weight: 600; color: #1a365d; margin-bottom: 8px; font-size: 13px; }
+.proj-list { display: flex; flex-direction: column; gap: 2px; }
+.proj-item { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 5px 8px; font-size: 13px; border-radius: 4px; color: #909399; cursor: default; }
+.proj-item.entered { color: #303133; background: #f5f7fa; }
+.d-right { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 768px) {
+  .d-body { flex-direction: column; }
+  .d-left { flex: none; width: 100%; border-right: none; border-bottom: 1px solid #ebeef5; padding-right: 0; padding-bottom: 8px; max-height: 200px; }
+}
 </style>

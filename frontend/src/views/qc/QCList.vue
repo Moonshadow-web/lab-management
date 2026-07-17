@@ -562,7 +562,7 @@
       <el-tab-pane label="室间比对" name="interlab" lazy>
         <InterlabComparison />
       </el-tab-pane>
-      <el-tab-pane label="批号累积靶值" name="lot" lazy>
+      <el-tab-pane label="质控品换批号累靶" name="lot" lazy>
         <TargetValueBoard />
       </el-tab-pane>
     </el-tabs>
