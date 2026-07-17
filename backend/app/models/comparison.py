@@ -92,3 +92,23 @@ class ComparisonQualResult(Base):
     results_json: Mapped[str] = mapped_column(Text, default="{}")  # JSON：{仪器id(字符串): [样本1..5 的 P/N]}
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ComparisonAttachment(Base):
+    """比对原始结果附件：手工录入的检测报告扫描件/图片等。
+
+    支持 jpg/png/webp/gif/bmp/pdf/word/excel 等；用于把"录入前的原始数据"沉淀在计划下，
+    方便后续审核/比对/复盘直接预览。报告本身的 docx 不归这里。
+    """
+
+    __tablename__ = "comparison_attachments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("comparison_plans.id", ondelete="CASCADE"), index=True)
+    file_type: Mapped[str] = mapped_column(String(20), default="other")  # image / pdf / doc / other
+    original_name: Mapped[str] = mapped_column(String(300), default="")  # 用户上传时的文件名
+    stored_name: Mapped[str] = mapped_column(String(300), default="")  # 实际存储文件名（避免冲突）
+    rel_path: Mapped[str] = mapped_column(String(500), default="")  # 相对 DATA_DIR 的路径
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    uploaded_by: Mapped[str] = mapped_column(String(100), default="")
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

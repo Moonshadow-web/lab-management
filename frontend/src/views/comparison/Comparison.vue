@@ -17,13 +17,13 @@
       title="请先选择或新建一个比对分组。系统已预设：生化分析仪/ DXI800 / 凝血 / 早孕系列 / 血气 / 定性 等分组（对应 BG-SM-CZ-021/024~027/071）。" />
 
     <el-table v-else :data="plans" border size="small" style="margin-top:12px">
-      <el-table-column label="年份" width="110">
+      <el-table-column label="年份" width="100">
         <template #default="{ row }">
           <el-input-number v-model="row.year" :min="2000" :max="2100" size="small"
             controls-position="right" style="width:100%" @change="(v) => onInlineEdit(row, { year: v })" />
         </template>
       </el-table-column>
-      <el-table-column label="半年" width="120">
+      <el-table-column label="半年" width="90">
         <template #default="{ row }">
           <el-select v-model="row.half" size="small" @change="(v) => onInlineEdit(row, { half: v })">
             <el-option :value="1" label="上半年" />
@@ -31,26 +31,56 @@
           </el-select>
         </template>
       </el-table-column>
-      <el-table-column prop="compared_at" label="比对日期" width="120" />
-      <el-table-column prop="operator" label="操作者" width="100" />
-      <el-table-column prop="reviewer" label="审核者" width="100" />
-      <el-table-column prop="conclusion" label="结论" width="100">
+      <el-table-column label="靶机" width="150" prop="reference_instrument_name" show-overflow-tooltip />
+      <el-table-column label="项目" min-width="200">
+        <template #default="{ row }">
+          <el-tooltip v-if="row.compared_items && row.compared_items.length" placement="top" :show-after="200">
+            <template #content>
+              <div style="max-width:400px;line-height:1.6">
+                已做：{{ row.compared_items.join('、') }}<br />
+                共 {{ row.compared_count }}/{{ row.group_total }} 项
+              </div>
+            </template>
+            <span class="items-line">
+              <span v-if="row.compared_count <= 6">{{ row.compared_items.join('、') }}</span>
+              <span v-else>{{ row.compared_items.slice(0, 6).join('、') }}…</span>
+              <el-tag size="small" :type="row.compared_count === row.group_total ? 'success' : 'info'" effect="plain" style="margin-left:4px">
+                {{ row.compared_count }}/{{ row.group_total }}
+              </el-tag>
+            </span>
+          </el-tooltip>
+          <span v-else class="muted">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="compared_at" label="比对日期" width="110" />
+      <el-table-column prop="operator" label="操作者" width="90" />
+      <el-table-column prop="reviewer" label="审核者" width="90" />
+      <el-table-column prop="conclusion" label="结论" width="90">
         <template #default="{ row }">
           <el-tag v-if="row.conclusion === '可接受'" type="success" size="small">可接受</el-tag>
           <el-tag v-else-if="row.conclusion === '不可接受'" type="danger" size="small">不可接受</el-tag>
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="报告" width="120">
+      <el-table-column label="报告" width="90">
         <template #default="{ row }">
           <el-tag v-if="row.report_filename" type="primary" size="small" effect="plain">已生成</el-tag>
-          <span v-else class="no">未生成</span>
+          <span v-else class="muted">未生成</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="240" fixed="right">
+      <el-table-column label="原始结果" width="110" align="center">
+        <template #default="{ row }">
+          <el-badge v-if="row.attachment_count" :value="row.attachment_count" :max="99" type="primary">
+            <el-button size="small" @click="openAttachments(row)">附件</el-button>
+          </el-badge>
+          <el-button v-else size="small" plain @click="openAttachments(row)">+上传</el-button>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" min-width="290" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openEntry(row)">录入</el-button>
           <el-button size="small" type="warning" @click="openReport(row)">报告</el-button>
+          <el-button size="small" @click="openAttachments(row)">附件</el-button>
           <el-button size="small" @click="openPlanEdit(row)">编辑</el-button>
           <el-button size="small" type="danger" @click="onDeletePlan(row)">删除</el-button>
         </template>
@@ -65,6 +95,8 @@
       @close="entryVisible = false" @saved="reloadPlans" />
     <ReportPanel v-if="reportVisible" :visible="reportVisible" :plan="activePlan" :group-name="selectedGroup?.name"
       @close="reportVisible = false" @saved="reloadPlans" />
+    <AttachmentsDialog v-if="attachVisible" :visible="attachVisible" :plan="activePlan"
+      @close="attachVisible = false" @changed="reloadPlans" />
   </div>
 </template>
 
@@ -79,6 +111,7 @@ import GroupDialog from './GroupDialog.vue'
 import PlanDialog from './PlanDialog.vue'
 import ResultEntry from './ResultEntry.vue'
 import ReportPanel from './ReportPanel.vue'
+import AttachmentsDialog from './AttachmentsDialog.vue'
 
 const groups = ref([])
 const instruments = ref([])
@@ -91,6 +124,7 @@ const planVisible = ref(false)
 const editingPlan = ref(null)
 const entryVisible = ref(false)
 const reportVisible = ref(false)
+const attachVisible = ref(false)
 const activePlan = ref(null)
 
 const selectedGroup = computed(() => groups.value.find((g) => g.id === selectedGroupId.value))
@@ -153,6 +187,7 @@ async function onDeletePlan(row) {
 
 function openEntry(row) { activePlan.value = row; entryVisible.value = true }
 function openReport(row) { activePlan.value = row; reportVisible.value = true }
+function openAttachments(row) { activePlan.value = row; attachVisible.value = true }
 async function onInlineEdit(row, patch) {
   try {
     await updatePlan(row.id, patch)
@@ -171,6 +206,8 @@ onMounted(() => { loadGroups(); loadInstruments() })
 .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .yes { color: #27ae60; font-weight: 700; }
 .no { color: #c0392b; font-weight: 700; }
+.muted { color: #999; }
+.items-line { display: inline-block; max-width: 100%; vertical-align: middle; }
 @media (max-width: 768px) {
   .toolbar { flex-direction: column; align-items: stretch; }
   .toolbar .el-select { width: 100% !important; }

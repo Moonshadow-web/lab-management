@@ -74,3 +74,21 @@ export function uploadReport(planId, file) {
 export function deleteReport(planId) {
   return request.delete(`/api/v1/comparison/plans/${planId}/report`)
 }
+
+// 原始结果附件：列表 / 上传(多文件) / 预览 / 下载 / 删除
+export function listAttachments(planId) {
+  return request.get(`/api/v1/comparison/plans/${planId}/attachments`)
+}
+export function uploadAttachments(planId, files) {
+  const fd = new FormData()
+  for (const f of files) fd.append('files', f)
+  return request.post(`/api/v1/comparison/plans/${planId}/attachments`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+export function attachmentUrl(id, inline = true) {
+  return `/api/v1/comparison/attachments/${id}${inline ? '?inline=true' : '?inline=false'}`
+}
+export function deleteAttachment(id) {
+  return request.delete(`/api/v1/comparison/attachments/${id}`)
+}
