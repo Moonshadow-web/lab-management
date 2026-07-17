@@ -760,6 +760,8 @@ def _is_instr_header(v):
         return False
     if "水平" in s:
         return False
+    if s in ("项目", "项目名称", "检验项目"):
+        return False
     if s.upper() in ("Y", "N", "YN"):
         return False
     # 纯数字 / 百分比不是仪器列
@@ -785,10 +787,11 @@ def _match_instrument(header, instruments):
         for ins in instruments:
             if ins.get("is_reference"):
                 return ins["id"]
-    # 含"急诊" → 匹配含"急诊"的仪器（处理 5811-急诊 ↔ AU5800急诊 之类命名差异）
-    if "急诊" in h:
+    # 含"急诊" → 匹配含"急诊"或"急"的仪器（处理 DXI800-急诊 ↔ DXI800急 之类命名差异）
+    if "急诊" in h or "急" in h:
         for ins in instruments:
-            if "急诊" in (ins.get("name", "") + ins.get("model", "")):
+            nm = ins.get("name", "") + ins.get("model", "")
+            if "急诊" in nm or ("急" in nm and "急" in h):
                 return ins["id"]
     # AU5822 → 实际上是 AU5821 系列（旧命名，已停用；新机为 AU5821 A/B）
     if "au5822" in hn:
@@ -815,7 +818,14 @@ def _match_instrument(header, instruments):
             n = _norm_token(ins.get("name", "") + ins.get("model", ""))
             if "au5821" in n and n.endswith(L):
                 return ins["id"]
-    # DXI800
+    # DXI800 + 序号（DXI800-3 → DXI800 3；保留原子串匹配作为兜底）
+    m = _re.search(r"dxi800[ -]?(\d)", hn)
+    if m:
+        L = m.group(1)
+        for ins in instruments:
+            n = _norm_token(ins.get("name", "") + ins.get("model", ""))
+            if n.endswith(L):
+                return ins["id"]
     if "dxi800" in hn:
         for ins in instruments:
             if "dxi800" in _norm_token(ins.get("name", "") + ins.get("model", "")):
@@ -840,9 +850,19 @@ def _match_instrument(header, instruments):
 # SOP 表单（BG-SM-CZ-025 等）用 BUN/CHOL/CRE，而系统分组用 UREA/TC/Cr 等代码，
 # 二者需打通才能正确匹配。键/值均为规范化(去非字母数字+小写)后的名称。
 QUANT_SYNONYMS = {
-    "bun": "urea",      # Blood Urea Nitrogen = 尿素
-    "chol": "tc",       # Cholesterol = 总胆固醇
-    "cre": "cr",        # Creatinine = 肌酐
+    "bun": "urea",           # Blood Urea Nitrogen = 尿素
+    "chol": "tc",            # Cholesterol = 总胆固醇
+    "cre": "cr",             # Creatinine = 肌酐
+    # DXI800 模板常见缩写
+    "fer": "ferr",           # Ferritin
+    "folw": "叶酸",          # Folate（中文名）
+    "hstni": "ctni",        # hsTnI → cTnI（高敏肌钙蛋白）
+    "ckmb": "ck-mb",        # CK-MB
+    "ifab": "ifa",           # Intrinsic Factor Antibody
+    # 早孕模板
+    "hcg": "β-hcg",         # HCG → β-HCG
+    "孕酮": "prog",         # 孕酮 → Progesterone
+    "雌二醇": "e2",         # 雌二醇 → Estradiol (E2)
 }
 
 # 反向同义：系统分组代码 → Excel 缩写（用于回退查 TE_LOOKUP 标准允许TE）
@@ -880,7 +900,11 @@ def _match_item(name, items):
     syn = QUANT_SYNONYMS.get(hn)
     if syn:
         for it in items:
+            # 先试规范化（英文字母缩写）
             if _norm_token(it.get("name", "")) == syn:
+                return it["name"]
+            # 中文字段名直接比较（如 叶酸 → syn="叶酸"）
+            if it.get("name", "") == syn:
                 return it["name"]
     # 3) 子串兜底
     for it in items:

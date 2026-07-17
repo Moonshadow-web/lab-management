@@ -326,29 +326,33 @@ def get_results(pid: int, db: Session = Depends(get_db), user: User = Depends(ge
 
 def _apply_results(db: Session, pid: int, quant: list, qual: list):
     """定量/定性结果 upsert（保存与导入共用）。quant: [{item,level,reference_value,values}]；
-    qual: [{item,results}]。"""
+    qual: [{item,results}]。入参既可能是 dict（导入），也可能是 pydantic 模型（在线保存）。"""
+    def _norm(row):
+        return row.model_dump() if hasattr(row, "model_dump") else row
     for row in (quant or []):
+        r = _norm(row)
         existing = db.query(ComparisonResult).filter_by(
-            plan_id=pid, item=row["item"], level=row["level"]).first()
-        vals_json = json.dumps(row.get("values", {}))
+            plan_id=pid, item=r["item"], level=r["level"]).first()
+        vals_json = json.dumps(r.get("values", {}))
         if existing:
-            existing.reference_value = row.get("reference_value", "")
+            existing.reference_value = r.get("reference_value", "")
             existing.values_json = vals_json
             existing.updated_at = datetime.utcnow()
         else:
             db.add(ComparisonResult(
-                plan_id=pid, item=row["item"], level=row["level"],
-                reference_value=row.get("reference_value", ""), values_json=vals_json,
+                plan_id=pid, item=r["item"], level=r["level"],
+                reference_value=r.get("reference_value", ""), values_json=vals_json,
             ))
     for row in (qual or []):
-        existing = db.query(ComparisonQualResult).filter_by(plan_id=pid, item=row["item"]).first()
-        rj = json.dumps(row.get("results", {}))
+        r = _norm(row)
+        existing = db.query(ComparisonQualResult).filter_by(plan_id=pid, item=r["item"]).first()
+        rj = json.dumps(r.get("results", {}))
         if existing:
             existing.results_json = rj
             existing.updated_at = datetime.utcnow()
         else:
             db.add(ComparisonQualResult(
-                plan_id=pid, item=row["item"], results_json=rj))
+                plan_id=pid, item=r["item"], results_json=rj))
 
 
 @router.put("/plans/{pid}/results")
