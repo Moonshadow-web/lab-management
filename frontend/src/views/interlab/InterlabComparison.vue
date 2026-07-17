@@ -129,14 +129,15 @@
           :title="`${entryPlan.year}年${entryPlan.half === 1 ? '上半年' : '下半年'} ｜ 仪器：${instrumentName(entryPlan.instrument_id)} ｜ 参比实验室：${entryPlan.reference_lab || '—'}`" />
         <div style="margin-bottom:10px">
           <el-button size="small" type="primary" :icon="Plus" @click="addItemRow" v-if="canWrite">添加项目</el-button>
-          <span class="tip">每个项目测 5 个水平，填入我室值(X)和参比实验室的 Y1/Y2/均值Y。偏倚自动计算。</span>
+          <span class="tip">每个项目测 5 个水平，填入参比值Y和我室值X。偏倚自动计算。</span>
         </div>
         <!-- 逐项目分组展示 -->
         <div v-for="(item, idx) in entryRows" :key="idx" class="item-group">
           <div class="item-header">
             <div class="item-header-left">
               <el-select v-model="item.item" filterable allow-create default-first-option placeholder="检验项目"
-                style="width:200px" @visible-change="(v)=>{ if(v) loadCandidates(entryPlan.instrument_id) }">
+                style="width:200px" @visible-change="(v)=>{ if(v) loadCandidates(entryPlan.instrument_id) }"
+                @change="(val) => onItemSelect(idx, val)">
                 <el-option v-for="p in candidates" :key="p.id" :label="p.name" :value="p.name">
                   <span v-if="p.mandatory" style="color:#c0392b">[必做]</span>{{ p.name }}
                 </el-option>
@@ -158,19 +159,11 @@
             <el-table-column label="水平" width="50">
               <template #default="{ row: lv }">{{ lv.level_num }}</template>
             </el-table-column>
-            <el-table-column label="我室值(X)" width="100">
-              <template #default="{ row: lv }"><el-input v-model="lv.our_value" /></template>
-            </el-table-column>
-            <el-table-column label="参比Y1" width="100">
+            <el-table-column label="参比值Y" width="110">
               <template #default="{ row: lv }"><el-input v-model="lv.ref1_y1" /></template>
             </el-table-column>
-            <el-table-column label="参比Y2" width="100">
-              <template #default="{ row: lv }"><el-input v-model="lv.ref1_y2" /></template>
-            </el-table-column>
-            <el-table-column label="均值Y" width="100">
-              <template #default="{ row: lv }">
-                <span>{{ computeMean(lv.ref1_y1, lv.ref1_y2) }}</span>
-              </template>
+            <el-table-column label="我室值(X)" width="110">
+              <template #default="{ row: lv }"><el-input v-model="lv.our_value" /></template>
             </el-table-column>
             <el-table-column label="偏倚(相对%)" width="120">
               <template #default="{ row: lv }">
@@ -183,12 +176,6 @@
                 <el-tag v-else-if="biasPass(lv, item) === false" type="danger" size="small">不合格</el-tag>
                 <span v-else>-</span>
               </template>
-            </el-table-column>
-            <el-table-column label="比较系统2-Y1" width="100">
-              <template #default="{ row: lv }"><el-input v-model="lv.ref2_y1" /></template>
-            </el-table-column>
-            <el-table-column label="比较系统2-Y2" width="100">
-              <template #default="{ row: lv }"><el-input v-model="lv.ref2_y2" /></template>
             </el-table-column>
             <el-table-column label="备注" min-width="120">
               <template #default="{ row: lv }"><el-input v-model="item.note" /></template>
@@ -274,21 +261,16 @@ function parseNum(v) {
   const n = parseFloat(v)
   return isNaN(n) ? null : n
 }
-function computeMean(y1, y2) {
-  const a = parseNum(y1); const b = parseNum(y2)
-  if (a === null || b === null) return ''
-  return ((a + b) / 2).toFixed(2)
-}
 function computeBias(lv, item) {
   const our = parseNum(lv.our_value)
-  const ref = parseNum(lv.ref1_mean || lv.ref1_y1)
+  const ref = parseNum(lv.ref1_y1)
   if (our === null || ref === null || ref === 0) return ''
   if (item.mode === 'absolute') return (our - ref).toFixed(3)
   return (((our - ref) / ref) * 100).toFixed(2) + '%'
 }
 function biasPass(lv, item) {
   const our = parseNum(lv.our_value)
-  const ref = parseNum(lv.ref1_mean || lv.ref1_y1)
+  const ref = parseNum(lv.ref1_y1)
   const te = parseNum(item.te)
   if (our === null || ref === null || ref === 0 || te === null) return null
   if (item.mode === 'absolute') return Math.abs(our - ref) <= te + 1e-9
@@ -299,6 +281,13 @@ function biasClass(lv, item) {
   if (p === true) return 'pass'
   if (p === false) return 'fail'
   return ''
+}
+
+function onItemSelect(idx, val) {
+  const found = candidates.value.find(p => p.name === val)
+  if (found && found.unit) {
+    entryRows.value[idx].unit = found.unit
+  }
 }
 
 function emptyLevels() {

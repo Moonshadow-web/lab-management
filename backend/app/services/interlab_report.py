@@ -292,8 +292,8 @@ def build_html(plan, data: dict, instrument_name: str, ref_lab: str):
                 continue
             html.append(f'<p style="margin:8px 0 2px;font-weight:bold;">项目：{proj["item"]}（单位：{proj["unit"]}，允许TE：{proj["te"]}{"%" if proj["mode"]=="relative" else ""}）</p>')
             html.append('<table><thead><tr>'
-                        '<th>水平</th><th>我室值(X)</th>'
-                        '<th>参比Y1</th><th>参比Y2</th><th>均值Y</th>'
+                        '<th>水平</th><th>参比值Y</th>'
+                        '<th>我室值(X)</th>'
                         '<th>偏倚</th><th>相对偏倚</th><th>是否合格</th>'
                         '</tr></thead><tbody>')
             ok_count = 0
@@ -305,8 +305,8 @@ def build_html(plan, data: dict, instrument_name: str, ref_lab: str):
                 acc_cls = "yes" if acc is True else ("no" if acc is False else "")
                 acc_s = {True: "合格", False: "不合格", None: "-"}[acc]
                 html.append(
-                    f'<tr><td>{lv["level"]}</td><td>{lv["our"]}</td>'
-                    f'<td>{lv["ref_y1"]}</td><td>{lv["ref_y2"]}</td><td>{lv["ref_mean"]}</td>'
+                    f'<tr><td>{lv["level"]}</td><td>{lv["ref_y1"]}</td>'
+                    f'<td>{lv["our"]}</td>'
                     f'<td>{abs_s}</td><td>{rel_s}</td>'
                     f'<td class="{acc_cls}">{acc_s}</td></tr>'
                 )
@@ -455,11 +455,11 @@ def build_docx(db, plan, data: dict, out_path: str, instrument_name: str, ref_la
             pr.font.size = Pt(10.5); pr.font.bold = True; pr.font.name = "SimSun"
             pr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
 
-            t = doc.add_table(rows=1, cols=8)
+            t = doc.add_table(rows=1, cols=6)
             t.style = "Table Grid"
             t.alignment = WD_TABLE_ALIGNMENT.CENTER
             hdr = t.rows[0].cells
-            for i, ht in enumerate(["水平", "我室值(X)", "参比Y1", "参比Y2", "均值Y", "偏倚", "相对偏倚", "是否合格"]):
+            for i, ht in enumerate(["水平", "参比值Y", "我室值(X)", "偏倚", "相对偏倚", "是否合格"]):
                 _fill(hdr[i], ht, bold=True)
 
             ok_count = 0
@@ -471,14 +471,12 @@ def build_docx(db, plan, data: dict, out_path: str, instrument_name: str, ref_la
                 if acc is True: ok_count += 1
                 acc_s = {True: "合格", False: "不合格", None: "-"}[acc]
                 _fill(cells[0], str(lv["level"]))
-                _fill(cells[1], lv["our"])
-                _fill(cells[2], lv["ref_y1"])
-                _fill(cells[3], lv["ref_y2"])
-                _fill(cells[4], lv["ref_mean"])
-                _fill(cells[5], abs_s)
-                _fill(cells[6], rel_s)
+                _fill(cells[1], lv["ref_y1"])
+                _fill(cells[2], lv["our"])
+                _fill(cells[3], abs_s)
+                _fill(cells[4], rel_s)
                 col = RGBColor(0x27, 0xae, 0x60) if acc is True else (RGBColor(0xc0, 0x39, 0x2b) if acc is False else None)
-                _fill(cells[7], acc_s, color=col, bold=True)
+                _fill(cells[5], acc_s, color=col, bold=True)
 
             p = doc.add_paragraph()
             pr = p.add_run(f"结论：5个水平中合格{ok_count}个（4/5即通过），项目{proj['item']}室间比对一致性{'可接受' if ok_count >= 4 else '不可接受'}。")
