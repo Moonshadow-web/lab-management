@@ -16,7 +16,7 @@ from .training import TrainingRecord
 from .user import User
 from .verification import VerificationRecord
 from .comparison import ComparisonGroup, ComparisonPlan, ComparisonResult, ComparisonQualResult, ComparisonAttachment
-from .interlab import InterlabPlan, InterlabItem
+from .interlab import InterlabPlan, InterlabItem, InterlabLevel
 from .qc_target import QCTargetBatch, QCTargetResult
 from .qc_material import QcMaterial
 
@@ -51,6 +51,7 @@ __all__ = [
     "ComparisonAttachment",
     "InterlabPlan",
     "InterlabItem",
+    "InterlabLevel",
     "QCTargetBatch",
     "QCTargetResult",
     "QcMaterial",

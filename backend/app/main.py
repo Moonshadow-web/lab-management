@@ -125,6 +125,18 @@ def _migrate_schema():
             )
         except Exception:
             pass
+        # 2026-07-17：interlab_items 表结构变更——移除 our_value/ref_value（改为 InterlabLevel 表）。
+        # 因 SQLite 不支持 DROP COLUMN，且本模块无正式数据，直接删表重建。
+        try:
+            conn.exec_driver_sql("DROP TABLE IF EXISTS interlab_levels")
+            conn.exec_driver_sql("DROP TABLE IF EXISTS interlab_items")
+        except Exception:
+            pass
+        # 删表后让 create_all 重新建表
+        try:
+            Base.metadata.create_all(bind=engine)
+        except Exception:
+            pass
         # 仪器替代关系：停用仪器不再作为任何家族成员（项目应挂在替代机而非停用机）。
         # AU5822/DXI800C/D/急诊/唐筛 已停用，由 AU5821A/B、DXI800 1-4/急/唐 取代。
         try:

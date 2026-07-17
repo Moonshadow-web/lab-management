@@ -25,9 +25,18 @@ class InterlabPlanBase(BaseModel):
     report_filename: str = ""
 
 
+class InterlabItemRow(BaseModel):
+    """创建计划时一行项目元数据（不含结果水平）。"""
+    item: str
+    unit: str = ""
+    te: str = "0"
+    mode: str = "relative"  # relative(相对%) / absolute(绝对)
+    kind: str = "定量"       # 定性 / 定量
+
+
 class InterlabPlanCreate(InterlabPlanBase):
-    items: list[InterlabItemRow] = []   # 可选：直接随计划创建结果行
-    auto_fill: bool = True              # 为 True 且未提供 items 时，按仪器自动带出必做项目
+    items: list[InterlabItemRow] = []
+    auto_fill: bool = True
 
 
 class InterlabPlanUpdate(BaseModel):
@@ -54,25 +63,59 @@ class InterlabPlanRead(InterlabPlanBase):
 
 
 # ---------------------------------------------------------------------------
-# 结果录入
+# 水平结果
 # ---------------------------------------------------------------------------
-class InterlabItemRow(BaseModel):
+class InterlabLevelRow(BaseModel):
+    """一个项目的一个水平（1~5）。"""
+    level_num: int = 1
+    # 我室均值 X
+    our_value: str = ""
+    # 比较系统1（通常即唯一参比实验室）
+    ref1_y1: str = ""
+    ref1_y2: str = ""
+    ref1_mean: str = ""
+    # 比较系统2（可空缺）
+    ref2_y1: str = ""
+    ref2_y2: str = ""
+    ref2_mean: str = ""
+
+
+class InterlabItemWithLevels(BaseModel):
+    """项目 + 其 1~5 水平结果（录入/回显用）。"""
     item: str
     unit: str = ""
-    our_value: str = ""
-    ref_value: str = ""
     te: str = "0"
-    mode: str = "relative"  # relative(相对%) / absolute(绝对)
-    kind: str = "定量"       # 定性 / 定量（决定套用 BG-SM-CZ-018 / 019 模板）
+    mode: str = "relative"
+    kind: str = "定量"
     note: str = ""
+    levels: list[InterlabLevelRow] = []
 
 
 class InterlabResultsPayload(BaseModel):
-    items: list[InterlabItemRow] = []
+    """批量保存一整个计划的结果。"""
+    items: list[InterlabItemWithLevels] = []
+
+
+class InterlabItemRead(BaseModel):
+    """get_results 返回的单项目结构。"""
+    item: str
+    unit: str = ""
+    te: str = "0"
+    mode: str = "relative"
+    kind: str = "定量"
+    note: str = ""
+    levels: list[InterlabLevelRow] = []
+
+
+class InterlabResultsRead(BaseModel):
+    """get_results 返回。"""
+    instrument_name: str = ""
+    reference_lab: str = ""
+    items: list[InterlabItemRead] = []
 
 
 # ---------------------------------------------------------------------------
-# 候选项目（按仪器 + 室间比对可用筛选）
+# 候选项目
 # ---------------------------------------------------------------------------
 class InterlabProject(BaseModel):
     id: int
@@ -80,3 +123,4 @@ class InterlabProject(BaseModel):
     name: str = ""
     unit: str = ""
     instrument: str = ""
+    mandatory: bool = True

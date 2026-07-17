@@ -4,9 +4,8 @@
 - 室间比对用于**无室间质评**(has_eqa=0) 且**有外部参比实验室**(has_interlab=1) 的项目，
   每半年一次（上半年/下半年），按所属仪器分类。
 - InterlabPlan（比对计划）：年 + 半年 + 我室仪器 + 参比实验室 + 比对日期/操作者/审核者/结论。
-- InterlabItem（比对结果）：每行 = 一个项目，录入我室检测值与参比实验室检测值；
-  偏倚% = (我室 - 参比)/参比 × 100（relative）或 我室 - 参比（absolute），
-  是否合格由服务层按允许偏倚(TE%)判定。
+- InterlabItem（比对项目）：一个计划下的一个项目，含单位/TE/定性定量等元数据。
+- InterlabLevel（水平结果）：每个项目 5 个水平（1~5），含我室值 X、比较系统1/2 的 Y1/Y2/均值Y。
 
 报告严格保留「室间比对结果记录及分析报告表」版式，可生成 docx / 预览 / 下载 / 上传存档。
 """
@@ -42,7 +41,7 @@ class InterlabPlan(Base):
 
 
 class InterlabItem(Base):
-    """室间比对结果：每行 = 项目（我室值 vs 参比实验室值）。"""
+    """室间比对项目：元数据（项目名/单位/允许总误差/定性定量），实际结果在 InterlabLevel。"""
 
     __tablename__ = "interlab_items"
 
@@ -50,11 +49,34 @@ class InterlabItem(Base):
     plan_id: Mapped[int] = mapped_column(ForeignKey("interlab_plans.id", ondelete="CASCADE"), index=True)
     item: Mapped[str] = mapped_column(String(100), default="")  # 项目名
     unit: Mapped[str] = mapped_column(String(30), default="")  # 单位
-    our_value: Mapped[str] = mapped_column(String(50), default="")  # 我室检测值
-    ref_value: Mapped[str] = mapped_column(String(50), default="")  # 参比实验室检测值
-    te: Mapped[str] = mapped_column(String(20), default="0")  # 允许偏倚，数字字符串
+    te: Mapped[str] = mapped_column(String(20), default="0")  # 允许总误差，数字字符串
     mode: Mapped[str] = mapped_column(String(20), default="relative")  # relative(相对%) / absolute(绝对)
-    kind: Mapped[str] = mapped_column(String(20), default="定量")  # 定性 / 定量（决定套用 BG-SM-CZ-018 / 019 模板）
+    kind: Mapped[str] = mapped_column(String(20), default="定量")  # 定性 / 定量
     note: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class InterlabLevel(Base):
+    """室间比对每个项目的 5 个水平结果。
+
+    每行 = 一个项目的一个水平（1~5），支持两个比较系统（模板预留）。
+    """
+
+    __tablename__ = "interlab_levels"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("interlab_items.id", ondelete="CASCADE"), index=True)
+    level_num: Mapped[int] = mapped_column(Integer, default=1)  # 1–5
+    # 我室均值 X
+    our_value: Mapped[str] = mapped_column(String(50), default="")
+    # 比较系统1
+    ref1_y1: Mapped[str] = mapped_column(String(50), default="")
+    ref1_y2: Mapped[str] = mapped_column(String(50), default="")
+    ref1_mean: Mapped[str] = mapped_column(String(50), default="")
+    # 比较系统2
+    ref2_y1: Mapped[str] = mapped_column(String(50), default="")
+    ref2_y2: Mapped[str] = mapped_column(String(50), default="")
+    ref2_mean: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -7,5 +7,6 @@ i Current Environment ID: cloud1-0gjhamv53ff2298d
   Yes (manually switch traffic to new version after successful release) [72D[72C[2K[1A[2K[1A[2K[G? Enable gray deployment? No (automatically switch traffic to new version after 
 successful release)[1A[19D[99C
 [1Bi Submitting Container-based cloud hosting lab-management, please wait...
-i Container-based cloud hosting lab-management submission completed!
-i Please open the link to view deployment status: https://tcb.cloud.tencent.com/dev?envId=cloud1-0gjhamv53ff2298d#/platform-run/service/detail?serverName=lab-management&tabId=deploy&envId=cloud1-0gjhamv53ff2298d
+? Platform currently has deployment tasks running. Confirm to continue deploymen
+t, running deployment tasks will be cancelled and latest code will be deployed i
+mmediately (Y/n) [2A[17D[177C[2B

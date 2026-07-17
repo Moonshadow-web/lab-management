@@ -1,5 +1,5 @@
 """室间比对（无室间质评项目 · 外部参比实验室比对）接口：
-计划CRUD、结果录入、候选项目、报告生成/预览/下载/上传/删除。"""
+计划CRUD、结果录入（5水平）、候选项目、报告生成/预览/下载/上传/删除。"""
 import json
 import os
 from datetime import datetime
@@ -12,12 +12,13 @@ from sqlalchemy.orm import Session
 from ...core.config import DATA_DIR
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
-from ...models.interlab import InterlabPlan, InterlabItem
+from ...models.interlab import InterlabPlan, InterlabItem, InterlabLevel
 from ...models.instrument import Instrument
 from ...models.user import User
 from ...schemas.interlab import (
     InterlabPlanCreate, InterlabPlanUpdate, InterlabPlanRead,
-    InterlabResultsPayload, InterlabProject, InterlabItemRow,
+    InterlabResultsPayload, InterlabResultsRead,
+    InterlabProject, InterlabItemRow,
 )
 from ...services import interlab_report as svc
 
@@ -44,12 +45,20 @@ def _ser_plan(p: InterlabPlan):
     }
 
 
+def _level_to_dict(lv: InterlabLevel) -> dict:
+    return {
+        "level_num": lv.level_num,
+        "our_value": lv.our_value,
+        "ref1_y1": lv.ref1_y1, "ref1_y2": lv.ref1_y2, "ref1_mean": lv.ref1_mean,
+        "ref2_y1": lv.ref2_y1, "ref2_y2": lv.ref2_y2, "ref2_mean": lv.ref2_mean,
+    }
+
+
 # ---------------------------------------------------------------------------
 # 仪器 / 候选项目
 # ---------------------------------------------------------------------------
 @router.get("/instruments")
 def instrument_options(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """计划对话框用的仪器选择列表（显示型号）。排除已停用/停用的机器。"""
     out = []
     for inst in db.query(Instrument).filter(
         or_(Instrument.status.is_(None), ~Instrument.status.like("%停用%"))
@@ -60,7 +69,6 @@ def instrument_options(db: Session = Depends(get_db), user: User = Depends(get_c
 
 @router.get("/mandatory")
 def mandatory_list(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """指导用：返回所有「无室间质评、需做室间比对」的必做项目及其所属仪器。"""
     return svc.mandatory_projects(db)
 
 
@@ -74,7 +82,6 @@ def svc_disp(inst: Instrument) -> str:
 
 @router.get("/projects", response_model=list[InterlabProject])
 def candidate_projects(instrument_id: int = 0, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """按仪器返回可参与室间比对的项目（has_interlab=1，排除无室间比对项目）。"""
     return svc.candidate_projects(db, instrument_id)
 
 
@@ -108,7 +115,6 @@ def create_plan(body: InterlabPlanCreate, db: Session = Depends(get_db), user: U
     payload = body.model_dump(exclude={"items", "auto_fill"})
     p = InterlabPlan(**payload, created_by=user.username)
     db.add(p); db.flush()
-    # 自助列计划：未显式给出项目时，按仪器自动带出该仪器的全部必做室间比对项目
     if body.items:
         rows = body.items
     elif body.auto_fill and p.instrument_id:
@@ -130,10 +136,12 @@ def create_plan(body: InterlabPlanCreate, db: Session = Depends(get_db), user: U
             mode = r.get("mode") or "relative"
         if not item:
             continue
-        db.add(InterlabItem(
-            plan_id=p.id, item=item, unit=unit or "", our_value="", ref_value="",
-            te=te, mode=mode, kind=kind, note="",
-        ))
+        it = InterlabItem(plan_id=p.id, item=item, unit=unit or "",
+                          te=te, mode=mode, kind=kind, note="")
+        db.add(it); db.flush()
+        # 自动创建 5 个空水平行
+        for ln in range(1, 6):
+            db.add(InterlabLevel(item_id=it.id, level_num=ln))
     db.commit(); db.refresh(p)
     return p
 
@@ -157,31 +165,37 @@ def delete_plan(pid: int, db: Session = Depends(get_db), user: User = Depends(WR
         raise HTTPException(404, "未找到计划")
     if p.report_path:
         _safe_remove(p.report_path)
+    # 级联删除 levels + items
+    for it in db.query(InterlabItem).filter_by(plan_id=pid).all():
+        db.query(InterlabLevel).filter_by(item_id=it.id).delete()
     db.query(InterlabItem).filter_by(plan_id=pid).delete()
     db.delete(p); db.commit()
     return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
-# 结果录入
+# 结果录入（5 水平）
 # ---------------------------------------------------------------------------
-@router.get("/plans/{pid}/results")
+@router.get("/plans/{pid}/results", response_model=InterlabResultsRead)
 def get_results(pid: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     p = db.get(InterlabPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
     inst = db.get(Instrument, p.instrument_id)
-    rows = []
+    items_out = []
     for it in db.query(InterlabItem).filter_by(plan_id=pid).order_by(InterlabItem.id).all():
-        rows.append({
-            "item": it.item, "unit": it.unit, "our_value": it.our_value,
-            "ref_value": it.ref_value, "te": it.te, "mode": it.mode,
-            "kind": it.kind or "定量", "note": it.note,
+        levels = [_level_to_dict(lv) for lv in
+                  db.query(InterlabLevel).filter_by(item_id=it.id).order_by(InterlabLevel.level_num).all()]
+        items_out.append({
+            "item": it.item, "unit": it.unit,
+            "te": it.te, "mode": it.mode, "kind": it.kind or "定量",
+            "note": it.note,
+            "levels": levels,
         })
     return {
         "instrument_name": svc_disp(inst) if inst else "",
         "reference_lab": p.reference_lab,
-        "items": rows,
+        "items": items_out,
     }
 
 
@@ -190,16 +204,33 @@ def save_results(pid: int, body: InterlabResultsPayload, db: Session = Depends(g
     p = db.get(InterlabPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
-    # 全量覆盖该行项目
+    # 全量覆盖：删旧 levels 和 items
+    for it in db.query(InterlabItem).filter_by(plan_id=pid).all():
+        db.query(InterlabLevel).filter_by(item_id=it.id).delete()
     db.query(InterlabItem).filter_by(plan_id=pid).delete()
+    # 创建新 items + levels
     for row in body.items:
         if not row.item:
             continue
-        db.add(InterlabItem(
-            plan_id=pid, item=row.item, unit=row.unit, our_value=row.our_value,
-            ref_value=row.ref_value, te=row.te, mode=row.mode,
-            kind=getattr(row, "kind", None) or "定量", note=row.note,
-        ))
+        it = InterlabItem(
+            plan_id=pid, item=row.item, unit=row.unit,
+            te=row.te, mode=row.mode, kind=row.kind or "定量",
+            note=row.note,
+        )
+        db.add(it); db.flush()
+        # 写入 5 个水平（客户端应有 5 个，不足则补空）
+        provided = {lv.level_num: lv for lv in row.levels}
+        for ln in range(1, 6):
+            lv = provided.get(ln)
+            if lv:
+                db.add(InterlabLevel(
+                    item_id=it.id, level_num=ln,
+                    our_value=lv.our_value,
+                    ref1_y1=lv.ref1_y1, ref1_y2=lv.ref1_y2, ref1_mean=lv.ref1_mean,
+                    ref2_y1=lv.ref2_y1, ref2_y2=lv.ref2_y2, ref2_mean=lv.ref2_mean,
+                ))
+            else:
+                db.add(InterlabLevel(item_id=it.id, level_num=ln))
     db.commit()
     return {"ok": True}
 
@@ -222,8 +253,11 @@ def preview_report(pid: int, db: Session = Depends(get_db), user: User = Depends
     if not p:
         raise HTTPException(404, "未找到计划")
     items = db.query(InterlabItem).filter_by(plan_id=pid).order_by(InterlabItem.id).all()
+    levels_map = {}
+    for it in items:
+        levels_map[it.id] = db.query(InterlabLevel).filter_by(item_id=it.id).order_by(InterlabLevel.level_num).all()
     inst = db.get(Instrument, p.instrument_id)
-    data = svc.compute_data(db, p, items)
+    data = svc.compute_data(db, p, items, levels_map)
     html = svc.build_html(p, data, svc_disp(inst) if inst else "", p.reference_lab)
     return {"html": html}
 
@@ -234,8 +268,11 @@ def generate_report(pid: int, db: Session = Depends(get_db), user: User = Depend
     if not p:
         raise HTTPException(404, "未找到计划")
     items = db.query(InterlabItem).filter_by(plan_id=pid).order_by(InterlabItem.id).all()
+    levels_map = {}
+    for it in items:
+        levels_map[it.id] = db.query(InterlabLevel).filter_by(item_id=it.id).order_by(InterlabLevel.level_num).all()
     inst = db.get(Instrument, p.instrument_id)
-    data = svc.compute_data(db, p, items)
+    data = svc.compute_data(db, p, items, levels_map)
     safe = f"interlab_{pid}_{datetime.now().strftime('%Y%m%d%H%M%S')}.docx"
     out = REPORT_DIR / safe
     svc.build_docx(db, p, data, str(out), svc_disp(inst) if inst else "", p.reference_lab)
