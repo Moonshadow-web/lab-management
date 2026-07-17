@@ -16,9 +16,10 @@ from io import BytesIO
 from pathlib import Path
 
 from docx import Document
-from docx.enum.section import WD_ORIENT
+from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
+from docx.oxml import parse_xml
 from docx.oxml.ns import qn
 from docx.shared import Pt, Cm, RGBColor
 
@@ -255,9 +256,52 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
     title = group.form_title or ("定性室内比对结果记录及分析报告表" if group.category == "定性" else "定量室内比对结果记录分析表")
     form_code = group.form_code or ""
     year = plan.year or ""
-    html = [f'<div class="rep">{css}<h1>定量室内比对报告（{group.name}）</h1>']
-    html.append(f'<div class="sub">表格编号 BG-SM-CZ-022（封面） / {form_code}（数据页）　　民航总医院检验科生化免疫组　　生效日期：{year}.01.01</div>')
-    html.append(f'<h2>数据页：{title}（{form_code}）</h2>')
+    kind = "定性" if group.category == "定性" else "定量"
+    html = [f'<div class="rep">{css}'
+            f'<div class="sub" style="text-align:left">民航总医院检验科　　生化免疫组　　比对日期：{plan.compared_at or ""}</div>'
+            f'<h1>{kind}室内比对报告（{group.name}）</h1>'
+            f'<div class="sub">表格编号 BG-SM-CZ-022（封面）　　{form_code}（数据页）　　民航总医院检验科生化免疫组　　生效日期：{year}.01.01</div>']
+
+    # 第一页（022 封面）：比对方案 / 结果分析 / 处理方案
+    ref = next((i for i in data["instruments"] if i["is_reference"]), None)
+    compared_names = "、".join(i["name"] for i in data["instruments"] if not i["is_reference"])
+    n_inst = len(data["instruments"])
+    if data["category"] == "定性":
+        items = [r["item"] for r in data["matrix"]]
+        item_names = "、".join(items)
+        n_item = len(items)
+        plan_lines = [
+            f"1.样本：{group.sample_desc or '5例临床样本'}。",
+            f"2.仪器：{ref['name'] if ref else ''}、{compared_names}。",
+            f"3.试验内容：将5例样本分别在{n_inst}台仪器上测定共有项目。",
+            f"4.项目：{item_names}，共{n_item}项。",
+            "5.评价标准：阴阳符合率≥80%代表比对可接受。",
+        ]
+    else:
+        seen = set(); items = []
+        for blk in data["matrix"]:
+            for r in blk["rows"]:
+                if r["item"] not in seen:
+                    seen.add(r["item"]); items.append(r["item"])
+        item_names = "、".join(items)
+        n_item = len(items)
+        has_abs = any(r["mode"] == "absolute" for blk in data["matrix"] for r in blk["rows"])
+        plan_lines = [
+            f"1.样本：{group.sample_desc or '5个不同浓度水平的室间质评样本'}。",
+            f"2.仪器：{ref['name'] if ref else ''}、{compared_names}。",
+            f"3.试验内容：将{group.levels or 5}份样本分别在{n_inst}台仪器上测定共有项目。",
+            f"4.项目：{item_names}，共{n_item}项。",
+            f"5.评价标准：允许偏倚参照行标/国家临检中心EQA评价准则，本实验室以{ref['name'] if ref else ''}结果为参照，"
+            f"{'绝对' if has_abs else '相对'}偏倚绝对值应小于允许偏倚。是否可接受用Y/N表示。各项目成绩&gt;80%代表比对可接受。",
+        ]
+    html.append("<h2>比对方案</h2>")
+    for line in plan_lines:
+        html.append(f"<p>{line}</p>")
+    html.append(f'<h2>结果分析</h2><p>{plan.summary or "各仪器上述所有项目均比对合格。"}</p>')
+    html.append('<h2>处理方案（如不合格）</h2><p>{}</p>'.format(plan.handle_plan or "无"))
+
+    # 后续页（数据页）
+    html.append('<hr style="margin:18px 0"><h2>数据页：{title}（{form_code}）</h2>'.format(title=title, form_code=form_code))
 
     if data["category"] == "定性":
         html.append("<h2>比对结果</h2>")
@@ -285,21 +329,6 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
         _qual_ok = _qual_vals and all(a is not None and a >= 80 for a in _qual_vals)
         html.append(f'<p>总结：使用5例样本进行室内比对，结果阴阳符合率见上表，结果一致性{"可接受" if _qual_ok else "待评估"}。</p>')
     else:
-        # 比对方案
-        ref = next((i for i in data["instruments"] if i["is_reference"]), None)
-        compared_names = "、".join(i["name"] for i in data["instruments"] if not i["is_reference"])
-        item_names = "、".join(it["item"] for it in data["matrix"][0]["rows"]) if data["matrix"] else ""
-        n_inst = len(data["instruments"])
-        n_item = len(data["matrix"][0]["rows"]) if data["matrix"] else 0
-        html.append("<h2>比对方案</h2>")
-        html.append(f"<p>1.样本：{group.sample_desc or '5个不同浓度水平的室间质评样本'}。</p>")
-        html.append(f"<p>2.仪器：{ref['name'] if ref else ''}、{compared_names}。</p>")
-        html.append(f"<p>3.试验内容：将{group.levels or 5}份样本分别在{n_inst}台仪器上测定共有项目。</p>")
-        html.append(f"<p>4.项目：{item_names}，共{n_item}项。</p>")
-        html.append(f"<p>5.评价标准：允许偏倚参照行标/国家临检中心EQA评价准则，本实验室以{ref['name'] if ref else ''}结果为参照，"
-                    f"{'绝对' if any(it['mode']=='absolute' for it in data['matrix'][0]['rows']) else '相对'}偏倚绝对值应小于允许偏倚。是否可接受用Y/N表示。各项目成绩&gt;80%代表比对可接受。</p>")
-
-        # 数据表（按水平）
         for blk in data["matrix"]:
             html.append(f"<h2>水平{blk['level']}</h2>")
             html.append('<table><thead><tr><th class="item">项目</th>'
@@ -327,7 +356,6 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
                 html.append("</tr>")
             html.append("</tbody></table>")
 
-        # 汇总
         html.append("<h2>汇总</h2>")
         html.append('<table><thead><tr><th class="item">项目</th>')
         for lv in range(1, (group.levels or 5) + 1):
@@ -341,8 +369,6 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
             html.append("</tr>")
         html.append("</tbody></table>")
 
-    html.append(f'<h2>结果分析</h2><p>{plan.summary or "各仪器上述所有项目均比对合格。"}</p>')
-    html.append('<h2>处理方案（如不合格）</h2><p>{}</p>'.format(plan.handle_plan or "无"))
     html.append(f'<div class="foot">操作者：{plan.operator or "　　　　"}　　审核者：{plan.reviewer or "　　　　"}　　日期：{plan.compared_at or "　　　　"}</div>')
     html.append("</div>")
     return "".join(html)
@@ -383,45 +409,143 @@ def _heading(doc, text, size=13):
     return p
 
 
+def _run_font(run, size=11, bold=False):
+    run.font.size = Pt(size)
+    run.font.bold = bold
+    run.font.name = "SimSun"
+    run._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+    return run
+
+
+def _add_field(run, field):
+    """在 run 内插入一个 Word 域（PAGE / NUMPAGES）。"""
+    f1 = parse_xml(r'<w:fldChar w:fldCharType="begin" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+    instr = parse_xml(f'<w:instrText xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"> {field} </w:instrText>')
+    fsep = parse_xml(r'<w:fldChar w:fldCharType="separate" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+    f2 = parse_xml(r'<w:fldChar w:fldCharType="end" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+    run._r.append(f1); run._r.append(instr); run._r.append(fsep); run._r.append(f2)
+
+
+def _add_footer_code(section, code, year):
+    """页脚：左 表格编号 / 右 医院+页码 / 中 生效日期。"""
+    footer = section.footer
+    footer.is_linked_to_previous = False
+    for p in footer.paragraphs:
+        p.text = ""
+    p = footer.paragraphs[0]
+    p.paragraph_format.tab_stops.add_tab_stop(Cm(16), WD_TAB_ALIGNMENT.RIGHT)
+    _run_font(p.add_run(f"表格编号：{code}\t"), 9)
+    _run_font(p.add_run("民航总医院检验科生化免疫组 第 "), 9)
+    _add_field(p.add_run(""), "PAGE")
+    _run_font(p.add_run(" 页 共 "), 9)
+    _add_field(p.add_run(""), "NUMPAGES")
+    _run_font(p.add_run(" 页"), 9)
+    p2 = footer.add_paragraph()
+    p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _run_font(p2.add_run(f"生效日期：{year}.01.01"), 9)
+
+
+def _cover_header(doc, plan):
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    _run_font(p.add_run(
+        f"民航总医院检验科　　　　生化免疫组　　　　比对日期：{plan.compared_at or '　　　　　'}"), 10.5)
+
+
+def _cover_title(doc, group):
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    kind = "定性" if group.category == "定性" else "定量"
+    _run_font(p.add_run(f"{kind}室内比对报告（{group.name}）"), 16, bold=True)
+
+
+def _cover_plan(doc, group, plan, data):
+    ref = next((i for i in data["instruments"] if i["is_reference"]), None)
+    compared = [i for i in data["instruments"] if not i["is_reference"]]
+    compared_names = "、".join(i["name"] for i in compared)
+    n_inst = len(data["instruments"])
+    if group.category == "定性":
+        items = [r["item"] for r in data["matrix"]]
+        n_item = len(items)
+        item_names = "、".join(items)
+        lines = [
+            f"1.样本：{group.sample_desc or '5例临床样本'}。",
+            f"2.仪器：{ref['name'] if ref else ''}、{compared_names}。",
+            f"3.试验内容：将5例样本分别在{n_inst}台仪器上测定共有项目。",
+            f"4.项目：{item_names}，共{n_item}项。",
+            "5.评价标准：阴阳符合率≥80%代表比对可接受。",
+        ]
+    else:
+        seen = set(); items = []
+        for blk in data["matrix"]:
+            for r in blk["rows"]:
+                if r["item"] not in seen:
+                    seen.add(r["item"]); items.append(r["item"])
+        n_item = len(items)
+        item_names = "、".join(items)
+        has_abs = any(r["mode"] == "absolute" for blk in data["matrix"] for r in blk["rows"])
+        lines = [
+            f"1.样本：{group.sample_desc or '5个不同浓度水平的室间质评样本'}。",
+            f"2.仪器：{ref['name'] if ref else ''}、{compared_names}。",
+            f"3.试验内容：将{group.levels or 5}份样本分别在{n_inst}台仪器上测定共有项目。",
+            f"4.项目：{item_names}，共{n_item}项。",
+            f"5.评价标准：允许偏倚参照行标/国家临检中心EQA评价准则，本实验室以{ref['name'] if ref else ''}结果为参照，"
+            f"{'绝对' if has_abs else '相对'}偏倚绝对值应小于允许偏倚。是否可接受用Y/N表示。各项目成绩>80%代表比对可接受。",
+        ]
+    _heading(doc, "比对方案")
+    for line in lines:
+        p = doc.add_paragraph()
+        _run_font(p.add_run(line), 11)
+
+
+def _cover_analysis(doc, plan):
+    _heading(doc, "结果分析")
+    p = doc.add_paragraph()
+    _run_font(p.add_run(plan.summary or "各仪器上述所有项目均比对合格。"), 11)
+
+
+def _cover_handle(doc, plan):
+    _heading(doc, "处理方案（如不合格）")
+    p = doc.add_paragraph()
+    _run_font(p.add_run(plan.handle_plan or "无"), 11)
+
+
+def _data_page_header(doc, group, plan):
+    title = group.form_title or ("定性室内比对结果记录及分析报告表" if group.category == "定性" else "定量室内比对结果记录分析表")
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _run_font(p.add_run(title), 15, bold=True)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _run_font(p.add_run(
+        f"表格编号 {group.form_code or ''}　　民航总医院检验科生化免疫组　　生效日期：{plan.year or ''}.01.01"), 10.5)
+
+
 def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out_path: str):
     doc = Document()
-    # 页边距
+    year = plan.year or ""
+
+    # 第一页：BG-SM-CZ-022 封面（含 比对方案/结果分析/处理方案，表格编号置页脚）
+    sec0 = doc.sections[0]
     for s in doc.sections:
         s.top_margin = Cm(1.8); s.bottom_margin = Cm(1.8)
         s.left_margin = Cm(1.8); s.right_margin = Cm(1.8)
+    _add_footer_code(sec0, "BG-SM-CZ-022", year)
+    _cover_header(doc, plan)
+    _cover_title(doc, group)
+    _cover_plan(doc, group, plan, data)
+    _cover_analysis(doc, plan)
+    _cover_handle(doc, plan)
 
-    title = group.form_title or ("定性室内比对结果记录及分析报告表" if group.category == "定性" else "定量室内比对结果记录分析表")
-    # 封面（BG-SM-CZ-022 样式）：标题 + 副标题同时保留封面号与数据页号
-    h = doc.add_paragraph()
-    h.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = h.add_run(f"定量室内比对报告（{group.name}）")
-    r.font.size = Pt(16); r.font.bold = True; r.font.name = "SimSun"
-    r._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-
-    sub = doc.add_paragraph()
-    sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    rs = sub.add_run(
-        f"表格编号 BG-SM-CZ-022（封面） / {group.form_code or ''}（数据页）　　"
-        f"民航总医院检验科生化免疫组　　生效日期：{plan.year or ''}.01.01"
-    )
-    rs.font.size = Pt(10.5); rs.font.name = "SimSun"
-    rs._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-
-    # 数据页（024/025/026/027/071 样式）：分页后再列详细结果表
-    doc.add_page_break()
-    dh = doc.add_paragraph()
-    dh.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    dr = dh.add_run(title)
-    dr.font.size = Pt(15); dr.font.bold = True; dr.font.name = "SimSun"
-    dr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-    dsub = doc.add_paragraph()
-    dsub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    drs = dsub.add_run(f"表格编号 {group.form_code or ''}　　民航总医院检验科生化免疫组　　生效日期：{plan.year or ''}.01.01")
-    drs.font.size = Pt(10.5); drs.font.name = "SimSun"
-    drs._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+    # 后续页：024/025/026/027/071 数据页（仅详细结果表，独立分节+各自页脚编号）
+    sec1 = doc.add_section(WD_SECTION.NEW_PAGE)
+    for s in doc.sections:
+        s.top_margin = Cm(1.8); s.bottom_margin = Cm(1.8)
+        s.left_margin = Cm(1.8); s.right_margin = Cm(1.8)
+    _add_footer_code(sec1, group.form_code or "", year)
+    _data_page_header(doc, group, plan)
 
     if data["category"] == "定性":
-        _heading(doc, "比对结果")
         insts = data["instruments"]
         cols = 1 + len(insts) * 2
         t = doc.add_table(rows=1, cols=cols)
@@ -450,59 +574,11 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
                 _fill(cells[1 + i * 2], samples)
                 _fill(cells[2 + i * 2], agr_s)
         p = doc.add_paragraph()
-        rp = p.add_run(f"总结：使用5例样本进行室内比对，结果阴阳符合率见上表，结果一致性{'可接受' if all_ok else '需关注'}。")
-        rp.font.size = Pt(11); rp.font.name = "SimSun"
-        rp._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-
-        _heading(doc, "结果分析")
-        p = doc.add_paragraph(); rp = p.add_run(plan.summary or "各仪器上述所有项目均比对合格。")
-        rp.font.size = Pt(11); rp.font.name = "SimSun"
-        rp._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-
-        _heading(doc, "处理方案（如不合格）")
-        p = doc.add_paragraph(); rp = p.add_run(plan.handle_plan or "无")
-        rp.font.size = Pt(11); rp.font.name = "SimSun"
-        rp._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-
-        foot = doc.add_paragraph()
-        rf = foot.add_run(f"操作者：{plan.operator or '　　　　'}　　审核者：{plan.reviewer or '　　　　'}　　日期：{plan.compared_at or '　　　　'}")
-        rf.font.size = Pt(11); rf.font.name = "SimSun"
-        rf._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+        _run_font(p.add_run(
+            f"总结：使用5例样本进行室内比对，结果阴阳符合率见上表，结果一致性{'可接受' if all_ok else '需关注'}。"), 11)
     else:
         ref = next((i for i in data["instruments"] if i["is_reference"]), None)
         compared = [i for i in data["instruments"] if not i["is_reference"]]
-        compared_names = "、".join(i["name"] for i in compared)
-        n_inst = len(data["instruments"])
-        item_names = "、".join(r["item"] for r in data["matrix"][0]["rows"]) if data["matrix"] else ""
-        n_item = len(data["matrix"][0]["rows"]) if data["matrix"] else 0
-        has_abs = any(r["mode"] == "absolute" for blk in data["matrix"] for r in blk["rows"])
-
-        _heading(doc, "比对方案")
-        for line in [
-            f"1.样本：{group.sample_desc or '5个不同浓度水平的室间质评样本'}。",
-            f"2.仪器：{ref['name'] if ref else ''}、{compared_names}。",
-            f"3.试验内容：将{group.levels or 5}份样本分别在{n_inst}台仪器上测定共有项目。",
-            f"4.项目：{item_names}，共{n_item}项。",
-            f"5.评价标准：允许偏倚参照行标/国家临检中心EQA评价准则，本实验室以{ref['name'] if ref else ''}结果为参照，"
-            f"{'绝对' if has_abs else '相对'}偏倚绝对值应小于允许偏倚。是否可接受用Y/N表示。各项目成绩>80%代表比对可接受。",
-        ]:
-            pp = doc.add_paragraph(); rr = pp.add_run(line)
-            rr.font.size = Pt(11); rr.font.name = "SimSun"
-            rr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-
-        # 数据页（024/025/026/027/071 样式）：分页后再列详细结果表
-        doc.add_page_break()
-        dh = doc.add_paragraph()
-        dh.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        dr = dh.add_run(title)
-        dr.font.size = Pt(15); dr.font.bold = True; dr.font.name = "SimSun"
-        dr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-        dsub = doc.add_paragraph()
-        dsub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        drs = dsub.add_run(f"表格编号 {group.form_code or ''}　　民航总医院检验科生化免疫组　　生效日期：{plan.year or ''}.01.01")
-        drs.font.size = Pt(10.5); drs.font.name = "SimSun"
-        drs._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-
         for blk in data["matrix"]:
             _heading(doc, f"水平{blk['level']}")
             ncol = 3 + len(compared) * 3
@@ -554,20 +630,10 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
                 col = RGBColor(0x27, 0xae, 0x60) if ok else RGBColor(0xc0, 0x39, 0x2b)
                 _fill(cells[1 + j], "Y" if ok else "N", color=col, bold=True)
 
-    _heading(doc, "结果分析")
-    p = doc.add_paragraph(); rr = p.add_run(plan.summary or "各仪器上述所有项目均比对合格。")
-    rr.font.size = Pt(11); rr.font.name = "SimSun"
-    rr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-
-    _heading(doc, "处理方案（如不合格）")
-    p = doc.add_paragraph(); rr = p.add_run(plan.handle_plan or "无")
-    rr.font.size = Pt(11); rr.font.name = "SimSun"
-    rr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
-
+    # 数据页底部：操作者 / 审核者 / 日期
     foot = doc.add_paragraph()
-    rf = foot.add_run(f"操作者：{plan.operator or '　　　　'}　　审核者：{plan.reviewer or '　　　　'}　　日期：{plan.compared_at or '　　　　'}")
-    rf.font.size = Pt(11); rf.font.name = "SimSun"
-    rf._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+    _run_font(foot.add_run(
+        f"操作者：{plan.operator or '　　　　'}　　审核者：{plan.reviewer or '　　　　'}　　日期：{plan.compared_at or '　　　　'}"), 11)
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     doc.save(out_path)
