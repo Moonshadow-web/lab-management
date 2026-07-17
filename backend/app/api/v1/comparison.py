@@ -319,6 +319,7 @@ def get_results(pid: int, db: Session = Depends(get_db), user: User = Depends(ge
         "items": json.loads(g.items) if g.items else [],
         "levels": g.levels,
         "instruments": instruments,
+        "global_ref_id": g.reference_instrument_id,
         "quant": quant, "qual": qual,
     }
 

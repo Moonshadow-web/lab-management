@@ -167,13 +167,36 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
     levels = group.levels or 5
     # 仅纳入本次计划实际录入了定量结果的项目（比对分批次进行，未参与本次的不列）
     involved = {name for (name, _lv) in results.keys()}
+    all_inst_ids = [i["id"] for i in instruments]
 
-    def _applicable(it):
-        """该项目适用的比对仪器 id 集合；未配置(空)=组内全部比对仪器。"""
+    def _all_applicable(it):
+        """该项目全部适用仪器 id（含参照仪器本身）；空 = 组内全部仪器。"""
         ids = it.get("instrument_ids") or []
         if not ids:
-            return set(compared)
-        return {c for c in compared if c in set(ids)}
+            return set(all_inst_ids)
+        return {c for c in all_inst_ids if c in set(ids)}
+
+    def _effective_ref(app):
+        """找出该项目的实际参照仪器 id：优先组参照；若组参照不适用，取第一个可用的比对仪器。"""
+        if ref_id in app:
+            return ref_id
+        for cid in compared:
+            if cid in app:
+                return cid
+        return ref_id  # fallback（不应发生）
+
+    def _compare_to_ids(app, eff_ref):
+        """该项目实际参与计算的比对仪器 id（排除有效靶机自身）。"""
+        return [cid for cid in compared if cid in app and cid != eff_ref]
+
+    # 预计算每项目的有效靶机（供 summary / matrix / 前端使用）
+    item_eff_refs = {}
+    for it in items:
+        if it["name"] not in involved:
+            continue
+        app = _all_applicable(it)
+        eff_ref = _effective_ref(app)
+        item_eff_refs[it["name"]] = eff_ref
 
     matrix = []
     for lv in range(1, levels + 1):
@@ -183,38 +206,49 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
                 continue
             r = results.get((it["name"], lv))
             ref_val = r.reference_value if r else ""
-            app = _applicable(it)
+            eff_ref = item_eff_refs[it["name"]]
+            app = _all_applicable(it)
+            compare_ids = _compare_to_ids(app, eff_ref)
             insts = {}
-            for cid in compared:
-                if cid not in app:
-                    insts[str(cid)] = {"value": "", "bias": None, "accepted": None, "masked": True}
-                    continue
+            # 有效靶机（动态参照）：标记 is_ref=True，在报告中显示"参照"而非"/"
+            v_ref = _load_json(r.values_json, {}).get(str(eff_ref), "") if r else ""
+            insts[str(eff_ref)] = {"value": v_ref, "bias": None, "accepted": None, "masked": False, "is_ref": True}
+            # 非靶机的比对仪器 → 正常计算偏倚
+            for cid in compare_ids:
                 v = _load_json(r.values_json, {}).get(str(cid), "") if r else ""
                 bias, accepted = _compute_bias(ref_val, v, _resolve_te(it), it.get("mode", "relative"))
                 insts[str(cid)] = {"value": v, "bias": bias, "accepted": accepted, "masked": False}
+            # 其余不适用仪器 → masked（组参照仪不在 app 或其它不适用）
+            for cid in [i for i in [ref_id] + compared if i != eff_ref and i not in compare_ids]:
+                insts[str(cid)] = {"value": "", "bias": None, "accepted": None, "masked": True}
             rows.append({
                 "item": it["name"],
                 "label": it.get("label", ""),
                 "te": _resolve_te(it),
                 "mode": it.get("mode", "relative"),
                 "ref": ref_val,
+                "effective_ref_id": eff_ref,
                 "insts": insts,
             })
         matrix.append({"level": lv, "rows": rows})
 
-    # 汇总：分仪器（每台非靶机）= 各自项目×水平的允许判定，便于一眼看出哪台仪器有问题
+    # 汇总：分仪器——注意动态靶机下，某仪器若是某项目的实际参照，则该项目不归入该仪器的成绩
     summary = []
     for cid in compared:
         per_item = []
         for it in items:
             if it["name"] not in involved:
                 continue
-            app = _applicable(it)
+            eff_ref = item_eff_refs.get(it["name"])
+            if cid == eff_ref:
+                continue  # 该仪器此项是靶机（非比对仪器），不列入汇总
+            app = _all_applicable(it)
             if cid not in app:
                 continue
             level_ok = []
             for lv in range(1, levels + 1):
                 r = results.get((it["name"], lv))
+                # 偏倚计算：对照该项目的实际靶机值（reference_value）
                 v = _load_json(r.values_json, {}).get(str(cid), "") if r else ""
                 _, accepted = _compute_bias(r.reference_value if r else "", v, _resolve_te(it), it.get("mode", "relative"))
                 level_ok.append(accepted is True)
@@ -229,6 +263,7 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
         "matrix": matrix,
         "summary": summary,
         "ref_id": ref_id,
+        "item_eff_refs": item_eff_refs,
     }
 
 
@@ -329,17 +364,20 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
         _qual_ok = _qual_vals and all(a is not None and a >= 80 for a in _qual_vals)
         html.append(f'<p>总结：使用5例样本进行室内比对，结果阴阳符合率见上表，结果一致性{"可接受" if _qual_ok else "待评估"}。</p>')
     else:
+        inst_name_map = {i["id"]: i["name"] for i in data["instruments"]}
         for blk in data["matrix"]:
             html.append(f"<h2>水平{blk['level']}</h2>")
             html.append('<table><thead><tr><th class="item">项目</th>'
-                        f'<th>{ref["name"] if ref else "标准"}</th><th>允许TE%</th>')
+                        '<th>参照值（靶机）</th><th>允许TE%</th>')
             for ins in data["instruments"]:
                 if ins["is_reference"]:
                     continue
                 html.append(f'<th>{ins["name"]}</th><th>偏倚%</th><th>是否允许</th>')
             html.append("</tr></thead><tbody>")
             for r in blk["rows"]:
-                html.append(f'<tr><td class="item">{r["item"]}</td><td>{r["ref"]}</td><td>{r["te"]}</td>')
+                eff_name = inst_name_map.get(r.get("effective_ref_id"), "")
+                ref_label = f'{r["ref"]}' if not eff_name else f'{r["ref"]}（{eff_name}）'
+                html.append(f'<tr><td class="item">{r["item"]}</td><td>{ref_label}</td><td>{r["te"]}</td>')
                 for ins in data["instruments"]:
                     if ins["is_reference"]:
                         continue
@@ -347,6 +385,10 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
                     if c.get("masked"):
                         html.append('<td class="mask">/</td><td class="mask">/</td><td class="mask">/</td>')
                         continue
+                    if c.get("is_ref"):
+                        html.append(f'<td>{c.get("value","")}</td><td style="color:#409eff;font-weight:600">参照</td><td>—</td>')
+                        continue
+                    bias = c.get("bias"); acc = c.get("accepted")
                     bias = c.get("bias")
                     acc = c.get("accepted")
                     bias_s = f"{bias}%" if bias is not None else "-"
@@ -616,6 +658,8 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
     else:
         ref = next((i for i in data["instruments"] if i["is_reference"]), None)
         compared = [i for i in data["instruments"] if not i["is_reference"]]
+        # 预建 {inst_id → name} 查找
+        inst_name_map = {i["id"]: i["name"] for i in data["instruments"]}
         for blk in data["matrix"]:
             _heading(doc, f"水平{blk['level']}")
             ncol = 3 + len(compared) * 3
@@ -624,7 +668,7 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
             t.alignment = WD_TABLE_ALIGNMENT.CENTER
             hdr = t.rows[0].cells
             _fill(hdr[0], "项目", bold=True)
-            _fill(hdr[1], ref["name"] if ref else "标准", bold=True)
+            _fill(hdr[1], "参照值（靶机）", bold=True)
             _fill(hdr[2], "允许TE%", bold=True)
             ci = 3
             for ins in compared:
@@ -633,7 +677,10 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
             for r in blk["rows"]:
                 cells = t.add_row().cells
                 _fill(cells[0], r["item"], align="left")
-                _fill(cells[1], r["ref"])
+                # 参照值：值 + 有效靶机名（如果与组参照不同则附加说明）
+                eff_name = inst_name_map.get(r.get("effective_ref_id"), "")
+                ref_label = f'{r["ref"]}' if not eff_name else f'{r["ref"]}（{eff_name}）'
+                _fill(cells[1], ref_label)
                 _fill(cells[2], r["te"])
                 ci = 3
                 for ins in compared:
@@ -642,6 +689,11 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
                         _fill(cells[ci], "/"); _fill(cells[ci + 1], "/"); _fill(cells[ci + 2], "/")
                         ci += 3
                         continue
+                    if c.get("is_ref"):
+                        # 该项目以此仪器为靶机
+                        _fill(cells[ci], c.get("value", ""));
+                        _fill(cells[ci + 1], "参照", size=9, color=RGBColor(0x40, 0x9e, 0xff));
+                        _fill(cells[ci + 2], "—", size=9)
                     bias = c.get("bias"); acc = c.get("accepted")
                     bias_s = f"{bias}%" if bias is not None else "-"
                     acc_s = {True: "Y", False: "N", None: "-"}[acc]
