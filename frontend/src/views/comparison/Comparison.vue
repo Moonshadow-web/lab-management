@@ -1,15 +1,15 @@
 <template>
   <div class="cmp-page">
     <div class="toolbar">
+      <el-button :icon="EditPen" @click="openGroupEdit" :disabled="!selectedGroup">编辑分组</el-button>
+      <el-button type="danger" :icon="Delete" @click="onDeleteGroup" :disabled="!selectedGroup">删除分组</el-button>
+      <el-button type="primary" :icon="Plus" @click="openGroupCreate">新建分组</el-button>
       <el-select v-model="selectedGroupId" filterable placeholder="选择比对分组" style="width:300px"
         @change="onGroupChange">
         <el-option v-for="g in groups" :key="g.id" :label="`${g.name}（${g.form_code}）`" :value="g.id" />
       </el-select>
       <el-tag type="info" v-if="selectedGroup">类型：{{ selectedGroup.category }}｜水平：{{ selectedGroup.levels }}｜项目：{{ selectedGroup.items.length }}</el-tag>
       <div style="flex:1" />
-      <el-button :icon="EditPen" @click="openGroupEdit" :disabled="!selectedGroup">编辑分组</el-button>
-      <el-button type="danger" :icon="Delete" @click="onDeleteGroup" :disabled="!selectedGroup">删除分组</el-button>
-      <el-button type="primary" :icon="Plus" @click="openGroupCreate">新建分组</el-button>
       <el-button type="success" :icon="Plus" @click="openPlanCreate" :disabled="!selectedGroup">新建计划</el-button>
     </div>
 
