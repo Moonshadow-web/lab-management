@@ -245,14 +245,15 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
             app = _all_applicable(it)
             if cid not in app:
                 continue
-            level_ok = []
+            level_info = []
             for lv in range(1, levels + 1):
                 r = results.get((it["name"], lv))
                 # 偏倚计算：对照该项目的实际靶机值（reference_value）
                 v = _load_json(r.values_json, {}).get(str(cid), "") if r else ""
+                ref_val = r.reference_value if r else ""
                 _, accepted = _compute_bias(r.reference_value if r else "", v, _resolve_te(it), it.get("mode", "relative"))
-                level_ok.append(accepted is True)
-            per_item.append({"item": it["name"], "label": it.get("label", ""), "levels": level_ok})
+                level_info.append({"ref": ref_val, "ok": accepted is True})
+            per_item.append({"item": it["name"], "label": it.get("label", ""), "levels": level_info})
         if per_item:
             ins_name = next((i["name"] for i in instruments if i["id"] == cid), f"仪器{cid}")
             summary.append({"instrument_id": cid, "instrument_name": ins_name, "items": per_item})
@@ -407,9 +408,12 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
             html.append("</tr></thead><tbody>")
             for it in s["items"]:
                 html.append(f'<tr><td class="item">{it["item"]}</td>')
-                for ok in it["levels"]:
+                for info in it["levels"]:
+                    ok = info["ok"]
                     cls = "yes" if ok else "no"
-                    html.append(f'<td class="{cls}">{"Y" if ok else "N"}</td>')
+                    ref = str(info.get("ref") or "")
+                    ref_line = f"{ref}<br>" if ref else ""
+                    html.append(f'<td>{ref_line}<span class="{cls}">{"Y" if ok else "N"}</span></td>')
                 html.append("</tr>")
             html.append("</tbody></table>")
 
@@ -440,6 +444,23 @@ def _fill(cell, text, size=10.5, bold=False, align="center", color=None):
         for p in cell.paragraphs:
             for run in p.runs:
                 run.font.color.rgb = color
+
+
+def _fill_ref_yn(cell, ref, ok, size=10.5, align="center"):
+    """汇总单元格：上一行写靶机浓度，下一行写 Y/N（红绿色）。"""
+    cell.text = ""
+    p1 = cell.paragraphs[0]
+    p1.alignment = {"center": WD_ALIGN_PARAGRAPH.CENTER, "left": WD_ALIGN_PARAGRAPH.LEFT,
+                    "right": WD_ALIGN_PARAGRAPH.RIGHT}.get(align, WD_ALIGN_PARAGRAPH.CENTER)
+    run1 = p1.add_run(str(ref) if ref not in (None, "") else "—")
+    _run_font(run1, size, bold=False)
+    p2 = cell.add_paragraph()
+    p2.alignment = p1.alignment
+    acc_s = "Y" if ok else "N"
+    color = RGBColor(0x27, 0xae, 0x60) if ok else RGBColor(0xc0, 0x39, 0x2b)
+    run2 = p2.add_run(acc_s)
+    _run_font(run2, size, bold=True)
+    run2.font.color.rgb = color
 
 
 def _heading(doc, text, size=13):
@@ -724,9 +745,8 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
             for it in s["items"]:
                 cells = t.add_row().cells
                 _fill(cells[0], it["item"], align="left")
-                for j, ok in enumerate(it["levels"]):
-                    col = RGBColor(0x27, 0xae, 0x60) if ok else RGBColor(0xc0, 0x39, 0x2b)
-                    _fill(cells[1 + j], "Y" if ok else "N", color=col, bold=True)
+                for j, info in enumerate(it["levels"]):
+                    _fill_ref_yn(cells[1 + j], info.get("ref"), info["ok"])
 
     # 数据页底部：操作者 / 审核者 / 日期
     foot = doc.add_paragraph()
