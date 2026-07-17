@@ -278,15 +278,16 @@ def build_html(plan, data: dict, instrument_name: str, ref_lab: str):
         title = "室间比对结果记录及分析报告表"
 
     html = [f'<div class="rep">{css}<h1>{title}</h1>']
-    html.append(f'<div class="sub">民航总医院检验科　　部门：生化免疫组　　{yn}年{half}</div>')
+    table_no = "BG-SM-CZ-019" if data["has_quan"] else "BG-SM-CZ-018"
+    html.append(f'<div class="sub">表格编号：{table_no}　　民航总医院检验科生化免疫组　　生效日期：2026.1.1</div>')
     html.append("<h2>基本信息</h2>")
-    html.append(f"<p>我室仪器：{instrument_name or '　　　　'}　　参比实验室：{ref_lab or '　　　　'}</p>")
+    html.append(f"<p>本实验室仪器：{instrument_name or '　　　　'}　　参比实验室：{ref_lab or '　　　　'}</p>")
     html.append(f"<p>比对日期：{plan.compared_at or '　　　　'}　　操作者：{plan.operator or '　　　　'}　　审核者：{plan.reviewer or '　　　　'}</p>")
 
     # ---- 定量（BG-SM-CZ-019 结构：每项目一张 5 水平表） ----
     if data["has_quan"]:
         html.append("<h2>定量项目室间比对结果</h2>")
-        html.append('<p class="note">注：80%样本（4/5）的相对偏倚需低于允许总误差认为合格，允许总误差参照行标及国家卫健委室间质评要求，无相应要求的按照30%计算。</p>')
+        html.append('<p class="note">注：参考WS/T415-2024《无室间质量评价时的临床检验质量评价》。<br>80%样本（4/5）的相对偏倚需低于允许总误差认为合格，允许总误差参照行标及国家卫健委室间质评要求，无相应要求的按照30%计算。</p>')
         for proj in data["projects"]:
             if proj["kind"] != "定量":
                 continue
@@ -388,7 +389,7 @@ def _heading(doc, text, size=13):
 def _add_basic_info(doc, instrument_name, ref_lab, plan):
     _heading(doc, "基本信息")
     for line in [
-        f"我室仪器：{instrument_name or '　　　　'}　　参比实验室：{ref_lab or '　　　　'}",
+        f"本实验室仪器：{instrument_name or '　　　　'}　　参比实验室：{ref_lab or '　　　　'}",
         f"比对日期：{plan.compared_at or '　　　　'}　　操作者：{plan.operator or '　　　　'}　　审核者：{plan.reviewer or '　　　　'}",
     ]:
         p = doc.add_paragraph()
@@ -432,7 +433,8 @@ def build_docx(db, plan, data: dict, out_path: str, instrument_name: str, ref_la
 
     sub = doc.add_paragraph()
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    rs = sub.add_run(f"民航总医院检验科　　部门：生化免疫组　　{year}年{half}")
+    table_no = "BG-SM-CZ-019" if has_n else "BG-SM-CZ-018"
+    rs = sub.add_run(f"表格编号：{table_no}　　民航总医院检验科生化免疫组　　生效日期：2026.1.1")
     rs.font.size = Pt(10.5); rs.font.name = "SimSun"
     rs._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
 
@@ -442,9 +444,13 @@ def build_docx(db, plan, data: dict, out_path: str, instrument_name: str, ref_la
     if has_n:
         _heading(doc, "定量项目室间比对结果")
         pn = doc.add_paragraph()
-        rr = pn.add_run("注：80%样本（4/5）的相对偏倚需低于允许总误差认为合格，允许总误差参照行标及国家卫健委室间质评要求，无相应要求的按照30%计算。")
+        rr = pn.add_run("注：参考WS/T415-2024《无室间质量评价时的临床检验质量评价》。")
         rr.font.size = Pt(9.5); rr.font.color.rgb = RGBColor(0x66, 0x66, 0x66); rr.font.name = "SimSun"
         rr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+        pn2 = doc.add_paragraph()
+        rr2 = pn2.add_run("80%样本（4/5）的相对偏倚需低于允许总误差认为合格，允许总误差参照行标及国家卫健委室间质评要求，无相应要求的按照30%计算。")
+        rr2.font.size = Pt(9.5); rr2.font.color.rgb = RGBColor(0x66, 0x66, 0x66); rr2.font.name = "SimSun"
+        rr2._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
 
         for proj in data["projects"]:
             if proj["kind"] != "定量":
