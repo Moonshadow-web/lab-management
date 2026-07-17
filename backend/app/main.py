@@ -70,6 +70,7 @@ def _migrate_schema():
         },
         "qc_target_batches": {
             "level": "INTEGER",
+            "qc_material_id": "INTEGER",
         },
     }
     with engine.begin() as conn:
@@ -239,6 +240,12 @@ async def lifespan(app: FastAPI):
         refresh_eqa_notifications(db)
         ensure_reminder_defaults(db)
         ensure_comparison_defaults(db)
+        # 质控品主数据：补齐预设（如「伯乐免疫多项」），仅当不存在时插入，幂等
+        from .models.qc_material import QcMaterial as _QM
+        for _pn in ["生化多项质控品", "伯乐免疫多项", "昆涞免疫多项"]:
+            if not db.query(_QM).filter(_QM.name == _pn).first():
+                db.add(_QM(name=_pn, items_json="[]"))
+        db.commit()
         # 升级兼容：已有接收人若未配置订阅分类，默认订阅全部现有规则（避免升级后收不到提醒）
         from .models.reminder import NotifyRecipient as _NR, ReminderRule as _RR
         _cats = [r.category for r in db.query(_RR).all() if r.category]

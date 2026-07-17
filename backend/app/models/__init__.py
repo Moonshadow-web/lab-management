@@ -18,6 +18,7 @@ from .verification import VerificationRecord
 from .comparison import ComparisonGroup, ComparisonPlan, ComparisonResult, ComparisonQualResult
 from .interlab import InterlabPlan, InterlabItem
 from .qc_target import QCTargetBatch, QCTargetResult
+from .qc_material import QcMaterial
 
 __all__ = [
     "User",
@@ -51,4 +52,5 @@ __all__ = [
     "InterlabItem",
     "QCTargetBatch",
     "QCTargetResult",
+    "QcMaterial",
 ]

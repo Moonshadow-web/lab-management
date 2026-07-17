@@ -17,7 +17,8 @@
       <el-input v-model="kw" placeholder="搜索批号/仪器" clearable style="width:180px" @keyup.enter="loadBatches" @clear="loadBatches" />
       <el-button type="primary" @click="loadBatches">查询</el-button>
       <el-button v-if="auth.canWrite('qc')" type="success" @click="openNew">+ 新建批号</el-button>
-      <span class="tb-hint">一盒质控品一条批号；生化多项仅存档，其余录入结果按所选方法累计靶值。</span>
+      <el-button v-if="auth.canWrite('qc')" @click="openMatManage">质控品管理</el-button>
+      <span class="tb-hint">一盒质控品一条批号（同质控品不同批号共享项目清单）；生化多项仅存档，其余录入结果按所选方法累计靶值。</span>
     </div>
 
     <!-- 列表 -->
@@ -69,10 +70,16 @@
     <el-dialog v-model="editVisible" :title="editForm.id ? '编辑批号' : '新建批号累积靶值'" width="560px" append-to-body>
       <el-form label-width="92px">
         <el-form-item label="质控品" required>
-          <el-select v-model="editForm.qc_material" filterable allow-create placeholder="选择或输入" style="width:100%"
-            @change="onMaterialChange">
-            <el-option v-for="m in presets" :key="m" :label="m" :value="m" />
-          </el-select>
+          <div class="mat-pick">
+            <el-select v-model="editForm.qc_material_id" filterable placeholder="选择质控品" style="width:100%"
+              @change="onMaterialPick">
+              <el-option v-for="m in materials" :key="m.id" :label="m.name" :value="m.id" />
+            </el-select>
+            <el-button link type="primary" @click="openMatManage()">+ 新建质控品</el-button>
+          </div>
+          <div class="form-tip" v-if="currentMatItems.length">
+            该项目含：{{ currentMatItems.join('、') }}
+          </div>
         </el-form-item>
         <el-form-item label="批号" required>
           <el-input v-model="editForm.lot_no" placeholder="如 20260101" />
@@ -164,8 +171,13 @@
 
           <!-- 录入区 -->
           <div v-if="auth.canWrite('qc')" class="entry">
-            <el-select v-model="resultForm.analyte" filterable allow-create placeholder="项目/分析物" style="width:180px">
-              <el-option v-for="a in stats.analytes" :key="a" :label="a" :value="a" />
+            <el-select v-model="resultForm.analyte" filterable allow-create placeholder="项目/分析物" style="width:200px">
+              <el-option-group label="质控品项目">
+                <el-option v-for="a in stats.material_items" :key="'m_' + a" :label="a" :value="a" />
+              </el-option-group>
+              <el-option-group label="已录入">
+                <el-option v-for="a in stats.analytes" :key="'e_' + a" :label="a" :value="a" />
+              </el-option-group>
             </el-select>
             <el-input v-model="resultForm.value" type="number" placeholder="测定值" style="width:140px" @keyup.enter="submitResult" />
             <el-date-picker v-model="resultForm.qc_date" type="date" value-format="YYYY-MM-DD" placeholder="日期" style="width:160px" />
@@ -203,11 +215,54 @@
         </template>
       </div>
     </el-dialog>
+
+    <!-- 质控品管理对话框 -->
+    <el-dialog v-model="matManageVisible" title="质控品管理" width="680px" top="5vh" append-to-body>
+      <div class="mat-toolbar" v-if="auth.canWrite('qc')">
+        <el-button type="primary" size="small" @click="openMatNew">+ 新建质控品</el-button>
+        <span class="form-tip">同一种质控品（不同批号）共享同一份项目清单；建批选质控品后，录入结果的分析物下拉即由它预填。</span>
+      </div>
+      <el-table :data="materials" border size="small" v-loading="matLoading" style="margin-top:8px">
+        <el-table-column prop="name" label="质控品" min-width="140" />
+        <el-table-column label="包含项目" min-width="240">
+          <template #default="{ row }">
+            <el-tag v-for="it in (row.items || [])" :key="it" size="small" style="margin:2px">{{ it }}</el-tag>
+            <span v-if="!row.items || !row.items.length" class="lv-muted">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150" v-if="auth.canWrite('qc')">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openMatEdit(row)">编辑</el-button>
+            <el-button link type="danger" size="small" @click="delMat(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 新建/编辑质控品 -->
+      <el-dialog v-model="matEditVisible" :title="matForm.id ? '编辑质控品' : '新建质控品'" width="460px" append-to-body>
+        <el-form label-width="84px">
+          <el-form-item label="名称" required>
+            <el-input v-model="matForm.name" placeholder="如 伯乐免疫多项" />
+          </el-form-item>
+          <el-form-item label="包含项目">
+            <el-input v-model="matItemsText" type="textarea" :rows="6" placeholder="每行一个项目，如：&#10;ALT&#10;AST&#10;肌酐" />
+            <div class="form-tip">同一质控品的不同批号共享此项目清单；录入结果时作为分析物下拉候选（仍可手填其他项）。</div>
+          </el-form-item>
+          <el-form-item label="备注">
+            <el-input v-model="matForm.note" type="textarea" :rows="2" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="matEditVisible = false">取消</el-button>
+          <el-button type="primary" :loading="matSaving" @click="saveMat">保存</el-button>
+        </template>
+      </el-dialog>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '../../store/auth'
 import {
@@ -215,6 +270,9 @@ import {
   getMaterialPresets, addTargetResult, listTargetResults, deleteTargetResult,
   toggleTargetResult, establishTarget, uploadTargetArchive, downloadTargetArchive,
 } from '../../api/qc_target'
+import {
+  listQcMaterials, createQcMaterial, updateQcMaterial, deleteQcMaterial,
+} from '../../api/qc_material'
 
 const auth = useAuthStore()
 const ARCHIVE_MATERIAL = '生化多项质控品'
@@ -225,6 +283,7 @@ const page = ref(1)
 const pageSize = ref(10)
 const loading = ref(false)
 const presets = ref([ARCHIVE_MATERIAL, '伯乐免疫多项', '昆涞免疫多项'])
+const materials = ref([])
 const filterMaterial = ref('')
 const filterMode = ref('')
 const filterMethod = ref('')
@@ -256,9 +315,17 @@ async function loadBatches() {
 }
 
 onMounted(async () => {
-  try { presets.value = await getMaterialPresets() } catch (e) {}
+  await loadMaterials()
   loadBatches()
 })
+
+async function loadMaterials() {
+  try {
+    const res = await listQcMaterials()
+    materials.value = res || []
+    presets.value = materials.value.map(m => m.name)
+  } catch (e) {}
+}
 
 function statusType(s) {
   if (s === '已确立' || s === '在控') return 'success'
@@ -270,15 +337,23 @@ function statusType(s) {
 // ---------------- 新建/编辑 ----------------
 const editVisible = ref(false)
 const saving = ref(false)
-const editForm = reactive({ id: null, qc_material: '', lot_no: '', level: 0, instrument: '', method: 'conventional', note: '' })
+const editForm = reactive({ id: null, qc_material: '', qc_material_id: null, lot_no: '', level: 0, instrument: '', method: 'conventional', note: '' })
 const archiveFile = ref(null)
 const currentArchive = ref('')
 
-function onMaterialChange() {
+const currentMatItems = computed(() => {
+  if (!editForm.qc_material_id) return []
+  const m = materials.value.find(x => x.id === editForm.qc_material_id)
+  return m && m.items ? m.items : []
+})
+
+function onMaterialPick(id) {
+  const m = materials.value.find(x => x.id === id)
+  editForm.qc_material = m ? m.name : ''
   if (editForm.qc_material === ARCHIVE_MATERIAL) editForm.method = ''
 }
 function openNew() {
-  Object.assign(editForm, { id: null, qc_material: '', lot_no: '', level: 0, instrument: '', method: 'conventional', note: '' })
+  Object.assign(editForm, { id: null, qc_material: '', qc_material_id: null, lot_no: '', level: 0, instrument: '', method: 'conventional', note: '' })
   archiveFile.value = null
   currentArchive.value = ''
   editVisible.value = true
@@ -295,6 +370,7 @@ async function saveBatch() {
   try {
     const payload = {
       qc_material: editForm.qc_material,
+      qc_material_id: editForm.qc_material_id || null,
       lot_no: editForm.lot_no,
       level: Number(editForm.level) || 0,
       instrument: editForm.instrument,
@@ -331,6 +407,61 @@ async function removeBatch(row) {
     await deleteTargetBatch(row.id)
     ElMessage.success('已删除')
     loadBatches()
+  } catch (e) {
+    ElMessage.error('删除失败：' + (e.response?.data?.detail || e.message))
+  }
+}
+
+// ---------------- 质控品主数据管理 ----------------
+const matManageVisible = ref(false)
+const matEditVisible = ref(false)
+const matLoading = ref(false)
+const matSaving = ref(false)
+const matForm = reactive({ id: null, name: '', note: '' })
+const matItemsText = ref('')
+
+function openMatManage() {
+  loadMaterials()
+  matManageVisible.value = true
+}
+function openMatNew() {
+  Object.assign(matForm, { id: null, name: '', note: '' })
+  matItemsText.value = ''
+  matEditVisible.value = true
+}
+function openMatEdit(row) {
+  Object.assign(matForm, { id: row.id, name: row.name, note: row.note || '' })
+  matItemsText.value = (row.items || []).join('\n')
+  matEditVisible.value = true
+}
+async function saveMat() {
+  if (!matForm.name || !matForm.name.trim()) {
+    ElMessage.warning('请填写质控品名称')
+    return
+  }
+  matSaving.value = true
+  try {
+    const items = matItemsText.value.split('\n').map(s => s.trim()).filter(Boolean)
+    const payload = { name: matForm.name.trim(), items, note: matForm.note }
+    if (matForm.id) await updateQcMaterial(matForm.id, payload)
+    else await createQcMaterial(payload)
+    ElMessage.success('已保存')
+    matEditVisible.value = false
+    await loadMaterials()
+  } catch (e) {
+    ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    matSaving.value = false
+  }
+}
+async function delMat(row) {
+  try {
+    await ElMessageBox.confirm(`确认删除质控品「${row.name}」？关联批号的项目预填将失效（批号本身保留）。`, '提示', { type: 'warning' })
+  } catch (e) { return }
+  try {
+    await deleteQcMaterial(row.id)
+    ElMessage.success('已删除')
+    await loadMaterials()
   } catch (e) {
     ElMessage.error('删除失败：' + (e.response?.data?.detail || e.message))
   }
@@ -500,4 +631,6 @@ async function uploadDetailArchive() {
 .ana-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
 .ana-row b { color: #303133; }
 .entry { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+.mat-pick { display: flex; gap: 8px; align-items: center; width: 100%; }
+.mat-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 </style>

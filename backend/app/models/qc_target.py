@@ -28,6 +28,7 @@ class QCTargetBatch(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     qc_material: Mapped[str] = mapped_column(String(200), index=True, default="")  # 质控品
+    qc_material_id: Mapped[int | None] = mapped_column(ForeignKey("qc_materials.id"), nullable=True, index=True, default=None)  # 关联注册质控品
     lot_no: Mapped[str] = mapped_column(String(100), index=True, default="")  # 批号
     level: Mapped[int] = mapped_column(Integer, default=0)  # 水平 1/2/3，0=未指定
     instrument: Mapped[str] = mapped_column(String(100), index=True, default="")  # 仪器

@@ -16,6 +16,7 @@ from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
 from ...models.qc_target import QCTargetBatch, QCTargetResult, QC_MATERIAL_PRESETS
+from ...models.qc_material import QcMaterial
 from ...models.user import User
 from ...services import qc_target as svc
 
@@ -33,6 +34,7 @@ WRITE = require_roles("admin", "qc_manager")
 class QCTargetBatchBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     qc_material: str = ""
+    qc_material_id: int | None = None  # 关联注册质控品（主数据）；空=未关联
     lot_no: str = ""
     level: int = 0  # 水平 1/2/3，0=未指定
     instrument: str = ""
@@ -77,11 +79,15 @@ def material_presets(db: Session = Depends(get_db), user: User = Depends(get_cur
 # batches CRUD（含 mode 归一化）
 # ---------------------------------------------------------------------------
 def _normalize_mode(db, action, obj):
-    """建批/改批时，按质控品归一化 mode 与 method：
-    - 生化多项质控品 → 仅存档（archive），method 清空；
-    - 其余 → 录入（entry），method 必为 conventional/immediate。
-    archive 模式建批即视为已存档（established=True）。
+    """建批/改批时：
+    - 若传了 qc_material_id，回填质控品名称（来自主数据）；
+    - 按质控品归一化 mode 与 method：生化多项质控品→仅存档，其余→录入。
     """
+    mid = getattr(obj, "qc_material_id", None)
+    if mid:
+        reg = db.get(QcMaterial, mid)
+        if reg:
+            obj.qc_material = reg.name
     mat = (obj.qc_material or "").strip()
     if mat == "生化多项质控品":
         obj.mode = "archive"
@@ -148,6 +154,15 @@ def _build_stats(db, batch):
         batch_status = "有失控"
     else:
         batch_status = "累积中"
+    # 关联质控品的项目清单（供录入分析物下拉预填）
+    material_items = []
+    if batch.qc_material_id:
+        reg = db.get(QcMaterial, batch.qc_material_id)
+        if reg and reg.items_json:
+            try:
+                material_items = json.loads(reg.items_json) or []
+            except Exception:
+                material_items = []
     return {
         "analytes": analytes,
         "per_analyte": per,
@@ -155,6 +170,7 @@ def _build_stats(db, batch):
         "total_entries": len(results),
         "out_count": sum(1 for r in results if r.is_out),
         "established_analytes": sum(1 for a in per.values() if a["established"]),
+        "material_items": material_items,
     }
 
 
