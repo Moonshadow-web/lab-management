@@ -202,26 +202,26 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
             })
         matrix.append({"level": lv, "rows": rows})
 
-    # 汇总：每项目各水平是否全部允许（仅统计适用仪器）
+    # 汇总：分仪器（每台非靶机）= 各自项目×水平的允许判定，便于一眼看出哪台仪器有问题
     summary = []
-    for it in items:
-        if it["name"] not in involved:
-            continue
-        app = _applicable(it)
-        level_ok = []
-        for lv in range(1, levels + 1):
-            r = results.get((it["name"], lv))
-            ok = True
-            for cid in compared:
-                if cid not in app:
-                    continue
+    for cid in compared:
+        per_item = []
+        for it in items:
+            if it["name"] not in involved:
+                continue
+            app = _applicable(it)
+            if cid not in app:
+                continue
+            level_ok = []
+            for lv in range(1, levels + 1):
+                r = results.get((it["name"], lv))
                 v = _load_json(r.values_json, {}).get(str(cid), "") if r else ""
                 _, accepted = _compute_bias(r.reference_value if r else "", v, _resolve_te(it), it.get("mode", "relative"))
-                if accepted is not True:
-                    ok = False
-                    break
-            level_ok.append(ok)
-        summary.append({"item": it["name"], "label": it.get("label", ""), "levels": level_ok, "ok": all(level_ok)})
+                level_ok.append(accepted is True)
+            per_item.append({"item": it["name"], "label": it.get("label", ""), "levels": level_ok})
+        if per_item:
+            ins_name = next((i["name"] for i in instruments if i["id"] == cid), f"仪器{cid}")
+            summary.append({"instrument_id": cid, "instrument_name": ins_name, "items": per_item})
     return {
         "category": "定量",
         "instruments": instruments,
@@ -258,8 +258,8 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
     year = plan.year or ""
     kind = "定性" if group.category == "定性" else "定量"
     html = [f'<div class="rep">{css}'
-            f'<div class="sub" style="text-align:left">民航总医院检验科　　生化免疫组　　比对日期：{plan.compared_at or ""}</div>'
             f'<h1>{kind}室内比对报告（{group.name}）</h1>'
+            f'<div class="sub" style="text-align:center;font-size:13px">民航总医院检验科　　生化免疫组　　比对日期：{plan.compared_at or ""}</div>'
             f'<div class="sub">表格编号 BG-SM-CZ-022（封面）　　{form_code}（数据页）　　民航总医院检验科生化免疫组　　生效日期：{year}.01.01</div>']
 
     # 第一页（022 封面）：比对方案 / 结果分析 / 处理方案
@@ -357,17 +357,19 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
             html.append("</tbody></table>")
 
         html.append("<h2>汇总</h2>")
-        html.append('<table><thead><tr><th class="item">项目</th>')
-        for lv in range(1, (group.levels or 5) + 1):
-            html.append(f"<th>水平{lv}</th>")
-        html.append("</tr></thead><tbody>")
         for s in data["summary"]:
-            html.append(f'<tr><td class="item">{s["item"]}</td>')
-            for ok in s["levels"]:
-                cls = "yes" if ok else "no"
-                html.append(f'<td class="{cls}">{"Y" if ok else "N"}</td>')
-            html.append("</tr>")
-        html.append("</tbody></table>")
+            html.append(f'<h3 style="font-size:13px;margin:8px 0 4px;color:#1a365d">▶ {s["instrument_name"]}（{len(s["items"])} 项）</h3>')
+            html.append('<table><thead><tr><th class="item">项目</th>')
+            for lv in range(1, (group.levels or 5) + 1):
+                html.append(f"<th>水平{lv}</th>")
+            html.append("</tr></thead><tbody>")
+            for it in s["items"]:
+                html.append(f'<tr><td class="item">{it["item"]}</td>')
+                for ok in it["levels"]:
+                    cls = "yes" if ok else "no"
+                    html.append(f'<td class="{cls}">{"Y" if ok else "N"}</td>')
+                html.append("</tr>")
+            html.append("</tbody></table>")
 
     html.append(f'<div class="foot">操作者：{plan.operator or "　　　　"}　　审核者：{plan.reviewer or "　　　　"}　　日期：{plan.compared_at or "　　　　"}</div>')
     html.append("</div>")
@@ -427,27 +429,62 @@ def _add_field(run, field):
 
 
 def _add_footer_code(section, code, year):
-    """页脚：左 表格编号 / 右 医院+页码 / 中 生效日期。"""
+    """页脚：3 列 1 行表 → 左 表格编号/生效日期（堆 2 行），中 医院名，右 第X页/共Y页。"""
     footer = section.footer
     footer.is_linked_to_previous = False
-    for p in footer.paragraphs:
+    # 清空默认段落
+    for p in list(footer.paragraphs):
         p.text = ""
-    p = footer.paragraphs[0]
-    p.paragraph_format.tab_stops.add_tab_stop(Cm(16), WD_TAB_ALIGNMENT.RIGHT)
-    _run_font(p.add_run(f"表格编号：{code}\t"), 9)
-    _run_font(p.add_run("民航总医院检验科生化免疫组 第 "), 9)
+    # 1×3 表格做三栏
+    tbl = footer.add_table(rows=1, cols=3, width=Cm(17.4))
+    tbl.autofit = False
+    tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    # 去掉表格边框
+    from docx.oxml import OxmlElement
+    tblPr = tbl._tbl.tblPr
+    borders = OxmlElement('w:tblBorders')
+    for side in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+        b = OxmlElement(f'w:{side}')
+        b.set(qn('w:val'), 'none')
+        b.set(qn('w:sz'), '0')
+        borders.append(b)
+    tblPr.append(borders)
+    # 列宽：左 5cm / 中 7.4cm / 右 5cm
+    widths = [Cm(5), Cm(7.4), Cm(5)]
+    for i, w in enumerate(widths):
+        for c in tbl.columns[i].cells:
+            c.width = w
+    left, center, right = tbl.rows[0].cells
+
+    # 左：两行
+    left.text = ""
+    p1 = left.paragraphs[0]
+    p1.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    _run_font(p1.add_run(f"表格编号：{code}"), 9)
+    p2 = left.add_paragraph()
+    p2.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    _run_font(p2.add_run(f"生效日期：{year}.01.01"), 9)
+
+    # 中：医院名
+    center.text = ""
+    p = center.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _run_font(p.add_run("民航总医院检验科生化免疫组"), 9)
+
+    # 右：第 X 页 共 Y 页
+    right.text = ""
+    p = right.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    _run_font(p.add_run("第 "), 9)
     _add_field(p.add_run(""), "PAGE")
     _run_font(p.add_run(" 页 共 "), 9)
     _add_field(p.add_run(""), "NUMPAGES")
     _run_font(p.add_run(" 页"), 9)
-    p2 = footer.add_paragraph()
-    p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _run_font(p2.add_run(f"生效日期：{year}.01.01"), 9)
 
 
 def _cover_header(doc, plan):
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _run_font(p.add_run(
         f"民航总医院检验科　　　　生化免疫组　　　　比对日期：{plan.compared_at or '　　　　　'}"), 10.5)
 
@@ -531,8 +568,8 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
         s.top_margin = Cm(1.8); s.bottom_margin = Cm(1.8)
         s.left_margin = Cm(1.8); s.right_margin = Cm(1.8)
     _add_footer_code(sec0, "BG-SM-CZ-022", year)
-    _cover_header(doc, plan)
     _cover_title(doc, group)
+    _cover_header(doc, plan)
     _cover_plan(doc, group, plan, data)
     _cover_analysis(doc, plan)
     _cover_handle(doc, plan)
@@ -615,20 +652,29 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
                     ci += 3
 
         _heading(doc, "汇总")
-        ncol = 1 + (group.levels or 5)
-        t = doc.add_table(rows=1, cols=ncol)
-        t.style = "Table Grid"
-        t.alignment = WD_TABLE_ALIGNMENT.CENTER
-        hdr = t.rows[0].cells
-        _fill(hdr[0], "项目", bold=True)
-        for lv in range(1, (group.levels or 5) + 1):
-            _fill(hdr[lv], f"水平{lv}", bold=True)
+        levels_n = group.levels or 5
         for s in data["summary"]:
-            cells = t.add_row().cells
-            _fill(cells[0], s["item"], align="left")
-            for j, ok in enumerate(s["levels"]):
-                col = RGBColor(0x27, 0xae, 0x60) if ok else RGBColor(0xc0, 0x39, 0x2b)
-                _fill(cells[1 + j], "Y" if ok else "N", color=col, bold=True)
+            # 每台仪器：仪器名 + 项目×水平 表
+            sub = doc.add_paragraph()
+            sub.paragraph_format.space_before = Pt(6)
+            sr = sub.add_run(f"▶ {s['instrument_name']}（{len(s['items'])} 项）")
+            sr.font.size = Pt(11)
+            sr.font.bold = True
+            sr.font.name = "SimSun"
+            sr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
+            t = doc.add_table(rows=1, cols=1 + levels_n)
+            t.style = "Table Grid"
+            t.alignment = WD_TABLE_ALIGNMENT.CENTER
+            hdr = t.rows[0].cells
+            _fill(hdr[0], "项目", bold=True)
+            for lv in range(1, levels_n + 1):
+                _fill(hdr[lv], f"水平{lv}", bold=True)
+            for it in s["items"]:
+                cells = t.add_row().cells
+                _fill(cells[0], it["item"], align="left")
+                for j, ok in enumerate(it["levels"]):
+                    col = RGBColor(0x27, 0xae, 0x60) if ok else RGBColor(0xc0, 0x39, 0x2b)
+                    _fill(cells[1 + j], "Y" if ok else "N", color=col, bold=True)
 
     # 数据页底部：操作者 / 审核者 / 日期
     foot = doc.add_paragraph()
