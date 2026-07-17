@@ -17,18 +17,10 @@
       title="请先选择或新建一个比对分组。系统已预设：生化分析仪/ DXI800 / 凝血 / 早孕系列 / 血气 / 定性 等分组（对应 BG-SM-CZ-021/024~027/071）。" />
 
     <el-table v-else :data="plans" border size="small" style="margin-top:12px">
-      <el-table-column label="年份" width="100">
+      <el-table-column label="年份" width="80" prop="year" />
+      <el-table-column label="半年" width="80">
         <template #default="{ row }">
-          <el-input-number v-model="row.year" :min="2000" :max="2100" size="small"
-            controls-position="right" style="width:100%" @change="(v) => onInlineEdit(row, { year: v })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="半年" width="90">
-        <template #default="{ row }">
-          <el-select v-model="row.half" size="small" @change="(v) => onInlineEdit(row, { half: v })">
-            <el-option :value="1" label="上半年" />
-            <el-option :value="2" label="下半年" />
-          </el-select>
+          {{ row.half === 1 ? '上半年' : '下半年' }}
         </template>
       </el-table-column>
       <el-table-column label="靶机" width="150" prop="reference_instrument_name" show-overflow-tooltip />
@@ -76,11 +68,10 @@
           <el-button v-else size="small" plain @click="openAttachments(row)">+上传</el-button>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="290" fixed="right">
+      <el-table-column label="操作" min-width="260" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openEntry(row)">录入</el-button>
-          <el-button size="small" type="warning" @click="openReport(row)">报告</el-button>
-          <el-button size="small" @click="openAttachments(row)">附件</el-button>
+          <el-button size="small" type="warning" @click="openReport(row)">报告管理</el-button>
           <el-button size="small" @click="openPlanEdit(row)">编辑</el-button>
           <el-button size="small" type="danger" @click="onDeletePlan(row)">删除</el-button>
         </template>
