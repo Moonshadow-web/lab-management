@@ -368,7 +368,7 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
         for blk in data["matrix"]:
             html.append(f"<h2>水平{blk['level']}</h2>")
             html.append('<table><thead><tr><th class="item">项目</th>'
-                        '<th>参照值（靶机）</th><th>允许TE%</th>')
+                        '<th>参照值（靶机）</th><th>允许偏倚%</th>')
             for ins in data["instruments"]:
                 if ins["is_reference"]:
                     continue
@@ -669,7 +669,7 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
             hdr = t.rows[0].cells
             _fill(hdr[0], "项目", bold=True)
             _fill(hdr[1], "参照值（靶机）", bold=True)
-            _fill(hdr[2], "允许TE%", bold=True)
+            _fill(hdr[2], "允许偏倚%", bold=True)
             ci = 3
             for ins in compared:
                 _fill(hdr[ci], ins["name"], bold=True); _fill(hdr[ci + 1], "偏倚%", bold=True); _fill(hdr[ci + 2], "是否允许", bold=True)
