@@ -768,7 +768,8 @@ def _is_instr_header(v):
 
 
 def _match_instrument(header, instruments):
-    """header: Excel 列头（如 AU5821-B / 5811-急诊）；instruments: [{id,name,model}]。
+    """header: Excel 列头（如 AU5821-B / 5811-急诊 / AU5822(标准) / HT7600）；
+    instruments: [{id,name,model,is_reference}]。
     返回匹配到的系统仪器 id，或 None。"""
     h = (header or "").strip()
     if not h:
@@ -778,10 +779,32 @@ def _match_instrument(header, instruments):
     for ins in instruments:
         if _norm_token(ins.get("name", "")) == hn or _norm_token(ins.get("model", "")) == hn:
             return ins["id"]
+    # 包含"标准" → 参照仪器（模板中参照仪标记为 AU5822(标准) 等）
+    if "标准" in h:
+        for ins in instruments:
+            if ins.get("is_reference"):
+                return ins["id"]
     # 含"急诊" → 匹配含"急诊"的仪器（处理 5811-急诊 ↔ AU5800急诊 之类命名差异）
     if "急诊" in h:
         for ins in instruments:
             if "急诊" in (ins.get("name", "") + ins.get("model", "")):
+                return ins["id"]
+    # AU5822 → 实际上是 AU5821 系列（旧命名，已停用；新机为 AU5821 A/B）
+    if "au5822" in hn:
+        for ins in instruments:
+            n = _norm_token(ins.get("name", "") + ins.get("model", ""))
+            if "au5821" in n:
+                return ins["id"]
+    # HT7600 → 常见旧型号；优先匹配名字中含 ht 且非参照的仪器
+    if "ht7600" in hn:
+        for ins in instruments:
+            if not ins.get("is_reference"):
+                n = _norm_token(ins.get("name", "") + ins.get("model", ""))
+                if "ht" in n or "7600" in n:
+                    return ins["id"]
+        # 实在找不到，返回第一个非参照仪
+        for ins in instruments:
+            if not ins.get("is_reference"):
                 return ins["id"]
     # AU5821 + 后缀字母
     m = _re.search(r"au5821([ab])", hn)
