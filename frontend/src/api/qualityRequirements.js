@@ -16,8 +16,8 @@ export function deleteQualityRequirement(id) {
   return request.delete(`/api/v1/quality-requirements/${id}`)
 }
 export function listQualitySources() {
-  return request.get('/api/v1/quality-requirements/sources')
+  return request.get('/api/v1/quality-requirements/_meta/sources')
 }
 export function seedQualityRequirements() {
-  return request.post('/api/v1/quality-requirements/seed')
+  return request.post('/api/v1/quality-requirements/_meta/seed')
 }

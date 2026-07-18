@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ...core.crud_base import write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
 from ...models import ModulePermission
@@ -19,7 +20,6 @@ from ...models.module_permission import (
     DEFAULT_MODULE_PERMISSIONS, ALL_MODULES, ALL_ROLES,
 )
 from ...models.user import User
-from ...core.audit_log import write_audit
 
 router = APIRouter(prefix="/module-permissions", tags=["module-permissions"])
 

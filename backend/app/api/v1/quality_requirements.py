@@ -10,10 +10,10 @@ from sqlalchemy.orm import Session
 from ...core.crud_base import make_router, paginate
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
-from ...models.quality_requirement import QualityRequirement
+from ...models.quality_requirement import QualityRequirement, QUALITY_SOURCES
 from ...models.user import User
 from ...schemas import QualityRequirementCreate, QualityRequirementRead, QualityRequirementUpdate
-from ...services.quality_requirements_seed import QUALITY_SOURCES, all_seed
+from ...services.quality_requirements_seed import all_seed
 
 router = make_router(
     QualityRequirement,
@@ -28,13 +28,16 @@ router = make_router(
 )
 
 
-@router.get("/sources")
+@router.get("/_meta/sources")
 def list_sources(_: User = Depends(get_current_user)):
-    """返回所有可用标准源（描述 + 计数），供前端 tab 切换。"""
+    """返回所有可用标准源（描述 + 计数），供前端 tab 切换。
+
+    用 _meta 前缀避开 make_router 自动生成的 /{item_id} 路由（int_parsing 冲突）。
+    """
     return {"items": [{"id": sid, "name": name} for sid, name in QUALITY_SOURCES]}
 
 
-@router.post("/seed", dependencies=[Depends(require_roles("admin"))])
+@router.post("/_meta/seed", dependencies=[Depends(require_roles("admin"))])
 def seed_defaults(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """幂等灌库：已存在的 (source, item_name) 不会重复追加；缺则新增。"""
     seed_rows = all_seed()
