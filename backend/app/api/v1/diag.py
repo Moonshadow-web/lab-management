@@ -118,7 +118,7 @@ def get_build_mark() -> str:
 from fastapi import APIRouter, Depends  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
-from ..auth import require_roles  # noqa: E402
+from ...core.security import require_roles  # noqa: E402
 from ...models.user import User  # noqa: E402
 from ...core.database import get_db  # noqa: E402
 
