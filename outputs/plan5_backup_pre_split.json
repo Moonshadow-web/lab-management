@@ -1,0 +1,2004 @@
+{
+  "plan": {
+    "group_id": 1,
+    "year": 2026,
+    "half": 1,
+    "form_code": "BG-SM-CZ-025",
+    "form_title": "定量室内比对结果记录分析表（生化分析仪）",
+    "compared_at": "2026-06-09",
+    "operator": "吕文娟",
+    "reviewer": "金子正",
+    "summary": "",
+    "conclusion": "可接受",
+    "handle_plan": "无",
+    "status": "done",
+    "only_uncompared": false,
+    "report_filename": "BG-SM-CZ-022_BG-SM-CZ-025_2026_半年1.docx",
+    "id": 5,
+    "report_path": "comparison_reports/comparison_5_20260718093609.docx",
+    "created_by": "jinzizheng",
+    "created_at": "2026-07-18T07:19:25.456243",
+    "updated_at": "2026-07-18T09:36:10.658363"
+  },
+  "group1": {
+    "id": 1,
+    "name": "生化分析仪",
+    "category": "定量",
+    "form_code": "BG-SM-CZ-025",
+    "form_title": "定量室内比对结果记录分析表（生化分析仪）",
+    "instrument_ids": [
+      67,
+      68,
+      5
+    ],
+    "reference_instrument_id": 68,
+    "levels": 5,
+    "items": [
+      {
+        "name": "TBiL",
+        "label": "总胆红素",
+        "te": "5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "DBiL",
+        "label": "直接胆红素",
+        "te": "6.7",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "Alb",
+        "label": "白蛋白",
+        "te": "2",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "TP",
+        "label": "总蛋白",
+        "te": "2",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "P",
+        "label": "无机磷",
+        "te": "3",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "GlU",
+        "label": "葡萄糖",
+        "te": "2",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "Ca",
+        "label": "总钙",
+        "te": "2",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "Fe",
+        "label": "铁",
+        "te": "4.5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "GGT",
+        "label": "γ-谷氨酰基转移酶",
+        "te": "5.5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "LDH",
+        "label": "乳酸脱氢酶",
+        "te": "4",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "UIBC",
+        "label": "不饱和铁结合力/总铁结合力",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "CHE",
+        "label": "胆碱酯酶",
+        "te": "8",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "HDL",
+        "label": "高密度脂蛋白胆固醇",
+        "te": "8",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "HCY",
+        "label": "同型半胱氨酸",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "CysC",
+        "label": "胱抑素C",
+        "te": "8",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "TBA",
+        "label": "总胆汁酸",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "TG",
+        "label": "甘油三酯",
+        "te": "5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "CK",
+        "label": "肌酸激酶",
+        "te": "5.5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "Mg",
+        "label": "镁",
+        "te": "5.5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "LDL",
+        "label": "低密度脂蛋白胆固醇",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "LPS",
+        "label": "脂肪酶",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "PA",
+        "label": "前白蛋白",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "CO2",
+        "label": "二氧化碳",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "HP",
+        "label": "触珠蛋白",
+        "te": "12",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "AMY",
+        "label": "淀粉酶",
+        "te": "7.5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "AST",
+        "label": "天门冬氨酸氨基转移酶",
+        "te": "5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "ALT",
+        "label": "丙氨酸氨基转移酶",
+        "te": "5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "TC",
+        "label": "总胆固醇",
+        "te": "4",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "UREA",
+        "label": "尿素",
+        "te": "3",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "UA",
+        "label": "尿酸",
+        "te": "4.5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "ALP",
+        "label": "碱性磷酸酶",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "Cr",
+        "label": "肌酐",
+        "te": "5.5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "K",
+        "label": "钾",
+        "te": "2",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "Na",
+        "label": "钠",
+        "te": "1.5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "CL",
+        "label": "氯",
+        "te": "1.5",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "LAC",
+        "label": "乳酸",
+        "te": "12",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "CRP",
+        "label": "超敏C反应蛋白",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      },
+      {
+        "name": "sdLDL",
+        "label": "小而密低密度脂蛋白胆固醇",
+        "te": "",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          68
+        ]
+      },
+      {
+        "name": "Zn",
+        "label": "锌",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          68
+        ]
+      },
+      {
+        "name": "GA",
+        "label": "糖化白蛋白",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          68
+        ]
+      },
+      {
+        "name": "APOA1",
+        "label": "载脂蛋白A1",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          68
+        ]
+      },
+      {
+        "name": "APOB",
+        "label": "载脂蛋白B",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          68
+        ]
+      },
+      {
+        "name": "LPa",
+        "label": "脂蛋白a",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          68
+        ]
+      },
+      {
+        "name": "RF",
+        "label": "类风湿因子",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67
+        ]
+      },
+      {
+        "name": "IgA",
+        "label": "免疫球蛋白A",
+        "te": "8",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67
+        ]
+      },
+      {
+        "name": "IgG",
+        "label": "免疫球蛋白G",
+        "te": "8",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67
+        ]
+      },
+      {
+        "name": "IgM",
+        "label": "免疫球蛋白M",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67
+        ]
+      },
+      {
+        "name": "ASO",
+        "label": "抗链球菌溶血素O",
+        "te": "10",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67
+        ]
+      },
+      {
+        "name": "β2-微球蛋白",
+        "label": "β2-微球蛋白",
+        "te": "",
+        "mode": "relative",
+        "instrument_ids": [
+          5,
+          67,
+          68
+        ]
+      }
+    ],
+    "sample_desc": "5个不同浓度水平的室间质评样本",
+    "note": "",
+    "created_by": "system",
+    "created_at": "2026-07-16T14:42:18.774164",
+    "updated_at": "2026-07-18T09:36:08.984660"
+  },
+  "quant": [
+    {
+      "item": "VitB12",
+      "level": 1,
+      "reference_value": "103.6",
+      "values": {
+        "73": "103.2"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 1,
+      "reference_value": "15.8",
+      "values": {
+        "73": "16.6"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 2,
+      "reference_value": "32.08",
+      "values": {
+        "73": "0"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 2,
+      "reference_value": "15.9",
+      "values": {
+        "73": "0"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 3,
+      "reference_value": "946",
+      "values": {
+        "73": "914"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 3,
+      "reference_value": "903",
+      "values": {
+        "73": "876"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 4,
+      "reference_value": "570.7",
+      "values": {
+        "73": "524.5"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 4,
+      "reference_value": "23653",
+      "values": {
+        "73": "24934.5"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 5,
+      "reference_value": "33",
+      "values": {
+        "73": "29.8"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 5,
+      "reference_value": "102.1",
+      "values": {
+        "73": "93.8"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 6,
+      "reference_value": "1206",
+      "values": {
+        "73": "1104"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 6,
+      "reference_value": "18",
+      "values": {
+        "73": "18"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 7,
+      "reference_value": "1.2",
+      "values": {
+        "73": "1.1"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 7,
+      "reference_value": "159.7",
+      "values": {
+        "73": "165.9"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 8,
+      "reference_value": "1.1",
+      "values": {
+        "73": "1.1"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 8,
+      "reference_value": "171.9",
+      "values": {
+        "73": "165.9"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 9,
+      "reference_value": "5.82",
+      "values": {
+        "73": "6.42"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 9,
+      "reference_value": "1",
+      "values": {
+        "73": "1.09"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 10,
+      "reference_value": "11.94",
+      "values": {
+        "73": "12.35"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 10,
+      "reference_value": "10.23",
+      "values": {
+        "73": "10.33"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 11,
+      "reference_value": "4.09",
+      "values": {
+        "73": "4.3"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 11,
+      "reference_value": "90.67",
+      "values": {
+        "73": "93.65"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 12,
+      "reference_value": "0.48",
+      "values": {
+        "73": "0.497"
+      }
+    },
+    {
+      "item": "VitB12",
+      "level": 12,
+      "reference_value": "0.042",
+      "values": {
+        "73": "0.041"
+      }
+    },
+    {
+      "item": "Alb",
+      "level": 1,
+      "reference_value": "30.4",
+      "values": {
+        "67": "31.0",
+        "5": "30.2"
+      }
+    },
+    {
+      "item": "Alb",
+      "level": 2,
+      "reference_value": "38.5",
+      "values": {
+        "67": "39.0",
+        "5": "39.2"
+      }
+    },
+    {
+      "item": "Alb",
+      "level": 3,
+      "reference_value": "43.5",
+      "values": {
+        "67": "44.2",
+        "5": "44.2"
+      }
+    },
+    {
+      "item": "ALP",
+      "level": 1,
+      "reference_value": "247.0",
+      "values": {
+        "67": "258.7",
+        "5": "224.0"
+      }
+    },
+    {
+      "item": "ALP",
+      "level": 2,
+      "reference_value": "276.6",
+      "values": {
+        "67": "285.5",
+        "5": "261.0"
+      }
+    },
+    {
+      "item": "ALP",
+      "level": 3,
+      "reference_value": "783.0",
+      "values": {
+        "67": "826.4",
+        "5": "727.0"
+      }
+    },
+    {
+      "item": "ALT",
+      "level": 1,
+      "reference_value": "406.6",
+      "values": {
+        "67": "411.1",
+        "5": "414.0"
+      }
+    },
+    {
+      "item": "ALT",
+      "level": 2,
+      "reference_value": "314.0",
+      "values": {
+        "67": "319.0",
+        "5": "317.0"
+      }
+    },
+    {
+      "item": "ALT",
+      "level": 3,
+      "reference_value": "37.4",
+      "values": {
+        "67": "37.6",
+        "5": "38.0"
+      }
+    },
+    {
+      "item": "AMY",
+      "level": 1,
+      "reference_value": "740.3",
+      "values": {
+        "67": "746.6",
+        "5": "758.0"
+      }
+    },
+    {
+      "item": "AMY",
+      "level": 2,
+      "reference_value": "245.1",
+      "values": {
+        "67": "245.2",
+        "5": "251.0"
+      }
+    },
+    {
+      "item": "AMY",
+      "level": 3,
+      "reference_value": "164.1",
+      "values": {
+        "67": "164.6",
+        "5": "171.0"
+      }
+    },
+    {
+      "item": "AST",
+      "level": 1,
+      "reference_value": "872.7",
+      "values": {
+        "67": "882.6",
+        "5": "911.0"
+      }
+    },
+    {
+      "item": "AST",
+      "level": 2,
+      "reference_value": "284.4",
+      "values": {
+        "67": "292.5",
+        "5": "295.0"
+      }
+    },
+    {
+      "item": "AST",
+      "level": 3,
+      "reference_value": "35.5",
+      "values": {
+        "67": "35.9",
+        "5": "36.0"
+      }
+    },
+    {
+      "item": "UREA",
+      "level": 1,
+      "reference_value": "39.13",
+      "values": {
+        "67": "39.0",
+        "5": "38.98"
+      }
+    },
+    {
+      "item": "UREA",
+      "level": 2,
+      "reference_value": "29.85",
+      "values": {
+        "67": "29.3",
+        "5": "28.99"
+      }
+    },
+    {
+      "item": "UREA",
+      "level": 3,
+      "reference_value": "20.93",
+      "values": {
+        "67": "20.56",
+        "5": "21.21"
+      }
+    },
+    {
+      "item": "Ca",
+      "level": 1,
+      "reference_value": "2.24",
+      "values": {
+        "67": "2.21",
+        "5": "2.25"
+      }
+    },
+    {
+      "item": "Ca",
+      "level": 2,
+      "reference_value": "2.05",
+      "values": {
+        "67": "2.03",
+        "5": "2.08"
+      }
+    },
+    {
+      "item": "Ca",
+      "level": 3,
+      "reference_value": "2.08",
+      "values": {
+        "67": "2.06",
+        "5": "2.09"
+      }
+    },
+    {
+      "item": "CHE",
+      "level": 1,
+      "reference_value": "0.72",
+      "values": {
+        "67": "0.72",
+        "5": "0.69"
+      }
+    },
+    {
+      "item": "CHE",
+      "level": 2,
+      "reference_value": "4.8",
+      "values": {
+        "67": "4.66",
+        "5": "4.78"
+      }
+    },
+    {
+      "item": "CHE",
+      "level": 3,
+      "reference_value": "1.26",
+      "values": {
+        "67": "1.23",
+        "5": "1.2"
+      }
+    },
+    {
+      "item": "TC",
+      "level": 1,
+      "reference_value": "8.17",
+      "values": {
+        "67": "8.37",
+        "5": "8.21"
+      }
+    },
+    {
+      "item": "TC",
+      "level": 2,
+      "reference_value": "6.19",
+      "values": {
+        "67": "6.36",
+        "5": "6.43"
+      }
+    },
+    {
+      "item": "TC",
+      "level": 3,
+      "reference_value": "7.06",
+      "values": {
+        "67": "7.26",
+        "5": "7.34"
+      }
+    },
+    {
+      "item": "CK",
+      "level": 1,
+      "reference_value": "67.3",
+      "values": {
+        "67": "67.5",
+        "5": "70.0"
+      }
+    },
+    {
+      "item": "CK",
+      "level": 2,
+      "reference_value": "99.4",
+      "values": {
+        "67": "98.4",
+        "5": "104.0"
+      }
+    },
+    {
+      "item": "CK",
+      "level": 3,
+      "reference_value": "1622.7",
+      "values": {
+        "67": "1615.3",
+        "5": "1630.0"
+      }
+    },
+    {
+      "item": "CL",
+      "level": 1,
+      "reference_value": "116.0",
+      "values": {
+        "67": "115.9",
+        "5": "117.5"
+      }
+    },
+    {
+      "item": "CL",
+      "level": 2,
+      "reference_value": "114.9",
+      "values": {
+        "67": "114.3",
+        "5": "115.7"
+      }
+    },
+    {
+      "item": "CL",
+      "level": 3,
+      "reference_value": "118.8",
+      "values": {
+        "67": "118.4",
+        "5": "119.3"
+      }
+    },
+    {
+      "item": "CO2",
+      "level": 1,
+      "reference_value": "9.4",
+      "values": {
+        "67": "9.9",
+        "5": "8.6"
+      }
+    },
+    {
+      "item": "CO2",
+      "level": 2,
+      "reference_value": "23.1",
+      "values": {
+        "67": "24.7",
+        "5": "22.89"
+      }
+    },
+    {
+      "item": "CO2",
+      "level": 3,
+      "reference_value": "20.2",
+      "values": {
+        "67": "20.8",
+        "5": "19.07"
+      }
+    },
+    {
+      "item": "Cr",
+      "level": 1,
+      "reference_value": "460.3",
+      "values": {
+        "67": "471.7",
+        "5": "443.2"
+      }
+    },
+    {
+      "item": "Cr",
+      "level": 2,
+      "reference_value": "1011.8",
+      "values": {
+        "67": "1035.6",
+        "5": "1001.5"
+      }
+    },
+    {
+      "item": "Cr",
+      "level": 3,
+      "reference_value": "1499.1",
+      "values": {
+        "67": "1548.9",
+        "5": "1465.1"
+      }
+    },
+    {
+      "item": "CysC",
+      "level": 1,
+      "reference_value": "5.79",
+      "values": {
+        "67": "5.87",
+        "5": "6.23"
+      }
+    },
+    {
+      "item": "CysC",
+      "level": 2,
+      "reference_value": "8.2",
+      "values": {
+        "67": "8.18",
+        "5": "8.28"
+      }
+    },
+    {
+      "item": "CysC",
+      "level": 3,
+      "reference_value": "5.37",
+      "values": {
+        "67": "5.43",
+        "5": "5.72"
+      }
+    },
+    {
+      "item": "Fe",
+      "level": 1,
+      "reference_value": "22.0",
+      "values": {
+        "67": "21.8",
+        "5": "22.7"
+      }
+    },
+    {
+      "item": "Fe",
+      "level": 2,
+      "reference_value": "4.2",
+      "values": {
+        "67": "4.2",
+        "5": "4.3"
+      }
+    },
+    {
+      "item": "Fe",
+      "level": 3,
+      "reference_value": "7.1",
+      "values": {
+        "67": "7.0",
+        "5": "6.9"
+      }
+    },
+    {
+      "item": "DBiL",
+      "level": 1,
+      "reference_value": "233.0",
+      "values": {
+        "67": "238.1",
+        "5": "223.8"
+      }
+    },
+    {
+      "item": "DBiL",
+      "level": 2,
+      "reference_value": "12.5",
+      "values": {
+        "67": "12.6",
+        "5": "12.0"
+      }
+    },
+    {
+      "item": "DBiL",
+      "level": 3,
+      "reference_value": "14.7",
+      "values": {
+        "67": "15.2",
+        "5": "14.5"
+      }
+    },
+    {
+      "item": "GGT",
+      "level": 1,
+      "reference_value": "149.8",
+      "values": {
+        "67": "151.1",
+        "5": "146.0"
+      }
+    },
+    {
+      "item": "GGT",
+      "level": 2,
+      "reference_value": "738.6",
+      "values": {
+        "67": "748.7",
+        "5": "737.0"
+      }
+    },
+    {
+      "item": "GGT",
+      "level": 3,
+      "reference_value": "540.9",
+      "values": {
+        "67": "546.4",
+        "5": "543.0"
+      }
+    },
+    {
+      "item": "GlU",
+      "level": 1,
+      "reference_value": "9.77",
+      "values": {
+        "67": "9.58",
+        "5": "9.67"
+      }
+    },
+    {
+      "item": "GlU",
+      "level": 2,
+      "reference_value": "13.37",
+      "values": {
+        "67": "13.24",
+        "5": "13.39"
+      }
+    },
+    {
+      "item": "GlU",
+      "level": 3,
+      "reference_value": "3.59",
+      "values": {
+        "67": "3.55",
+        "5": "3.57"
+      }
+    },
+    {
+      "item": "HCY",
+      "level": 1,
+      "reference_value": "9.5",
+      "values": {
+        "67": "8.9",
+        "5": "9.67"
+      }
+    },
+    {
+      "item": "HCY",
+      "level": 2,
+      "reference_value": "13.1",
+      "values": {
+        "67": "12.9",
+        "5": "13.7"
+      }
+    },
+    {
+      "item": "HCY",
+      "level": 3,
+      "reference_value": "9.7",
+      "values": {
+        "67": "9.4",
+        "5": "10.1"
+      }
+    },
+    {
+      "item": "HDL",
+      "level": 1,
+      "reference_value": "1.44",
+      "values": {
+        "67": "1.41",
+        "5": "1.46"
+      }
+    },
+    {
+      "item": "HDL",
+      "level": 2,
+      "reference_value": "0.86",
+      "values": {
+        "67": "0.83",
+        "5": "0.87"
+      }
+    },
+    {
+      "item": "HDL",
+      "level": 3,
+      "reference_value": "2.45",
+      "values": {
+        "67": "2.4",
+        "5": "2.46"
+      }
+    },
+    {
+      "item": "K",
+      "level": 1,
+      "reference_value": "6.38",
+      "values": {
+        "67": "6.35",
+        "5": "6.37"
+      }
+    },
+    {
+      "item": "K",
+      "level": 2,
+      "reference_value": "3.28",
+      "values": {
+        "67": "3.22",
+        "5": "3.3"
+      }
+    },
+    {
+      "item": "K",
+      "level": 3,
+      "reference_value": "3.58",
+      "values": {
+        "67": "3.55",
+        "5": "3.6"
+      }
+    },
+    {
+      "item": "LDH",
+      "level": 1,
+      "reference_value": "144.0",
+      "values": {
+        "67": "145.0",
+        "5": "146.0"
+      }
+    },
+    {
+      "item": "LDH",
+      "level": 2,
+      "reference_value": "143.3",
+      "values": {
+        "67": "142.2",
+        "5": "145.0"
+      }
+    },
+    {
+      "item": "LDH",
+      "level": 3,
+      "reference_value": "778.3",
+      "values": {
+        "67": "772.2",
+        "5": "770.0"
+      }
+    },
+    {
+      "item": "LDL",
+      "level": 1,
+      "reference_value": "5.26",
+      "values": {
+        "67": "5.22",
+        "5": "5.26"
+      }
+    },
+    {
+      "item": "LDL",
+      "level": 2,
+      "reference_value": "2.91",
+      "values": {
+        "67": "2.84",
+        "5": "2.89"
+      }
+    },
+    {
+      "item": "LDL",
+      "level": 3,
+      "reference_value": "3.84",
+      "values": {
+        "67": "3.77",
+        "5": "3.78"
+      }
+    },
+    {
+      "item": "LPS",
+      "level": 1,
+      "reference_value": "6.9",
+      "values": {
+        "67": "7.2",
+        "5": "7.1"
+      }
+    },
+    {
+      "item": "LPS",
+      "level": 2,
+      "reference_value": "615.4",
+      "values": {
+        "67": "614.0",
+        "5": "613.0"
+      }
+    },
+    {
+      "item": "LPS",
+      "level": 3,
+      "reference_value": "11.9",
+      "values": {
+        "67": "12.3",
+        "5": "12.0"
+      }
+    },
+    {
+      "item": "Mg",
+      "level": 1,
+      "reference_value": "0.96",
+      "values": {
+        "67": "0.91",
+        "5": "0.92"
+      }
+    },
+    {
+      "item": "Mg",
+      "level": 2,
+      "reference_value": "1.05",
+      "values": {
+        "67": "1.02",
+        "5": "1.01"
+      }
+    },
+    {
+      "item": "Mg",
+      "level": 3,
+      "reference_value": "0.81",
+      "values": {
+        "67": "0.82",
+        "5": "0.81"
+      }
+    },
+    {
+      "item": "Na",
+      "level": 1,
+      "reference_value": "149.4",
+      "values": {
+        "67": "148.6",
+        "5": "149.8"
+      }
+    },
+    {
+      "item": "Na",
+      "level": 2,
+      "reference_value": "159.2",
+      "values": {
+        "67": "158.0",
+        "5": "161.0"
+      }
+    },
+    {
+      "item": "Na",
+      "level": 3,
+      "reference_value": "152.9",
+      "values": {
+        "67": "152.4",
+        "5": "154.1"
+      }
+    },
+    {
+      "item": "P",
+      "level": 1,
+      "reference_value": "1.26",
+      "values": {
+        "67": "1.23",
+        "5": "1.25"
+      }
+    },
+    {
+      "item": "P",
+      "level": 2,
+      "reference_value": "2.38",
+      "values": {
+        "67": "2.31",
+        "5": "2.35"
+      }
+    },
+    {
+      "item": "P",
+      "level": 3,
+      "reference_value": "2.5",
+      "values": {
+        "67": "2.48",
+        "5": "2.48"
+      }
+    },
+    {
+      "item": "PA",
+      "level": 1,
+      "reference_value": "26.3",
+      "values": {
+        "67": "30.4",
+        "5": "30.7"
+      }
+    },
+    {
+      "item": "PA",
+      "level": 2,
+      "reference_value": "241.3",
+      "values": {
+        "67": "241.4",
+        "5": "245.4"
+      }
+    },
+    {
+      "item": "PA",
+      "level": 3,
+      "reference_value": "56.9",
+      "values": {
+        "67": "60.0",
+        "5": "61.3"
+      }
+    },
+    {
+      "item": "TBA",
+      "level": 1,
+      "reference_value": "173.9",
+      "values": {
+        "67": "168.3",
+        "5": "171.4"
+      }
+    },
+    {
+      "item": "TBA",
+      "level": 2,
+      "reference_value": "15.6",
+      "values": {
+        "67": "15.0",
+        "5": "15.96"
+      }
+    },
+    {
+      "item": "TBA",
+      "level": 3,
+      "reference_value": "12.8",
+      "values": {
+        "67": "12.3",
+        "5": "13.07"
+      }
+    },
+    {
+      "item": "TBiL",
+      "level": 1,
+      "reference_value": "465.4",
+      "values": {
+        "67": "456.9",
+        "5": "451.6"
+      }
+    },
+    {
+      "item": "TBiL",
+      "level": 2,
+      "reference_value": "34.2",
+      "values": {
+        "67": "33.3",
+        "5": "33.8"
+      }
+    },
+    {
+      "item": "TBiL",
+      "level": 3,
+      "reference_value": "40.6",
+      "values": {
+        "67": "40.1",
+        "5": "39.8"
+      }
+    },
+    {
+      "item": "TG",
+      "level": 1,
+      "reference_value": "2.62",
+      "values": {
+        "67": "2.49",
+        "5": "2.49"
+      }
+    },
+    {
+      "item": "TG",
+      "level": 2,
+      "reference_value": "10.79",
+      "values": {
+        "67": "10.27",
+        "5": "10.56"
+      }
+    },
+    {
+      "item": "TG",
+      "level": 3,
+      "reference_value": "0.85",
+      "values": {
+        "67": "0.82",
+        "5": "0.81"
+      }
+    },
+    {
+      "item": "TP",
+      "level": 1,
+      "reference_value": "58.8",
+      "values": {
+        "67": "57.7",
+        "5": "58.0"
+      }
+    },
+    {
+      "item": "TP",
+      "level": 2,
+      "reference_value": "68.7",
+      "values": {
+        "67": "67.9",
+        "5": "67.5"
+      }
+    },
+    {
+      "item": "TP",
+      "level": 3,
+      "reference_value": "90.8",
+      "values": {
+        "67": "89.8",
+        "5": "89.3"
+      }
+    },
+    {
+      "item": "UA",
+      "level": 1,
+      "reference_value": "829.2",
+      "values": {
+        "67": "820.2",
+        "5": "854.0"
+      }
+    },
+    {
+      "item": "UA",
+      "level": 2,
+      "reference_value": "517.9",
+      "values": {
+        "67": "517.6",
+        "5": "534.0"
+      }
+    },
+    {
+      "item": "UA",
+      "level": 3,
+      "reference_value": "655.5",
+      "values": {
+        "67": "668.9",
+        "5": "670.0"
+      }
+    },
+    {
+      "item": "UIBC",
+      "level": 1,
+      "reference_value": "20.5",
+      "values": {
+        "67": "22.1",
+        "5": "22.5"
+      }
+    },
+    {
+      "item": "UIBC",
+      "level": 2,
+      "reference_value": "33.4",
+      "values": {
+        "67": "34.0",
+        "5": "33.8"
+      }
+    },
+    {
+      "item": "UIBC",
+      "level": 3,
+      "reference_value": "48.3",
+      "values": {
+        "67": "49.3",
+        "5": "50.4"
+      }
+    },
+    {
+      "item": "APOA1",
+      "level": 1,
+      "reference_value": "2.35",
+      "values": {
+        "5": "2.31"
+      }
+    },
+    {
+      "item": "APOA1",
+      "level": 2,
+      "reference_value": "1.88",
+      "values": {
+        "5": "1.84"
+      }
+    },
+    {
+      "item": "APOA1",
+      "level": 3,
+      "reference_value": "1.39",
+      "values": {
+        "5": "1.36"
+      }
+    },
+    {
+      "item": "APOB",
+      "level": 1,
+      "reference_value": "1.02",
+      "values": {
+        "5": "1.05"
+      }
+    },
+    {
+      "item": "APOB",
+      "level": 2,
+      "reference_value": "0.93",
+      "values": {
+        "5": "0.97"
+      }
+    },
+    {
+      "item": "APOB",
+      "level": 3,
+      "reference_value": "1.42",
+      "values": {
+        "5": "1.44"
+      }
+    },
+    {
+      "item": "ASO",
+      "level": 1,
+      "reference_value": "416.5",
+      "values": {
+        "5": "423.2"
+      }
+    },
+    {
+      "item": "ASO",
+      "level": 2,
+      "reference_value": "365.5",
+      "values": {
+        "5": "364.5"
+      }
+    },
+    {
+      "item": "ASO",
+      "level": 3,
+      "reference_value": "221.3",
+      "values": {
+        "5": "218.1"
+      }
+    },
+    {
+      "item": "IgA",
+      "level": 1,
+      "reference_value": "2.78",
+      "values": {
+        "5": "2.71"
+      }
+    },
+    {
+      "item": "IgA",
+      "level": 2,
+      "reference_value": "4.2",
+      "values": {
+        "5": "3.94"
+      }
+    },
+    {
+      "item": "IgA",
+      "level": 3,
+      "reference_value": "2.76",
+      "values": {
+        "5": "2.69"
+      }
+    },
+    {
+      "item": "IgG",
+      "level": 1,
+      "reference_value": "25.39",
+      "values": {
+        "5": "26.85"
+      }
+    },
+    {
+      "item": "IgG",
+      "level": 2,
+      "reference_value": "20.7",
+      "values": {
+        "5": "21.28"
+      }
+    },
+    {
+      "item": "IgG",
+      "level": 3,
+      "reference_value": "11.28",
+      "values": {
+        "5": "11.67"
+      }
+    },
+    {
+      "item": "IgM",
+      "level": 1,
+      "reference_value": "0.9",
+      "values": {
+        "5": "0.85"
+      }
+    },
+    {
+      "item": "IgM",
+      "level": 2,
+      "reference_value": "1.19",
+      "values": {
+        "5": "1.15"
+      }
+    },
+    {
+      "item": "IgM",
+      "level": 3,
+      "reference_value": "1.54",
+      "values": {
+        "5": "1.47"
+      }
+    },
+    {
+      "item": "LPa",
+      "level": 1,
+      "reference_value": "399.4",
+      "values": {
+        "5": "416.4"
+      }
+    },
+    {
+      "item": "LPa",
+      "level": 2,
+      "reference_value": "78.2",
+      "values": {
+        "5": "76.1"
+      }
+    },
+    {
+      "item": "LPa",
+      "level": 3,
+      "reference_value": "192.2",
+      "values": {
+        "5": "201.5"
+      }
+    },
+    {
+      "item": "RF",
+      "level": 1,
+      "reference_value": "124.5",
+      "values": {
+        "5": "124.2"
+      }
+    },
+    {
+      "item": "RF",
+      "level": 2,
+      "reference_value": "56.3",
+      "values": {
+        "5": "53.9"
+      }
+    },
+    {
+      "item": "RF",
+      "level": 3,
+      "reference_value": "145",
+      "values": {
+        "5": "145.1"
+      }
+    },
+    {
+      "item": "APOA1",
+      "level": 4,
+      "reference_value": "1.46",
+      "values": {
+        "5": "1.39"
+      }
+    },
+    {
+      "item": "APOA1",
+      "level": 5,
+      "reference_value": "0.83",
+      "values": {
+        "5": "0.79"
+      }
+    },
+    {
+      "item": "APOB",
+      "level": 4,
+      "reference_value": "1.66",
+      "values": {
+        "5": "1.58"
+      }
+    },
+    {
+      "item": "APOB",
+      "level": 5,
+      "reference_value": "1.12",
+      "values": {
+        "5": "1.07"
+      }
+    },
+    {
+      "item": "ASO",
+      "level": 4,
+      "reference_value": "65.20",
+      "values": {
+        "5": "62.60"
+      }
+    },
+    {
+      "item": "ASO",
+      "level": 5,
+      "reference_value": "115.00",
+      "values": {
+        "5": "112.80"
+      }
+    },
+    {
+      "item": "IgA",
+      "level": 4,
+      "reference_value": "6.09",
+      "values": {
+        "5": "5.76"
+      }
+    },
+    {
+      "item": "IgA",
+      "level": 5,
+      "reference_value": "2.25",
+      "values": {
+        "5": "2.21"
+      }
+    },
+    {
+      "item": "IgG",
+      "level": 4,
+      "reference_value": "14.88",
+      "values": {
+        "5": "15.38"
+      }
+    },
+    {
+      "item": "IgG",
+      "level": 5,
+      "reference_value": "9.77",
+      "values": {
+        "5": "10.09"
+      }
+    },
+    {
+      "item": "IgM",
+      "level": 4,
+      "reference_value": "1.91",
+      "values": {
+        "5": "1.82"
+      }
+    },
+    {
+      "item": "IgM",
+      "level": 5,
+      "reference_value": "2.38",
+      "values": {
+        "5": "2.29"
+      }
+    },
+    {
+      "item": "LPa",
+      "level": 4,
+      "reference_value": "97.20",
+      "values": {
+        "5": "101.40"
+      }
+    },
+    {
+      "item": "LPa",
+      "level": 5,
+      "reference_value": "53.70",
+      "values": {
+        "5": "55.60"
+      }
+    },
+    {
+      "item": "RF",
+      "level": 4,
+      "reference_value": "247.50",
+      "values": {
+        "5": "241.30"
+      }
+    },
+    {
+      "item": "RF",
+      "level": 5,
+      "reference_value": "37.20",
+      "values": {
+        "5": "35.20"
+      }
+    }
+  ]
+}
