@@ -107,7 +107,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "4da3a52-selfheal-2026-07-18-cleanup2"
+_BUILD_MARK = "reconcile-idx-2026-07-18"
 
 
 def get_build_mark() -> str:
@@ -121,5 +121,28 @@ router = APIRouter(prefix="/_diag", tags=["diag"])
 
 @router.get("/build")
 def diag_build():
-    """返回构建标记，确认当前服役容器版本（免鉴权，仅探针）。"""
-    return {"build": _BUILD_MARK, "has_self_heal": True}
+    """返回构建标记 + 关键表实时列 + 迁移日志尾，确认当前服役容器版本与 schema 状态
+    （免鉴权，仅只读探针，无副作用）。"""
+    import sqlite3 as _sq
+    out = {"build": _BUILD_MARK, "has_self_heal": True}
+    try:
+        c = _sq.connect(_DB_PATH)
+        for t in ("interlab_items", "interlab_levels", "interlab_plans"):
+            try:
+                rows = c.execute(f"PRAGMA table_info({t})").fetchall()
+                out[f"cols_{t}"] = [r[1] for r in rows]
+            except Exception as e:  # noqa: BLE001
+                out[f"cols_{t}"] = f"err: {e}"
+        c.close()
+    except Exception as e:  # noqa: BLE001
+        out["cols_err"] = repr(e)
+    try:
+        with open("/app/data/_migrate.log", "r", encoding="utf-8") as f:
+            content = f.read()
+        # 保留最后 ~2000 字符，避免响应过大
+        out["migrate_log_tail"] = content[-2000:]
+    except FileNotFoundError:
+        out["migrate_log_tail"] = "<no log yet>"
+    except Exception as e:  # noqa: BLE001
+        out["migrate_log_tail"] = f"err: {e}"
+    return out

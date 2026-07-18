@@ -124,14 +124,58 @@ def _migrate_schema():
             except Exception:
                 continue
             extras = existing - expected
+            if not extras:
+                continue
+            # 若某列被索引引用，SQLite DROP COLUMN 会拒；先收集并 DROP 这些索引。
+            # PRAGMA index_list → 索引名；PRAGMA index_info(索引名) → 索引列。
+            try:
+                idx_rows = conn.exec_driver_sql(
+                    f"PRAGMA index_list({table})"
+                ).fetchall()
+            except Exception:
+                idx_rows = []
+            dropped_idx = []
+            for idx_row in idx_rows:
+                idx_name = idx_row[1]
+                try:
+                    info = conn.exec_driver_sql(
+                        f"PRAGMA index_info({idx_name})"
+                    ).fetchall()
+                except Exception:
+                    continue
+                idx_cols = {r[2] for r in info}
+                if idx_cols & extras:
+                    try:
+                        conn.exec_driver_sql(f"DROP INDEX IF EXISTS {idx_name}")
+                        dropped_idx.append(idx_name)
+                    except Exception:
+                        pass
             for col in extras:
                 try:
                     conn.exec_driver_sql(
                         f"ALTER TABLE {table} DROP COLUMN {col}"
                     )
-                    print(f"[migrate] DROP COLUMN {table}.{col}")
+                    print(f"[migrate] DROP COLUMN {table}.{col} ok (dropped_idx={dropped_idx})")
                 except Exception as e:  # noqa: BLE001
                     print(f"[migrate] DROP COLUMN {table}.{col} failed: {e}")
+        # 写迁移摘要到 /app/data/_migrate.log，供 /build 探针回报
+        try:
+            import datetime as _dt
+            lines = []
+            for table, expected in reconcile.items():
+                try:
+                    rows = conn.exec_driver_sql(
+                        f"PRAGMA table_info({table})"
+                    ).fetchall()
+                    cols = [r[1] for r in rows]
+                except Exception:
+                    cols = ["<err>"]
+                lines.append(f"{table}: cols={cols} expected={sorted(expected)}")
+            log = _dt.datetime.utcnow().isoformat() + "\n" + "\n".join(lines) + "\n"
+            with open("/app/data/_migrate.log", "a", encoding="utf-8") as f:
+                f.write(log)
+        except Exception:
+            pass
         # 旧总结行 category 为 NULL/空 → 回填默认「生化+凝血」，避免拆分后过滤失效
         try:
             conn.exec_driver_sql(
