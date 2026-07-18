@@ -287,34 +287,69 @@ async def _background_init():
 
 
 def _self_heal_db():
-    """启动自愈：CFS 上 SQLite 偶发索引页损坏会导致查询 500/登录 500。
-    启动时检测 integrity_check，若损坏则 REINDEX 从完好表数据重建索引页。
-    轻量、快，不阻塞就绪探针；异常均吞掉，不影响启动。"""
+    """启动自愈：CFS 上 SQLite 偶发页损坏会导致查询 500/登录 500。
+    启动时检测 integrity_check，按 REINDEX → VACUUM → 逐表 dump 重建 三级恢复，
+    在容器开始服务前把库修好，避免新容器因健康检查碰损坏库被判不健康而灰度卡死。
+    全部异常吞掉，绝不影响启动。"""
     try:
+        from .api.v1.diag import _generic_dump_recover, _swap_in  # noqa: WPS433
+
         db_file = str(DB_PATH)
         con = sqlite3.connect(db_file)
         res = con.execute("PRAGMA integrity_check").fetchall()
-        if [r[0] for r in res] != ["ok"]:
-            logger.warning("DB 完整性异常，启动自愈 REINDEX: %s", res)
-            con.execute("PRAGMA writable_schema=ON")
+        if [r[0] for r in res] == ["ok"]:
+            logger.info("DB integrity_check ok")
+            con.close()
+            return
+        logger.warning("DB 完整性异常，启动自愈: %s", res)
+        con.execute("PRAGMA writable_schema=ON")
+        try:
             con.execute("REINDEX")
             con.commit()
-            res2 = con.execute("PRAGMA integrity_check").fetchall()
-            logger.warning("REINDEX 后 integrity_check: %s", [r[0] for r in res2])
-        else:
-            logger.info("DB integrity_check ok")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("REINDEX 失败(忽略，继续 VACUUM): %s", e)
+        res2 = con.execute("PRAGMA integrity_check").fetchall()
         con.close()
+        if [r[0] for r in res2] == ["ok"]:
+            logger.info("REINDEX 后 DB 已恢复")
+            return
+        # REINDEX 不行就 VACUUM 原地重写
+        try:
+            c = sqlite3.connect(db_file)
+            c.execute("VACUUM")
+            c.close()
+            c2 = sqlite3.connect(db_file)
+            r3 = c2.execute("PRAGMA integrity_check").fetchall()
+            c2.close()
+            if [r[0] for r in r3] == ["ok"]:
+                logger.info("VACUUM 后 DB 已恢复")
+                return
+        except Exception as e:  # noqa: BLE001
+            logger.warning("VACUUM 失败(忽略，继续 dump 重建): %s", e)
+        # 兜底：逐表 dump 重建（从 sqlite_master 存的原 CREATE 语句建表+索引，再拷行）
+        report: dict = {}
+        dump_path = "/tmp/self_heal_dump.db"
+        _generic_dump_recover(db_file, dump_path, report)
+        if report.get("recovered_integrity") == ["ok"]:
+            _swap_in(report, dump_path, "ok (startup dump-recover)")
+            logger.warning("启动自愈 dump-recover 完成: %s", report.get("recover_tables"))
+        else:
+            logger.error("启动自愈 dump-recover 后仍不干净: %s", report.get("recovered_integrity"))
     except Exception as e:  # noqa: BLE001
         logger.error("self-heal db failed (non-fatal): %s", e)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 同步、轻量初始化：建表 + 迁移补列（快，不阻塞就绪探针）
+    # 同步、轻量初始化：先启动自愈修库（CFS 偶发损坏会让新容器健康检查失败、
+    # 灰度卡死），再建表 + 迁移补列。全部异常吞掉，不阻塞就绪探针。
+    try:
+        _self_heal_db()
+    except Exception as e:  # noqa: BLE001
+        logger.error("self-heal db error (non-fatal): %s", e)
     try:
         Base.metadata.create_all(bind=engine)
         _migrate_schema()
-        _self_heal_db()
     except Exception as e:  # noqa: BLE001
         logger.error("init error (create_all/migrate): %s", e)
     # 重活放后台：关联打标 / 种子 / 刷新通知 / 提醒，避免启动过慢导致探针超时
