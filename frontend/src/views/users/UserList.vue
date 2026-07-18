@@ -330,15 +330,15 @@ function canWriteModule(userRoles, moduleKey) {
 function userPerms(row) {
   const roles = fullRoles(row)
   const out = {}
-  for (const m of MODULES) out[m.key] = canWriteModule(roles, m.key)
+  for (const m of MODULES.value) out[m.key] = canWriteModule(roles, m.key)
   return out
 }
 
 // 主表格"权限概览"列用：哪些模块 + 数量
 function permSummary(row) {
-  if (isAdmin(row)) return { count: MODULES.length, mods: [] }
+  if (isAdmin(row)) return { count: MODULES.value.length, mods: [] }
   const roles = fullRoles(row)
-  const allowed = MODULES.filter((m) => canWriteModule(roles, m.key))
+  const allowed = MODULES.value.filter((m) => canWriteModule(roles, m.key))
   return { count: allowed.length, mods: allowed }
 }
 
