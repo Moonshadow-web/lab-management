@@ -99,6 +99,27 @@ def _migrate_schema():
                     conn.exec_driver_sql(
                         f"ALTER TABLE {table} ADD COLUMN {col} {ctype}"
                     )
+        # 清理过时列：老 schema 残留、不再被模型管理的列。
+        # 例如 interlab_items.our_value 早被迁到 interlab_levels，但旧表仍有 NOT NULL，
+        # 导致 create_all 不删、INSERT 留空触发 NOT NULL 失败。
+        drops = {
+            "interlab_items": ["our_value"],
+        }
+        for table, cols in drops.items():
+            try:
+                res = conn.exec_driver_sql(f"PRAGMA table_info({table})")
+                existing = {row[1] for row in res}
+            except Exception:
+                continue
+            for col in cols:
+                if col in existing:
+                    try:
+                        conn.exec_driver_sql(
+                            f"ALTER TABLE {table} DROP COLUMN {col}"
+                        )
+                    except Exception as e:  # noqa: BLE001
+                        # 旧版 SQLite 不支持 DROP COLUMN；记录后由后续默认值兼容路径兜底
+                        print(f"[migrate] DROP COLUMN {table}.{col} failed: {e}")
         # 旧总结行 category 为 NULL/空 → 回填默认「生化+凝血」，避免拆分后过滤失效
         try:
             conn.exec_driver_sql(
