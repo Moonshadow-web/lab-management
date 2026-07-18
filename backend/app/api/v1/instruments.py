@@ -503,3 +503,9 @@ def debug_instruments_raw(db: Session = Depends(get_db), user: User = Depends(ge
                 "error": repr(e),
             })
     return {"total": len(rows), "problems": problems}
+
+
+# 路由重排：/debug-raw 静态路由必须排在 /{instrument_id} 之前，否则被参数路由吞掉
+_dr_routes = [r for r in router.routes if getattr(r, "path", None) == "/debug-raw"]
+_dr_others = [r for r in router.routes if getattr(r, "path", None) != "/debug-raw"]
+router.routes = _dr_routes + _dr_others
