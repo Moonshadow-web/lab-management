@@ -24,7 +24,10 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 # 安全
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-prod-9f2a7b3c")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 2 * 60  # 2 小时，会话超时短过期
+# access token 短效，过期由 refresh token 静默续期，避免频繁登录
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# refresh token 长效 = 「保持登录」时长；可经环境变量覆盖
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
 # 前端源（CORS）
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")

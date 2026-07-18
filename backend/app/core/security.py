@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
@@ -6,7 +7,12 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from .config import ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
+from .config import (
+    ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+    SECRET_KEY,
+)
 from .database import get_db
 from ..models.user import User
 
@@ -27,8 +33,27 @@ def verify_password(password: str, hashed: str) -> bool:
 
 def create_access_token(subject: int, expires_minutes: int | None = None) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes or ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode = {"sub": str(subject), "exp": expire}
+    to_encode = {"sub": str(subject), "type": "access", "exp": expire}
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(subject: int) -> tuple[str, str]:
+    """签发 refresh token，返回 (token, jti)。
+
+    jti 存入 refresh_tokens 表用于吊销；token 含 type=refresh 与 exp。
+    """
+    jti = uuid.uuid4().hex
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode = {"sub": str(subject), "type": "refresh", "jti": jti, "exp": expire}
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM), jti
+
+
+def decode_token(token: str, expected_type: str | None = None) -> dict:
+    """解码并校验 JWT（签名 + 过期）。可选校验 type 声明。"""
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    if expected_type and payload.get("type") != expected_type:
+        raise JWTError("token type mismatch")
+    return payload
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:

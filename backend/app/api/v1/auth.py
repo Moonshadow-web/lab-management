@@ -2,20 +2,29 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ...core.config import REFRESH_TOKEN_EXPIRE_DAYS
 from ...core.crud_base import write_audit
 from ...core.database import get_db
 from ...core.security import (
     create_access_token,
+    create_refresh_token,
+    decode_token,
     get_current_user,
     hash_password,
     verify_password,
 )
+from ...models.refresh_token import RefreshToken
 from ...models.user import User
 from ...schemas import ChangePassword, UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+class RefreshBody(BaseModel):
+    refresh_token: str
 
 # 登录失败锁定策略
 MAX_FAILED_ATTEMPTS = 5
@@ -87,8 +96,18 @@ def login(
     db.commit()
     write_audit(db, user, "login", "users", user.id, "login success", ip)
     token = create_access_token(user.id)
+    refresh, jti = create_refresh_token(user.id)
+    db.add(
+        RefreshToken(
+            user_id=user.id,
+            jti=jti,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        )
+    )
+    db.commit()
     return {
         "access_token": token,
+        "refresh_token": refresh,
         "token_type": "bearer",
         "must_change_password": bool(user.must_change_password),
         "roles": user.roles or "",
@@ -112,7 +131,57 @@ def change_password(
     user.password_hash = hash_password(pw)
     user.must_change_password = False
     db.commit()
+    # 改密后吊销该用户全部 refresh token，强制各端重新登录（旧 token 失效）
+    db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update(
+        {RefreshToken.revoked: True, RefreshToken.revoked_at: _now_utc()}
+    )
+    db.commit()
     write_audit(db, user, "update", "users", user.id, {"action": "change_password"})
+    return {"ok": True}
+
+
+@router.post("/refresh")
+def refresh(body: RefreshBody, db: Session = Depends(get_db)):
+    """用 refresh token 静默换取新的 access token（保持登录）。
+
+    不做轮换：返回原 refresh_token，避免多标签页互相踢下线。
+    """
+    try:
+        payload = decode_token(body.refresh_token, expected_type="refresh")
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="refresh token 无效或已过期"
+        )
+    jti = payload.get("jti")
+    rt = db.query(RefreshToken).filter(RefreshToken.jti == jti).first()
+    if not rt or rt.revoked:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="refresh token 已失效，请重新登录"
+        )
+    if rt.expires_at.replace(tzinfo=timezone.utc) < _now_utc():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="refresh token 已过期，请重新登录"
+        )
+    access = create_access_token(int(payload["sub"]))
+    return {
+        "access_token": access,
+        "refresh_token": body.refresh_token,
+        "token_type": "bearer",
+    }
+
+
+@router.post("/logout")
+def logout(body: RefreshBody, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """吊销当前 refresh token（使其立即失效）。"""
+    try:
+        payload = decode_token(body.refresh_token, expected_type="refresh")
+        rt = db.query(RefreshToken).filter(RefreshToken.jti == payload.get("jti")).first()
+        if rt and not rt.revoked:
+            rt.revoked = True
+            rt.revoked_at = _now_utc()
+            db.commit()
+    except (JWTError, Exception):
+        pass
     return {"ok": True}
 
 

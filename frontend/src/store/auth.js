@@ -18,6 +18,7 @@ const MODULE_WRITE_ROLES = {
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem('token') || '',
+    refreshToken: localStorage.getItem('refresh_token') || '',
     user: JSON.parse(localStorage.getItem('user') || 'null'),
   }),
   getters: {
@@ -46,6 +47,10 @@ export const useAuthStore = defineStore('auth', {
       })
       this.token = data.access_token
       localStorage.setItem('token', this.token)
+      if (data.refresh_token) {
+        this.refreshToken = data.refresh_token
+        localStorage.setItem('refresh_token', data.refresh_token)
+      }
       const me = await request.get('/api/v1/auth/me')
       this.user = me
       localStorage.setItem('user', JSON.stringify(this.user))
@@ -58,9 +63,16 @@ export const useAuthStore = defineStore('auth', {
       })
     },
     logout() {
+      const refreshToken = localStorage.getItem('refresh_token')
+      if (refreshToken) {
+        // 尽力吊销服务端 refresh token（失败不影响本地退出）
+        request.post('/api/v1/auth/logout', { refresh_token: refreshToken }).catch(() => {})
+      }
       this.token = ''
+      this.refreshToken = ''
       this.user = null
       localStorage.removeItem('token')
+      localStorage.removeItem('refresh_token')
       localStorage.removeItem('user')
     },
     // 判断当前用户对某模块是否有写权限

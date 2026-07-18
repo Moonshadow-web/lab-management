@@ -19,6 +19,7 @@ from .comparison import ComparisonGroup, ComparisonPlan, ComparisonResult, Compa
 from .interlab import InterlabPlan, InterlabItem, InterlabLevel
 from .qc_target import QCTargetBatch, QCTargetResult
 from .qc_material import QcMaterial
+from .refresh_token import RefreshToken
 
 __all__ = [
     "User",
@@ -55,4 +56,5 @@ __all__ = [
     "QCTargetBatch",
     "QCTargetResult",
     "QcMaterial",
+    "RefreshToken",
 ]
