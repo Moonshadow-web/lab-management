@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 import asyncio
 import logging
+import os
+import shutil
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -250,6 +252,22 @@ def _recompute_interlab_tags(db):
         logger.error("recompute has_interlab failed (non-fatal): %s", e)
 
 
+async def _backup_scheduler():
+    """每 10 分钟把当前 CFS 库复制为 .lastgood（仅当 integrity ok），
+    作为下次损坏时的近实时回退点，降低 CFS 页损坏导致的数据丢失窗口。"""
+    while True:
+        try:
+            await asyncio.sleep(600)
+            db_file = str(DB_PATH)
+            if _integrity_ok(db_file):
+                try:
+                    shutil.copy2(db_file, f"{db_file}.lastgood")
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("lastgood 备份失败(忽略): %s", e)
+        except Exception as e:  # noqa: BLE001
+            logger.error("backup scheduler error: %s", e)
+
+
 async def _background_init():
     """后台初始化：重活不阻塞就绪探针，避免容器被标记异常 → 503。
 
@@ -286,57 +304,103 @@ async def _background_init():
         logger.error("background init error (non-fatal, skipped): %s", e)
 
 
-def _self_heal_db():
-    """启动自愈：CFS 上 SQLite 偶发页损坏会导致查询 500/登录 500。
-    启动时检测 integrity_check，按 REINDEX → VACUUM → 逐表 dump 重建 三级恢复，
-    在容器开始服务前把库修好，避免新容器因健康检查碰损坏库被判不健康而灰度卡死。
-    全部异常吞掉，绝不影响启动。"""
+def _integrity_ok(path: str) -> bool:
     try:
-        from .api.v1.diag import _generic_dump_recover, _swap_in  # noqa: WPS433
+        c = sqlite3.connect(path)
+        ok = [r[0] for r in c.execute("PRAGMA integrity_check").fetchall()] == ["ok"]
+        c.close()
+        return ok
+    except Exception:
+        return False
 
+
+def _restore_from(src: str, dst: str):
+    """用 src 原子覆盖 dst，并清理 WAL/SHM、释放连接池（src 本身保留）。"""
+    for ext in ("-wal", "-shm"):
+        p = dst + ext
+        if os.path.exists(p):
+            os.remove(p)
+    shutil.copy2(src, dst)
+    try:
+        engine.dispose()
+    except Exception:
+        pass
+
+
+def _self_heal_db():
+    """启动自愈：CFS 上 SQLite 偶发页损坏会让查询/登录 500，新容器健康检查碰损坏库会
+    被判不健康→灰度卡死。策略（全部异常吞掉，绝不阻塞就绪探针）：
+    1) CFS 库存在且 integrity ok → 直接用（最快）。
+    2) REINDEX 重建索引（仅索引页损坏时秒级修复）。
+    3) 逐表 dump 重建（数据页完好，保留线上已录入数据；REINDEX/VACUUM 对此库均报
+       malformed 无效，故必须走 dump）。
+    4) 回退到最近 lastgood 备份（后台周期任务维护的近实时副本）。
+    5) 回退到镜像内干净种子库 /app/backup/app.db（覆盖损坏文件，含全部基础数据）。
+    启动期只做「快速文件拷贝/小库 dump」，不做整库 VACUUM 复制，避免 CFS 上超时卡死。"""
+    try:
         db_file = str(DB_PATH)
-        con = sqlite3.connect(db_file)
-        res = con.execute("PRAGMA integrity_check").fetchall()
-        if [r[0] for r in res] == ["ok"]:
-            logger.info("DB integrity_check ok")
-            con.close()
+        # 0) 健康则直接用
+        if _integrity_ok(db_file):
+            logger.info("DB integrity ok, 直接使用 CFS 库")
             return
-        logger.warning("DB 完整性异常，启动自愈: %s", res)
-        con.execute("PRAGMA writable_schema=ON")
+        logger.warning("DB 完整性异常，启动修复")
+
+        # 备份损坏文件（不删除，留作回滚）
         try:
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            shutil.copy2(db_file, f"{db_file}.corrupt-bak-{ts}")
+        except Exception:
+            pass
+
+        # 1) REINDEX（仅索引页损坏时修复；数据页损坏会抛 malformed，忽略继续）
+        try:
+            con = sqlite3.connect(db_file)
+            con.execute("PRAGMA writable_schema=ON")
             con.execute("REINDEX")
             con.commit()
-        except Exception as e:  # noqa: BLE001
-            logger.warning("REINDEX 失败(忽略，继续 VACUUM): %s", e)
-        res2 = con.execute("PRAGMA integrity_check").fetchall()
-        con.close()
-        if [r[0] for r in res2] == ["ok"]:
-            logger.info("REINDEX 后 DB 已恢复")
-            return
-        # REINDEX 不行就 VACUUM 原地重写
-        try:
-            c = sqlite3.connect(db_file)
-            c.execute("VACUUM")
-            c.close()
-            c2 = sqlite3.connect(db_file)
-            r3 = c2.execute("PRAGMA integrity_check").fetchall()
-            c2.close()
-            if [r[0] for r in r3] == ["ok"]:
-                logger.info("VACUUM 后 DB 已恢复")
+            con.close()
+            if _integrity_ok(db_file):
+                logger.info("REINDEX 后 DB 已恢复")
                 return
         except Exception as e:  # noqa: BLE001
-            logger.warning("VACUUM 失败(忽略，继续 dump 重建): %s", e)
-        # 兜底：逐表 dump 重建（从 sqlite_master 存的原 CREATE 语句建表+索引，再拷行）
-        report: dict = {}
-        dump_path = "/tmp/self_heal_dump.db"
-        _generic_dump_recover(db_file, dump_path, report)
-        if report.get("recovered_integrity") == ["ok"]:
-            _swap_in(report, dump_path, "ok (startup dump-recover)")
-            logger.warning("启动自愈 dump-recover 完成: %s", report.get("recover_tables"))
-        else:
-            logger.error("启动自愈 dump-recover 后仍不干净: %s", report.get("recovered_integrity"))
+            logger.warning("REINDEX 失败(忽略，继续 dump 重建): %s", e)
+
+        # 2) 逐表 dump 重建（保留线上数据）
+        try:
+            from .api.v1.diag import _generic_dump_recover, _swap_in  # noqa: WPS433
+            dump_path = "/tmp/self_heal_dump.db"
+            report: dict = {}
+            _generic_dump_recover(db_file, dump_path, report)
+            if report.get("recovered_integrity") == ["ok"]:
+                _swap_in(report, dump_path, "ok (startup dump-recover)")
+                logger.warning("启动 dump-recover 完成: %s", report.get("recover_tables"))
+                return
+            logger.error("启动 dump-recover 后仍不干净: %s", report.get("recovered_integrity"))
+        except Exception as e:  # noqa: BLE001
+            logger.error("dump-recover 失败(继续回退 lastgood/种子): %s", e)
+
+        # 3) 回退到最近 lastgood 备份
+        lastgood = f"{db_file}.lastgood"
+        if os.path.exists(lastgood) and _integrity_ok(lastgood):
+            try:
+                _restore_from(lastgood, db_file)
+                logger.warning("已从 lastgood 备份恢复 DB: %s", lastgood)
+                return
+            except Exception as e:  # noqa: BLE001
+                logger.error("lastgood 恢复失败(继续种子): %s", e)
+
+        # 4) 回退到镜像种子库（干净，含全部基础数据）
+        seed = "/app/backup/app.db"
+        if os.path.exists(seed):
+            try:
+                _restore_from(seed, db_file)
+                logger.warning("已从镜像种子库恢复 DB: %s", seed)
+                return
+            except Exception as e:  # noqa: BLE001
+                logger.error("种子恢复失败: %s", e)
+        logger.error("启动修复失败：无可用恢复源，应用将以损坏库运行")
     except Exception as e:  # noqa: BLE001
-        logger.error("self-heal db failed (non-fatal): %s", e)
+        logger.error("self-heal db error (non-fatal): %s", e)
 
 
 @asynccontextmanager
@@ -355,6 +419,7 @@ async def lifespan(app: FastAPI):
     # 重活放后台：关联打标 / 种子 / 刷新通知 / 提醒，避免启动过慢导致探针超时
     asyncio.create_task(_background_init())
     asyncio.create_task(_reminder_scheduler())
+    asyncio.create_task(_backup_scheduler())
     yield
 
 

@@ -21,6 +21,16 @@ _DB_PATH = "/app/data/app.db"
 _RECOVERED = "/tmp/recovered_app.db"
 
 
+def _integrity_ok(path: str) -> bool:
+    try:
+        c = sqlite3.connect(path)
+        ok = [r[0] for r in c.execute("PRAGMA integrity_check").fetchall()] == ["ok"]
+        c.close()
+        return ok
+    except Exception:
+        return False
+
+
 def _swap_in(report: dict, new_path: str, label: str):
     """用新文件原子替换损坏库，并清理 WAL/SHM、强制连接池重连。"""
     for ext in ("-wal", "-shm"):
@@ -151,7 +161,23 @@ def diag_db_recover():
             if report.get("recovered_integrity") == ["ok"]:
                 _swap_in(report, dump_path, "ok (dump-recover)")
             else:
-                report["swap"] = "skipped: dump 后仍不干净，保留原文件，请用 backup 回滚"
+                # dump 后仍不干净：回退到镜像种子库（干净，含全部基础数据）。
+                # 用 copy 而非 replace，保留 /app/backup/app.db 不被移走。
+                seed = "/app/backup/app.db"
+                if os.path.exists(seed) and _integrity_ok(seed):
+                    for ext in ("-wal", "-shm"):
+                        p = _DB_PATH + ext
+                        if os.path.exists(p):
+                            os.remove(p)
+                    shutil.copy2(seed, _DB_PATH)
+                    try:
+                        engine.dispose()
+                    except Exception:
+                        pass
+                    report["swap"] = "ok (seed fallback)"
+                    report["recovered_integrity"] = ["ok"]
+                else:
+                    report["swap"] = "skipped: dump 后仍不干净，保留原文件，请用 backup 回滚"
         except Exception as e:  # noqa: BLE001
             report["dump_stage_error"] = repr(e)
 
