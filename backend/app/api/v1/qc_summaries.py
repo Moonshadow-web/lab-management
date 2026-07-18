@@ -231,8 +231,8 @@ def upload_qc_summary(
     分组聚合，自动跑 Westgard 判定失控点，存入 qc_monthly_summaries + qc_daily_values。
     同名(同维度)月结自动覆盖重算。
 
-    instrument_id：受控仪器（绑定 instruments 表）。若提供，则该文件全部数据归于此
-    仪器（忽略 CSV 中的仪器列）；否则沿用 CSV 的仪器列（旧式自由文本）。
+    instrument_id（必填）：受控仪器（绑定 instruments 表）。该文件全部数据归于此仪器，
+    文件中的仪器代码（deviceId 等）一律忽略，不会单独作为仪器生成总结。
     """
     content = file.file.read()
     if not content:
@@ -251,14 +251,16 @@ def upload_qc_summary(
     if "test_item" not in hmap:
         raise HTTPException(status_code=400, detail="未识别到「项目」列。当前识别映射：" + str(hmap))
 
-    # 受控仪器
-    sel_inst = None
-    sel_inst_no = ""
-    if instrument_id:
-        sel_inst = db.get(Instrument, instrument_id)
-        if not sel_inst:
-            raise HTTPException(status_code=400, detail=f"instrument_id={instrument_id} 对应的仪器不存在")
-        sel_inst_no = sel_inst.dept_no or ""
+    # 受控仪器（必填）：文件中的仪器代码不允许单独成一台仪器出总结
+    if not instrument_id:
+        raise HTTPException(
+            status_code=400,
+            detail="请先在『质控仪器』下拉中选择真实受控仪器后再上传；文件中的仪器代码不会单独作为仪器生成总结。",
+        )
+    sel_inst = db.get(Instrument, instrument_id)
+    if not sel_inst:
+        raise HTTPException(status_code=400, detail=f"instrument_id={instrument_id} 对应的仪器不存在")
+    sel_inst_no = sel_inst.dept_no or ""
 
     groups: dict[tuple, list[float]] = {}
     meta: dict[tuple, dict] = {}
@@ -277,12 +279,9 @@ def upload_qc_summary(
         ti = (get("test_item") or "").strip()
         lot = (get("lot_no") or "").strip()
         lvl = (get("level") or "").strip()
-        if sel_inst:
-            inst = sel_inst.name
-            inst_no = sel_inst_no
-        else:
-            inst = (get("instrument") or "").strip()
-            inst_no = ""
+        # 仪器只取用户选定的真实受控仪器；文件中的仪器代码忽略，不单独成仪器
+        inst = sel_inst.name
+        inst_no = sel_inst_no
         key = (d.year, d.month, ti, lot, lvl, inst)
         groups.setdefault(key, [])
         groups[key].append(v)
