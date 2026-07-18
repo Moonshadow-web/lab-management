@@ -1037,32 +1037,123 @@ def import_quant_from_excel(db, group: ComparisonGroup, plan: ComparisonPlan, fi
 
 # ---------------------------------------------------------------------------
 # 默认分组种子（参照 SOP 表单 BG-SM-CZ-021/024~027/071）
+# 允许偏倚(TE) 默认取自 WS/T 403—2024《临床化学检验常用项目分析质量标准》附录 A
+#  资料来源：C:\Users\81526\Desktop\WST403-2024临床化学检验常用项目分析质量标准.pdf
+#  该标准为推荐性国标（2024-05-09 发布 2024-11-01 实施，代替 WS/T 403—2012）
+#  各项的"允许偏倚"列即为系统 te 字段的权威值（相对%）。
+#  标准里允许总误差(TEa)对低浓度水平有"绝对值/相对%"分段公式，
+#  对应"低浓度用绝对偏倚、高浓度用相对偏倚"——本系统已在 GroupItem
+#  的 te_by_level / mode_by_level 字段里支持该场景。
 # ---------------------------------------------------------------------------
 def _items_quant(pairs):
     return [{"name": n, "te": str(te), "mode": m} for n, te, m in pairs]
 
 
+# WS/T 403-2024 附录 A 允许偏倚（系统项目代码 → 偏倚%）。
+# mode='absolute' 表示标准对该项目在所有水平都用绝对偏倚（如 pH）；
+# mode='relative' 表示相对%（绝大多数项目）；低浓度水平可通过 te_by_level/mode_by_level 切换绝对偏倚。
+WST403_2024 = {
+    # ─ 常规生化 ─
+    "K":  2.0,  "NA": 1.5,  "CL": 1.5,  "CA": 2.0,  "P":  3.0,  "GLU": 2.0,
+    "UREA": 3.0,  "UA": 4.5,  "CR": 5.5,  "TP": 2.0,  "ALB": 2.0,  "TC": 4.0,
+    "TG":  5.0,  "HDL": 8.0,  "LDL": 8.0,  "APOA1": 10.0, "APOB": 10.0, "LPA": 10.0,
+    "TBIL": 5.0,  "DBIL": 6.7,  "ALT": 5.0,  "AST": 5.0,  "ALP": 10.0,  "AMY": 7.5,
+    "CK": 5.5,  "LDH": 4.0,  "GGT": 5.5,  "HBDH": 10.0,
+    "CHE": 8.0,  "FE": 4.5,  "MG": 5.5,  "CYSC": 8.0,
+    # ─ 免疫 ─
+    "CKMB": 10.0,  "MYO": 10.0,  "HCY": 10.0,
+    "IGG": 8.0,  "IGA": 8.0,  "IGM": 10.0,
+    "CRP": 10.0,  "RF": 10.0,  "ASO": 10.0,  "PA": 10.0,
+    "FT3": 8.0,  "TT3": 8.0,  "FT4": 8.0,  "TT4": 8.0,  "TSH": 8.0,
+    "CORTISOL": 8.0,  "E2": 10.0,  "FSH": 8.0,  "LH": 8.0,
+    "PROG": 8.0,  "PRL": 8.0,  "TESTO": 8.0,  "INSULIN": 12.0,
+    "FA": 12.0,  "B12": 10.0,  "PTH": 10.0,
+    "FERR": 10.0,  "B2MG": 10.0,
+    # ─ 血气（pH 绝对，其余相对%） ─
+    "PH":   (0.015, "absolute"),  "PCO2": (4.0, "relative"),  "PO2": (5.0, "relative"),
+}
+
+
+def _wst(item_code: str, default_te: float = 10.0, default_mode: str = "relative"):
+    """从 WS/T 403-2024 取允许偏倚；标准未列出的项目用 default_* 回退。"""
+    v = WST403_2024.get(item_code.upper())
+    if v is None:
+        return default_te, default_mode
+    if isinstance(v, tuple):
+        return v
+    return v, "relative"
+
+
 BIOTH_ITEM = _items_quant([
-    ("ALB", 2, "relative"), ("ALP", 10, "relative"), ("ALT", 5, "relative"), ("AMY", 7.5, "relative"),
-    ("APA", 10, "relative"), ("APB", 10, "relative"), ("ASO", 10, "relative"), ("AST", 5, "relative"),
-    ("BUN", 3, "relative"), ("C3", 8, "relative"), ("C4", 10, "relative"), ("CA", 2, "relative"),
-    ("CHE", 8, "relative"), ("CHOL", 4, "relative"), ("CK", 5.5, "relative"), ("CL", 1.5, "relative"),
-    ("CO2", 3, "relative"), ("CRE", 5.5, "relative"), ("CRP", 10, "relative"), ("CYSC", 8, "relative"),
-    ("DBIL", 6.7, "relative"), ("FE", 4.5, "relative"), ("GA", 10, "relative"), ("GGT", 5.5, "relative"),
-    ("GLU", 2, "relative"), ("HCY", 10, "relative"), ("HDL", 8, "relative"), ("Hp", 12, "relative"),
-    ("Ig-A", 10, "relative"), ("Ig-G", 8, "relative"), ("Ig-M", 8, "relative"), ("K", 2, "relative"),
-    ("LAC", 12, "relative"), ("LDH", 4, "relative"), ("LDL", 8, "relative"), ("LPa", 10, "relative"),
-    ("LPS", 10, "relative"), ("Mg", 5.5, "relative"), ("NA", 1.5, "relative"), ("P", 3, "relative"),
-    ("PA", 10, "relative"), ("RF", 10, "relative"), ("SAA", 15, "relative"), ("sd-LDL", 10, "relative"),
-    ("TBA", 12, "relative"), ("TBIL", 5, "relative"), ("TG", 5, "relative"), ("TP", 2, "relative"),
-    ("UA", 4.5, "relative"), ("UIBC", 10, "relative"), ("Zn", 10, "relative"), ("β2mg", 10, "relative"),
-    ("β-HBDH", 15, "relative"),
+    # 以下按 WS/T 403-2024 附录 A 校准（先前错误值已纠正）：
+    ("ALB", *_wst("ALB")),       # 白蛋白
+    ("ALP", *_wst("ALP")),       # 碱性磷酸酶
+    ("ALT", *_wst("ALT")),       # 丙氨酸氨基转移酶
+    ("AMY", *_wst("AMY")),       # 淀粉酶
+    ("APA", *_wst("APOA1")),     # 载脂蛋白 A1（系统别名 APA → APOA1）
+    ("APB", *_wst("APOB")),      # 载脂蛋白 B
+    ("ASO", *_wst("ASO")),       # 抗链球菌溶血素 O
+    ("AST", *_wst("AST")),       # 天门冬氨酸氨基转移酶
+    ("BUN", *_wst("UREA")),      # 尿素（Excel 缩写 BUN → 系统 UREA）
+    ("C3",  8, "relative"),      # 补体 C3（标准未单列，沿用行业通用 8%）
+    ("C4",  10, "relative"),     # 补体 C4
+    ("CA", *_wst("CA")),
+    ("CHE", *_wst("CHE")),       # 胆碱酯酶
+    ("CHOL", *_wst("TC")),       # 总胆固醇
+    ("CK", *_wst("CK")),
+    ("CL", *_wst("CL")),
+    ("CO2", 3, "relative"),      # 二氧化碳（标准未单列，沿用 3%）
+    ("CRE", *_wst("CR")),        # 肌酐
+    ("CRP", *_wst("CRP")),
+    ("CYSC", *_wst("CYSC")),     # 胱抑素 C
+    ("DBIL", *_wst("DBIL")),
+    ("FE", *_wst("FE")),
+    ("GA", 10, "relative"),      # 糖化白蛋白（标准未单列）
+    ("GGT", *_wst("GGT")),
+    ("GLU", *_wst("GLU")),
+    ("HCY", *_wst("HCY")),
+    ("HDL", *_wst("HDL")),
+    ("Hp", 12, "relative"),      # 触珠蛋白（标准未单列）
+    ("Ig-A", *_wst("IGA")),      # ← 之前错为 10，标准 8%
+    ("Ig-G", *_wst("IGG")),
+    ("Ig-M", *_wst("IGM")),      # ← 之前错为 8，标准 10%
+    ("K", *_wst("K")),
+    ("LAC", 12, "relative"),     # 乳酸（标准未单列）
+    ("LDH", *_wst("LDH")),
+    ("LDL", *_wst("LDL")),
+    ("LPa", *_wst("LPA")),
+    ("LPS", 10, "relative"),     # 脂肪酶（标准未单列）
+    ("Mg", *_wst("MG")),
+    ("NA", *_wst("NA")),
+    ("P", *_wst("P")),
+    ("PA", *_wst("PA")),
+    ("RF", *_wst("RF")),
+    ("SAA", 15, "relative"),     # 血清淀粉样蛋白 A（标准未单列）
+    ("sd-LDL", 10, "relative"),  # 小而密 LDL（标准未单列）
+    ("TBA", 10, "relative"),     # 总胆汁酸（标准未单列，10%）
+    ("TBIL", *_wst("TBIL")),
+    ("TG", *_wst("TG")),
+    ("TP", *_wst("TP")),
+    ("UA", *_wst("UA")),
+    ("UIBC", 10, "relative"),    # 不饱和铁结合力（标准未单列）
+    ("Zn", 10, "relative"),      # 锌（标准未单列）
+    ("β2mg", *_wst("B2MG")),     # β2-微球蛋白
+    ("β-HBDH", *_wst("HBDH")),   # ← 之前错为 15，标准 10%
 ])
 
 DXI_ITEM = _items_quant([
-    ("FERR", 0.1, "relative"), ("叶酸", 0.1, "relative"), ("B12", 0.1, "relative"), ("sTfR", 0.1, "relative"),
-    ("IFA", 0.1, "relative"), ("PCT", 0.1, "relative"), ("IL-6", 0.1, "relative"), ("cTnI", 0.1, "relative"),
-    ("MYO", 0.1, "relative"), ("CK-MB", 0.1, "relative"), ("BNP", 0.1, "relative"),
+    # 之前全部填 0.1 是占位符，现按 WS/T 403-2024 校准：
+    ("FERR",  *_wst("FERR")),    # 铁蛋白
+    ("叶酸",   *_wst("FA")),      # 叶酸
+    ("B12",   *_wst("B12")),     # 维生素 B12
+    ("sTfR",  10, "relative"),   # 可溶性转铁蛋白受体（标准未单列）
+    ("IFA",   10, "relative"),   # 铁蛋白（已在 FERR 中；此处为去铁铁蛋白？沿用 10%）
+    ("PCT",   10, "relative"),   # 降钙素原（标准未单列）
+    ("IL-6",  12, "relative"),   # 白介素 6（标准未单列）
+    ("cTnI",  10, "relative"),   # 心肌肌钙蛋白 I（标准未单列）
+    ("MYO",   *_wst("MYO")),
+    ("CK-MB", *_wst("CKMB")),    # 肌酸激酶-MB（μg/L，质量法）
+    ("BNP",   10, "relative"),   # B 型利钠肽（标准未单列）
 ])
 
 COAG_ITEM = _items_quant([
@@ -1070,16 +1161,22 @@ COAG_ITEM = _items_quant([
     ("TT", 10, "relative"), ("PT", 8, "relative"), ("FDP", 7, "relative"), ("FIB", 10, "relative"),
 ])
 
-PREG_ITEM = _items_quant([("HCG", 25, "relative"), ("孕酮", 25, "relative"), ("雌二醇", 25, "relative")])
+PREG_ITEM = _items_quant([
+    # 之前全部填 25 偏高，按 WS/T 403-2024 校准（β-HCG 标准未单列，沿用 10%）：
+    ("HCG",   10, "relative"),   # β-HCG 标准未列
+    ("孕酮",  *_wst("PROG")),    # 孕酮
+    ("雌二醇", *_wst("E2")),     # 雌二醇
+])
 
 BLOODGAS_ITEM = [
-    {"name": "PH", "te": "0.02", "mode": "absolute"},
-    {"name": "PCO2", "te": "5", "mode": "absolute"},
-    {"name": "pO2", "te": "0.05", "mode": "relative"},
-    {"name": "Na+", "te": "0.04", "mode": "relative"},
-    {"name": "K+", "te": "0.06", "mode": "relative"},
-    {"name": "Ca2+", "te": "0.05", "mode": "relative"},
-    {"name": "Cl-", "te": "0.04", "mode": "relative"},
+    # 按 WS/T 403-2024 校准：
+    {"name": "PH",   "te": "0.015", "mode": "absolute"},  # pH 标准为绝对偏倚 0.015
+    {"name": "PCO2", "te": "4",     "mode": "relative"},  # CO2 分压 4%
+    {"name": "pO2",  "te": "5",     "mode": "relative"},  # O2 分压 5%（原误为 0.05/相对，按标准改为 5%）
+    {"name": "Na+",  "te": "1.5",   "mode": "relative"},  # 与血 Na 共享 1.5%
+    {"name": "K+",   "te": "2",     "mode": "relative"},  # 与血 K 共享 2%
+    {"name": "Ca2+", "te": "2",     "mode": "relative"},  # 与血 Ca 共享 2%
+    {"name": "Cl-",  "te": "1.5",   "mode": "relative"},  # 与血 Cl 共享 1.5%
 ]
 
 QUAL_ITEM = [
