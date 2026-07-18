@@ -28,6 +28,7 @@
       <div class="aside-footer">
         <el-button class="families-btn" size="small" :icon="Connection" @click="goEqaAssociations">项目库与质评关联</el-button>
         <el-button class="families-btn" size="small" :icon="Share" @click="goFamilies">仪器关联管理</el-button>
+        <el-button class="families-btn" size="small" :icon="Document" @click="goQualityRequirements">项目质量要求</el-button>
       </div>
     </el-aside>
     <el-container>
@@ -55,7 +56,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
-import { Share, Connection, Menu, Close } from '@element-plus/icons-vue'
+import { Share, Connection, Document, Menu, Close } from '@element-plus/icons-vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -111,6 +112,10 @@ function goFamilies() {
 
 function goEqaAssociations() {
   router.push('/eqa-associations')
+}
+
+function goQualityRequirements() {
+  router.push('/quality-requirements')
 }
 </script>
 

@@ -21,6 +21,7 @@ const routes = [
       { path: 'instrument-families', name: 'instrument-families', component: () => import('../views/instruments/InstrumentFamilyManage.vue'), meta: { title: '仪器关联' } },
       { path: 'qc', name: 'qc', component: () => import('../views/qc/QCList.vue'), meta: { title: '质控管理' } },
       { path: 'eqa-associations', name: 'eqa-associations', component: () => import('../views/eqa/EqaAssociationManage.vue'), meta: { title: '项目库与质评关联' } },
+      { path: 'quality-requirements', name: 'quality-requirements', component: () => import('../views/quality/QualityRequirementList.vue'), meta: { title: '项目质量要求' } },
       { path: 'reagents', name: 'reagents', component: () => import('../views/reagents/ReagentList.vue'), meta: { title: '试剂管理' } },
       { path: 'training', name: 'training', component: () => import('../views/training/TrainingList.vue'), meta: { title: '继教培训' } },
       { path: 'verification', name: 'verification', component: () => import('../views/verification/VerificationList.vue'), meta: { title: '性能验证' } },

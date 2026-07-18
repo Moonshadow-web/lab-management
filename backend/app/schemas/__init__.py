@@ -559,3 +559,32 @@ class EqaSummaryRead(EqaSummaryBase):
     id: int
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+# ---------------- QualityRequirement ----------------
+class QualityRequirementBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    source: str = "wst403-2024"
+    category: str = ""
+    item_code: str = ""
+    item_name: str = ""
+    cv: str = ""
+    bias: str = ""
+    tea: str = ""
+    unit: str = ""
+    remark: str = ""
+    updated_by: str = ""
+
+
+class QualityRequirementCreate(QualityRequirementBase):
+    pass
+
+
+class QualityRequirementUpdate(QualityRequirementBase):
+    pass
+
+
+class QualityRequirementRead(QualityRequirementBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

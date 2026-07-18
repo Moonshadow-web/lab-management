@@ -20,6 +20,7 @@ from .interlab import InterlabPlan, InterlabItem, InterlabLevel
 from .qc_target import QCTargetBatch, QCTargetResult
 from .qc_material import QcMaterial
 from .refresh_token import RefreshToken
+from .quality_requirement import QualityRequirement
 
 __all__ = [
     "User",
@@ -57,4 +58,5 @@ __all__ = [
     "QCTargetResult",
     "QcMaterial",
     "RefreshToken",
+    "QualityRequirement",
 ]

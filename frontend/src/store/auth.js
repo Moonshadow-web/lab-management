@@ -13,6 +13,7 @@ const MODULE_WRITE_ROLES = {
   'training': ['admin', 'training_manager'],
   'verification': ['admin', 'specialty_leader'],
   'iso15189': ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader'],
+  'quality-requirements': ['admin'],
 }
 
 export const useAuthStore = defineStore('auth', {
