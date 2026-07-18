@@ -56,6 +56,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
+import { usePermissionStore } from '../store/permission'
 import { Share, Connection, Document, Menu, Close } from '@element-plus/icons-vue'
 
 const auth = useAuthStore()
@@ -78,6 +79,7 @@ const menus = computed(() => {
   const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')
   if (isAdmin) {
     base.push({ path: '/users', title: '用户管理', icon: 'UserFilled' })
+    base.push({ path: '/permission-config', title: '权限配置', icon: 'Lock' })
     base.push({ path: '/audit-logs', title: '审计日志', icon: 'View' })
     base.push({ path: '/reminder-settings', title: '提醒设置', icon: 'Bell' })
   }
@@ -93,7 +95,13 @@ function checkMobile() {
 function onMenuSelect() {
   if (isMobile.value) drawerVisible.value = false
 }
-onMounted(() => window.addEventListener('resize', checkMobile))
+onMounted(() => {
+  window.addEventListener('resize', checkMobile)
+  // 页面刷新场景：登录态下补一次模块权限映射（canWrite 依赖）
+  if (auth.isLoggedIn) {
+    try { usePermissionStore().load() } catch (_) {}
+  }
+})
 onUnmounted(() => window.removeEventListener('resize', checkMobile))
 
 const activeMenu = computed(() => route.path)

@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import request from '../utils/request'
+import { usePermissionStore } from './permission'
 
-// 模块 → 写权限角色映射（与后端 write_roles 一致）
-const MODULE_WRITE_ROLES = {
+// 模块 → 写权限角色映射（启动期 fallback；登录后会从后端拉新值覆盖）
+// 与 backend/models/module_permission.py DEFAULT_MODULE_PERMISSIONS 一致
+const FALLBACK_MODULE_WRITE_ROLES = {
   'test-items': ['admin'],
   'documents': ['admin', 'specialty_leader'],
   'instruments': ['admin', 'specialty_leader'],
@@ -55,6 +57,11 @@ export const useAuthStore = defineStore('auth', {
       const me = await request.get('/api/v1/auth/me')
       this.user = me
       localStorage.setItem('user', JSON.stringify(this.user))
+      // 登录成功后拉一次模块权限映射（用于全站 canWrite 判定）
+      try {
+        const permStore = usePermissionStore()
+        await permStore.load(true)
+      } catch (_) { /* 拉失败不阻塞登录 */ }
       return data
     },
     async changePassword(oldPassword, newPassword) {
@@ -79,7 +86,13 @@ export const useAuthStore = defineStore('auth', {
     // 判断当前用户对某模块是否有写权限
     canWrite(module) {
       if (this.isAdmin) return true
-      const required = MODULE_WRITE_ROLES[module]
+      // 优先读后端拉的最新配置；尚未加载或找不到时用 fallback
+      let required
+      try {
+        const permStore = usePermissionStore()
+        required = permStore.moduleRoles[module]
+      } catch (_) { /* store 未挂载时退化 */ }
+      if (!required) required = FALLBACK_MODULE_WRITE_ROLES[module]
       if (!required) return true // 未配置的模块默认允许
       return this.myRoles.some(r => required.includes(r))
     },

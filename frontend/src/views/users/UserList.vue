@@ -248,22 +248,11 @@ import { ref, computed, onMounted } from 'vue'
 import { Search, Plus, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listUsers, createUser, updateUser, deleteUser, resetPassword, getRoleOptions } from '../../api/users'
+import { getModulePermissionsStructure } from '../../api/modulePermissions'
+import { usePermissionStore } from '../../store/permission'
 
-// 模块写权限白名单（与 store/auth.js 保持一致；用户管理里要可视化展示）
-const MODULE_WRITE_ROLES = {
-  'test-items': ['admin'],
-  'documents': ['admin', 'specialty_leader'],
-  'instruments': ['admin', 'specialty_leader'],
-  'instrument-families': ['admin', 'specialty_leader'],
-  'qc': ['admin', 'qc_manager'],
-  'eqa': ['admin', 'qc_manager'],
-  'reagents': ['admin', 'reagent_manager'],
-  'training': ['admin', 'training_manager'],
-  'verification': ['admin', 'specialty_leader'],
-  'iso15189': ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader'],
-  'quality-requirements': ['admin'],
-}
-const MODULES = [
+// 模块列表：启动时由 /module-permissions/structure 拉取（保留硬编码 fallback 保证首屏可用）
+const FALLBACK_MODULES = [
   { key: 'test-items',          label: '项目库' },
   { key: 'documents',           label: '文件' },
   { key: 'instruments',         label: '仪器档案' },
@@ -276,6 +265,8 @@ const MODULES = [
   { key: 'iso15189',            label: '15189' },
   { key: 'quality-requirements',label: '质量要求' },
 ]
+const permStore = usePermissionStore()
+const MODULES = ref([...FALLBACK_MODULES])
 
 const users = ref([])
 const loading = ref(false)
@@ -329,7 +320,8 @@ function isAdmin(row) {
 // 单个模块的写权限判断（与 store/auth.js canWrite 逻辑一致）
 function canWriteModule(userRoles, moduleKey) {
   if (userRoles.includes('admin')) return true
-  const allowed = MODULE_WRITE_ROLES[moduleKey]
+  // 优先从全局权限 store 读（admin 在配置页改后会同步到这里）
+  const allowed = permStore.moduleRoles[moduleKey] || permStore.$state.moduleRoles?.[moduleKey]
   if (!allowed) return true  // 未配置白名单 = 默认允许
   return userRoles.some((r) => allowed.includes(r))
 }
@@ -362,11 +354,12 @@ const matrixRows = computed(() => users.value.map((row) => ({
 const permDetail = computed(() => {
   if (!permUser.value) return { count: 0, table: [] }
   const roles = fullRoles(permUser.value)
-  const table = MODULES.map((m) => {
+  const table = MODULES.value.map((m) => {
     let reason = '无写权限（角色不在白名单）'
     if (isAdmin(permUser.value)) reason = '管理员：所有模块通杀'
     else if (canWriteModule(roles, m.key)) {
-      const hits = roles.filter((r) => (MODULE_WRITE_ROLES[m.key] || ['admin']).includes(r))
+      const allowed = permStore.moduleRoles[m.key] || []
+      const hits = roles.filter((r) => allowed.includes(r))
       reason = `角色 ${hits.map((r) => roleLabel(r)).join(' / ')} 在「${m.label}」白名单内`
     }
     return { key: m.key, label: m.label, allowed: isAdmin(permUser.value) || canWriteModule(roles, m.key), reason }
@@ -524,6 +517,14 @@ async function onDelete(row) {
 
 onMounted(async () => {
   try { roleOptions.value = await getRoleOptions() } catch {}
+  // 拉最新模块结构（同步到全局 store + 本地 MODULES 列表）
+  try {
+    const r = await getModulePermissionsStructure()
+    if (r.data?.modules?.length) {
+      MODULES.value = r.data.modules.map((m) => ({ key: m.key, label: m.label }))
+      for (const m of r.data.modules) permStore.setLocal(m.key, m.roles)
+    }
+  } catch {}
   await loadData()
 })
 </script>

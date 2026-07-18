@@ -21,6 +21,7 @@ from .qc_target import QCTargetBatch, QCTargetResult
 from .qc_material import QcMaterial
 from .refresh_token import RefreshToken
 from .quality_requirement import QualityRequirement
+from .module_permission import ModulePermission, DEFAULT_MODULE_PERMISSIONS, ALL_MODULES, ALL_ROLES
 
 __all__ = [
     "User",
@@ -59,4 +60,5 @@ __all__ = [
     "QcMaterial",
     "RefreshToken",
     "QualityRequirement",
+    "ModulePermission",
 ]

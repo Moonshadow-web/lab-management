@@ -329,6 +329,14 @@ async def _background_init():
             refresh_eqa_notifications(db)
             ensure_reminder_defaults(db)
             ensure_comparison_defaults(db)
+            # 模块写权限配置：表为空时灌入出厂默认（与旧硬编码值一致）
+            from .models.module_permission import ModulePermission, DEFAULT_MODULE_PERMISSIONS
+            if db.query(ModulePermission).count() == 0:
+                for mod_key, roles in DEFAULT_MODULE_PERMISSIONS.items():
+                    for r in roles:
+                        db.add(ModulePermission(module_key=mod_key, role_code=r, updated_by="system"))
+                db.commit()
+                logger.info("已初始化 module_permissions 默认配置")
             # 质控品主数据：补齐预设（如「伯乐免疫多项」），仅当不存在时插入，幂等
             from .models.qc_material import QcMaterial as _QM
             for _pn in ["生化多项质控品", "伯乐免疫多项", "昆涞免疫多项"]:

@@ -28,6 +28,7 @@ const routes = [
       { path: 'iso15189', name: 'iso15189', component: () => import('../views/iso15189/NonconformityList.vue'), meta: { title: '15189专项' } },
       { path: 'audit-logs', name: 'audit-logs', component: () => import('../views/audit/AuditLogList.vue'), meta: { title: '审计日志', adminOnly: true } },
       { path: 'users', name: 'users', component: () => import('../views/users/UserList.vue'), meta: { title: '用户管理', adminOnly: true } },
+      { path: 'permission-config', name: 'permission-config', component: () => import('../views/users/PermissionsConfig.vue'), meta: { title: '权限配置', adminOnly: true } },
       { path: 'reminder-settings', name: 'reminder-settings', component: () => import('../views/ReminderSettings.vue'), meta: { title: '提醒设置', adminOnly: true } },
     ],
   },
