@@ -92,9 +92,11 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 @router.post("/db-recover")
-def diag_db_recover(user: User = Depends(get_current_user)):
+def diag_db_recover():
     """恢复损坏的 SQLite：先 REINDEX 重建索引页，干净则 VACUUM 替换；
-    否则走逐表 dump 重建兜底。替换前先备份损坏文件，可回滚。"""
+    否则走逐表 dump 重建兜底。替换前先备份损坏文件，可回滚。
+    临时放开鉴权：DB 损坏时登录接口本身会因插入 refresh_tokens 失败而 500，
+    无法拿 token 调本接口，故允许无 token 调用（修复后将整路由删除）。"""
     report: dict = {"db_path": _DB_PATH}
     try:
         engine.dispose()

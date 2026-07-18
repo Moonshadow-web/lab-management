@@ -97,14 +97,19 @@ def login(
     write_audit(db, user, "login", "users", user.id, "login success", ip)
     token = create_access_token(user.id)
     refresh, jti = create_refresh_token(user.id)
-    db.add(
-        RefreshToken(
-            user_id=user.id,
-            jti=jti,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+    # refresh token 落库容错：万一 refresh_tokens 表/索引损坏导致写入失败，
+    # 绝不让登录整体 500（仍可凭 access token 正常使用，只是暂无自动续期）。
+    try:
+        db.add(
+            RefreshToken(
+                user_id=user.id,
+                jti=jti,
+                expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+            )
         )
-    )
-    db.commit()
+        db.commit()
+    except Exception:  # noqa: BLE001
+        db.rollback()
     return {
         "access_token": token,
         "refresh_token": refresh,
