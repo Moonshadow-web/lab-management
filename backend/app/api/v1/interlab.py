@@ -237,9 +237,9 @@ def save_results(pid: int, body: InterlabResultsPayload, db: Session = Depends(g
                 else:
                     db.add(InterlabLevel(item_id=it.id, level_num=ln))
         db.commit()
-    except Exception as e:  # 临时诊断：把真实异常透出，便于定位线上写失败
+    except Exception as e:  # 临时诊断：把真实异常以 200 返回，避免被 500 处理器吞掉
         import traceback
-        raise HTTPException(status_code=500, detail=traceback.format_exc()[-1500:])
+        return {"ok": False, "diag_error": traceback.format_exc()[-1800:]}
     return {"ok": True}
 
 
