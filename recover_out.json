@@ -1,0 +1,1 @@
+{"db_path":"/app/data/app.db","started_at":"2026-07-18T03:20:23.081449","backup":"/app/data/app.db.corrupt-bak-20260718_032023","reindex_error":"DatabaseError('database disk image is malformed')","integrity_after_reindex":null,"vacuum_error":"DatabaseError('database disk image is malformed')","finished_at":"2026-07-18T03:20:23.116818"}

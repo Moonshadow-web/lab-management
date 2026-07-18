@@ -18,7 +18,10 @@ from ...models.user import User
 router = APIRouter(prefix="/_diag", tags=["diag"])
 
 _DB_PATH = "/app/data/app.db"
-_RECOVERED = "/tmp/recovered_app.db"
+# 注意：CFS 持久卷 /app/data 与本机 /tmp 是不同设备，
+# os.replace 跨设备会报 OSError(18, 'Invalid cross-device link')，
+# 因此临时文件与最终库都放在 /app/data 同设备内，且用 shutil.move 兜底跨设备。
+_TMP_DIR = "/app/data"
 
 
 def _integrity_ok(path: str) -> bool:
@@ -32,12 +35,19 @@ def _integrity_ok(path: str) -> bool:
 
 
 def _swap_in(report: dict, new_path: str, label: str):
-    """用新文件原子替换损坏库，并清理 WAL/SHM、强制连接池重连。"""
+    """用新文件替换损坏库（同设备用 os.replace 原子替换；跨设备 shutil.move 兜底），
+    并清理 WAL/SHM、强制连接池重连。"""
     for ext in ("-wal", "-shm"):
         p = _DB_PATH + ext
         if os.path.exists(p):
             os.remove(p)
-    os.replace(new_path, _DB_PATH)
+    try:
+        os.replace(new_path, _DB_PATH)
+    except OSError as e:  # noqa: BLE001
+        if getattr(e, "errno", None) == 18:  # Invalid cross-device link
+            shutil.move(new_path, _DB_PATH)
+        else:
+            raise
     try:
         engine.dispose()
     except Exception as e:  # noqa: BLE001
@@ -102,7 +112,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役的是哪个容器版本（修复 CFS 损坏自愈相关改动后）
-_BUILD_MARK = "4da3a52-selfheal-2026-07-18-qcrecover"
+_BUILD_MARK = "4da3a52-selfheal-2026-07-18-recover2"
 
 
 @router.get("/build")
@@ -166,7 +176,7 @@ def diag_db_recover():
     #    仅当 REINDEX+VACUUM 仍不干净时启用。小库（几十张表、数千行）秒级完成，不超网关超时。
     if report.get("integrity_after_reindex") != ["ok"] and report.get("integrity_after_vacuum") != ["ok"]:
         try:
-            dump_path = "/tmp/recover_dump.db"
+            dump_path = os.path.join(_TMP_DIR, "recover_dump.db")
             _generic_dump_recover(_DB_PATH, dump_path, report)
             if report.get("recovered_integrity") == ["ok"]:
                 _swap_in(report, dump_path, "ok (dump-recover)")
@@ -367,6 +377,121 @@ def diag_db_repair_swap(db: Session = Depends(get_db), user: User = Depends(get_
         pass
 
     return {"ok": True, "swapped": True, "backup": bak}
+
+
+@router.get("/inspect-all")
+def diag_inspect_all():
+    """只读、免鉴权：扫描线上库与 CFS 上所有副本（corrupt-bak/lastgood/manual-bak/seed），
+    逐文件报告 integrity + 全部表计数。用于定位损坏前含用户数据的副本、评估损坏范围。
+    临时诊断接口，修复后删除。"""
+    import glob
+
+    d = os.path.dirname(_DB_PATH)
+    pats = ["app.db", "app.db.lastgood", "app.db.corrupt-bak-*", "app.db.manual-bak-*"]
+    files = sorted(
+        set(sum((glob.glob(os.path.join(d, p)) for p in pats), [])),
+        key=lambda f: os.path.getmtime(f) if os.path.exists(f) else 0,
+    )
+    seed = "/app/backup/app.db"
+    if os.path.exists(seed):
+        files = files + [seed]
+    out = []
+    for f in files:
+        rec = {
+            "path": f,
+            "size": os.path.getsize(f) if os.path.exists(f) else None,
+            "mtime": (_dt.datetime.fromtimestamp(os.path.getmtime(f)).isoformat()
+                      if os.path.exists(f) else None),
+        }
+        try:
+            c = sqlite3.connect(f)
+            c.text_factory = str
+            c.execute("PRAGMA writable_schema=ON")
+            rec["integrity"] = [r[0] for r in c.execute("PRAGMA integrity_check").fetchall()]
+            names = [n[0] for n in c.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchall()]
+            counts = {}
+            for n in names:
+                try:
+                    counts[n] = c.execute(f'SELECT COUNT(*) FROM "{n}"').fetchone()[0]
+                except Exception as e:  # noqa: BLE001
+                    counts[n] = f"ERR:{e}"
+            rec["table_counts"] = counts
+            c.close()
+        except Exception as e:  # noqa: BLE001
+            rec["error"] = repr(e)
+        out.append(rec)
+    return {"db_path": _DB_PATH, "files": out}
+
+
+@router.post("/recover-modules-from-backup")
+def diag_recover_modules_from_backup(db: Session = Depends(get_db)):
+    """免鉴权（临时）：从损坏前副本把用户数据导回线上库。覆盖三大模块：
+    室间比对(interlab_*)、质控累靶(qc_target_*)、仪器间比对(comparison_*)。
+    策略：对每个目标表，扫描所有副本，选取「可读且行数最多」的副本作为数据源，
+    只 INSERT 线上缺失的行、保留原 id，绝不删除/覆盖线上已有记录。
+    写操作走 uvicorn 自身的 SQLAlchemy 连接池（同进程/同引擎），避免独立连接抢锁。
+    临时诊断接口，修复后删除。"""
+    import glob
+
+    d = os.path.dirname(_DB_PATH)
+    pats = ["app.db.corrupt-bak-*", "app.db.lastgood", "app.db.manual-bak-*"]
+    cand = sorted(
+        set(sum((glob.glob(os.path.join(d, p)) for p in pats), [])),
+        key=lambda f: os.path.getmtime(f),
+    )
+    TARGETS = [
+        "interlab_plans", "interlab_items", "interlab_levels",
+        "qc_target_batches", "qc_target_results",
+        "comparison_plans", "comparison_results", "comparison_qual_results",
+        "comparison_attachments",
+    ]
+    report = {"candidates": len(cand), "tables": {}}
+    for t in TARGETS:
+        best = None  # (count, rows, src, cols)
+        for src in cand:
+            try:
+                s = sqlite3.connect(src)
+                s.text_factory = str
+                s.execute("PRAGMA writable_schema=ON")
+                cols = [r[1] for r in s.execute(f'PRAGMA table_info("{t}")').fetchall()]
+                if "id" not in cols:
+                    s.close()
+                    continue
+                rows = s.execute(f'SELECT * FROM "{t}"').fetchall()
+                s.close()
+                if len(rows) > (best[0] if best else -1):
+                    best = (len(rows), rows, src, cols)
+            except Exception:  # noqa: BLE001
+                continue
+        if not best:
+            report["tables"][t] = {"added": 0, "source": None, "note": "no readable copy"}
+            continue
+        cnt, rows, src, cols = best
+        exist = set(r[0] for r in db.execute(text(f'SELECT "id" FROM "{t}"')).fetchall())
+        colspec = ", ".join(f'"{c}"' for c in cols)
+        ph = ", ".join(f":{c}" for c in cols)
+        added = 0
+        for row in rows:
+            rid = row[cols.index("id")]
+            if rid in exist:
+                continue
+            params = {c: v for c, v in zip(cols, row)}
+            db.execute(text(f'INSERT INTO "{t}" ({colspec}) VALUES ({ph})'), params)
+            added += 1
+        db.commit()
+        try:
+            mx = db.execute(text(f'SELECT MAX("id") FROM "{t}"')).fetchone()[0]
+            if mx is not None:
+                db.execute(
+                    text("INSERT OR REPLACE INTO sqlite_sequence(name,seq) VALUES(:n,:s)"),
+                    {"n": t, "s": mx})
+            db.commit()
+        except Exception:  # noqa: BLE001
+            pass
+        report["tables"][t] = {"added": added, "source": src, "source_rows": cnt}
+    return report
 
 
 @router.get("/inspect-backups")
