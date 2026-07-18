@@ -108,7 +108,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "4da3a52-selfheal-2026-07-18-audit"
+_BUILD_MARK = "4da3a52-selfheal-2026-07-18-diffrec"
 
 
 def get_build_mark() -> str:
@@ -201,4 +201,156 @@ def diag_audit_missing(db: Session = Depends(get_db),
         "missing": missing,
         "copy_table_counts": copy_rows,
     }
+
+
+def _list_copies():
+    import glob
+
+    d = os.path.dirname(_DB_PATH)
+    pats = ["app.db.corrupt-bak-*", "app.db.lastgood", "app.db.manual-bak-*"]
+    return sorted(
+        set(sum((glob.glob(os.path.join(d, p)) for p in pats), [])),
+        key=lambda f: os.path.getmtime(f),
+    )
+
+
+def _best_copy_for(table: str):
+    """返回 (副本路径, 可读行数) —— 选该表可读行数最多的副本。"""
+    best_cp, best_n = None, -1
+    for cp in _list_copies():
+        try:
+            c = sqlite3.connect(cp)
+            c.text_factory = str
+            n = c.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
+            c.close()
+            if n > best_n:
+                best_n, best_cp = n, cp
+        except Exception:  # noqa: BLE001
+            pass
+    return best_cp, best_n
+
+
+@router.get("/diff-table")
+def diag_diff_table(table: str, db: Session = Depends(get_db),
+                    _u: User = Depends(require_roles("admin"))):
+    """逐行对比线上表与最佳可读副本（按首列即主键），找出缺失/多余/值不一致。只读。"""
+    best_cp, best_n = _best_copy_for(table)
+    if best_cp is None or best_n <= 0:
+        return {"table": table, "status": "no_source", "best_copy": best_cp}
+    c = sqlite3.connect(best_cp)
+    c.text_factory = str
+    cols = [r[1] for r in c.execute(f'PRAGMA table_info("{table}")').fetchall()]
+    if not cols:
+        c.close()
+        return {"table": table, "status": "no_cols"}
+    col_sql = ", ".join(f'"{x}"' for x in cols)
+    try:
+        rows = c.execute(f'SELECT {col_sql} FROM "{table}"').fetchall()
+    except Exception as e:  # noqa: BLE001
+        c.close()
+        return {"table": table, "status": "read_err", "error": str(e)}
+    c.close()
+    src = {r[0]: r for r in rows}
+    live_rows = db.execute(text(f'SELECT {col_sql} FROM "{table}"')).fetchall()
+    live = {r[0]: r for r in live_rows}
+    missing_in_live = [k for k in src if k not in live]
+    extra_in_live = [k for k in live if k not in src]
+    mismatched = []
+    for k in src:
+        if k in live and src[k] != live[k]:
+            diff_cols = [cols[i] for i in range(1, len(cols)) if src[k][i] != live[k][i]]
+            mismatched.append({"id": k, "diff_cols": diff_cols[:8]})
+            if len(mismatched) >= 20:
+                break
+    return {
+        "table": table,
+        "best_copy": os.path.basename(best_cp),
+        "source_rows": len(rows),
+        "live_rows": len(live_rows),
+        "missing_in_live": missing_in_live[:50],
+        "missing_in_live_count": len(missing_in_live),
+        "extra_in_live_count": len(extra_in_live),
+        "mismatched_count": len(mismatched),
+        "mismatched_sample": mismatched,
+    }
+
+
+@router.post("/recover-table")
+def diag_recover_table(payload: dict, db: Session = Depends(get_db),
+                        _u: User = Depends(require_roles("admin"))):
+    """用最佳可读副本对指定表做 INSERT OR REPLACE 整表修复：
+    - 副本有、线上漏的 → 新增
+    - 两边都有(同主键) → 用副本值覆盖线上(修正损坏/错误值)
+    - 线上独有(副本无) → 保留，不删除
+    不触发 DELETE，避免外键级联问题。仅处理用户数据表，跳过系统表。
+    """
+    BLOCK = {"alembic_version", "sqlite_sequence", "refresh_tokens"}
+    tables = payload.get("tables", [])
+    report = []
+    for t in tables:
+        if t in BLOCK:
+            report.append({"table": t, "status": "skipped_system"})
+            continue
+        best_cp, best_n = _best_copy_for(t)
+        if best_cp is None or best_n <= 0:
+            report.append({"table": t, "status": "no_source", "best_copy": best_cp})
+            continue
+        c = sqlite3.connect(best_cp)
+        c.text_factory = str
+        cols = [r[1] for r in c.execute(f'PRAGMA table_info("{t}")').fetchall()]
+        if not cols:
+            c.close()
+            report.append({"table": t, "status": "no_cols"})
+            continue
+        col_sql = ", ".join(f'"{x}"' for x in cols)
+        qmarks = ", ".join("?" * len(cols))
+        try:
+            rows = c.execute(f'SELECT {col_sql} FROM "{t}"').fetchall()
+        except Exception as e:  # noqa: BLE001
+            c.close()
+            report.append({"table": t, "status": "read_err", "error": str(e)})
+            continue
+        c.close()
+        replaced = 0
+        added = 0
+        live_ids = set(r[0] for r in db.execute(text(f'SELECT "{cols[0]}" FROM "{t}"')).fetchall())
+        for r in rows:
+            try:
+                db.execute(
+                    text(f'INSERT OR REPLACE INTO "{t}" ({col_sql}) VALUES ({qmarks})'), r
+                )
+                if r[0] in live_ids:
+                    replaced += 1
+                else:
+                    added += 1
+            except Exception:  # noqa: BLE001
+                pass
+        db.commit()
+        # 同步 sqlite_sequence，避免后续自增主键冲突
+        try:
+            maxid = db.execute(
+                text(f'SELECT MAX("{cols[0]}") FROM "{t}"')
+            ).fetchone()[0]
+            if maxid is not None:
+                db.execute(
+                    text(
+                        "INSERT OR REPLACE INTO sqlite_sequence(name, seq) "
+                        "VALUES (:n, :s)"
+                    ),
+                    {"n": t, "s": maxid},
+                )
+                db.commit()
+        except Exception:  # noqa: BLE001
+            pass
+        report.append(
+            {
+                "table": t,
+                "status": "ok",
+                "best_copy": os.path.basename(best_cp),
+                "source_rows": len(rows),
+                "replaced": replaced,
+                "added": added,
+            }
+        )
+    return {"report": report}
 
