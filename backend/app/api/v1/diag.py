@@ -142,9 +142,21 @@ def diag_db_recover():
         except Exception as e:  # noqa: BLE001
             report["vacuum_error"] = repr(e)
 
+    # 4. 兜底：逐表 dump 重建（从 sqlite_master 存的 CREATE 语句原样建表+索引，再拷行）
+    #    仅当 REINDEX+VACUUM 仍不干净时启用。小库（几十张表、数千行）秒级完成，不超网关超时。
+    if report.get("integrity_after_reindex") != ["ok"] and report.get("integrity_after_vacuum") != ["ok"]:
+        try:
+            dump_path = "/tmp/recover_dump.db"
+            _generic_dump_recover(_DB_PATH, dump_path, report)
+            if report.get("recovered_integrity") == ["ok"]:
+                _swap_in(report, dump_path, "ok (dump-recover)")
+            else:
+                report["swap"] = "skipped: dump 后仍不干净，保留原文件，请用 backup 回滚"
+        except Exception as e:  # noqa: BLE001
+            report["dump_stage_error"] = repr(e)
+
     report["finished_at"] = _dt.datetime.now().isoformat()
     return report
-
 
 @router.post("/db-backup")
 def diag_db_backup():
