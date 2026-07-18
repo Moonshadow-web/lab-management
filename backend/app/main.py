@@ -368,7 +368,7 @@ def _self_heal_db():
         # 2) 逐表 dump 重建（保留线上数据）
         try:
             from .api.v1.diag import _generic_dump_recover, _swap_in  # noqa: WPS433
-            dump_path = "/tmp/self_heal_dump.db"
+            dump_path = "/app/data/self_heal_dump.db"
             report: dict = {}
             _generic_dump_recover(db_file, dump_path, report)
             if report.get("recovered_integrity") == ["ok"]:
