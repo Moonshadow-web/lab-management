@@ -108,7 +108,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "4da3a52-selfheal-2026-07-18-diffrec2"
+_BUILD_MARK = "4da3a52-selfheal-2026-07-18-diffrec3"
 
 
 def get_build_mark() -> str:
@@ -120,7 +120,7 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from ...core.security import require_roles  # noqa: E402
 from ...models.user import User  # noqa: E402
-from ...core.database import get_db  # noqa: E402
+from ...core.database import get_db, engine  # noqa: E402
 
 router = APIRouter(prefix="/_diag", tags=["diag"])
 
@@ -313,39 +313,40 @@ def diag_recover_table(payload: dict, db: Session = Depends(get_db),
             report.append({"table": t, "status": "read_err", "error": str(e)})
             continue
         c.close()
-        replaced = 0
-        added = 0
-        live_ids = set(r[0] for r in db.execute(text(f'SELECT "{cols[0]}" FROM "{t}"')).fetchall())
-        for r in rows:
-            if mode == "insert_missing" and r[0] in live_ids:
-                continue  # 仅补缺失，不覆盖现有行（保护 password_hash 等）
+        # 从 SQLAlchemy 连接池取原生连接写回（支持 ? 占位符，且不会与池抢锁）
+        conn = engine.raw_connection()
+        try:
+            cur = conn.cursor()
+            replaced = 0
+            added = 0
+            live_ids = set(r[0] for r in cur.execute(f'SELECT "{cols[0]}" FROM "{t}"').fetchall())
+            for r in rows:
+                if mode == "insert_missing" and r[0] in live_ids:
+                    continue  # 仅补缺失，不覆盖现有行（保护 password_hash 等）
+                try:
+                    cur.execute(
+                        f'INSERT OR REPLACE INTO "{t}" ({col_sql}) VALUES ({qmarks})', r
+                    )
+                    if r[0] in live_ids:
+                        replaced += 1
+                    else:
+                        added += 1
+                except Exception:  # noqa: BLE001
+                    pass
+            conn.commit()
+            # 同步 sqlite_sequence，避免后续自增主键冲突
             try:
-                db.execute(
-                    text(f'INSERT OR REPLACE INTO "{t}" ({col_sql}) VALUES ({qmarks})'), r
-                )
-                if r[0] in live_ids:
-                    replaced += 1
-                else:
-                    added += 1
+                maxid = cur.execute(f'SELECT MAX("{cols[0]}") FROM "{t}"').fetchone()[0]
+                if maxid is not None:
+                    cur.execute(
+                        "INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES (?, ?)",
+                        (t, maxid),
+                    )
+                    conn.commit()
             except Exception:  # noqa: BLE001
                 pass
-        db.commit()
-        # 同步 sqlite_sequence，避免后续自增主键冲突
-        try:
-            maxid = db.execute(
-                text(f'SELECT MAX("{cols[0]}") FROM "{t}"')
-            ).fetchone()[0]
-            if maxid is not None:
-                db.execute(
-                    text(
-                        "INSERT OR REPLACE INTO sqlite_sequence(name, seq) "
-                        "VALUES (:n, :s)"
-                    ),
-                    {"n": t, "s": maxid},
-                )
-                db.commit()
-        except Exception:  # noqa: BLE001
-            pass
+        finally:
+            conn.close()
         report.append(
             {
                 "table": t,
