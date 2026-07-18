@@ -99,27 +99,39 @@ def _migrate_schema():
                     conn.exec_driver_sql(
                         f"ALTER TABLE {table} ADD COLUMN {col} {ctype}"
                     )
-        # 清理过时列：老 schema 残留、不再被模型管理的列。
-        # 例如 interlab_items.our_value 早被迁到 interlab_levels，但旧表仍有 NOT NULL，
-        # 导致 create_all 不删、INSERT 留空触发 NOT NULL 失败。
-        drops = {
-            "interlab_items": ["our_value"],
+        # 清理过时列（以模型为权威）：扫描表中列，凡不在「当前模型期望列集合」的，
+        # 视为老 schema 残留（多半带 NOT NULL），一律 DROP COLUMN。
+        # 背景：interlab_items 早把 our_value/ref_value/ref1_*/ref2_* 迁到 interlab_levels，
+        # 但旧线上表保留这些列且 NOT NULL，导致 INSERT 留空触发 IntegrityError。
+        # 用「expected = 模型实际列」做 reconcile，一次性兜住所有残留列。
+        reconcile = {
+            "interlab_items": {
+                "id", "plan_id", "item", "unit", "te", "mode", "kind", "note",
+                "created_at", "updated_at",
+            },
+            "interlab_levels": {
+                "id", "item_id", "level_num",
+                "our_value",
+                "ref1_y1", "ref1_y2", "ref1_mean",
+                "ref2_y1", "ref2_y2", "ref2_mean",
+                "created_at", "updated_at",
+            },
         }
-        for table, cols in drops.items():
+        for table, expected in reconcile.items():
             try:
                 res = conn.exec_driver_sql(f"PRAGMA table_info({table})")
                 existing = {row[1] for row in res}
             except Exception:
                 continue
-            for col in cols:
-                if col in existing:
-                    try:
-                        conn.exec_driver_sql(
-                            f"ALTER TABLE {table} DROP COLUMN {col}"
-                        )
-                    except Exception as e:  # noqa: BLE001
-                        # 旧版 SQLite 不支持 DROP COLUMN；记录后由后续默认值兼容路径兜底
-                        print(f"[migrate] DROP COLUMN {table}.{col} failed: {e}")
+            extras = existing - expected
+            for col in extras:
+                try:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE {table} DROP COLUMN {col}"
+                    )
+                    print(f"[migrate] DROP COLUMN {table}.{col}")
+                except Exception as e:  # noqa: BLE001
+                    print(f"[migrate] DROP COLUMN {table}.{col} failed: {e}")
         # 旧总结行 category 为 NULL/空 → 回填默认「生化+凝血」，避免拆分后过滤失效
         try:
             conn.exec_driver_sql(
