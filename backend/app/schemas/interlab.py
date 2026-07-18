@@ -15,6 +15,7 @@ class InterlabPlanBase(BaseModel):
     half: int = 1  # 1=上半年 2=下半年
     instrument_id: int = 0
     reference_lab: str = ""
+    compared_instrument2: str = ""
     compared_at: str = ""
     operator: str = ""
     reviewer: str = ""
@@ -44,6 +45,7 @@ class InterlabPlanUpdate(BaseModel):
     half: Optional[int] = None
     instrument_id: Optional[int] = None
     reference_lab: Optional[str] = None
+    compared_instrument2: Optional[str] = None
     compared_at: Optional[str] = None
     operator: Optional[str] = None
     reviewer: Optional[str] = None
@@ -57,6 +59,7 @@ class InterlabPlanUpdate(BaseModel):
 class InterlabPlanRead(InterlabPlanBase):
     id: int
     report_path: str = ""
+    compared_instrument2: str = ""
     created_by: str = ""
     created_at: Any = None
     updated_at: Any = None

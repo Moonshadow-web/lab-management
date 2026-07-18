@@ -68,6 +68,9 @@ def _migrate_schema():
         "interlab_items": {
             "kind": "VARCHAR(20)",
         },
+        "interlab_plans": {
+            "compared_instrument2": "VARCHAR(200)",
+        },
         "comparison_plans": {
             "only_uncompared": "BOOLEAN",
         },

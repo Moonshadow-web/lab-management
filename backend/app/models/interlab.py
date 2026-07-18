@@ -25,7 +25,8 @@ class InterlabPlan(Base):
     year: Mapped[int] = mapped_column(Integer, index=True, default=0)  # 年份
     half: Mapped[int] = mapped_column(Integer, default=1)  # 半年：1=上半年，2=下半年
     instrument_id: Mapped[int] = mapped_column(Integer, index=True, default=0)  # 我室仪器 id
-    reference_lab: Mapped[str] = mapped_column(String(200), default="")  # 参比实验室名称
+    reference_lab: Mapped[str] = mapped_column(String(200), default="")  # 参比实验室名称（可比较系统）
+    compared_instrument2: Mapped[str] = mapped_column(String(200), default="")  # 本实验室比较系统2（第二平台）仪器名称
     compared_at: Mapped[str] = mapped_column(String(30), default="")  # 比对日期
     operator: Mapped[str] = mapped_column(String(100), default="")  # 操作者
     reviewer: Mapped[str] = mapped_column(String(100), default="")  # 审核者

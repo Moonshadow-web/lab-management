@@ -179,7 +179,14 @@ def mandatory_projects(db):
 # ---------------------------------------------------------------------------
 def compute_data(db, plan, items, levels_map: dict):
     """items: list[InterlabItem]; levels_map: {item_id -> list[InterlabLevel]}。
-    返回每个项目的 5 水平计算结果。"""
+    返回每个项目的 5 水平计算结果。
+
+    语义（用户更正）：
+    - 可比较系统 = 参比实验室 → ref1_*
+    - 比较系统1 = 本实验室平台1 → our_value
+    - 比较系统2 = 本实验室平台2 → ref2_*（可能有，亦可能空缺）
+    偏倚均指「本实验室比较系统 vs 可比较系统(参比)」。
+    """
     project_rows = []
     all_ok = True
     has_qual = False
@@ -193,46 +200,74 @@ def compute_data(db, plan, items, levels_map: dict):
         if kind == "定性":
             has_qual = True
             for lv in levels:
-                matched, pn = _qualitative_eval(lv.our_value, lv.ref1_y1)
-                acc = matched
-                if acc is False:
+                # 比较系统1（本实验室平台1）vs 可比较系统（参比）
+                matched1, pn1 = _qualitative_eval(lv.our_value, lv.ref1_y1)
+                has2 = bool((lv.ref2_y1 or "").strip())
+                matched2, pn2 = (None, "") if not has2 else _qualitative_eval(lv.ref2_y1, lv.ref1_y1)
+                acc1 = matched1
+                acc2 = matched2 if has2 else None
+                if acc1 is False:
+                    all_ok = False
+                if has2 and acc2 is False:
                     all_ok = False
                 level_results.append({
                     "level": lv.level_num,
-                    "our": lv.our_value, "ref": lv.ref1_y1,
-                    "match": matched, "pn": pn, "accepted": acc,
+                    "ref": lv.ref1_y1,
+                    "sys1": lv.our_value, "pn1": pn1, "match1": matched1, "accepted1": acc1,
+                    "sys2": lv.ref2_y1 if has2 else "", "pn2": pn2 if has2 else "",
+                    "match2": matched2 if has2 else None, "accepted2": acc2,
+                    "has2": has2,
                 })
         else:
             has_quan = True
             for lv in levels:
-                # 默认用比较系统1的均值作为参比值
                 ref_val = lv.ref1_mean or lv.ref1_y1 or ""
                 of = _parse_float(lv.our_value)
                 rf = _parse_float(ref_val)
                 tf = _parse_float(it.te)
-                abs_bias = (of - rf) if (of is not None and rf is not None) else None
-                rel_bias = ((of - rf) / rf * 100.0) if (of is not None and rf not in (None, 0)) else None
+                abs_bias1 = (of - rf) if (of is not None and rf is not None) else None
+                rel_bias1 = ((of - rf) / rf * 100.0) if (of is not None and rf not in (None, 0)) else None
                 if it.mode == "absolute":
-                    bias = abs_bias
-                    accepted = (abs_bias is not None and tf is not None and abs(abs_bias) <= tf + 1e-9)
+                    bias1 = abs_bias1
+                    accepted1 = (abs_bias1 is not None and tf is not None and abs(abs_bias1) <= tf + 1e-9)
                 else:
-                    bias = rel_bias
-                    accepted = (rel_bias is not None and tf is not None and abs(rel_bias) <= tf + 1e-9)
-                if accepted is False:
+                    bias1 = rel_bias1
+                    accepted1 = (rel_bias1 is not None and tf is not None and abs(rel_bias1) <= tf + 1e-9)
+                if accepted1 is False:
                     all_ok = False
+
+                r2 = _parse_float(lv.ref2_mean or lv.ref2_y1 or "")
+                has2 = r2 is not None
+                abs_bias2 = (r2 - rf) if (has2 and rf is not None) else None
+                rel_bias2 = ((r2 - rf) / rf * 100.0) if (has2 and rf not in (None, 0)) else None
+                if it.mode == "absolute":
+                    bias2 = abs_bias2
+                    accepted2 = (abs_bias2 is not None and tf is not None and abs(abs_bias2) <= tf + 1e-9)
+                else:
+                    bias2 = rel_bias2
+                    accepted2 = (rel_bias2 is not None and tf is not None and abs(rel_bias2) <= tf + 1e-9)
+                if has2 and accepted2 is False:
+                    all_ok = False
+
                 level_results.append({
                     "level": lv.level_num,
-                    "our": lv.our_value,
                     "ref_y1": lv.ref1_y1, "ref_y2": lv.ref1_y2, "ref_mean": lv.ref1_mean,
-                    "abs_bias": round(abs_bias, 3) if abs_bias is not None else None,
-                    "rel_bias": round(rel_bias, 2) if rel_bias is not None else None,
-                    "bias": bias, "accepted": accepted,
+                    "sys1": lv.our_value,
+                    "abs_bias1": round(abs_bias1, 3) if abs_bias1 is not None else None,
+                    "rel_bias1": round(rel_bias1, 2) if rel_bias1 is not None else None,
+                    "bias1": bias1, "accepted1": accepted1,
+                    "sys2": (lv.ref2_mean or lv.ref2_y1) if has2 else "",
+                    "abs_bias2": round(abs_bias2, 3) if abs_bias2 is not None else None,
+                    "rel_bias2": round(rel_bias2, 2) if rel_bias2 is not None else None,
+                    "bias2": bias2, "accepted2": accepted2,
+                    "has2": has2,
                 })
 
+        proj_has2 = any(l.get("has2") for l in level_results)
         project_rows.append({
             "item": it.item, "unit": it.unit,
             "te": it.te, "mode": it.mode, "kind": kind, "note": it.note,
-            "levels": level_results,
+            "levels": level_results, "has2": proj_has2,
         })
 
     return {"projects": project_rows, "all_ok": all_ok, "has_qual": has_qual, "has_quan": has_quan}
@@ -280,8 +315,11 @@ def build_html(plan, data: dict, instrument_name: str, ref_lab: str):
     html = [f'<div class="rep">{css}<h1>{title}</h1>']
     table_no = "BG-SM-CZ-019" if data["has_quan"] else "BG-SM-CZ-018"
     html.append(f'<div class="sub">表格编号：{table_no}　　民航总医院检验科生化免疫组　　生效日期：2026.1.1</div>')
+    sys2 = getattr(plan, "compared_instrument2", "") or ""
     html.append("<h2>基本信息</h2>")
-    html.append(f"<p>本实验室仪器：{instrument_name or '　　　　'}　　参比实验室：{ref_lab or '　　　　'}</p>")
+    html.append(f"<p>本实验室仪器（比较系统1）：{instrument_name or '　　　　'}　　参比实验室（可比较系统）：{ref_lab or '　　　　'}</p>")
+    if sys2:
+        html.append(f"<p>本实验室比较系统2：{sys2}</p>")
     html.append(f"<p>比对日期：{plan.compared_at or '　　　　'}　　操作者：{plan.operator or '　　　　'}　　审核者：{plan.reviewer or '　　　　'}</p>")
 
     # ---- 定量（BG-SM-CZ-019 结构：每项目一张 5 水平表） ----
@@ -291,26 +329,33 @@ def build_html(plan, data: dict, instrument_name: str, ref_lab: str):
         for proj in data["projects"]:
             if proj["kind"] != "定量":
                 continue
+            has2 = proj.get("has2")
             html.append(f'<p style="margin:8px 0 2px;font-weight:bold;">项目：{proj["item"]}（单位：{proj["unit"]}，允许TE：{proj["te"]}{"%" if proj["mode"]=="relative" else ""}）</p>')
-            html.append('<table><thead><tr>'
-                        '<th>水平</th><th>参比值Y</th>'
-                        '<th>本实验室值(X)</th>'
-                        '<th>偏倚</th><th>相对偏倚</th><th>是否合格</th>'
-                        '</tr></thead><tbody>')
+            head = ('<th>水平</th><th>参比值Y<br>(可比较系统)</th>'
+                    '<th>比较系统1值<br>(本实验室)</th><th>比较系统1偏倚</th>')
+            if has2:
+                head += '<th>比较系统2值<br>(本实验室)</th><th>比较系统2偏倚</th>'
+            head += '<th>是否合格</th>'
+            html.append(f'<table><thead><tr>{head}</tr></thead><tbody>')
             ok_count = 0
             for lv in proj["levels"]:
-                abs_s = f"{lv['abs_bias']}" if lv.get("abs_bias") is not None else "—"
-                rel_s = f"{lv['rel_bias']}%" if lv.get("rel_bias") is not None else "—"
-                acc = lv["accepted"]
-                if acc is True: ok_count += 1
-                acc_cls = "yes" if acc is True else ("no" if acc is False else "")
-                acc_s = {True: "合格", False: "不合格", None: "-"}[acc]
-                html.append(
-                    f'<tr><td>{lv["level"]}</td><td>{lv["ref_y1"]}</td>'
-                    f'<td>{lv["our"]}</td>'
-                    f'<td>{abs_s}</td><td>{rel_s}</td>'
-                    f'<td class="{acc_cls}">{acc_s}</td></tr>'
-                )
+                if proj["mode"] == "absolute":
+                    b1 = f"{lv['abs_bias1']}" if lv.get("abs_bias1") is not None else "—"
+                    b2 = f"{lv['abs_bias2']}" if (has2 and lv.get("abs_bias2") is not None) else "—"
+                else:
+                    b1 = f"{lv['rel_bias1']}%" if lv.get("rel_bias1") is not None else "—"
+                    b2 = f"{lv['rel_bias2']}%" if (has2 and lv.get("rel_bias2") is not None) else "—"
+                lev_ok = lv["accepted1"] and (lv["accepted2"] if has2 else True)
+                if lev_ok:
+                    ok_count += 1
+                acc_cls = "yes" if lev_ok else ("no" if (lv["accepted1"] is False or (has2 and lv["accepted2"] is False)) else "")
+                acc_s = "合格" if lev_ok else "不合格"
+                row = (f'<tr><td>{lv["level"]}</td><td>{lv["ref_y1"]}</td>'
+                       f'<td>{lv["sys1"]}</td><td>{b1}</td>')
+                if has2:
+                    row += f'<td>{lv["sys2"]}</td><td>{b2}</td>'
+                row += f'<td class="{acc_cls}">{acc_s}</td></tr>'
+                html.append(row)
             html.append("</tbody></table>")
             html.append(f'<p class="concl">5个水平中合格{ok_count}个（4/5即通过），项目{proj["item"]}室间比对一致性'
                         f'{"可接受" if ok_count >= 4 else "不可接受"}。</p>')
@@ -321,23 +366,29 @@ def build_html(plan, data: dict, instrument_name: str, ref_lab: str):
         for proj in data["projects"]:
             if proj["kind"] != "定性":
                 continue
+            has2 = proj.get("has2")
             html.append(f'<p style="margin:8px 0 2px;font-weight:bold;">项目：{proj["item"]}</p>')
-            html.append('<table><thead><tr>'
-                        '<th>水平</th><th>本院结果</th><th>参比结果</th><th>阴阳判定</th><th>符合</th><th>是否合格</th>'
-                        '</tr></thead><tbody>')
+            head = ('<th>水平</th><th>参比结果<br>(可比较系统)</th>'
+                    '<th>比较系统1<br>(本实验室)</th><th>比较系统1符合</th>')
+            if has2:
+                head += '<th>比较系统2<br>(本实验室)</th><th>比较系统2符合</th>'
+            head += '<th>是否合格</th>'
+            html.append(f'<table><thead><tr>{head}</tr></thead><tbody>')
             matched = 0
             for lv in proj["levels"]:
-                m = lv.get("match")
-                acc = lv["accepted"]
-                if acc is True: matched += 1
-                acc_cls = "yes" if acc is True else ("no" if acc is False else "")
-                acc_s = {True: "合格", False: "不合格", None: "-"}[acc]
-                m_s = {True: "是", False: "否", None: "-"}[m]
-                html.append(
-                    f'<tr><td>{lv["level"]}</td><td>{lv["our"]}</td><td>{lv["ref"]}</td>'
-                    f'<td>{lv["pn"]}</td><td>{m_s}</td>'
-                    f'<td class="{acc_cls}">{acc_s}</td></tr>'
-                )
+                m_s1 = {True: "是", False: "否", None: "-"}[lv.get("match1")]
+                lev_ok = lv["accepted1"] and (lv["accepted2"] if has2 else True)
+                if lev_ok:
+                    matched += 1
+                acc_cls = "yes" if lev_ok else ("no" if (lv["accepted1"] is False or (has2 and lv["accepted2"] is False)) else "")
+                acc_s = "合格" if lev_ok else "不合格"
+                row = (f'<tr><td>{lv["level"]}</td><td>{lv["ref"]}</td>'
+                       f'<td>{lv["sys1"]}</td><td>{m_s1}</td>')
+                if has2:
+                    m_s2 = {True: "是", False: "否", None: "-"}[lv.get("match2")]
+                    row += f'<td>{lv["sys2"]}</td><td>{m_s2}</td>'
+                row += f'<td class="{acc_cls}">{acc_s}</td></tr>'
+                html.append(row)
             html.append("</tbody></table>")
             rate = round(matched / max(len(proj["levels"]), 1) * 100, 1)
             html.append(f'<p class="concl">5个水平符合{matched}/{len(proj["levels"])}，符合率{rate}%。</p>')
@@ -387,11 +438,15 @@ def _heading(doc, text, size=13):
 
 
 def _add_basic_info(doc, instrument_name, ref_lab, plan):
+    sys2 = getattr(plan, "compared_instrument2", "") or ""
     _heading(doc, "基本信息")
-    for line in [
-        f"本实验室仪器：{instrument_name or '　　　　'}　　参比实验室：{ref_lab or '　　　　'}",
-        f"比对日期：{plan.compared_at or '　　　　'}　　操作者：{plan.operator or '　　　　'}　　审核者：{plan.reviewer or '　　　　'}",
-    ]:
+    lines = [
+        f"本实验室仪器（比较系统1）：{instrument_name or '　　　　'}　　参比实验室（可比较系统）：{ref_lab or '　　　　'}",
+    ]
+    if sys2:
+        lines.append(f"本实验室比较系统2：{sys2}")
+    lines.append(f"比对日期：{plan.compared_at or '　　　　'}　　操作者：{plan.operator or '　　　　'}　　审核者：{plan.reviewer or '　　　　'}")
+    for line in lines:
         p = doc.add_paragraph()
         rr = p.add_run(line)
         rr.font.size = Pt(11)
@@ -461,28 +516,41 @@ def build_docx(db, plan, data: dict, out_path: str, instrument_name: str, ref_la
             pr.font.size = Pt(10.5); pr.font.bold = True; pr.font.name = "SimSun"
             pr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
 
-            t = doc.add_table(rows=1, cols=6)
+            has2 = proj.get("has2")
+            headers = ["水平", "参比值Y\n(可比较系统)", "比较系统1值\n(本实验室)", "比较系统1偏倚"]
+            if has2:
+                headers += ["比较系统2值\n(本实验室)", "比较系统2偏倚"]
+            headers += ["是否合格"]
+            t = doc.add_table(rows=1, cols=len(headers))
             t.style = "Table Grid"
             t.alignment = WD_TABLE_ALIGNMENT.CENTER
             hdr = t.rows[0].cells
-            for i, ht in enumerate(["水平", "参比值Y", "本实验室值(X)", "偏倚", "相对偏倚", "是否合格"]):
+            for i, ht in enumerate(headers):
                 _fill(hdr[i], ht, bold=True)
 
             ok_count = 0
             for lv in proj["levels"]:
+                if proj["mode"] == "absolute":
+                    b1 = f"{lv['abs_bias1']}" if lv.get("abs_bias1") is not None else "—"
+                    b2 = f"{lv['abs_bias2']}" if (has2 and lv.get("abs_bias2") is not None) else "—"
+                else:
+                    b1 = f"{lv['rel_bias1']}%" if lv.get("rel_bias1") is not None else "—"
+                    b2 = f"{lv['rel_bias2']}%" if (has2 and lv.get("rel_bias2") is not None) else "—"
+                lev_ok = lv["accepted1"] and (lv["accepted2"] if has2 else True)
+                if lev_ok:
+                    ok_count += 1
+                acc_s = "合格" if lev_ok else "不合格"
                 cells = t.add_row().cells
-                abs_s = f"{lv['abs_bias']}" if lv.get("abs_bias") is not None else "—"
-                rel_s = f"{lv['rel_bias']}%" if lv.get("rel_bias") is not None else "—"
-                acc = lv["accepted"]
-                if acc is True: ok_count += 1
-                acc_s = {True: "合格", False: "不合格", None: "-"}[acc]
                 _fill(cells[0], str(lv["level"]))
                 _fill(cells[1], lv["ref_y1"])
-                _fill(cells[2], lv["our"])
-                _fill(cells[3], abs_s)
-                _fill(cells[4], rel_s)
-                col = RGBColor(0x27, 0xae, 0x60) if acc is True else (RGBColor(0xc0, 0x39, 0x2b) if acc is False else None)
-                _fill(cells[5], acc_s, color=col, bold=True)
+                _fill(cells[2], lv["sys1"])
+                _fill(cells[3], b1)
+                if has2:
+                    _fill(cells[4], lv["sys2"])
+                    _fill(cells[5], b2)
+                col_idx = 5 if has2 else 4
+                col = RGBColor(0x27, 0xae, 0x60) if lev_ok else RGBColor(0xc0, 0x39, 0x2b)
+                _fill(cells[col_idx], acc_s, color=col, bold=True)
 
             p = doc.add_paragraph()
             pr = p.add_run(f"结论：5个水平中合格{ok_count}个（4/5即通过），项目{proj['item']}室间比对一致性{'可接受' if ok_count >= 4 else '不可接受'}。")
@@ -500,28 +568,37 @@ def build_docx(db, plan, data: dict, out_path: str, instrument_name: str, ref_la
             pr.font.size = Pt(10.5); pr.font.bold = True; pr.font.name = "SimSun"
             pr._element.rPr.rFonts.set(qn("w:eastAsia"), "SimSun")
 
-            t = doc.add_table(rows=1, cols=6)
+            has2 = proj.get("has2")
+            headers = ["水平", "参比结果\n(可比较系统)", "比较系统1\n(本实验室)", "比较系统1符合"]
+            if has2:
+                headers += ["比较系统2\n(本实验室)", "比较系统2符合"]
+            headers += ["是否合格"]
+            t = doc.add_table(rows=1, cols=len(headers))
             t.style = "Table Grid"
             t.alignment = WD_TABLE_ALIGNMENT.CENTER
             hdr = t.rows[0].cells
-            for i, ht in enumerate(["水平", "本院结果", "参比结果", "阴阳判定", "符合", "是否合格"]):
+            for i, ht in enumerate(headers):
                 _fill(hdr[i], ht, bold=True)
 
             matched = 0
             for lv in proj["levels"]:
+                m_s1 = {True: "是", False: "否", None: "-"}[lv.get("match1")]
+                lev_ok = lv["accepted1"] and (lv["accepted2"] if has2 else True)
+                if lev_ok:
+                    matched += 1
+                acc_s = "合格" if lev_ok else "不合格"
                 cells = t.add_row().cells
-                m = lv.get("match")
-                acc = lv["accepted"]
-                if acc is True: matched += 1
-                acc_s = {True: "合格", False: "不合格", None: "-"}[acc]
-                m_s = {True: "是", False: "否", None: "-"}[m]
                 _fill(cells[0], str(lv["level"]))
-                _fill(cells[1], lv["our"])
-                _fill(cells[2], lv["ref"])
-                _fill(cells[3], lv["pn"])
-                _fill(cells[4], m_s)
-                col = RGBColor(0x27, 0xae, 0x60) if acc is True else (RGBColor(0xc0, 0x39, 0x2b) if acc is False else None)
-                _fill(cells[5], acc_s, color=col, bold=True)
+                _fill(cells[1], lv["ref"])
+                _fill(cells[2], lv["sys1"])
+                _fill(cells[3], m_s1)
+                if has2:
+                    m_s2 = {True: "是", False: "否", None: "-"}[lv.get("match2")]
+                    _fill(cells[4], lv["sys2"])
+                    _fill(cells[5], m_s2)
+                col_idx = 5 if has2 else 4
+                col = RGBColor(0x27, 0xae, 0x60) if lev_ok else RGBColor(0xc0, 0x39, 0x2b)
+                _fill(cells[col_idx], acc_s, color=col, bold=True)
 
             rate = round(matched / max(len(proj["levels"]), 1) * 100, 1)
             p = doc.add_paragraph()

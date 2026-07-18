@@ -37,7 +37,8 @@ WRITE = require_roles("admin", "qc_manager")
 def _ser_plan(p: InterlabPlan):
     return {
         "id": p.id, "year": p.year, "half": p.half, "instrument_id": p.instrument_id,
-        "reference_lab": p.reference_lab, "compared_at": p.compared_at,
+        "reference_lab": p.reference_lab, "compared_instrument2": p.compared_instrument2,
+        "compared_at": p.compared_at,
         "operator": p.operator, "reviewer": p.reviewer, "summary": p.summary,
         "conclusion": p.conclusion, "handle_plan": p.handle_plan, "status": p.status,
         "report_path": p.report_path, "report_filename": p.report_filename,
