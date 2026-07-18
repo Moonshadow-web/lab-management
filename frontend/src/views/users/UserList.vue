@@ -520,9 +520,9 @@ onMounted(async () => {
   // 拉最新模块结构（同步到全局 store + 本地 MODULES 列表）
   try {
     const r = await getModulePermissionsStructure()
-    if (r.data?.modules?.length) {
-      MODULES.value = r.data.modules.map((m) => ({ key: m.key, label: m.label }))
-      for (const m of r.data.modules) permStore.setLocal(m.key, m.roles)
+    if (r?.modules?.length) {
+      MODULES.value = r.modules.map((m) => ({ key: m.key, label: m.label }))
+      for (const m of r.modules) permStore.setLocal(m.key, m.roles)
     }
   } catch {}
   await loadData()

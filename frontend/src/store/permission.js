@@ -41,7 +41,7 @@ export const usePermissionStore = defineStore('permissions', {
       try {
         const r = await getModulePermissionsStructure()
         const map = {}
-        for (const m of r.data.modules) {
+        for (const m of r.modules) {
           map[m.key] = m.roles
         }
         this.moduleRoles = map

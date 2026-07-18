@@ -84,11 +84,11 @@ async function load() {
   loading.value = true
   try {
     const r = await getModulePermissionsStructure()
-    modules.value = r.data.modules
-    roleOptions.value = r.data.roles
+    modules.value = r.modules
+    roleOptions.value = r.roles
     loaded.value = true
     // 同步到全局 store，让其他模块的 canWrite 立即用新值
-    for (const m of r.data.modules) {
+    for (const m of r.modules) {
       permStore.setLocal(m.key, m.roles)
     }
   } catch (e) {

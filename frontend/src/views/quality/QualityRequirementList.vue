@@ -182,7 +182,7 @@ async function loadSources() {
   await Promise.all(sources.value.map(async (s) => {
     try {
       const r = await listQualityRequirements({ source: s.id, page: 1, page_size: 1 })
-      counts.value[s.id] = r.data.total
+      counts.value[s.id] = r.total
     } catch (e) {
       counts.value[s.id] = 0
     }
@@ -196,9 +196,9 @@ async function refresh() {
     const params = { source: activeSource.value, page: page.value, page_size: pageSize.value }
     if (searchKey.value.trim()) params.q = searchKey.value.trim()
     const r = await listQualityRequirements(params)
-    rows.value = r.data.items
-    total.value = r.data.total
-    counts.value[activeSource.value] = r.data.total
+    rows.value = r.items
+    total.value = r.total
+    counts.value[activeSource.value] = r.total
     emptyText.value = searchKey.value.trim() ? '没有匹配的项目，试试别的关键词' : '该来源下还没有数据，点右上角「导入默认标准」快速灌库'
   } catch (e) {
     rows.value = []
@@ -265,7 +265,7 @@ async function onSeed() {
   seeding.value = true
   try {
     const r = await seedQualityRequirements()
-    ElMessage.success(`已新增 ${r.data.added} 条；已存在 ${r.data.skipped} 条`)
+    ElMessage.success(`已新增 ${r.added} 条；已存在 ${r.skipped} 条`)
     await loadSources()
     refresh()
   } catch (e) {
