@@ -85,5 +85,23 @@ export const usePermissionStore = defineStore('permissions', {
     setLocal(moduleKey, roles) {
       this.moduleRoles = { ...this.moduleRoles, [moduleKey]: [...roles] }
     },
+
+    // 模块可见性（菜单/页签是否展示）。
+    // 角色对该模块的「基础键 / '_delete' 变体 / '-edit' 变体」中任一拥有授权即视为可见。
+    // admin 短路为可见；未配置白名单的模块按"可见"兜底，避免误隐藏。
+    canAccess(userRoles, moduleKey) {
+      if (userRoles.includes('admin')) return true
+      const variants = [moduleKey, moduleKey + '_delete', moduleKey + '-edit']
+      for (const vk of variants) {
+        const allowed = this.moduleRoles[vk]
+        if (allowed && userRoles.some((r) => allowed.includes(r))) return true
+      }
+      return false
+    },
+
+    // 多个模块键中任一可见即视为可见（用于"质控管理"这种聚合菜单）
+    canAccessAny(userRoles, moduleKeys) {
+      return moduleKeys.some((k) => this.canAccess(userRoles, k))
+    },
   },
 })

@@ -2,7 +2,7 @@
   <div class="page">
     <el-tabs v-model="activeTab">
       <!-- ============ 月结 ============ -->
-      <el-tab-pane label="室内质控月结" name="summary">
+      <el-tab-pane label="室内质控月结" name="summary" v-if="auth.canAccessMenu('qc-monthly')">
         <div class="toolbar">
           <el-date-picker
             v-model="monthValue"
@@ -174,7 +174,7 @@
       </el-tab-pane>
 
       <!-- ============ 室间质评 ============ -->
-      <el-tab-pane label="室间质评" name="eqa">
+      <el-tab-pane label="室间质评" name="eqa" v-if="auth.canAccessMenu('eqa')">
         <div class="toolbar">
           <el-date-picker
             v-model="eqaYear"
@@ -556,13 +556,13 @@
           </template>
         </el-dialog>
       </el-tab-pane>
-      <el-tab-pane label="仪器间比对" name="cmp" lazy>
+      <el-tab-pane label="仪器间比对" name="cmp" lazy v-if="auth.canAccessMenu('comparison')">
         <Comparison />
       </el-tab-pane>
-      <el-tab-pane label="室间比对" name="interlab" lazy>
+      <el-tab-pane label="室间比对" name="interlab" lazy v-if="auth.canAccessMenu('interlab')">
         <InterlabComparison />
       </el-tab-pane>
-      <el-tab-pane label="质控品换批号累靶" name="lot" lazy>
+      <el-tab-pane label="质控品换批号累靶" name="lot" lazy v-if="auth.canAccessMenu('qc-target')">
         <TargetValueBoard />
       </el-tab-pane>
     </el-tabs>
@@ -593,6 +593,26 @@ import TargetValueBoard from './TargetValueBoard.vue'
 
 const activeTab = ref('summary')
 const auth = useAuthStore()
+
+// 按权限收口可见页签：technical_support 仅见其被授权的页签
+const visibleTabs = computed(() => {
+  const map = {
+    summary: 'qc-monthly',
+    eqa: 'eqa',
+    cmp: 'comparison',
+    interlab: 'interlab',
+    lot: 'qc-target',
+  }
+  return Object.keys(map).filter((t) => auth.canAccessMenu(map[t]))
+})
+// 当前选中页签不可见时，自动切到第一个可见页签（如 technical_support 默认落在"仪器间比对"）
+watch(
+  visibleTabs,
+  (v) => {
+    if (v.length && !v.includes(activeTab.value)) activeTab.value = v[0]
+  },
+  { immediate: true },
+)
 
 // ---------- 仪器台账（仅室内质控受控仪器） ----------
 const instrumentList = ref([])

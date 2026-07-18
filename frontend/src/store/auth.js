@@ -49,6 +49,11 @@ export const useAuthStore = defineStore('auth', {
       if (!state.user) return false
       return state.user.role === 'admin' || (state.user.roles || '').includes('admin')
     },
+    // 是否为技术支持（仅该角色需要严格按授权隐藏未授权模块）
+    isTechnicalSupport: (state) => {
+      if (!state.user) return false
+      return state.user.role === 'technical_support' || (state.user.roles || '').includes('technical_support')
+    },
   },
   actions: {
     async login(username, password) {
@@ -119,6 +124,21 @@ export const useAuthStore = defineStore('auth', {
       if (!required) required = FALLBACK_MODULE_WRITE_ROLES[module + '_delete'] || FALLBACK_MODULE_WRITE_ROLES[module]
       if (!required) return true
       return this.myRoles.some(r => required.includes(r))
+    },
+    // 菜单/页签是否可见。
+    // 规则：仅 technical_support 严格按授权收口（未授权模块一律不显示）；
+    // 其余角色维持原行为（全部可见），不做全站 RBAC 改造以免误伤。
+    canAccessMenu(moduleKey) {
+      if (!this.isTechnicalSupport) return true
+      if (this.isAdmin) return true
+      try {
+        const permStore = usePermissionStore()
+        return permStore.canAccess(this.myRoles, moduleKey)
+      } catch (_) { return false }
+    },
+    // 聚合菜单（如"质控管理"含多个权限模块）：任一可见即显示
+    canAccessAnyMenu(moduleKeys) {
+      return moduleKeys.some((k) => this.canAccessMenu(k))
     },
   },
 })

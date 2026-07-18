@@ -25,10 +25,10 @@
           <el-tag v-if="m.wip" size="small" type="info" class="wip">建设中</el-tag>
         </el-menu-item>
       </el-menu>
-      <div class="aside-footer">
-        <el-button class="families-btn" size="small" :icon="Connection" @click="goEqaAssociations">项目库与质评关联</el-button>
-        <el-button class="families-btn" size="small" :icon="Share" @click="goFamilies">仪器关联管理</el-button>
-        <el-button class="families-btn" size="small" :icon="Document" @click="goQualityRequirements">项目质量要求</el-button>
+      <div class="aside-footer" v-if="auth.canAccessMenu('instrument-families') || auth.canAccessMenu('quality-requirements')">
+        <el-button v-if="auth.canAccessMenu('instrument-families')" class="families-btn" size="small" :icon="Connection" @click="goEqaAssociations">项目库与质评关联</el-button>
+        <el-button v-if="auth.canAccessMenu('instrument-families')" class="families-btn" size="small" :icon="Share" @click="goFamilies">仪器关联管理</el-button>
+        <el-button v-if="auth.canAccessMenu('quality-requirements')" class="families-btn" size="small" :icon="Document" @click="goQualityRequirements">项目质量要求</el-button>
       </div>
     </el-aside>
     <el-container>
@@ -64,26 +64,33 @@ const route = useRoute()
 const router = useRouter()
 
 const menus = computed(() => {
-  const base = [
+  const all = [
     { path: '/dashboard', title: '工作台', icon: 'Odometer' },
-    { path: '/test-items', title: '项目查询', icon: 'Document' },
-    { path: '/documents', title: '文件管理', icon: 'Files' },
-    { path: '/instruments', title: '仪器档案', icon: 'Cpu' },
-    { path: '/qc', title: '质控管理', icon: 'DataLine' },
-    { path: '/reagents', title: '试剂管理', icon: 'ShoppingCart' },
-    { path: '/training', title: '继教培训', icon: 'Reading' },
-    { path: '/verification', title: '性能验证', icon: 'DataAnalysis' },
-    { path: '/iso15189', title: '15189专项', icon: 'Stamp' },
+    { path: '/test-items', title: '项目查询', icon: 'Document', moduleKey: 'test-items' },
+    { path: '/documents', title: '文件管理', icon: 'Files', moduleKey: 'documents' },
+    { path: '/instruments', title: '仪器档案', icon: 'Cpu', moduleKey: 'instruments' },
+    // 质控管理是聚合菜单：含 月结/质评/仪器间比对/室间比对/累靶 多个权限模块，任一可见即显示
+    { path: '/qc', title: '质控管理', icon: 'DataLine', moduleKeys: ['qc-monthly', 'eqa', 'comparison', 'interlab', 'qc-target'] },
+    { path: '/reagents', title: '试剂管理', icon: 'ShoppingCart', moduleKey: 'reagents' },
+    { path: '/training', title: '继教培训', icon: 'Reading', moduleKey: 'training' },
+    { path: '/verification', title: '性能验证', icon: 'DataAnalysis', moduleKey: 'verification' },
+    { path: '/iso15189', title: '15189专项', icon: 'Stamp', moduleKey: 'iso15189' },
   ]
-  // 管理员可见审计日志
+  // 按权限过滤：technical_support 仅显示其被授权的模块；其余角色维持原样（全部可见）
+  const visible = all.filter((m) => {
+    if (m.path === '/dashboard') return true
+    if (m.moduleKeys) return auth.canAccessAnyMenu(m.moduleKeys)
+    return auth.canAccessMenu(m.moduleKey)
+  })
+  // 管理员额外可见系统管理类
   const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')
   if (isAdmin) {
-    base.push({ path: '/users', title: '用户管理', icon: 'UserFilled' })
-    base.push({ path: '/permission-config', title: '权限配置', icon: 'Lock' })
-    base.push({ path: '/audit-logs', title: '审计日志', icon: 'View' })
-    base.push({ path: '/reminder-settings', title: '提醒设置', icon: 'Bell' })
+    visible.push({ path: '/users', title: '用户管理', icon: 'UserFilled' })
+    visible.push({ path: '/permission-config', title: '权限配置', icon: 'Lock' })
+    visible.push({ path: '/audit-logs', title: '审计日志', icon: 'View' })
+    visible.push({ path: '/reminder-settings', title: '提醒设置', icon: 'Bell' })
   }
-  return base
+  return visible
 })
 
 const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
