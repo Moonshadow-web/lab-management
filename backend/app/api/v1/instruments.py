@@ -482,7 +482,8 @@ def import_archives_folder(
 
 
 # ============ 临时诊断接口（排查线上 /instruments 500，修复后删除）============
-@router.get("/debug-raw")
+# 用两段路径 /_debug/raw 规避与 /{instrument_id} 单段路由的参数匹配冲突
+@router.get("/_debug/raw")
 def debug_instruments_raw(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     import traceback as _tb
     try:
@@ -503,9 +504,3 @@ def debug_instruments_raw(db: Session = Depends(get_db), user: User = Depends(ge
                 "error": repr(e),
             })
     return {"total": len(rows), "problems": problems}
-
-
-# 路由重排：/debug-raw 静态路由必须排在 /{instrument_id} 之前，否则被参数路由吞掉
-_dr_routes = [r for r in router.routes if getattr(r, "path", None) == "/debug-raw"]
-_dr_others = [r for r in router.routes if getattr(r, "path", None) != "/debug-raw"]
-router.routes = _dr_routes + _dr_others
