@@ -198,11 +198,31 @@
 
             <!-- 定性：比较系统1 / 比较系统2 分别与参比比较阴阳一致性 -->
             <template v-else>
-              <el-table-column label="参比结果(可比较系统)" width="140">
-                <template #default="{ row: lv }"><el-input v-model="lv.ref1_y1" /></template>
+              <el-table-column label="参比结果(可比较系统)" width="170">
+                <template #default="{ row: lv }">
+                  <div style="display:flex;gap:4px;align-items:center;">
+                    <el-input :model-value="splitPn(lv.ref1_y1).val" placeholder="数值" style="width:80px;"
+                      @update:model-value="v => setPn(lv, 'ref1_y1', 'val', v)" />
+                    <el-select :model-value="splitPn(lv.ref1_y1).pn" placeholder="P/N" style="width:60px;"
+                      @update:model-value="v => setPn(lv, 'ref1_y1', 'pn', v)">
+                      <el-option label="P" value="P" />
+                      <el-option label="N" value="N" />
+                    </el-select>
+                  </div>
+                </template>
               </el-table-column>
-              <el-table-column label="比较系统1(本实验室)" width="140">
-                <template #default="{ row: lv }"><el-input v-model="lv.our_value" /></template>
+              <el-table-column label="比较系统1(本实验室)" width="170">
+                <template #default="{ row: lv }">
+                  <div style="display:flex;gap:4px;align-items:center;">
+                    <el-input :model-value="splitPn(lv.our_value).val" placeholder="数值" style="width:80px;"
+                      @update:model-value="v => setPn(lv, 'our_value', 'val', v)" />
+                    <el-select :model-value="splitPn(lv.our_value).pn" placeholder="P/N" style="width:60px;"
+                      @update:model-value="v => setPn(lv, 'our_value', 'pn', v)">
+                      <el-option label="P" value="P" />
+                      <el-option label="N" value="N" />
+                    </el-select>
+                  </div>
+                </template>
               </el-table-column>
               <el-table-column label="比较系统1符合" width="90">
                 <template #default="{ row: lv }">
@@ -211,8 +231,18 @@
                   <span v-else>-</span>
                 </template>
               </el-table-column>
-              <el-table-column label="比较系统2(本实验室)" width="140">
-                <template #default="{ row: lv }"><el-input v-model="lv.ref2_y1" /></template>
+              <el-table-column label="比较系统2(本实验室)" width="170">
+                <template #default="{ row: lv }">
+                  <div style="display:flex;gap:4px;align-items:center;">
+                    <el-input :model-value="splitPn(lv.ref2_y1).val" placeholder="数值" style="width:80px;"
+                      @update:model-value="v => setPn(lv, 'ref2_y1', 'val', v)" />
+                    <el-select :model-value="splitPn(lv.ref2_y1).pn" placeholder="P/N" style="width:60px;"
+                      @update:model-value="v => setPn(lv, 'ref2_y1', 'pn', v)">
+                      <el-option label="P" value="P" />
+                      <el-option label="N" value="N" />
+                    </el-select>
+                  </div>
+                </template>
               </el-table-column>
               <el-table-column label="比较系统2符合" width="90">
                 <template #default="{ row: lv }">
@@ -365,6 +395,40 @@ function biasClass2(lv, item) {
   if (p === false) return 'fail'
   return ''
 }
+// 定性：把 "P(1.05)" / "N(1.05)" / "阳性(6.78)" / "阴性(1.05)" 拆成 {pn, val}
+// 任意一边为空也安全（返回 {pn:'', val:原字符串} 或相反）。
+function splitPn(s) {
+  const t = String(s || '').trim()
+  if (!t) return { pn: '', val: '' }
+  const m = t.match(/^([PpNn]|[阳阴]性?)\s*\(\s*([^)]*?)\s*\)\s*$/)
+  if (m) {
+    const head = m[1].toUpperCase()
+    let pn = ''
+    if (head === 'P' || head === '阳' || head === '阳性' || head === '+') pn = 'P'
+    else if (head === 'N' || head === '阴' || head === '阴性' || head === '-') pn = 'N'
+    return { pn, val: m[2] || '' }
+  }
+  // 没匹配上：尝试从字符串前缀剥出 P/N/阳/阴
+  const head2 = t.toUpperCase()
+  if (/^P\+?$|^阳|^阳性|\+/.test(head2)) return { pn: 'P', val: t.replace(/^[Pp]|^阳(性)?|\+/, '').trim() }
+  if (/^N-?$|^阴|^阴性|-/.test(head2)) return { pn: 'N', val: t.replace(/^[Nn]|^阴(性)?|-/, '').trim() }
+  return { pn: '', val: t }
+}
+
+function joinPn(pn, val) {
+  if (pn && val) return `${pn}(${val})`
+  if (pn) return pn
+  if (val) return val
+  return ''
+}
+
+// 给定 lv 字段，把 pn / val 之一写回，组合成 "P(数值)" 存到原字段。
+function setPn(lv, field, kind, v) {
+  const cur = splitPn(lv[field])
+  const next = kind === 'pn' ? { pn: v || '', val: cur.val } : { pn: cur.pn, val: v || '' }
+  lv[field] = joinPn(next.pn, next.val)
+}
+
 // 定性：阴阳判定与符合
 // 支持完整词和带括号/数值后缀的复合形式（"阴性(1.05)" / "阳性(6.78)" / "阴(+)" 等）。
 function normPn(v) {
