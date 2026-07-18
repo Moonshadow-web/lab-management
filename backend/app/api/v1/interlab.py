@@ -237,7 +237,13 @@ def save_results(pid: int, body: InterlabResultsPayload, db: Session = Depends(g
                 else:
                     db.add(InterlabLevel(item_id=it.id, level_num=ln))
         db.commit()
-    except Exception as e:  # 临时诊断：把真实异常以 200 返回，避免被 500 处理器吞掉
+    # === TEMP DIAGNOSTIC (TODO: remove after verifying non-destructive fix) ===
+    # 背景：Starlette 的 ServerErrorMiddleware 会把 500 响应的 body 替换成纯文本
+    # "Internal Server Error"，导致 raise HTTPException(500, detail=...) 的 detail
+    # 在客户端看不到。这里以 200 + ok=False 返回 traceback 仅用于本次排障；
+    # 验证写流程稳定后必须改回 raise HTTPException(500, detail=str(e))，并把
+    # 调试信息落到服务端日志，绝不能继续向客户端泄露堆栈。
+    except Exception as e:  # noqa: BLE001
         import traceback
         return {"ok": False, "diag_error": traceback.format_exc()[-1800:]}
     return {"ok": True}

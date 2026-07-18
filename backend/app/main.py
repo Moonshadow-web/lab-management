@@ -99,11 +99,13 @@ def _migrate_schema():
                     conn.exec_driver_sql(
                         f"ALTER TABLE {table} ADD COLUMN {col} {ctype}"
                     )
-        # 清理过时列（以模型为权威）：扫描表中列，凡不在「当前模型期望列集合」的，
-        # 视为老 schema 残留（多半带 NOT NULL），一律 DROP COLUMN。
-        # 背景：interlab_items 早把 our_value/ref_value/ref1_*/ref2_* 迁到 interlab_levels，
-        # 但旧线上表保留这些列且 NOT NULL，导致 INSERT 留空触发 IntegrityError。
-        # 用「expected = 模型实际列」做 reconcile，一次性兜住所有残留列。
+        # 非破坏性 reconcile：扫描表中列，凡不在「当前模型期望列集合」的，
+        # 视为老 schema 残留（多半 NOT NULL）。**绝不在自动迁移里 DROP 任何东西**
+        # （不删列、不删索引、不删表），只把残留列的 NOT NULL 约束放宽 → INSERT
+        # 留空不再触发 IntegrityError，列与历史数据完整保留。
+        # 原则：迁移代码用 ALTER ADD COLUMN 补新列 + ALTER COLUMN DROP NOT NULL
+        # 兜底老列；任何 DROP 都是不可逆的数据丢失风险，禁止放进每次启动的自动迁移。
+        # PRAGMA table_info 行: (cid, name, type, notnull, default, pk)
         reconcile = {
             "interlab_items": {
                 "id", "plan_id", "item", "unit", "te", "mode", "kind", "note",
@@ -119,63 +121,22 @@ def _migrate_schema():
         }
         for table, expected in reconcile.items():
             try:
-                res = conn.exec_driver_sql(f"PRAGMA table_info({table})")
-                existing = {row[1] for row in res}
-            except Exception:
-                continue
-            extras = existing - expected
-            if not extras:
-                continue
-            # 若某列被索引引用，SQLite DROP COLUMN 会拒；先收集并 DROP 这些索引。
-            # PRAGMA index_list → 索引名；PRAGMA index_info(索引名) → 索引列。
-            try:
-                idx_rows = conn.exec_driver_sql(
-                    f"PRAGMA index_list({table})"
+                rows = conn.exec_driver_sql(
+                    f"PRAGMA table_info({table})"
                 ).fetchall()
             except Exception:
-                idx_rows = []
-            dropped_idx = []
-            for idx_row in idx_rows:
-                idx_name = idx_row[1]
-                try:
-                    info = conn.exec_driver_sql(
-                        f"PRAGMA index_info({idx_name})"
-                    ).fetchall()
-                except Exception:
+                continue
+            for cid, name, ctype, notnull, dflt, pk in rows:
+                if name in expected or not notnull:
                     continue
-                idx_cols = {r[2] for r in info}
-                if idx_cols & extras:
-                    try:
-                        conn.exec_driver_sql(f"DROP INDEX IF EXISTS {idx_name}")
-                        dropped_idx.append(idx_name)
-                    except Exception:
-                        pass
-            for col in extras:
                 try:
                     conn.exec_driver_sql(
-                        f"ALTER TABLE {table} DROP COLUMN {col}"
+                        f"ALTER TABLE {table} ALTER COLUMN {name} DROP NOT NULL"
                     )
-                    print(f"[migrate] DROP COLUMN {table}.{col} ok (dropped_idx={dropped_idx})")
                 except Exception as e:  # noqa: BLE001
-                    print(f"[migrate] DROP COLUMN {table}.{col} failed: {e}")
-        # 写迁移摘要到 /app/data/_migrate.log，供 /build 探针回报
-        try:
-            import datetime as _dt
-            lines = []
-            for table, expected in reconcile.items():
-                try:
-                    rows = conn.exec_driver_sql(
-                        f"PRAGMA table_info({table})"
-                    ).fetchall()
-                    cols = [r[1] for r in rows]
-                except Exception:
-                    cols = ["<err>"]
-                lines.append(f"{table}: cols={cols} expected={sorted(expected)}")
-            log = _dt.datetime.utcnow().isoformat() + "\n" + "\n".join(lines) + "\n"
-            with open("/app/data/_migrate.log", "a", encoding="utf-8") as f:
-                f.write(log)
-        except Exception:
-            pass
+                    # 极旧 SQLite（< 3.35）不支持 DROP NOT NULL；列与数据保留，
+                    # 由后续手工迁移或更精确的模型变更处理。绝不回退到 DROP。
+                    print(f"[migrate] relax NOT NULL on {table}.{name} failed: {e}")
         # 旧总结行 category 为 NULL/空 → 回填默认「生化+凝血」，避免拆分后过滤失效
         try:
             conn.exec_driver_sql(
