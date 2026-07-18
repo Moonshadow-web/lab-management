@@ -67,7 +67,7 @@
       <el-table-column label="操作" min-width="280" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openEntry(row)">录入</el-button>
-          <el-button size="small" type="warning" @click="openReport(row)">报告</el-button>
+          <el-button size="small" type="warning" @click="openReport(row)">报告管理</el-button>
           <el-button size="small" @click="openPlanEdit(row)" v-if="canWrite">编辑</el-button>
           <el-button size="small" type="danger" @click="onDeletePlan(row)" v-if="canWrite">删除</el-button>
         </template>
@@ -92,7 +92,10 @@
           </el-select>
         </el-form-item>
         <el-form-item label="参比实验室">
-          <el-input v-model="planForm.reference_lab" placeholder="如：某某医院检验科" />
+          <el-input v-model="planForm.reference_lab" placeholder="如：某某医院检验科（可比较系统）" />
+        </el-form-item>
+        <el-form-item label="比较系统2仪器">
+          <el-input v-model="planForm.compared_instrument2" placeholder="本实验室第二平台仪器名（若有2个平台），如：DxI800-线上3号机" />
         </el-form-item>
         <el-form-item label="比对日期">
           <el-date-picker v-model="planForm.compared_at" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" />
@@ -129,7 +132,7 @@
           :title="`${entryPlan.year}年${entryPlan.half === 1 ? '上半年' : '下半年'} ｜ 仪器：${instrumentName(entryPlan.instrument_id)} ｜ 参比实验室：${entryPlan.reference_lab || '—'}`" />
         <div style="margin-bottom:10px">
           <el-button size="small" type="primary" :icon="Plus" @click="addItemRow" v-if="canWrite">添加项目</el-button>
-          <span class="tip">每个项目测 5 个水平，填入参比值Y和我室值X。偏倚自动计算。</span>
+          <span class="tip">每个项目测 5 个水平。可比较系统=参比实验室，比较系统1=本实验室平台1，比较系统2=本实验室平台2（若有2个平台）。偏倚/符合自动计算。</span>
         </div>
         <!-- 逐项目分组展示 -->
         <div v-for="(item, idx) in entryRows" :key="idx" class="item-group">
@@ -156,27 +159,70 @@
             <el-button size="small" type="danger" :icon="Delete" circle @click="entryRows.splice(idx, 1)" v-if="canWrite" />
           </div>
           <el-table :data="item.levels" border size="small">
-            <el-table-column label="水平" width="50">
+            <el-table-column label="水平" width="50" fixed>
               <template #default="{ row: lv }">{{ lv.level_num }}</template>
             </el-table-column>
-            <el-table-column label="参比值Y" width="110">
-              <template #default="{ row: lv }"><el-input v-model="lv.ref1_y1" /></template>
-            </el-table-column>
-            <el-table-column label="我室值(X)" width="110">
-              <template #default="{ row: lv }"><el-input v-model="lv.our_value" /></template>
-            </el-table-column>
-            <el-table-column label="偏倚(相对%)" width="120">
-              <template #default="{ row: lv }">
-                <span :class="biasClass(lv, item)">{{ computeBias(lv, item) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="状态" width="80">
-              <template #default="{ row: lv }">
-                <el-tag v-if="biasPass(lv, item) === true" type="success" size="small">合格</el-tag>
-                <el-tag v-else-if="biasPass(lv, item) === false" type="danger" size="small">不合格</el-tag>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
+
+            <!-- 定量：比较系统1 / 比较系统2 分别计算偏倚与合格判定 -->
+            <template v-if="item.kind === '定量'">
+              <el-table-column label="参比值Y(可比较系统)" width="120">
+                <template #default="{ row: lv }"><el-input v-model="lv.ref1_y1" /></template>
+              </el-table-column>
+              <el-table-column label="比较系统1值(本实验室)" width="120">
+                <template #default="{ row: lv }"><el-input v-model="lv.our_value" /></template>
+              </el-table-column>
+              <el-table-column label="比较系统1偏倚" width="110">
+                <template #default="{ row: lv }"><span :class="biasClass(lv, item)">{{ computeBias(lv, item) }}</span></template>
+              </el-table-column>
+              <el-table-column label="比较系统1状态" width="80">
+                <template #default="{ row: lv }">
+                  <el-tag v-if="biasPass(lv, item) === true" type="success" size="small">合格</el-tag>
+                  <el-tag v-else-if="biasPass(lv, item) === false" type="danger" size="small">不合格</el-tag>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="比较系统2值(本实验室)" width="120">
+                <template #default="{ row: lv }"><el-input v-model="lv.ref2_y1" /></template>
+              </el-table-column>
+              <el-table-column label="比较系统2偏倚" width="110">
+                <template #default="{ row: lv }"><span :class="biasClass2(lv, item)">{{ computeBias2(lv, item) }}</span></template>
+              </el-table-column>
+              <el-table-column label="比较系统2状态" width="80">
+                <template #default="{ row: lv }">
+                  <el-tag v-if="biasPass2(lv, item) === true" type="success" size="small">合格</el-tag>
+                  <el-tag v-else-if="biasPass2(lv, item) === false" type="danger" size="small">不合格</el-tag>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+            </template>
+
+            <!-- 定性：比较系统1 / 比较系统2 分别与参比比较阴阳一致性 -->
+            <template v-else>
+              <el-table-column label="参比结果(可比较系统)" width="140">
+                <template #default="{ row: lv }"><el-input v-model="lv.ref1_y1" /></template>
+              </el-table-column>
+              <el-table-column label="比较系统1(本实验室)" width="140">
+                <template #default="{ row: lv }"><el-input v-model="lv.our_value" /></template>
+              </el-table-column>
+              <el-table-column label="比较系统1符合" width="90">
+                <template #default="{ row: lv }">
+                  <el-tag v-if="pnMatch1(lv) === true" type="success" size="small">符合</el-tag>
+                  <el-tag v-else-if="pnMatch1(lv) === false" type="danger" size="small">不符</el-tag>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="比较系统2(本实验室)" width="140">
+                <template #default="{ row: lv }"><el-input v-model="lv.ref2_y1" /></template>
+              </el-table-column>
+              <el-table-column label="比较系统2符合" width="90">
+                <template #default="{ row: lv }">
+                  <el-tag v-if="pnMatch2(lv) === true" type="success" size="small">符合</el-tag>
+                  <el-tag v-else-if="pnMatch2(lv) === false" type="danger" size="small">不符</el-tag>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+            </template>
+
             <el-table-column label="备注" min-width="120">
               <template #default="{ row: lv }"><el-input v-model="item.note" /></template>
             </el-table-column>
@@ -189,19 +235,34 @@
       </template>
     </el-dialog>
 
-    <!-- 报告对话框 -->
-    <el-dialog v-model="reportVisible" title="室间比对报告" width="1000px" top="4vh">
-      <div class="rep-toolbar">
-        <el-button :icon="View" @click="doPreview" :loading="previewing">预览</el-button>
-        <el-button type="success" :icon="Document" @click="doGenerate" :loading="generating" v-if="canWrite">生成报告</el-button>
-        <el-button :icon="Download" @click="doDownload" :disabled="!reportPlan || !reportPlan.report_filename">下载</el-button>
-        <el-button :icon="Printer" @click="doPrint" :disabled="!previewHtml">打印</el-button>
-        <el-upload :show-file-list="false" :auto-upload="true" :http-request="doUpload" v-if="canWrite">
-          <el-button :icon="Upload">上传存档</el-button>
-        </el-upload>
-        <el-button type="danger" :icon="Delete" @click="doDeleteReport" :disabled="!reportPlan || !reportPlan.report_filename" v-if="canWrite">删除报告</el-button>
+    <!-- 报告管理对话框 -->
+    <el-dialog v-model="reportVisible" :title="`报告管理 · ${reportPlan ? reportPlan.year + '年' + (reportPlan.half === 1 ? '上半年' : '下半年') + ' 室间比对' : ''}`" width="1000px" top="4vh">
+      <div v-if="reportPlan">
+        <el-descriptions :column="3" border size="small" style="margin-bottom:12px">
+          <el-descriptions-item label="仪器（比较系统1）">{{ instrumentName(reportPlan.instrument_id) }}</el-descriptions-item>
+          <el-descriptions-item label="参比实验室（可比较系统）">{{ reportPlan.reference_lab || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="比较系统2">{{ reportPlan.compared_instrument2 || '未填写' }}</el-descriptions-item>
+          <el-descriptions-item label="比对日期">{{ reportPlan.compared_at || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="操作者">{{ reportPlan.operator || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="审核者">{{ reportPlan.reviewer || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="报告文件" :span="3">
+            <span v-if="reportPlan.report_filename" class="yes">{{ reportPlan.report_filename }}</span>
+            <span v-else class="no">未生成</span>
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <div class="rep-toolbar">
+          <el-button :icon="View" @click="doPreview" :loading="previewing">预览</el-button>
+          <el-button type="success" :icon="Document" @click="doGenerate" :loading="generating" v-if="canWrite">生成报告</el-button>
+          <el-button :icon="Download" @click="doDownload" :disabled="!reportPlan || !reportPlan.report_filename">下载</el-button>
+          <el-button :icon="Printer" @click="doPrint" :disabled="!previewHtml">打印</el-button>
+          <el-upload :show-file-list="false" :auto-upload="true" :http-request="doUpload" v-if="canWrite">
+            <el-button :icon="Upload">上传存档</el-button>
+          </el-upload>
+          <el-button type="danger" :icon="Delete" @click="doDeleteReport" :disabled="!reportPlan || !reportPlan.report_filename" v-if="canWrite">删除报告</el-button>
+        </div>
+        <div class="rep-preview" v-html="previewHtml" v-loading="previewing" />
       </div>
-      <div class="rep-preview" v-html="previewHtml" v-loading="previewing" />
     </el-dialog>
   </div>
 </template>
@@ -237,7 +298,7 @@ const editingPlan = ref(null)
 const saving = ref(false)
 const planForm = reactive({
   year: new Date().getFullYear(), half: 1, instrument_id: null, reference_lab: '',
-  compared_at: '', operator: '', reviewer: '', conclusion: '', summary: '', handle_plan: '',
+  compared_instrument2: '', compared_at: '', operator: '', reviewer: '', conclusion: '', summary: '', handle_plan: '',
 })
 
 const entryVisible = ref(false)
@@ -282,6 +343,47 @@ function biasClass(lv, item) {
   if (p === false) return 'fail'
   return ''
 }
+// 比较系统2 偏倚/合格（相对/绝对，以可比较系统=参比 为基准）
+function computeBias2(lv, item) {
+  const sys2 = parseNum(lv.ref2_y1)
+  const ref = parseNum(lv.ref1_y1)
+  if (sys2 === null || ref === null || ref === 0) return ''
+  if (item.mode === 'absolute') return (sys2 - ref).toFixed(3)
+  return (((sys2 - ref) / ref) * 100).toFixed(2) + '%'
+}
+function biasPass2(lv, item) {
+  const sys2 = parseNum(lv.ref2_y1)
+  const ref = parseNum(lv.ref1_y1)
+  const te = parseNum(item.te)
+  if (sys2 === null || ref === null || ref === 0 || te === null) return null
+  if (item.mode === 'absolute') return Math.abs(sys2 - ref) <= te + 1e-9
+  return Math.abs((sys2 - ref) / ref * 100) <= te + 1e-9
+}
+function biasClass2(lv, item) {
+  const p = biasPass2(lv, item)
+  if (p === true) return 'pass'
+  if (p === false) return 'fail'
+  return ''
+}
+// 定性：阴阳判定与符合
+function normPn(v) {
+  const s = String(v || '').toUpperCase().trim()
+  if (['阳', '阳性', 'POS', 'POSITIVE', 'P', '+', '1'].includes(s)) return 'positive'
+  if (['阴', '阴性', 'NEG', 'NEGATIVE', 'N', '-', '0'].includes(s)) return 'negative'
+  return null
+}
+function pnMatch1(lv) {
+  const a = normPn(lv.our_value)
+  const b = normPn(lv.ref1_y1)
+  if (a === null || b === null) return null
+  return a === b
+}
+function pnMatch2(lv) {
+  const a = normPn(lv.ref2_y1)
+  const b = normPn(lv.ref1_y1)
+  if (a === null || b === null) return null
+  return a === b
+}
 
 function onItemSelect(idx, val) {
   const found = candidates.value.find(p => p.name === val)
@@ -319,7 +421,7 @@ function openPlanCreate() {
   editingPlan.value = null
   Object.assign(planForm, {
     year: new Date().getFullYear(), half: 1, instrument_id: null, reference_lab: '',
-    compared_at: '', operator: '', reviewer: '', conclusion: '', summary: '', handle_plan: '',
+    compared_instrument2: '', compared_at: '', operator: '', reviewer: '', conclusion: '', summary: '', handle_plan: '',
   })
   planVisible.value = true
 }
@@ -327,6 +429,7 @@ function openPlanEdit(row) {
   editingPlan.value = row
   Object.assign(planForm, {
     year: row.year, half: row.half, instrument_id: row.instrument_id, reference_lab: row.reference_lab,
+    compared_instrument2: row.compared_instrument2 || '',
     compared_at: row.compared_at, operator: row.operator, reviewer: row.reviewer,
     conclusion: row.conclusion, summary: row.summary, handle_plan: row.handle_plan,
   })
@@ -410,6 +513,7 @@ function openReport(row) {
   reportPlan.value = row
   previewHtml.value = ''
   reportVisible.value = true
+  if (row.report_filename) doPreview()
 }
 async function doPreview() {
   previewing.value = true
