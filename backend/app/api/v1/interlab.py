@@ -208,34 +208,38 @@ def save_results(pid: int, body: InterlabResultsPayload, db: Session = Depends(g
     # 防御：空载荷（无项目）时不执行「先删后插」，避免误清空已录入结果。
     if not body.items:
         return {"ok": True, "note": "未提供项目，已保留原有结果"}
-    # 全量覆盖：删旧 levels 和 items
-    for it in db.query(InterlabItem).filter_by(plan_id=pid).all():
-        db.query(InterlabLevel).filter_by(item_id=it.id).delete()
-    db.query(InterlabItem).filter_by(plan_id=pid).delete()
-    # 创建新 items + levels
-    for row in body.items:
-        if not row.item:
-            continue
-        it = InterlabItem(
-            plan_id=pid, item=row.item, unit=row.unit,
-            te=row.te, mode=row.mode, kind=row.kind or "定量",
-            note=row.note,
-        )
-        db.add(it); db.flush()
-        # 写入 5 个水平（客户端应有 5 个，不足则补空）
-        provided = {lv.level_num: lv for lv in row.levels}
-        for ln in range(1, 6):
-            lv = provided.get(ln)
-            if lv:
-                db.add(InterlabLevel(
-                    item_id=it.id, level_num=ln,
-                    our_value=lv.our_value,
-                    ref1_y1=lv.ref1_y1, ref1_y2=lv.ref1_y2, ref1_mean=lv.ref1_mean,
-                    ref2_y1=lv.ref2_y1, ref2_y2=lv.ref2_y2, ref2_mean=lv.ref2_mean,
-                ))
-            else:
-                db.add(InterlabLevel(item_id=it.id, level_num=ln))
-    db.commit()
+    try:
+        # 全量覆盖：删旧 levels 和 items
+        for it in db.query(InterlabItem).filter_by(plan_id=pid).all():
+            db.query(InterlabLevel).filter_by(item_id=it.id).delete()
+        db.query(InterlabItem).filter_by(plan_id=pid).delete()
+        # 创建新 items + levels
+        for row in body.items:
+            if not row.item:
+                continue
+            it = InterlabItem(
+                plan_id=pid, item=row.item, unit=row.unit,
+                te=row.te, mode=row.mode, kind=row.kind or "定量",
+                note=row.note,
+            )
+            db.add(it); db.flush()
+            # 写入 5 个水平（客户端应有 5 个，不足则补空）
+            provided = {lv.level_num: lv for lv in row.levels}
+            for ln in range(1, 6):
+                lv = provided.get(ln)
+                if lv:
+                    db.add(InterlabLevel(
+                        item_id=it.id, level_num=ln,
+                        our_value=lv.our_value,
+                        ref1_y1=lv.ref1_y1, ref1_y2=lv.ref1_y2, ref1_mean=lv.ref1_mean,
+                        ref2_y1=lv.ref2_y1, ref2_y2=lv.ref2_y2, ref2_mean=lv.ref2_mean,
+                    ))
+                else:
+                    db.add(InterlabLevel(item_id=it.id, level_num=ln))
+        db.commit()
+    except Exception as e:  # 临时诊断：把真实异常透出，便于定位线上写失败
+        import traceback
+        raise HTTPException(status_code=500, detail=traceback.format_exc()[-1500:])
     return {"ok": True}
 
 
