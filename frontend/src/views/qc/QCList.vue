@@ -170,6 +170,10 @@
             <el-button type="primary" size="small" :loading="reportMap[g.key]._saving" @click="saveReport(g)">
               保存总结文字
             </el-button>
+            <el-button size="small" @click="openDocxPreview(g)">预览月小结</el-button>
+            <el-button type="success" size="small" :loading="reportMap[g.key]._docxing" @click="downloadDocx(g)">
+              下载 Word (A4 横向)
+            </el-button>
           </div>
         </div>
       </el-tab-pane>
@@ -464,6 +468,34 @@
           </div>
         </el-dialog>
 
+        <!-- CZ-012 月小结预览（HTML，与 Word 版一致） -->
+        <el-dialog v-model="docxPreview" title="月小结预览（与 Word 版一致）" width="92%" top="3vh">
+          <div class="docx-preview" v-if="docxGroup">
+            <h2 class="prev-title">{{ docxYear }}年{{ String(docxMonth).padStart(2, '0') }}月　仪器：{{ docxInst }}</h2>
+            <table class="prev-table">
+              <tr>
+                <th>项目</th><th>质控批号</th><th>单位</th><th>水平</th><th>靶值</th><th>靶值SD</th>
+                <th>靶值CV%</th><th>均值</th><th>SD</th><th>CV%</th><th>n</th><th>失控数</th><th>在控率</th><th>质量目标</th>
+              </tr>
+              <tr v-for="r in docxGroup.rows" :key="r.id">
+                <td>{{ r.test_item }}</td><td>{{ r.lot_no }}</td><td>{{ r.unit }}</td><td>{{ r.level }}</td>
+                <td>{{ fmtNum(r.target_mean) }}</td><td>{{ fmtNum(r.target_sd) }}</td><td>{{ r.target_cv?.toFixed(2) }}%</td>
+                <td>{{ fmtNum(r.mean) }}</td><td>{{ fmtNum(r.sd) }}</td><td>{{ r.cv?.toFixed(2) }}%</td>
+                <td>{{ r.n }}</td><td>{{ r.out_of_control_count }}</td><td>{{ (r.in_control_rate * 100).toFixed(1) }}%</td><td>{{ r.quality_goal }}</td>
+              </tr>
+            </table>
+            <h3>文字部分</h3>
+            <p><b>一、仪器运行情况：</b>{{ (docxReport.operation_status || '（未填写）') }}</p>
+            <p><b>二、各项目是否出现漂移或趋势性改变：</b>{{ (docxReport.drift_trend || '（未填写）') }}</p>
+            <p><b>三、各项目CV%设置是否达标：</b>{{ (docxReport.cv_setting_ok || '（未填写）') }}</p>
+            <p><b>四、各项目计算CV%是否达标：</b>{{ (docxReport.cv_calc_ok || '（未填写）') }}</p>
+            <p><b>五、各项目质控频次是否达标：</b>{{ (docxReport.freq_ok || '（未填写）') }}</p>
+            <div class="prev-foot">
+              <el-button type="success" :loading="docxDownloading" @click="downloadDocx(docxGroup)">下载 Word (A4 横向打印)</el-button>
+            </div>
+          </div>
+        </el-dialog>
+
         <!-- 录入结果（样本×项目矩阵 + 双人签字审核单打印） -->
         <el-dialog
           v-model="resultDialog"
@@ -577,7 +609,7 @@ import ExcelJS from 'exceljs'
 import {
   listQCSummaries, uploadQCSummary, getQCDaily, updateQCSummary, deleteQCSummary,
   uploadQCPdf, downloadQCPdf, deleteQCPdf, exportQCSummary,
-  getQCReport, upsertQCReport,
+  getQCReport, upsertQCReport, exportQCReportDocx,
 } from '../../api/qc'
 import { getQCInstruments } from '../../api/qc'
 import {
@@ -642,6 +674,51 @@ const filterInstrumentId = ref(0)      // 0 = 全部
 const uploadInstrumentId = ref(null)   // 上传时选定的受控仪器
 const csvInput = ref(null)
 const reportMap = reactive({})         // blockKey -> 文字报告对象
+
+// CZ-012 月小结预览 / Word 下载
+const docxPreview = ref(false)
+const docxGroup = ref(null)
+const docxDownloading = ref(false)
+const docxYear = computed(() => { const { year } = parseMonth(); return year || '—' })
+const docxMonth = computed(() => { const { month } = parseMonth(); return month || 0 })
+const docxInst = computed(() => {
+  const g = docxGroup.value
+  if (!g) return ''
+  return g.instrument || '—' + (g.deptNo ? '（编号：' + g.deptNo + '）' : '')
+})
+const docxReport = computed(() => (docxGroup.value ? (reportMap[docxGroup.value.key] || {}) : {}))
+function openDocxPreview(g) {
+  docxGroup.value = g
+  docxPreview.value = true
+}
+async function downloadDocx(g) {
+  const grp = g || docxGroup.value
+  if (!grp) return
+  const { year, month } = parseMonth()
+  const rep = reportMap[grp.key]
+  if (rep) rep._docxing = true
+  docxDownloading.value = true
+  try {
+    const blob = await exportQCReportDocx(year, month, grp.rows[0]?.instrument_id || undefined)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const instId = grp.rows[0]?.instrument_id
+    a.download = `室内质控月小结_${year}年${String(month).padStart(2, '0')}月${instId ? '_' + instId : ''}.docx`
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('Word 月小结已生成')
+  } catch (e) {
+    ElMessage.error('生成失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    if (rep) rep._docxing = false
+    docxDownloading.value = false
+  }
+}
+function fmtNum(v) {
+  if (v === null || v === undefined || v === '') return '-'
+  return Number(v).toFixed(4)
+}
 
 // 按仪器分块（受控：优先用 instrument_id 作为块键）；显示仪器编号
 const groups = computed(() => {
@@ -1865,6 +1942,10 @@ watch(activeTab, (t) => {
 .prev-table th { background: #f5f7fa; font-weight: 600; }
 .prev-table .prev-total { background: #f0f7ff; font-weight: 600; }
 .prev-narr { white-space: pre-wrap; color: #606266; }
+.docx-preview { font-size: 13px; line-height: 1.8; color: #303133; }
+.docx-preview h3 { font-size: 15px; margin: 16px 0 8px; border-left: 3px solid #409eff; padding-left: 8px; }
+.docx-preview p { margin: 6px 0; }
+.prev-foot { margin-top: 16px; text-align: right; }
 
 /* 录入结果矩阵 */
 .result-entry { font-size: 13px; }

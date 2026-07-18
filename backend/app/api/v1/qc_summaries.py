@@ -1,6 +1,8 @@
 import csv
 import io
+import os
 import re
+import tempfile
 import datetime
 
 from fastapi import Depends, File, HTTPException, Request, UploadFile, Form
@@ -599,12 +601,9 @@ def export_qc_summary(
         ws.cell(row=row, column=1, value="生化免疫组室内质控月小结").font = title_font
         row += 1
         ws.cell(row=row, column=1,
-                value=f"仪器：{instrument or '—'}{('（编号：' + inst_no + '）') if inst_no else ''}        年：{y or '—'}        月：{mo or '—'}")
+                value=f"{y or '—'}年{str(mo).zfill(2) if mo else '—'}月　　仪器：{instrument or '—'}{('（编号：' + inst_no + '）') if inst_no else ''}")
         row += 1
-        # 质控批号汇总
-        lots = sorted({s.lot_no for s in items if s.lot_no})
-        ws.cell(row=row, column=1, value="质控批号：" + ("、".join(lots) if lots else "—"))
-        row += 1
+        # 质控批号已在表格列中体现，不单独成句
         # 表头
         for c, h in enumerate(headers, 1):
             cell = ws.cell(row=row, column=c, value=h)
@@ -671,3 +670,55 @@ def export_qc_summary(
 # sort 稳定，保持组内相对顺序。
 # ---------------------------------------------------------------------------
 router.routes.sort(key=lambda r: ("{" in getattr(r, "path", ""),))
+
+
+@router.get("/report/docx")
+def export_qc_report_docx(
+    year: int = 0,
+    month: int = 0,
+    instrument_id: int | None = None,
+    instrument: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """导出 CZ-012 室内质控月小结 Word（A4 横向，含 14 列表格 + 五段文字部分）。
+
+    - instrument_id / instrument：仅导出该台仪器的月小结（逐台留档/上交）。
+    - 文字部分取自 qc_monthly_reports（无则留空，由人工补录）。
+    """
+    from ..services.qc_report import build_docx
+
+    q = db.query(QCMonthlySummary).filter_by(year=year, month=month)
+    if instrument_id:
+        q = q.filter(QCMonthlySummary.instrument_id == instrument_id)
+    elif instrument:
+        q = q.filter(QCMonthlySummary.instrument == instrument)
+    summaries = q.order_by(QCMonthlySummary.test_item, QCMonthlySummary.level).all()
+    if not summaries:
+        raise HTTPException(status_code=404, detail="该(仪器,年,月)暂无月结数据")
+
+    inst_name = summaries[0].instrument or ""
+    inst_no = summaries[0].instrument_no or ""
+    rep = _find_report(db, instrument_id, instrument, year, month)
+
+    fd, out_path = tempfile.mkstemp(suffix=".docx", prefix=f"cz012_{year}_{month}_")
+    os.close(fd)
+    try:
+        build_docx(out_path, summaries, rep, inst_name, inst_no, year, month)
+        fname = f"室内质控月小结_{year}年{str(month).zfill(2)}月"
+        if instrument_id:
+            fname += f"_{instrument_id}"
+        elif instrument:
+            fname += f"_{instrument}"
+        fname += ".docx"
+        from urllib.parse import quote
+        return FileResponse(
+            out_path,
+            filename=fname,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
+        )
+    except Exception:
+        if os.path.exists(out_path):
+            os.remove(out_path)
+        raise

@@ -65,6 +65,14 @@ export function exportQCSummary(year, month, instrumentId) {
     responseType: 'blob',
   })
 }
+export function exportQCReportDocx(year, month, instrumentId) {
+  const params = { year, month }
+  if (instrumentId) params.instrument_id = instrumentId
+  return request.get('/api/v1/qc-summaries/report/docx', {
+    params,
+    responseType: 'blob',
+  })
+}
 // 月结下拉专用：仅室内质控受控仪器
 export function getQCInstruments() {
   return request.get('/api/v1/qc-summaries/instruments')

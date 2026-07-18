@@ -198,16 +198,18 @@ def draft_report(instrument: str, year: int, month: int, summaries: list, daily_
         })
         total_ooc += s.out_of_control_count
 
-    # 一、仪器运行情况
+    # 一、仪器运行情况（末尾固定追加运行维护结论，供人工在此基础上修改）
+    RUN_SUFFIX = "仪器运行良好，日常维护保养按时完成，无维修。"
     if total_ooc > 0:
         all_details = [d for p in projects for d in p["ooc_details"]]
         reason_text = ("失控明细：" + "；".join(all_details) + "。") if all_details else ""
         operation_status = (
             f"本月共出现 {total_ooc} 个失控点，均按 Westgard 规则判定并处置"
             f"{('，' + reason_text) if reason_text else ''}处置后已恢复在控；仪器总体运行正常。"
+            + RUN_SUFFIX
         )
     else:
-        operation_status = "本仪器本月运行正常，各项质控在控，未出现失控。"
+        operation_status = "本仪器本月运行正常，各项质控在控，未出现失控。" + RUN_SUFFIX
 
     # 二、各项目是否出现漂移或趋势性改变
     drift_lines = []
@@ -248,14 +250,8 @@ def draft_report(instrument: str, year: int, month: int, summaries: list, daily_
             cv_calc_lines.append(f"{p['name']}({p['level']})：计算CV% {p['cv']:.2f}% > 允许 {p['goal']:.2f}%，不达标")
     cv_calc_ok = ("；".join(cv_calc_lines) + "。") if cv_calc_lines else "无项目数据。"
 
-    # 五、各项目质控频次是否达标（默认 ≥ DEFAULT_MONTHLY_QC_MIN 次/月）
-    freq_lines = []
-    for p in projects:
-        if p["n"] >= DEFAULT_MONTHLY_QC_MIN:
-            freq_lines.append(f"{p['name']}({p['level']})：本月检测 {p['n']} 次 ≥ {DEFAULT_MONTHLY_QC_MIN} 次/月，达标")
-        else:
-            freq_lines.append(f"{p['name']}({p['level']})：本月检测 {p['n']} 次 < {DEFAULT_MONTHLY_QC_MIN} 次/月，不达标")
-    freq_ok = ("；".join(freq_lines) + "。") if freq_lines else "无项目数据。"
+    # 五、各项目质控频次是否达标（不由系统自动判定，留空模板「是」供人工手录）
+    freq_ok = "是"
 
     return {
         "operation_status": operation_status,
