@@ -101,6 +101,16 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
     v.close()
 
 
+# 构建标记：用于线上确认当前服役的是哪个容器版本（修复 CFS 损坏自愈相关改动后）
+_BUILD_MARK = "4da3a52-selfheal-2026-07-18"
+
+
+@router.get("/build")
+def diag_build():
+    """返回构建标记，确认当前服役容器是否包含启动自愈+登录容错（免鉴权）。"""
+    return {"build": _BUILD_MARK, "has_self_heal": True}
+
+
 @router.post("/db-recover")
 def diag_db_recover():
     """轻量恢复损坏的 SQLite（针对「仅索引页损坏、表数据完好」场景）：
