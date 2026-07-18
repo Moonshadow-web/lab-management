@@ -328,7 +328,7 @@ app.add_middleware(AssetCacheMiddleware)
 
 app.include_router(api_router)
 from .api.v1.diag import router as diag_router  # noqa: E402 临时诊断路由（修复后删除）
-app.include_router(diag_router)
+app.include_router(diag_router, prefix="/api/v1")
 
 # 本地磁盘文件预览（上云由云存储 SDK 的临时 URL 替代）
 if UPLOAD_ROOT.exists():
