@@ -4,6 +4,7 @@ from . import (
     auth,
     audit_logs,
     change_log,
+    dashboard,
     documents,
     eqa,
     eqa_associations,
@@ -30,6 +31,7 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(audit_logs.router)
+api_router.include_router(dashboard.router)
 api_router.include_router(test_items.router)
 api_router.include_router(change_log.router)
 api_router.include_router(documents.router)

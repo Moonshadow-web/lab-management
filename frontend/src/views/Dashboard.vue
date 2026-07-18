@@ -89,6 +89,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import AppCard from '../components/AppCard.vue'
+import { getDashboardStats } from '../api/dashboard'
 import { listTestItems } from '../api/testItems'
 import { listInstruments } from '../api/instruments'
 import { listDocuments } from '../api/documents'
@@ -118,32 +119,43 @@ function go(path) {
 }
 
 async function loadStats() {
+  // 优先使用聚合统计接口（单次请求，鉴权面最小）
   try {
-    const [ti, ins, docs, notis, qc, rea, tr, ver, nc] = await Promise.all([
-      listTestItems({ page: 1, page_size: 1 }),
-      listInstruments({ page: 1, page_size: 1 }),
-      listDocuments({ page: 1, page_size: 1 }),
-      listNotifications({ page: 1, page_size: 1, unread_only: true }),
-      listQC({ page: 1, page_size: 1 }),
-      listReagents({ page: 1, page_size: 1 }),
-      listTraining({ page: 1, page_size: 1 }),
-      listVerification({ page: 1, page_size: 1 }),
-      listNC({ page: 1, page_size: 1 }),
-    ])
+    const data = await getDashboardStats()
     stats.value = {
-      testItems: ti.total,
-      instruments: ins.total,
-      documents: docs.total,
-      notifications: notis.total,
-      qc: qc.total,
-      reagents: rea.total,
-      training: tr.total,
-      verification: ver.total,
-      nc: nc.total,
+      testItems: data.test_items ?? '-',
+      instruments: data.instruments ?? '-',
+      documents: data.documents ?? '-',
+      notifications: data.unread_notifications ?? '-',
+      qc: data.qc_records ?? '-',
+      reagents: data.reagents ?? '-',
+      training: data.training_records ?? '-',
+      verification: data.verification_records ?? '-',
+      nc: data.nonconformities ?? '-',
     }
-  } catch (e) {
-    // 忽略
+    return
+  } catch (_) {
+    // 聚合接口失败，回退到逐个请求
   }
+
+  // 回退：用 allSettled 确保单个接口失败不影响其他卡片
+  const results = await Promise.allSettled([
+    listTestItems({ page: 1, page_size: 1 }),
+    listInstruments({ page: 1, page_size: 1 }),
+    listDocuments({ page: 1, page_size: 1 }),
+    listNotifications({ page: 1, page_size: 1, unread_only: true }),
+    listQC({ page: 1, page_size: 1 }),
+    listReagents({ page: 1, page_size: 1 }),
+    listTraining({ page: 1, page_size: 1 }),
+    listVerification({ page: 1, page_size: 1 }),
+    listNC({ page: 1, page_size: 1 }),
+  ])
+  const keys = ['testItems', 'instruments', 'documents', 'notifications', 'qc', 'reagents', 'training', 'verification', 'nc']
+  const updated = {}
+  results.forEach((r, i) => {
+    updated[keys[i]] = r.status === 'fulfilled' ? r.value.total : '-'
+  })
+  stats.value = updated
 }
 
 async function loadNotices() {
