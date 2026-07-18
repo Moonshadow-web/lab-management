@@ -101,10 +101,10 @@
           <el-date-picker v-model="planForm.compared_at" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" />
         </el-form-item>
         <el-form-item label="操作者">
-          <el-input v-model="planForm.operator" />
+          <UserSelect v-model="planForm.operator" />
         </el-form-item>
         <el-form-item label="审核者">
-          <el-input v-model="planForm.reviewer" />
+          <UserSelect v-model="planForm.reviewer" />
         </el-form-item>
         <el-form-item label="结论">
           <el-select v-model="planForm.conclusion" clearable placeholder="选择" style="width:100%">
@@ -113,7 +113,8 @@
           </el-select>
         </el-form-item>
         <el-form-item label="结果分析">
-          <el-input v-model="planForm.summary" type="textarea" :rows="2" />
+          <el-input v-model="planForm.summary" type="textarea" :rows="2"
+            @input="summaryTouched = true" />
         </el-form-item>
         <el-form-item label="处理方案">
           <el-input v-model="planForm.handle_plan" type="textarea" :rows="2" placeholder="如不合格时的处理措施" />
@@ -298,7 +299,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, View, Document, Download, Printer, Upload } from '@element-plus/icons-vue'
 import {
@@ -308,6 +309,7 @@ import {
   uploadInterlabReport, deleteInterlabReport,
 } from '../../api/interlab'
 import { useAuthStore } from '../../store/auth'
+import UserSelect from '../../components/UserSelect.vue'
 
 const auth = useAuthStore()
 const canWrite = computed(() => {
@@ -326,9 +328,21 @@ const yearOptions = ref([])
 const planVisible = ref(false)
 const editingPlan = ref(null)
 const saving = ref(false)
+// 结果分析：用户手动改过后置 true，参比实验室联动不再覆盖
+const summaryTouched = ref(false)
 const planForm = reactive({
   year: new Date().getFullYear(), half: 1, instrument_id: null, reference_lab: '',
   compared_instrument2: '', compared_at: '', operator: '', reviewer: '', conclusion: '', summary: '', handle_plan: '',
+})
+
+// 结果分析默认句（用户未改过时，随参比实验室联动）
+function defaultSummary(refLab) {
+  const lab = (refLab || '').trim() || '参比实验室'
+  return `使用5例样本与${lab}实验室进行室间比对， 一致性可接受。`
+}
+// 监听参比实验室：用户未手动编辑时，自动更新结果分析默认句
+watch(() => planForm.reference_lab, (v) => {
+  if (!summaryTouched.value) planForm.summary = defaultSummary(v)
 })
 
 const entryVisible = ref(false)
@@ -501,6 +515,9 @@ function openPlanCreate() {
     year: new Date().getFullYear(), half: 1, instrument_id: null, reference_lab: '',
     compared_instrument2: '', compared_at: '', operator: '', reviewer: '', conclusion: '', summary: '', handle_plan: '',
   })
+  // 新建：结果分析填入默认句，标记未手动编辑（让 watch 随参比实验室联动）
+  summaryTouched.value = false
+  planForm.summary = defaultSummary(planForm.reference_lab)
   planVisible.value = true
 }
 function openPlanEdit(row) {
@@ -511,6 +528,8 @@ function openPlanEdit(row) {
     compared_at: row.compared_at, operator: row.operator, reviewer: row.reviewer,
     conclusion: row.conclusion, summary: row.summary, handle_plan: row.handle_plan,
   })
+  // 编辑：已存在 summary，标记为已手动编辑，避免 watch 覆盖
+  summaryTouched.value = true
   planVisible.value = true
 }
 async function savePlan() {

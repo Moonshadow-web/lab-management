@@ -23,3 +23,8 @@ export function resetPassword(uid) {
 export function getRoleOptions() {
   return request.get('/api/v1/users/role-options')
 }
+
+// 任意已登录用户可访问：返回活跃用户精简信息，供操作者/审核者下拉复用。
+export function listActiveUsers() {
+  return request.get('/api/v1/users/active')
+}

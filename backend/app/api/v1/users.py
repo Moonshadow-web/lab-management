@@ -33,6 +33,30 @@ def get_role_options(
     return ROLE_OPTIONS
 
 
+@router.get("/active")
+def list_active_users(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """返回所有活跃用户的精简信息（id/full_name/username/roles），
+    供前端「操作者/审核者」类下拉复用。鉴权：任意已登录用户。"""
+    rows = (
+        db.query(User)
+        .filter(User.is_active == True)  # noqa: E712
+        .order_by(User.full_name.asc(), User.username.asc())
+        .all()
+    )
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "full_name": (u.full_name or "").strip() or u.username,
+            "roles": u.roles or "",
+        }
+        for u in rows
+    ]
+
+
 @router.get("")
 def list_users(
     page: int = 1,

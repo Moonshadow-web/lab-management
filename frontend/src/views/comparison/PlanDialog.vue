@@ -46,12 +46,12 @@
       <el-row :gutter="12">
         <el-col :span="12">
           <el-form-item label="操作者">
-            <el-input v-model="form.operator" />
+            <UserSelect v-model="form.operator" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="审核者">
-            <el-input v-model="form.reviewer" />
+            <UserSelect v-model="form.reviewer" />
           </el-form-item>
         </el-col>
       </el-row>
@@ -79,6 +79,7 @@
 import { ref, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createPlan, updatePlan } from '../../api/comparison'
+import UserSelect from '../../components/UserSelect.vue'
 
 const props = defineProps({
   visible: Boolean,
