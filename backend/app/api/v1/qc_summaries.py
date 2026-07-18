@@ -62,15 +62,19 @@ def qc_instruments(
 # 列名别名（兼容不同 LIS 导出）
 # ---------------------------------------------------------------------------
 _COLUMN_ALIASES = {
-    "test_item": ["项目", "检验项目", "项目名称", "item", "test_item", "name"],
-    "lot_no": ["批号", "质控批号", "lot", "lot_no", "批"],
-    "level": ["水平", "level", "浓度水平"],
+    # 注意 test_item 优先取 itemName（中文全名，如「艾滋病」），其次 testCommon（代码，如 HIV）
+    "test_item": ["项目", "检验项目", "项目名称", "item", "test_item", "name",
+                  "itemname", "testcommon", "检验名称", "测试项目"],
+    "lot_no": ["批号", "质控批号", "lot", "lot_no", "批", "batch"],
+    "level": ["水平", "level", "浓度水平", "testname"],
     "unit": ["单位", "unit"],
-    "instrument": ["仪器", "instrument", "设备"],
-    "qc_date": ["日期", "质控日期", "测定日期", "date", "qc_date"],
-    "value": ["测值", "测定值", "结果", "浓度", "value", "result"],
-    "target_mean": ["靶值", "定值", "靶值均值", "target", "target_mean"],
-    "target_sd": ["靶值sd", "靶值sd", "sd", "标准差", "target_sd"],
+    "instrument": ["仪器", "instrument", "设备", "deviceid", "仪器代码", "设备编号"],
+    "qc_date": ["日期", "质控日期", "测定日期", "date", "qc_date", "testdate", "测定时间", "检测时间"],
+    # 注意：爱康导出的 averageValue 是「靶值/定值」（同一项目-水平为常量），逐次实测值在
+    # result 列；故 value 取 result，averageValue 归入 target_mean，standardDeviation 归入 target_sd。
+    "value": ["测值", "测定值", "浓度", "value", "结果", "result"],
+    "target_mean": ["靶值", "定值", "靶值均值", "target", "target_mean", "averagevalue"],
+    "target_sd": ["靶值sd", "靶值sd", "sd", "标准差", "target_sd", "standarddeviation"],
 }
 
 
@@ -118,26 +122,37 @@ def _parse_date(s):
 
 
 def _read_rows(file_bytes: bytes, filename: str):
-    """返回 list[dict]，键为标准化字段名。"""
+    """返回 list[dict]，键为标准化字段名。
+
+    解析策略：
+    - 真实 xlsx（zip 包，magic=PK）走 openpyxl；
+    - 其它情况（含伪装成 .xls 的 TSV/CSV 文本、乃至非法的 .xls）一律降级为文本解析，
+      自动探测分隔符（Tab 优先于逗号）并按 utf-8/utf-8-sig/gbk 容错解码。
+    """
     name = (filename or "").lower()
-    if name.endswith(".xlsx") or name.endswith(".xls"):
+    is_zip = file_bytes[:2] == b"PK"
+    if name.endswith(".xlsx") or is_zip:
         try:
             import openpyxl
         except ImportError:
             raise HTTPException(status_code=400, detail="服务器未安装 openpyxl，无法解析 xlsx")
-        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
-        ws = wb.active
-        rows = list(ws.iter_rows(values_only=True))
-        if not rows:
-            return []
-        headers = [str(h) if h is not None else "" for h in rows[0]]
-        out = []
-        for r in rows[1:]:
-            if r is None:
-                continue
-            out.append({headers[i]: (r[i] if i < len(r) else None) for i in range(len(headers))})
-        return out
-    # 默认按 CSV 处理（utf-8 / gbk 容错）
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+            ws = wb.active
+            rows = list(ws.iter_rows(values_only=True))
+            if not rows:
+                return []
+            headers = [str(h) if h is not None else "" for h in rows[0]]
+            out = []
+            for r in rows[1:]:
+                if r is None:
+                    continue
+                out.append({headers[i]: (r[i] if i < len(r) else None) for i in range(len(headers))})
+            return out
+        except Exception:
+            # 不是合法 xlsx（例如 .xls 后缀实为文本），落到下方文本解析分支
+            pass
+    # 文本解析（utf-8 / utf-8-sig / gbk 容错）
     text = None
     for enc in ("utf-8-sig", "utf-8", "gbk"):
         try:
@@ -146,8 +161,14 @@ def _read_rows(file_bytes: bytes, filename: str):
         except UnicodeDecodeError:
             continue
     if text is None:
-        raise HTTPException(status_code=400, detail="无法解码文件（请使用 UTF-8 或 GBK 编码的 CSV）")
-    reader = csv.DictReader(io.StringIO(text))
+        raise HTTPException(
+            status_code=400,
+            detail="无法解码文件（请使用 UTF-8、GBK 编码的 CSV/TSV 或标准 xlsx）",
+        )
+    lines = text.splitlines()
+    sample = lines[0] if lines else ""
+    delim = "\t" if ("\t" in sample and sample.count("\t") >= sample.count(",")) else ","
+    reader = csv.DictReader(io.StringIO(text), delimiter=delim)
     return [dict(row) for row in reader]
 
 
@@ -280,6 +301,10 @@ def upload_qc_summary(
         tm = m["target_mean"]
         ts = m["target_sd"]
         agg = aggregate(values, tm, ts)
+        if not tm and not ts:
+            # 未提供靶值：用本批实测均值/标准差回填，保证报表可读
+            tm = agg["mean"]
+            ts = agg["sd"]
         target_cv = (ts / tm * 100) if tm else 0.0
         quality_goal = lookup_quality_goal(test_item)
         existing = (

@@ -129,7 +129,13 @@ def aggregate(values: list[float], target_mean: float, target_sd: float):
     mean = sum(values) / n
     sd = statistics.stdev(values) if n > 1 else 0.0
     cv = (sd / mean * 100) if mean else 0.0
-    ooc = evaluate_westgard(values, target_mean, target_sd)
+    # Westgard 判定：优先用靶值（target_mean/target_sd）；若缺失则退化为本批实测
+    # 均值/标准差，保证未提供靶值的导入数据也能真实判定失控（不影响已带靶值的数据）。
+    if target_mean and target_sd:
+        eff_mean, eff_sd = target_mean, target_sd
+    else:
+        eff_mean, eff_sd = mean, sd
+    ooc = evaluate_westgard(values, eff_mean, eff_sd)
     ooc_count = len(ooc)
     in_control_rate = (n - ooc_count) / n if n else 0.0
     return {
