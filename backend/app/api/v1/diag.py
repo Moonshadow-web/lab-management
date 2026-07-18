@@ -7,12 +7,12 @@ import shutil
 import sqlite3
 import datetime as _dt
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ...core.database import engine, get_db
-from ...core.security import get_current_user
+from ...core.security import get_current_user, require_roles
 from ...models.user import User
 
 router = APIRouter(prefix="/_diag", tags=["diag"])
@@ -102,7 +102,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役的是哪个容器版本（修复 CFS 损坏自愈相关改动后）
-_BUILD_MARK = "4da3a52-selfheal-2026-07-18"
+_BUILD_MARK = "4da3a52-selfheal-2026-07-18-restore"
 
 
 @router.get("/build")
@@ -205,6 +205,74 @@ def diag_db_backup():
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": repr(e)}
 
+
+
+@router.post("/restore-modules-from-seed")
+def diag_restore_modules_from_seed(_u: User = Depends(require_roles("admin"))):
+    """仅从镜像种子库 /app/backup/app.db 把「线上缺失」的三大模块记录补回：
+    按主键 id 比对，只 INSERT 线上没有的行，**绝不更新/删除线上已有记录**。
+    用于 CFS 损坏导致局部数据丢失后的定向补全。临时诊断接口，修复后删除。"""
+    seed = "/app/backup/app.db"
+    if not os.path.exists(seed):
+        raise HTTPException(status_code=409, detail="seed not found at /app/backup/app.db")
+    tables = [
+        "interlab_plans", "interlab_items", "interlab_levels",
+        "comparison_plans", "comparison_results", "comparison_qual_results", "comparison_attachments",
+        "qc_target_batches", "qc_target_results",
+    ]
+    report: dict = {}
+    scon = sqlite3.connect(seed)
+    scon.text_factory = str
+    ccon = sqlite3.connect(_DB_PATH)
+    ccon.text_factory = str
+    try:
+        scon.execute("PRAGMA foreign_keys=OFF")
+        ccon.execute("PRAGMA foreign_keys=OFF")
+        for t in tables:
+            try:
+                scols = [r[1] for r in scon.execute(f'PRAGMA table_info("{t}")')]
+            except Exception:
+                report[t] = "seed-no-table"
+                continue
+            try:
+                ccols = [r[1] for r in ccon.execute(f'PRAGMA table_info("{t}")')]
+            except Exception:
+                report[t] = "cfs-no-table"
+                continue
+            cols = [c for c in scols if c in ccols]
+            if "id" not in cols:
+                report[t] = "no-id-col"
+                continue
+            colspec = ", ".join(f'"{c}"' for c in cols)
+            qmarks = ", ".join("?" * len(cols))
+            srows = scon.execute(f'SELECT {colspec} FROM "{t}"').fetchall()
+            existing = set(r[0] for r in ccon.execute(f'SELECT "id" FROM "{t}"').fetchall())
+            added = 0
+            for r in srows:
+                rid = r[cols.index("id")]
+                if rid in existing:
+                    continue
+                ccon.execute(f'INSERT INTO "{t}" ({colspec}) VALUES ({qmarks})', r)
+                added += 1
+            ccon.commit()
+            try:
+                mx = ccon.execute(f'SELECT MAX("id") FROM "{t}"').fetchone()[0]
+                if mx is not None:
+                    ccon.execute(
+                        "INSERT OR REPLACE INTO sqlite_sequence(name,seq) VALUES(?,?)", (t, mx)
+                    )
+                    ccon.commit()
+            except Exception:
+                pass
+            report[t] = {"seed_rows": len(srows), "existing_in_cfs": len(existing), "added": added}
+    finally:
+        scon.close()
+        ccon.close()
+    try:
+        engine.dispose()
+    except Exception:
+        pass
+    return {"ok": True, "report": report}
 
 
 @router.get("/db")
