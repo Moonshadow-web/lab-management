@@ -9,12 +9,20 @@ from pydantic import BaseModel
 # 比对分组
 # ---------------------------------------------------------------------------
 class GroupItem(BaseModel):
-    """分组内单个比对项目：名称、允许偏倚(TE)、偏倚计算方式、适用仪器。"""
+    """分组内单个比对项目：名称、允许偏倚(TE)、偏倚计算方式、适用仪器。
+
+    TE/mode 支持两级：
+    - `te` / `mode`：项目级默认（所有水平共用）
+    - `te_by_level` / `mode_by_level`：水平级覆盖（key 为水平号字符串，如 "1"/"2"）
+    解析顺序：te_by_level[str(level)] > te > TE_LOOKUP；mode_by_level[str(level)] > mode。
+    """
     name: str
     label: str = ""  # 中文名（便于识别），name 可为项目代码
     te: str = "0"  # 允许偏倚，数字字符串；如 "2"、"0.02"
     mode: str = "relative"  # relative(相对%) / absolute(绝对)
     instrument_ids: list[int] = []  # 该项目实际适用的仪器 id；空=组内全部仪器（录入/报告对不适用仪器遮蔽）
+    te_by_level: dict[str, str] = {}  # 按水平覆盖 TE，如 {"1":"绝对5","2":"10"}
+    mode_by_level: dict[str, str] = {}  # 按水平覆盖 mode，如 {"1":"absolute","2":"relative"}
 
 
 class ComparisonGroupBase(BaseModel):

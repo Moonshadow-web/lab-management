@@ -1,5 +1,5 @@
 <template>
-  <el-dialog :model-value="visible" :title="group ? '编辑比对分组' : '新建比对分组'" width="880px"
+  <el-dialog :model-value="visible" :title="group ? '编辑比对分组' : '新建比对分组'" width="980px"
     @update:model-value="(v) => !v && $emit('close')" @open="onOpen">
     <el-form :model="form" label-width="110px">
       <el-row :gutter="12">
@@ -25,7 +25,7 @@
         </el-col>
         <el-col :span="12">
           <el-form-item label="水平数">
-            <el-input-number v-model="form.levels" :min="1" :max="10" />
+            <el-input-number v-model="form.levels" :min="1" :max="10" @change="onLevelsChange" />
           </el-form-item>
         </el-col>
       </el-row>
@@ -69,25 +69,65 @@
             </el-button>
             <span class="hint">
               依据仪器档案「项目↔仪器」关联，自动列出该仪器组共有项目及每项适用仪器；
+              TE/mode 默认沿用本系统已生成过的项目配置，未生成过的再回退到内置推荐值；
               「适用仪器」留空=组内全部，录入/报告时对不适用的仪器自动遮蔽（显示 /）。
             </span>
           </div>
-          <el-table :data="form.items" size="small" border style="margin-top:8px">
+          <el-table :data="form.items" size="small" border row-key="__rk"
+            :expand-row-keys="expandedKeys" style="margin-top:8px">
+            <el-table-column type="expand">
+              <template #default="{ row }">
+                <div class="lvl-editor">
+                  <div class="lvl-title">按水平设置（低浓度常用绝对偏倚，其他水平相对偏倚）</div>
+                  <table class="lvl-grid">
+                    <thead>
+                      <tr>
+                        <th>水平</th>
+                        <th v-for="lv in levelList" :key="lv">L{{ lv }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>允许偏倚</td>
+                        <td v-for="lv in levelList" :key="'te-'+lv">
+                          <el-input v-model="row.te_by_level[String(lv)]" size="small" placeholder="留空=项目级" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>偏倚方式</td>
+                        <td v-for="lv in levelList" :key="'mode-'+lv">
+                          <el-select v-model="row.mode_by_level[String(lv)]" size="small" clearable placeholder="项目级">
+                            <el-option label="相对%" value="relative" />
+                            <el-option label="绝对" value="absolute" />
+                          </el-select>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column label="项目代码" min-width="110">
               <template #default="{ row }"><el-input v-model="row.name" size="small" /></template>
             </el-table-column>
             <el-table-column label="中文名" min-width="120">
               <template #default="{ row }"><el-input v-model="row.label" size="small" /></template>
             </el-table-column>
-            <el-table-column label="允许TE" width="100">
+            <el-table-column label="允许偏倚（项目级默认）" width="150">
               <template #default="{ row }"><el-input v-model="row.te" size="small" placeholder="2 或 0.02" /></template>
             </el-table-column>
-            <el-table-column label="偏倚方式" width="106">
+            <el-table-column label="偏倚方式" width="120">
               <template #default="{ row }">
                 <el-select v-model="row.mode" size="small">
                   <el-option label="相对%" value="relative" />
                   <el-option label="绝对" value="absolute" />
                 </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="按水平" width="70" align="center">
+              <template #default="{ row }">
+                <el-button size="small" link type="primary"
+                  @click="toggleExpand(row)">{{ hasLevelCfg(row) ? '已设' : '设置' }}</el-button>
               </template>
             </el-table-column>
             <el-table-column label="适用仪器（遮蔽）" min-width="200">
@@ -104,8 +144,7 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-button size="small" @click="form.items.push({ name: '', label: '', te: '0', mode: 'relative', instrument_ids: [] })"
-            style="margin-top:6px">+ 新增项目</el-button>
+          <el-button size="small" @click="addItem" style="margin-top:6px">+ 新增项目</el-button>
         </div>
       </el-form-item>
     </el-form>
@@ -134,6 +173,9 @@ const form = reactive({
 })
 const saving = ref(false)
 const resolving = ref(false)
+const expandedKeys = ref([])
+
+const levelList = computed(() => Array.from({ length: form.levels || 1 }, (_, i) => i + 1))
 
 const selectedInstruments = computed(() =>
   props.instruments.filter((i) => form.instrument_ids.includes(i.id)))
@@ -144,8 +186,50 @@ const refName = computed(() => {
 
 function normItem(i) {
   return {
-    name: i.name || '', label: i.label || '', te: i.te != null ? String(i.te) : '0',
-    mode: i.mode || 'relative', instrument_ids: Array.isArray(i.instrument_ids) ? [...i.instrument_ids] : [],
+    name: i.name || '', label: i.label || '',
+    te: i.te != null ? String(i.te) : '0',
+    mode: i.mode || 'relative',
+    instrument_ids: Array.isArray(i.instrument_ids) ? [...i.instrument_ids] : [],
+    te_by_level: i.te_by_level ? { ...i.te_by_level } : {},
+    mode_by_level: i.mode_by_level ? { ...i.mode_by_level } : {},
+    __rk: (i.name || '') + '_' + Math.random().toString(36).slice(2, 8),
+  }
+}
+
+function hasLevelCfg(row) {
+  const t = row.te_by_level && Object.values(row.te_by_level).some((v) => String(v || '').trim() !== '')
+  const m = row.mode_by_level && Object.values(row.mode_by_level).some((v) => !!v)
+  return !!(t || m)
+}
+
+function toggleExpand(row) {
+  const k = row.__rk
+  const i = expandedKeys.value.indexOf(k)
+  if (i >= 0) expandedKeys.value.splice(i, 1)
+  else expandedKeys.value.push(k)
+}
+
+function addItem() {
+  form.items.push({
+    name: '', label: '', te: '0', mode: 'relative', instrument_ids: [],
+    te_by_level: {}, mode_by_level: {},
+    __rk: '_new_' + Math.random().toString(36).slice(2, 8),
+  })
+}
+
+function onLevelsChange(newLv) {
+  // 水平数变化时清掉越界的 te/mode_by_level
+  for (const it of form.items) {
+    if (it.te_by_level) {
+      for (const k of Object.keys(it.te_by_level)) {
+        if (Number(k) > newLv) delete it.te_by_level[k]
+      }
+    }
+    if (it.mode_by_level) {
+      for (const k of Object.keys(it.mode_by_level)) {
+        if (Number(k) > newLv) delete it.mode_by_level[k]
+      }
+    }
   }
 }
 
@@ -164,6 +248,7 @@ function onOpen() {
       reference_instrument_id: null, levels: 5, sample_desc: '', items: [],
     })
   }
+  expandedKeys.value = []
 }
 watch(() => props.visible, (v) => v && onOpen())
 
@@ -185,7 +270,8 @@ async function onResolve() {
       ElMessage.warning('未从仪器档案解析到该仪器组的共有项目，请检查仪器与项目关联或手动添加')
     } else {
       form.items = items
-      ElMessage.success(`已生成 ${items.length} 个共有项目（含每项适用仪器）`)
+      expandedKeys.value = []
+      ElMessage.success(`已生成 ${items.length} 个共有项目（含每项适用仪器，TE/mode 默认沿用历史配置）`)
     }
   } catch (e) {
     ElMessage.error('生成失败：' + (e.response?.data?.detail || e.message))
@@ -203,11 +289,18 @@ async function onSave() {
     name: form.name, category: form.category, form_code: form.form_code, form_title: form.form_title,
     instrument_ids: form.instrument_ids, reference_instrument_id: form.reference_instrument_id || 0,
     levels: form.levels, sample_desc: form.sample_desc,
-    items: form.items.filter((i) => i.name).map((i) => ({
-      name: i.name, label: i.label || '', te: String(i.te), mode: i.mode,
-      // 仅保留仍在组内的适用仪器；空=全部（遮蔽依据）
-      instrument_ids: (i.instrument_ids || []).filter((x) => form.instrument_ids.includes(x)),
-    })),
+    items: form.items.filter((i) => i.name).map((i) => {
+      const t = { ...(i.te_by_level || {}) }
+      const m = { ...(i.mode_by_level || {}) }
+      // 清掉空值键
+      for (const k of Object.keys(t)) if (String(t[k] || '').trim() === '') delete t[k]
+      for (const k of Object.keys(m)) if (!m[k]) delete m[k]
+      return {
+        name: i.name, label: i.label || '', te: String(i.te), mode: i.mode,
+        instrument_ids: (i.instrument_ids || []).filter((x) => form.instrument_ids.includes(x)),
+        te_by_level: t, mode_by_level: m,
+      }
+    }),
   }
   saving.value = true
   try {
@@ -227,4 +320,12 @@ async function onSave() {
 <style scoped>
 .items-tip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .items-tip .hint { color: #909399; font-size: 12px; line-height: 1.4; }
+.lvl-editor { padding: 4px 12px 8px; }
+.lvl-title { font-size: 12px; color: #606266; margin-bottom: 6px; }
+.lvl-grid { width: 100%; border-collapse: collapse; }
+.lvl-grid th, .lvl-grid td {
+  border: 1px solid #ebeef5; padding: 4px 6px; font-size: 12px; text-align: center;
+}
+.lvl-grid th { background: #f5f7fa; }
+.lvl-grid td:first-child { background: #fafafa; text-align: right; color: #606266; }
 </style>

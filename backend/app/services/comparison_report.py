@@ -216,7 +216,7 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
             # 非靶机的比对仪器 → 正常计算偏倚
             for cid in compare_ids:
                 v = _load_json(r.values_json, {}).get(str(cid), "") if r else ""
-                bias, accepted = _compute_bias(ref_val, v, _resolve_te(it), it.get("mode", "relative"))
+                bias, accepted = _compute_bias(ref_val, v, _resolve_te(it, lv), _resolve_mode(it, lv))
                 insts[str(cid)] = {"value": v, "bias": bias, "accepted": accepted, "masked": False}
             # 其余不适用仪器 → masked（组参照仪不在 app 或其它不适用）
             for cid in [i for i in [ref_id] + compared if i != eff_ref and i not in compare_ids]:
@@ -224,8 +224,8 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
             rows.append({
                 "item": it["name"],
                 "label": it.get("label", ""),
-                "te": _resolve_te(it),
-                "mode": it.get("mode", "relative"),
+                "te": _resolve_te(it, lv),
+                "mode": _resolve_mode(it, lv),
                 "ref": ref_val,
                 "effective_ref_id": eff_ref,
                 "insts": insts,
@@ -251,7 +251,7 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
                 # 偏倚计算：对照该项目的实际靶机值（reference_value）
                 v = _load_json(r.values_json, {}).get(str(cid), "") if r else ""
                 ref_val = r.reference_value if r else ""
-                _, accepted = _compute_bias(r.reference_value if r else "", v, _resolve_te(it), it.get("mode", "relative"))
+                _, accepted = _compute_bias(r.reference_value if r else "", v, _resolve_te(it, lv), _resolve_mode(it, lv))
                 level_info.append({"ref": ref_val, "ok": accepted is True})
             per_item.append({"item": it["name"], "label": it.get("label", ""), "levels": level_info})
         if per_item:
@@ -889,9 +889,15 @@ QUANT_SYNONYMS = {
 _GROUP_TO_EXCEL = {v: k for k, v in QUANT_SYNONYMS.items()}
 
 
-def _resolve_te(it: dict):
+def _resolve_te(it: dict, level: int = None):
     """允许TE 解析：优先用分组里配置好的 te；若为空/0，则回退到内置 TE_LOOKUP
-    （含同义缩写映射，如分组 UREA → TE_LOOKUP 的 BUN=3）。保证缺配项目也能算出偏倚与判定。"""
+    （含同义缩写映射，如分组 UREA → TE_LOOKUP 的 BUN=3）。保证缺配项目也能算出偏倚与判定。
+
+    若提供 `level`，先查 `it["te_by_level"][str(level)]`，再回退到 `it["te"]`，再 TE_LOOKUP。
+    """
+    by_lv = it.get("te_by_level") or {}
+    if level is not None and str(level) in by_lv and str(by_lv.get(str(level), "")).strip() not in ("", "0", "0.0"):
+        return by_lv[str(level)]
     te = it.get("te")
     if str(te or "").strip() not in ("", "0", "0.0"):
         return te
@@ -903,6 +909,15 @@ def _resolve_te(it: dict):
     if ex and ex.upper() in TE_LOOKUP:
         return TE_LOOKUP[ex.upper()][0]
     return te or "0"
+
+
+def _resolve_mode(it: dict, level: int = None, default: str = "relative"):
+    """偏倚方式解析：先 `mode_by_level[str(level)]` > `mode` > default。"""
+    by_lv = it.get("mode_by_level") or {}
+    if level is not None and str(level) in by_lv and by_lv[str(level)]:
+        return by_lv[str(level)]
+    m = it.get("mode")
+    return m if m else default
 
 
 def _match_item(name, items):
@@ -1147,6 +1162,21 @@ def resolve_common_items(db, instrument_ids, category="定量", min_count=2):
 
     items_out = []
     seen_names = set()
+    # 1) 先检索现有已生成的报告（同 group 内、或跨 group），从已知 group items 里取真实用过的 te/mode 作为默认
+    from ..models.comparison import ComparisonGroup
+    used_default = {}  # code_upper -> {te, mode}
+    for g in db.query(ComparisonGroup).all():
+        for gi in _load_json(g.items, []):
+            c = (gi.get("name") or "").strip().upper()
+            if not c: continue
+            cur = used_default.get(c)
+            cand_te = gi.get("te"); cand_mode = gi.get("mode")
+            if cur is None:
+                used_default[c] = {"te": cand_te, "mode": cand_mode}
+            else:
+                # 保留最具体的：te/mode 非空时优先
+                if (not cur.get("te")) and cand_te: cur["te"] = cand_te
+                if (not cur.get("mode")) and cand_mode: cur["mode"] = cand_mode
     for ti in db.query(TestItem).all():
         # 该项目装机仪器 id 集合
         run_ids = set()
@@ -1164,7 +1194,11 @@ def resolve_common_items(db, instrument_ids, category="定量", min_count=2):
         if key in seen_names:
             continue
         seen_names.add(key)
-        te, mode = TE_LOOKUP.get(key, ("", "relative"))
+        # 默认 TE/mode 优先级：现有报告里已用过的 > TE_LOOKUP
+        prior = used_default.get(key) or {}
+        te_lk, mode_lk = TE_LOOKUP.get(key, ("", "relative"))
+        te = prior.get("te") or te_lk or "0"
+        mode = prior.get("mode") or mode_lk or "relative"
         items_out.append({
             "name": code, "label": label, "te": str(te), "mode": mode,
             "instrument_ids": app,
