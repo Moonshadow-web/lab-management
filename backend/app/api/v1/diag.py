@@ -102,7 +102,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役的是哪个容器版本（修复 CFS 损坏自愈相关改动后）
-_BUILD_MARK = "4da3a52-selfheal-2026-07-18-restore"
+_BUILD_MARK = "4da3a52-selfheal-2026-07-18-qcrecover"
 
 
 @router.get("/build")
@@ -367,3 +367,127 @@ def diag_db_repair_swap(db: Session = Depends(get_db), user: User = Depends(get_
         pass
 
     return {"ok": True, "swapped": True, "backup": bak}
+
+
+@router.get("/inspect-backups")
+def diag_inspect_backups(_u: User = Depends(require_roles("admin"))):
+    """只读：列出 CFS 上 app.db 的副本（corrupt-bak / lastgood / manual-bak），
+    读取每个副本里的 qc_target 计数与批号详情，定位损坏前含用户数据的副本。"""
+    import glob
+
+    d = os.path.dirname(_DB_PATH)
+    pats = ["app.db", "app.db.lastgood", "app.db.corrupt-bak-*", "app.db.manual-bak-*"]
+    files = sorted(
+        set(sum((glob.glob(os.path.join(d, p)) for p in pats), [])),
+        key=lambda f: os.path.getmtime(f) if os.path.exists(f) else 0,
+    )
+    out = []
+    for f in files:
+        rec = {
+            "path": f,
+            "size": os.path.getsize(f) if os.path.exists(f) else None,
+            "mtime": (_dt.datetime.fromtimestamp(os.path.getmtime(f)).isoformat()
+                      if os.path.exists(f) else None),
+        }
+        try:
+            c = sqlite3.connect(f)
+            c.text_factory = str
+            c.execute("PRAGMA writable_schema=ON")
+            for t in ("qc_target_batches", "qc_target_results"):
+                try:
+                    rec.setdefault("qc_target", {})[t] = c.execute(
+                        f'SELECT COUNT(*) FROM "{t}"').fetchone()[0]
+                except Exception as e:
+                    rec.setdefault("qc_target", {})[t] = f"ERR {e}"
+            try:
+                bcols = [r[1] for r in c.execute(
+                    "PRAGMA table_info('qc_target_batches')").fetchall()]
+                brows = c.execute("SELECT * FROM qc_target_batches").fetchall()
+                rec["batches"] = [dict(zip(bcols, r)) for r in brows]
+            except Exception as e:
+                rec["batches"] = f"ERR {e}"
+            c.close()
+        except Exception as e:
+            rec["error"] = repr(e)
+        out.append(rec)
+    return {"db_path": _DB_PATH, "files": out}
+
+
+@router.post("/recover-qc-target-from-backup")
+def diag_recover_qc_target(_u: User = Depends(require_roles("admin"))):
+    """从损坏前副本把 qc_target 数据导回线上库：只 INSERT 线上缺失的行、保留原 id，
+    绝不删除/覆盖线上已有记录。优先用最早（损坏最轻时）含数据的副本。"""
+    import glob
+
+    d = os.path.dirname(_DB_PATH)
+    pats = ["app.db.corrupt-bak-*", "app.db.lastgood", "app.db.manual-bak-*"]
+    cand = sorted(
+        set(sum((glob.glob(os.path.join(d, p)) for p in pats), [])),
+        key=lambda f: os.path.getmtime(f),
+    )
+    report = {"candidates": len(cand), "scanned": [], "batches_added": 0,
+              "results_added": 0, "restored_from": None}
+    best_src = None
+    for src in cand:  # 升序：最早副本优先（损坏最轻时数据最全）
+        rec = {"src": src}
+        try:
+            s = sqlite3.connect(src)
+            s.text_factory = str
+            s.execute("PRAGMA writable_schema=ON")
+            sb = s.execute('SELECT * FROM "qc_target_batches"').fetchall()
+            sr = s.execute('SELECT * FROM "qc_target_results"').fetchall()
+            s.close()
+            rec["src_batches"] = len(sb)
+            rec["src_results"] = len(sr)
+            if sb and best_src is None:
+                best_src = src
+            report["scanned"].append(rec)
+        except Exception as e:
+            report["scanned"].append({**rec, "error": repr(e)})
+    if not best_src:
+        return {**report, "note": "no backup with qc_target data found"}
+    s = sqlite3.connect(best_src)
+    s.text_factory = str
+    s.execute("PRAGMA writable_schema=ON")
+    bcols = [r[1] for r in s.execute("PRAGMA table_info('qc_target_batches')").fetchall()]
+    rcols = [r[1] for r in s.execute("PRAGMA table_info('qc_target_results')").fetchall()]
+    sbatches = s.execute('SELECT * FROM "qc_target_batches"').fetchall()
+    sresults = s.execute('SELECT * FROM "qc_target_results"').fetchall()
+    s.close()
+    c = sqlite3.connect(_DB_PATH)
+    c.text_factory = str
+    c.execute("PRAGMA foreign_keys=OFF")
+    c.execute("PRAGMA writable_schema=ON")
+    exist_b = set(r[0] for r in c.execute('SELECT "id" FROM "qc_target_batches"').fetchall())
+    exist_r = set(r[0] for r in c.execute('SELECT "id" FROM "qc_target_results"').fetchall())
+    bspec = ", ".join(f'"{x}"' for x in bcols)
+    bmarks = ", ".join("?" * len(bcols))
+    rspec = ", ".join(f'"{x}"' for x in rcols)
+    rmarks = ", ".join("?" * len(rcols))
+    for row in sbatches:
+        if row[0] in exist_b:
+            continue
+        c.execute(f'INSERT INTO "qc_target_batches" ({bspec}) VALUES ({bmarks})', row)
+        report["batches_added"] += 1
+    for row in sresults:
+        if row[0] in exist_r:
+            continue
+        c.execute(f'INSERT INTO "qc_target_results" ({rspec}) VALUES ({rmarks})', row)
+        report["results_added"] += 1
+    c.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    for t, cols in (("qc_target_batches", bcols), ("qc_target_results", rcols)):
+        try:
+            mx = c.execute(f'SELECT MAX("id") FROM "{t}"').fetchone()[0]
+            if mx is not None:
+                c.execute(
+                    "INSERT OR REPLACE INTO sqlite_sequence(name,seq) VALUES(?,?)", (t, mx))
+        except Exception:
+            pass
+    c.commit()
+    c.close()
+    try:
+        engine.dispose()
+    except Exception:
+        pass
+    report["restored_from"] = best_src
+    return report
