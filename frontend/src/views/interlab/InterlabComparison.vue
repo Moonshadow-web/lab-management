@@ -366,10 +366,24 @@ function biasClass2(lv, item) {
   return ''
 }
 // 定性：阴阳判定与符合
+// 支持完整词和带括号/数值后缀的复合形式（"阴性(1.05)" / "阳性(6.78)" / "阴(+)" 等）。
 function normPn(v) {
   const s = String(v || '').toUpperCase().trim()
-  if (['阳', '阳性', 'POS', 'POSITIVE', 'P', '+', '1'].includes(s)) return 'positive'
-  if (['阴', '阴性', 'NEG', 'NEGATIVE', 'N', '-', '0'].includes(s)) return 'negative'
+  if (!s) return null
+  const pos = ['阳', '阳性', 'POS', 'POSITIVE', 'P', '+', '1']
+  const neg = ['阴', '阴性', 'NEG', 'NEGATIVE', 'N', '-', '0']
+  if (pos.includes(s)) return 'positive'
+  if (neg.includes(s)) return 'negative'
+  // 前缀匹配：长前缀优先
+  const prefixes = [
+    ['阳性', 'positive'], ['POSITIVE', 'positive'], ['POS', 'positive'],
+    ['阳', 'positive'], ['+', 'positive'], ['P', 'positive'],
+    ['阴性', 'negative'], ['NEGATIVE', 'negative'], ['NEG', 'negative'],
+    ['阴', 'negative'], ['-', 'negative'], ['N', 'negative'],
+  ]
+  for (const [tok, kind] of prefixes) {
+    if (s.startsWith(tok)) return kind
+  }
   return null
 }
 function pnMatch1(lv) {

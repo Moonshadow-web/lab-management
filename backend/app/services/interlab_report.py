@@ -50,12 +50,28 @@ def _compute_bias(our, ref, te, mode):
 
 
 def _norm_pn(v):
-    """阴阳判定归一化。"""
+    """阴阳判定归一化。
+    支持完整词（"阳性"/"阴"/"POS" 等）和带括号/数值后缀的复合形式
+    （"阴性(1.05)" / "阳性(6.78)" / "阴(+)" 等），从字符串前缀提取 阴/阳。"""
     s = (str(v or "").strip()).upper()
-    if s in ("阳", "阳性", "POS", "POSITIVE", "P", "+", "1"):
+    if not s:
+        return None
+    pos_full = {"阳", "阳性", "POS", "POSITIVE", "P", "+", "1"}
+    neg_full = {"阴", "阴性", "NEG", "NEGATIVE", "N", "-", "0"}
+    if s in pos_full:
         return "positive"
-    if s in ("阴", "阴性", "NEG", "NEGATIVE", "N", "-", "0", "阴性(-)"):
+    if s in neg_full:
         return "negative"
+    # 前缀匹配：长前缀优先（"阳性" 在 "阳" 之前；"阴性" 在 "阴" 之前）
+    prefixes = [
+        ("阳性", "positive"), ("POSITIVE", "positive"), ("POS", "positive"),
+        ("阳", "positive"), ("+", "positive"), ("P", "positive"),
+        ("阴性", "negative"), ("NEGATIVE", "negative"), ("NEG", "negative"),
+        ("阴", "negative"), ("-", "negative"), ("N", "negative"),
+    ]
+    for tok, kind in prefixes:
+        if s.startswith(tok):
+            return kind
     return None
 
 
