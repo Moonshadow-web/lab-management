@@ -331,12 +331,28 @@ async def _background_init():
             ensure_comparison_defaults(db)
             # 模块写权限配置：表为空时灌入出厂默认（与旧硬编码值一致）
             from .models.module_permission import ModulePermission, DEFAULT_MODULE_PERMISSIONS
-            if db.query(ModulePermission).count() == 0:
-                for mod_key, roles in DEFAULT_MODULE_PERMISSIONS.items():
-                    for r in roles:
+            # 增量补齐：无论表是否为空，都把 DEFAULT_MODULE_PERMISSIONS 中缺失的
+            # (module_key, role_code) 对补上，保证升级后新增模块（comparison/interlab 等）也有默认授权。
+            _existing = {(p.module_key, p.role_code) for p in db.query(ModulePermission).all()}
+            _added = 0
+            for mod_key, roles in DEFAULT_MODULE_PERMISSIONS.items():
+                for r in roles:
+                    if (mod_key, r) not in _existing:
                         db.add(ModulePermission(module_key=mod_key, role_code=r, updated_by="system"))
+                        _added += 1
+            if _added:
                 db.commit()
-                logger.info("已初始化 module_permissions 默认配置")
+                logger.info("补齐 module_permissions 默认配置 %d 项", _added)
+            # 迁移：把旧版单一的 `qc` 权限拆成 `qc-monthly` + `qc-target`（兼容升级）
+            old_qc_roles = {p.role_code for p in db.query(ModulePermission).filter(ModulePermission.module_key == "qc").all()}
+            if old_qc_roles:
+                for new_key in ("qc-monthly", "qc-target"):
+                    if db.query(ModulePermission).filter(ModulePermission.module_key == new_key).count() == 0:
+                        for r in old_qc_roles:
+                            db.add(ModulePermission(module_key=new_key, role_code=r, updated_by="migrate"))
+                        logger.info("迁移 qc → %s，角色 %s", new_key, old_qc_roles)
+                # 不删旧 qc 行（保留以便人工对比）
+                db.commit()
             # 质控品主数据：补齐预设（如「伯乐免疫多项」），仅当不存在时插入，幂等
             from .models.qc_material import QcMaterial as _QM
             for _pn in ["生化多项质控品", "伯乐免疫多项", "昆涞免疫多项"]:

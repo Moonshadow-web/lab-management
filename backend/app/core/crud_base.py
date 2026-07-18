@@ -46,16 +46,22 @@ def make_router(
     prefix: str = "",
     after_write: Callable | None = None,
     write_roles: tuple[str, ...] | None = None,
+    delete_roles: tuple[str, ...] | None = None,
 ):
     """通用 CRUD 路由工厂：分页/搜索、get、create、update、delete，并统一写审计日志。
 
     权限模型：
     - 查（list/get）：所有登录用户可访问
-    - 改（create/update/delete）：需要 write_roles 中的任一角色；admin 自动通过
+    - 写（create/update）：需要 write_roles 中的任一角色；admin 自动通过
+    - 删（delete）：需要 delete_roles 中的任一角色；admin 自动通过
+      未设 delete_roles 时回退到 write_roles
     - write_roles=None 时不做角色限制（向后兼容，仅要求登录）
     """
     # 写权限依赖：有 write_roles 则校验角色，否则仅要求登录
     WriteDep = require_roles(*write_roles) if write_roles else get_current_user
+    # 删除权限：独立配置；未设则沿用 write_roles
+    DeleteRoles = delete_roles if delete_roles is not None else write_roles
+    DeleteDep = require_roles(*DeleteRoles) if DeleteRoles else get_current_user
     router = APIRouter(prefix=prefix, tags=[Model.__name__])
 
     @router.get("")
@@ -153,7 +159,7 @@ def make_router(
         item_id: int,
         request: Request,
         db: Session = Depends(get_db),
-        user: User = Depends(WriteDep),
+        user: User = Depends(DeleteDep),
     ):
         obj = db.get(Model, item_id)
         if not obj:

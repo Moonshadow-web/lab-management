@@ -9,10 +9,20 @@ const FALLBACK_MODULE_WRITE_ROLES = {
   'documents': ['admin', 'specialty_leader'],
   'instruments': ['admin', 'specialty_leader'],
   'instrument-families': ['admin', 'specialty_leader'],
-  'qc': ['admin', 'qc_manager'],
+  'qc-monthly': ['admin', 'qc_manager', 'member'],
+  'qc-monthly_delete': ['admin', 'qc_manager'],
+  'qc-target': ['admin', 'qc_manager', 'member'],
+  'qc-target_delete': ['admin', 'qc_manager'],
   'eqa': ['admin', 'qc_manager'],
+  'eqa_delete': ['admin', 'qc_manager'],
+  'comparison': ['admin', 'qc_manager', 'technical_support'],
+  'comparison-edit': ['admin', 'qc_manager'],
+  'interlab': ['admin', 'qc_manager', 'technical_support'],
+  'interlab-edit': ['admin', 'qc_manager'],
   'reagents': ['admin', 'reagent_manager'],
+  'reagents_delete': ['admin', 'reagent_manager'],
   'training': ['admin', 'training_manager'],
+  'training_delete': ['admin', 'training_manager'],
   'verification': ['admin', 'specialty_leader'],
   'iso15189': ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader'],
   'quality-requirements': ['admin'],
@@ -93,7 +103,21 @@ export const useAuthStore = defineStore('auth', {
         required = permStore.moduleRoles[module]
       } catch (_) { /* store 未挂载时退化 */ }
       if (!required) required = FALLBACK_MODULE_WRITE_ROLES[module]
+      // 旧版 'qc' 兼容：自动映射到 qc-monthly / qc-target
+      if (!required && module === 'qc') required = (permStore?.moduleRoles?.['qc-monthly']) || FALLBACK_MODULE_WRITE_ROLES['qc-monthly']
       if (!required) return true // 未配置的模块默认允许
+      return this.myRoles.some(r => required.includes(r))
+    },
+    // 删除权限（沿用 canWrite 同样的 store 查找，但查找 `xxx_delete` 专属配置）
+    canDelete(module) {
+      if (this.isAdmin) return true
+      let required
+      try {
+        const permStore = usePermissionStore()
+        required = permStore.moduleRoles[module + '_delete'] || permStore.moduleRoles[module]
+      } catch (_) { /* store 未挂载时退化 */ }
+      if (!required) required = FALLBACK_MODULE_WRITE_ROLES[module + '_delete'] || FALLBACK_MODULE_WRITE_ROLES[module]
+      if (!required) return true
       return this.myRoles.some(r => required.includes(r))
     },
   },

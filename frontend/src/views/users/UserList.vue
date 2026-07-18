@@ -257,8 +257,13 @@ const FALLBACK_MODULES = [
   { key: 'documents',           label: '文件' },
   { key: 'instruments',         label: '仪器档案' },
   { key: 'instrument-families', label: '仪器关联' },
-  { key: 'qc',                  label: '质控' },
+  { key: 'qc-monthly',          label: '室内质控月结' },
+  { key: 'qc-target',           label: '质控品靶值' },
   { key: 'eqa',                 label: 'EQA' },
+  { key: 'comparison',          label: '仪器间比对(新建)' },
+  { key: 'comparison-edit',     label: '仪器间比对(编辑)' },
+  { key: 'interlab',            label: '室间比对(新建)' },
+  { key: 'interlab-edit',       label: '室间比对(编辑)' },
   { key: 'reagents',            label: '试剂' },
   { key: 'training',            label: '继教' },
   { key: 'verification',        label: '性能验证' },
@@ -290,6 +295,7 @@ const ROLE_LABELS = {
   director: '主任', deputy_director: '副主任', quality_manager: '质量负责人',
   specialty_leader: '专业组长', qc_manager: '质控管理员', reagent_manager: '试剂管理员',
   training_manager: '继教管理员', biosafety_officer: '生物安全员', it_manager: '信息管理员',
+  technical_support: '技术支持',
   staff: '职工',
 }
 

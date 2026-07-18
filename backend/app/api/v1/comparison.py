@@ -32,7 +32,25 @@ os.makedirs(REPORT_DIR, exist_ok=True)
 ATTACH_DIR = DATA_DIR / "comparison_attachments"
 os.makedirs(ATTACH_DIR, exist_ok=True)
 
-WRITE = require_roles("admin", "qc_manager")
+# 权限分层：
+#   CREATE = 新建计划 + 在新计划上录入结果（technical_support 也可做）
+#   EDIT   = 编辑/删除既有计划 + 生成报告 + 编辑已生成报告的计划
+# 既有的 WRITE 别名保留向后兼容
+CREATE = require_roles("admin", "qc_manager", "technical_support")
+EDIT = require_roles("admin", "qc_manager")
+WRITE = EDIT  # 向后兼容（旧调用方仍用 WRITE）
+
+
+def _ensure_can_edit_results(db: Session, pid: int, user: User):
+    """在 PUT results 时检查：草稿状态可用 CREATE 权限；已完成报告的计划必须 EDIT 权限。"""
+    p = db.get(ComparisonPlan, pid)
+    if not p:
+        raise HTTPException(404, "未找到计划")
+    if p.status == "done":
+        # 既有报告的计划：必须是 qc_manager 或 admin
+        if user.role != "admin" and (user.roles or "").find("qc_manager") == -1:
+            raise HTTPException(403, "该计划已生成报告，仅质控管理员可修改结果")
+    return p
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +115,7 @@ def resolve_items(
 
 @router.post("/groups", status_code=201)
 def create_group(
-    body: ComparisonGroupCreate, db: Session = Depends(get_db), user: User = Depends(WRITE),
+    body: ComparisonGroupCreate, db: Session = Depends(get_db), user: User = Depends(CREATE),
 ):
     g = ComparisonGroup(
         name=body.name, category=body.category, form_code=body.form_code,
@@ -155,7 +173,7 @@ def uncompared_items(
 
 @router.put("/groups/{gid}")
 def update_group(
-    gid: int, body: ComparisonGroupUpdate, db: Session = Depends(get_db), user: User = Depends(WRITE),
+    gid: int, body: ComparisonGroupUpdate, db: Session = Depends(get_db), user: User = Depends(EDIT),
 ):
     g = db.get(ComparisonGroup, gid)
     if not g:
@@ -181,7 +199,7 @@ def update_group(
 
 
 @router.delete("/groups/{gid}")
-def delete_group(gid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def delete_group(gid: int, db: Session = Depends(get_db), user: User = Depends(EDIT)):
     g = db.get(ComparisonGroup, gid)
     if not g:
         raise HTTPException(404, "未找到分组")
@@ -262,14 +280,14 @@ def get_plan(pid: int, db: Session = Depends(get_db), user: User = Depends(get_c
 
 
 @_plan_router.post("", response_model=ComparisonPlanRead, status_code=201)
-def create_plan(body: ComparisonPlanCreate, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def create_plan(body: ComparisonPlanCreate, db: Session = Depends(get_db), user: User = Depends(CREATE)):
     p = ComparisonPlan(**body.model_dump(), created_by=user.username)
     db.add(p); db.commit(); db.refresh(p)
     return p
 
 
 @_plan_router.put("/{pid}", response_model=ComparisonPlanRead)
-def update_plan(pid: int, body: ComparisonPlanUpdate, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def update_plan(pid: int, body: ComparisonPlanUpdate, db: Session = Depends(get_db), user: User = Depends(EDIT)):
     p = db.get(ComparisonPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
@@ -281,7 +299,7 @@ def update_plan(pid: int, body: ComparisonPlanUpdate, db: Session = Depends(get_
 
 
 @_plan_router.delete("/{pid}")
-def delete_plan(pid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def delete_plan(pid: int, db: Session = Depends(get_db), user: User = Depends(EDIT)):
     p = db.get(ComparisonPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
@@ -357,11 +375,10 @@ def _apply_results(db: Session, pid: int, quant: list, qual: list):
 
 @router.put("/plans/{pid}/results")
 def save_results(
-    pid: int, body: ComparisonResultsPayload, db: Session = Depends(get_db), user: User = Depends(WRITE),
+    pid: int, body: ComparisonResultsPayload, db: Session = Depends(get_db), user: User = Depends(CREATE),
 ):
-    p = db.get(ComparisonPlan, pid)
-    if not p:
-        raise HTTPException(404, "未找到计划")
+    # 草稿状态可用 CREATE 权限；已完成报告的计划必须 EDIT 权限（只 qc_manager）
+    p = _ensure_can_edit_results(db, pid, user)
     _apply_results(db, pid, body.quant, body.qual)
     db.commit()
     return {"ok": True}
@@ -369,7 +386,7 @@ def save_results(
 
 @router.post("/plans/{pid}/results/import")
 async def import_results(
-    pid: int, file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(WRITE),
+    pid: int, file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(CREATE),
 ):
     """从填好的定量比对结果 Excel（如 BG-SM-CZ-025）导入结果，自动匹配仪器与项目。"""
     p = db.get(ComparisonPlan, pid)
@@ -429,7 +446,7 @@ def preview_report(pid: int, db: Session = Depends(get_db), user: User = Depends
 
 
 @router.post("/plans/{pid}/report/generate")
-def generate_report(pid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def generate_report(pid: int, db: Session = Depends(get_db), user: User = Depends(EDIT)):
     p = db.get(ComparisonPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")

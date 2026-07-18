@@ -9,13 +9,23 @@ const FALLBACK = {
   'documents':            ['admin', 'specialty_leader'],
   'instruments':          ['admin', 'specialty_leader'],
   'instrument-families':  ['admin', 'specialty_leader'],
-  'qc':                   ['admin', 'qc_manager'],
+  'qc-monthly':           ['admin', 'qc_manager', 'member'],
+  'qc-monthly_delete':    ['admin', 'qc_manager'],
+  'qc-target':            ['admin', 'qc_manager', 'member'],
+  'qc-target_delete':     ['admin', 'qc_manager'],
   'eqa':                  ['admin', 'qc_manager'],
+  'eqa_delete':           ['admin', 'qc_manager'],
+  'comparison':           ['admin', 'qc_manager', 'technical_support'],
+  'comparison-edit':      ['admin', 'qc_manager'],
+  'interlab':             ['admin', 'qc_manager', 'technical_support'],
+  'interlab-edit':        ['admin', 'qc_manager'],
   'reagents':             ['admin', 'reagent_manager'],
+  'reagents_delete':      ['admin', 'reagent_manager'],
   'training':             ['admin', 'training_manager'],
+  'training_delete':      ['admin', 'training_manager'],
   'verification':         ['admin', 'specialty_leader'],
   'iso15189':             ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader'],
-  'quality-requirements':['admin'],
+  'quality-requirements': ['admin'],
 }
 
 export const usePermissionStore = defineStore('permissions', {
@@ -52,6 +62,23 @@ export const usePermissionStore = defineStore('permissions', {
       } finally {
         this.loading = false
       }
+    },
+
+    // 单个模块的写权限判定（与 auth.canWrite 一致；admin 短路）
+    canWrite(userRoles, moduleKey) {
+      if (userRoles.includes('admin')) return true
+      const allowed = this.moduleRoles[moduleKey]
+      if (!allowed) return true  // 未配置白名单 = 默认允许
+      return userRoles.some((r) => allowed.includes(r))
+    },
+
+    // 单个模块的删除权限判定
+    // 查找规则：先查 `moduleKey + '_delete'` 专属配置；找不到则回退到写权限
+    canDelete(userRoles, moduleKey) {
+      if (userRoles.includes('admin')) return true
+      const allowed = this.moduleRoles[moduleKey + '_delete'] || this.moduleRoles[moduleKey]
+      if (!allowed) return true
+      return userRoles.some((r) => allowed.includes(r))
     },
 
     // admin 在 UI 改了某个模块的角色后，调用此方法同步到本地 store

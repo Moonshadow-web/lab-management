@@ -111,7 +111,8 @@ batch_router = make_router(
     filter_fields=["method", "mode", "established"],
     prefix="",
     after_write=_normalize_mode,
-    write_roles=("admin", "qc_manager"),
+    write_roles=("admin", "qc_manager", "member"),
+    delete_roles=("admin", "qc_manager"),
 )
 # 重写路径带上本 router 前缀后并入（避免 include_router 重复前缀 / 空路径报错）
 for _r in batch_router.routes:

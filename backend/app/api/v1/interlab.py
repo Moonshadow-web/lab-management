@@ -28,7 +28,23 @@ REPORT_DIR = DATA_DIR / "interlab_reports"
 os.makedirs(REPORT_DIR, exist_ok=True)
 svc.REPORT_DIR = REPORT_DIR
 
-WRITE = require_roles("admin", "qc_manager")
+# 权限分层：
+#   CREATE = 新建计划 + 在新计划上录入结果（technical_support 也可做）
+#   EDIT   = 编辑/删除既有计划 + 生成报告 + 上传报告 + 编辑已生成报告的计划
+CREATE = require_roles("admin", "qc_manager", "technical_support")
+EDIT = require_roles("admin", "qc_manager")
+WRITE = EDIT  # 向后兼容
+
+
+def _ensure_can_edit_results(db: Session, pid: int, user: User):
+    """PUT results 时检查：草稿状态可用 CREATE 权限；已完成报告的计划必须 EDIT 权限。"""
+    p = db.get(InterlabPlan, pid)
+    if not p:
+        raise HTTPException(404, "未找到计划")
+    if p.status == "done":
+        if user.role != "admin" and (user.roles or "").find("qc_manager") == -1:
+            raise HTTPException(403, "该计划已生成报告，仅质控管理员可修改结果")
+    return p
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +128,7 @@ def get_plan(pid: int, db: Session = Depends(get_db), user: User = Depends(get_c
 
 
 @router.post("/plans", response_model=InterlabPlanRead, status_code=201)
-def create_plan(body: InterlabPlanCreate, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def create_plan(body: InterlabPlanCreate, db: Session = Depends(get_db), user: User = Depends(CREATE)):
     payload = body.model_dump(exclude={"items", "auto_fill"})
     p = InterlabPlan(**payload, created_by=user.username)
     db.add(p); db.flush()
@@ -148,7 +164,7 @@ def create_plan(body: InterlabPlanCreate, db: Session = Depends(get_db), user: U
 
 
 @router.put("/plans/{pid}", response_model=InterlabPlanRead)
-def update_plan(pid: int, body: InterlabPlanUpdate, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def update_plan(pid: int, body: InterlabPlanUpdate, db: Session = Depends(get_db), user: User = Depends(EDIT)):
     p = db.get(InterlabPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
@@ -160,7 +176,7 @@ def update_plan(pid: int, body: InterlabPlanUpdate, db: Session = Depends(get_db
 
 
 @router.delete("/plans/{pid}")
-def delete_plan(pid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def delete_plan(pid: int, db: Session = Depends(get_db), user: User = Depends(EDIT)):
     p = db.get(InterlabPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
@@ -201,8 +217,9 @@ def get_results(pid: int, db: Session = Depends(get_db), user: User = Depends(ge
 
 
 @router.put("/plans/{pid}/results")
-def save_results(pid: int, body: InterlabResultsPayload, db: Session = Depends(get_db), user: User = Depends(WRITE)):
-    p = db.get(InterlabPlan, pid)
+def save_results(pid: int, body: InterlabResultsPayload, db: Session = Depends(get_db), user: User = Depends(CREATE)):
+    # 草稿状态可用 CREATE 权限；已完成报告的计划必须 EDIT 权限（只 qc_manager）
+    p = _ensure_can_edit_results(db, pid, user)
     if not p:
         raise HTTPException(404, "未找到计划")
     # 防御：空载荷（无项目）时不执行「先删后插」，避免误清空已录入结果。
@@ -276,7 +293,7 @@ def preview_report(pid: int, db: Session = Depends(get_db), user: User = Depends
 
 
 @router.post("/plans/{pid}/report/generate")
-def generate_report(pid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def generate_report(pid: int, db: Session = Depends(get_db), user: User = Depends(EDIT)):
     p = db.get(InterlabPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
@@ -312,7 +329,7 @@ def download_report(pid: int, db: Session = Depends(get_db), user: User = Depend
 
 
 @router.post("/plans/{pid}/report/upload")
-def upload_report(pid: int, file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def upload_report(pid: int, file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(EDIT)):
     p = db.get(InterlabPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
@@ -331,7 +348,7 @@ def upload_report(pid: int, file: UploadFile = File(...), db: Session = Depends(
 
 
 @router.delete("/plans/{pid}/report")
-def delete_report(pid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def delete_report(pid: int, db: Session = Depends(get_db), user: User = Depends(EDIT)):
     p = db.get(InterlabPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
