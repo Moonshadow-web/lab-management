@@ -215,16 +215,17 @@ def _list_copies():
 
 
 def _best_copy_for(table: str):
-    """返回 (副本路径, 可读行数) —— 选该表可读行数最多的副本。"""
-    best_cp, best_n = None, -1
+    """返回 (副本路径, 可读行数) —— 选该表可读行数最多、且修改时间最新的副本。"""
+    best_cp, best_n, best_mt = None, -1, 0
     for cp in _list_copies():
         try:
             c = sqlite3.connect(cp)
             c.text_factory = str
             n = c.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
             c.close()
-            if n > best_n:
-                best_n, best_cp = n, cp
+            mt = os.path.getmtime(cp)
+            if n > best_n or (n == best_n and mt > best_mt):
+                best_n, best_cp, best_mt = n, cp, mt
         except Exception:  # noqa: BLE001
             pass
     return best_cp, best_n
@@ -286,6 +287,7 @@ def diag_recover_table(payload: dict, db: Session = Depends(get_db),
     """
     BLOCK = {"alembic_version", "sqlite_sequence", "refresh_tokens"}
     tables = payload.get("tables", [])
+    mode = payload.get("mode", "replace")  # replace | insert_missing
     report = []
     for t in tables:
         if t in BLOCK:
@@ -315,6 +317,8 @@ def diag_recover_table(payload: dict, db: Session = Depends(get_db),
         added = 0
         live_ids = set(r[0] for r in db.execute(text(f'SELECT "{cols[0]}" FROM "{t}"')).fetchall())
         for r in rows:
+            if mode == "insert_missing" and r[0] in live_ids:
+                continue  # 仅补缺失，不覆盖现有行（保护 password_hash 等）
             try:
                 db.execute(
                     text(f'INSERT OR REPLACE INTO "{t}" ({col_sql}) VALUES ({qmarks})'), r
