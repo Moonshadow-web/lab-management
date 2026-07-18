@@ -108,14 +108,19 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "4da3a52-selfheal-2026-07-18-cleanup"
+_BUILD_MARK = "4da3a52-selfheal-2026-07-18-audit"
 
 
 def get_build_mark() -> str:
     return _BUILD_MARK
 
 
-from fastapi import APIRouter  # noqa: E402
+from fastapi import APIRouter, Depends  # noqa: E402
+from sqlalchemy import text  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
+from ..auth import require_roles  # noqa: E402
+from ...models.user import User  # noqa: E402
+from ...core.database import get_db  # noqa: E402
 
 router = APIRouter(prefix="/_diag", tags=["diag"])
 
@@ -124,4 +129,76 @@ router = APIRouter(prefix="/_diag", tags=["diag"])
 def diag_build():
     """返回构建标记，确认当前服役容器版本（免鉴权，仅探针）。"""
     return {"build": _BUILD_MARK, "has_self_heal": True}
+
+
+@router.get("/audit-missing")
+def diag_audit_missing(db: Session = Depends(get_db),
+                       _u: User = Depends(require_roles("admin"))):
+    """只读审计：逐表比较线上库行数与所有损坏前副本(corrupt-bak/lastgood/manual-bak)的
+    可读行数，找出任何「副本里有、线上漏了」的数据。无写操作。"""
+    import glob
+
+    d = os.path.dirname(_DB_PATH)
+    pats = ["app.db.corrupt-bak-*", "app.db.lastgood", "app.db.manual-bak-*"]
+    copies = sorted(
+        set(sum((glob.glob(os.path.join(d, p)) for p in pats), [])),
+        key=lambda f: os.path.getmtime(f),
+    )
+    live_tables = [
+        r[0] for r in db.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        ).fetchall()
+    ]
+    live_counts = {}
+    for t in live_tables:
+        try:
+            live_counts[t] = db.execute(text(f'SELECT COUNT(*) FROM "{t}"')).fetchone()[0]
+        except Exception:  # noqa: BLE001
+            live_counts[t] = None
+    copy_rows = {}
+    copy_integrity = {}
+    for cp in copies:
+        base = os.path.basename(cp)
+        try:
+            c = sqlite3.connect(cp)
+            c.text_factory = str
+            copy_integrity[base] = [r[0] for r in c.execute("PRAGMA integrity_check").fetchall()]
+            tbls = [
+                r[0] for r in c.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                ).fetchall()
+            ]
+            rows = {}
+            for t in tbls:
+                try:
+                    rows[t] = c.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0]
+                except Exception as e:  # noqa: BLE001
+                    rows[t] = f"err:{e}"
+            copy_rows[base] = rows
+            c.close()
+        except Exception as e:  # noqa: BLE001
+            copy_rows[base] = {"__open_err__": str(e)}
+            copy_integrity[base] = ["open_err"]
+    missing = []
+    for t in live_tables:
+        best = None
+        best_src = None
+        for base, rows in copy_rows.items():
+            if t in rows and isinstance(rows[t], int):
+                if best is None or rows[t] > best:
+                    best = rows[t]
+                    best_src = base
+        live = live_counts.get(t)
+        if isinstance(live, int) and best is not None and best > live:
+            missing.append(
+                {"table": t, "live": live, "best_copy": best,
+                 "missing_rows": best - live, "source": best_src}
+            )
+    return {
+        "live_table_count": len(live_tables),
+        "live_counts": live_counts,
+        "copies_integrity": copy_integrity,
+        "missing": missing,
+        "copy_table_counts": copy_rows,
+    }
 
