@@ -12,6 +12,13 @@
         </div>
       </template>
 
+      <el-tabs v-model="activeTab" class="perm-tabs">
+        <el-tab-pane name="list" label="用户列表" />
+        <el-tab-pane name="matrix" label="权限矩阵" />
+      </el-tabs>
+
+      <!-- 用户列表 tab -->
+      <div v-show="activeTab === 'list'">
       <el-table :data="users" v-loading="loading" stripe size="small">
         <el-table-column prop="id" label="ID" width="50" />
         <el-table-column prop="username" label="用户名" width="120" />
@@ -23,12 +30,26 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="角色" min-width="200">
+        <el-table-column label="角色" min-width="180">
           <template #default="{ row }">
             <el-tag v-for="r in parseRoles(row.roles)" :key="r" size="small" style="margin-right: 4px; margin-bottom: 2px">
               {{ roleLabel(r) }}
             </el-tag>
             <span v-if="!row.roles && row.role" style="color: #999; font-size: 12px">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="权限概览" min-width="200">
+          <template #default="{ row }">
+            <el-tag v-if="isAdmin(row)" type="danger" size="small" effect="dark">管理员·通杀</el-tag>
+            <template v-else>
+              <span style="color: #67c23a; font-weight: 600">{{ permSummary(row).count }}</span>
+              <span style="color: #909399; font-size: 12px"> / {{ MODULES.length }} 模块</span>
+              <div style="margin-top: 4px">
+                <el-tag v-for="m in permSummary(row).mods" :key="m.key" size="small" type="success" effect="plain" style="margin-right: 3px; margin-bottom: 2px">
+                  {{ m.label }}
+                </el-tag>
+              </div>
+            </template>
           </template>
         </el-table-column>
         <el-table-column label="改密" width="60">
@@ -42,8 +63,9 @@
             <el-switch :model-value="row.is_active" @change="(v) => onToggleActive(row, v)" size="small" />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
+            <el-button size="small" text type="primary" @click="onShowPerm(row)">权限</el-button>
             <el-button size="small" text @click="onEditRoles(row)">角色</el-button>
             <el-button size="small" text @click="onEditInfo(row)">编辑</el-button>
             <el-button size="small" text type="warning" @click="onResetPwd(row)">重置密码</el-button>
@@ -60,7 +82,87 @@
         style="margin-top: 12px; justify-content: flex-end"
         @current-change="loadData"
       />
+      </div>
+
+      <!-- 权限矩阵 tab -->
+      <div v-show="activeTab === 'matrix'">
+        <div class="matrix-tip">
+          <el-icon><InfoFilled /></el-icon>
+          行 = 用户，列 = 模块；✓=可写，✗=只读。带"管"字的单元格说明此用户是该模块的负责角色。
+          <span style="margin-left: 12px">显示 {{ users.length }} / 共 {{ total }} 个用户</span>
+        </div>
+        <el-table :data="matrixRows" border size="small" style="margin-top: 8px" max-height="65vh">
+          <el-table-column prop="username" label="用户名" width="120" fixed />
+          <el-table-column prop="full_name" label="姓名" width="80" fixed />
+          <el-table-column prop="level" label="级别" width="80" fixed>
+            <template #default="{ row }">
+              <el-tag :type="row.level === 'admin' ? 'danger' : row.level === 'leader' ? 'warning' : 'info'" size="small">
+                {{ ROLE_LABELS[row.level] || row.level }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column v-for="m in MODULES" :key="m.key" :label="m.label" width="92" align="center">
+            <template #default="{ row }">
+              <span v-if="row.isAdmin" style="color: #f56c6c; font-weight: 600">管</span>
+              <span v-else-if="row.perm[m.key]" style="color: #67c23a; font-weight: 600">✓</span>
+              <span v-else style="color: #c0c4cc">—</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </el-card>
+
+    <!-- 用户权限详情 -->
+    <el-dialog v-model="showPerm" :title="`权限详情 - ${permUser?.full_name || ''}`" width="780px">
+      <div v-if="permUser" class="perm-detail">
+        <el-descriptions :column="3" border size="small" style="margin-bottom: 12px">
+          <el-descriptions-item label="用户名">{{ permUser.username }}</el-descriptions-item>
+          <el-descriptions-item label="姓名">{{ permUser.full_name }}</el-descriptions-item>
+          <el-descriptions-item label="部门">{{ permUser.department || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="级别">
+            <el-tag :type="permUser.role === 'admin' ? 'danger' : permUser.role === 'leader' ? 'warning' : 'info'" size="small">
+              {{ ROLE_LABELS[permUser.role] || permUser.role }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="角色" :span="2">
+            <el-tag v-for="r in parseRoles(permUser.roles)" :key="r" size="small" style="margin-right: 4px">{{ roleLabel(r) }}</el-tag>
+            <span v-if="!permUser.roles" style="color: #999">—</span>
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <el-alert
+          v-if="isAdmin(permUser)"
+          title="管理员通杀"
+          type="success"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+        >
+          此用户是管理员，拥有所有模块的写权限
+        </el-alert>
+        <el-alert
+          v-else
+          :title="`可写 ${permDetail.count} / ${MODULES.length} 个模块`"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+        >
+          基于角色 + 模块白名单计算；调整用户的角色（"角色"按钮）即可改变权限
+        </el-alert>
+
+        <el-table :data="permDetail.table" border size="small">
+          <el-table-column prop="label" label="模块" width="120" />
+          <el-table-column label="写权限" width="80" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.allowed" type="success" size="small">可写</el-tag>
+              <el-tag v-else type="info" size="small">只读</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="reason" label="依据" />
+        </el-table>
+      </div>
+    </el-dialog>
 
     <!-- 新增用户 -->
     <el-dialog v-model="showAdd" title="新增用户" width="480px">
@@ -142,10 +244,38 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Search, Plus } from '@element-plus/icons-vue'
+import { ref, computed, onMounted } from 'vue'
+import { Search, Plus, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listUsers, createUser, updateUser, deleteUser, resetPassword, getRoleOptions } from '../../api/users'
+
+// 模块写权限白名单（与 store/auth.js 保持一致；用户管理里要可视化展示）
+const MODULE_WRITE_ROLES = {
+  'test-items': ['admin'],
+  'documents': ['admin', 'specialty_leader'],
+  'instruments': ['admin', 'specialty_leader'],
+  'instrument-families': ['admin', 'specialty_leader'],
+  'qc': ['admin', 'qc_manager'],
+  'eqa': ['admin', 'qc_manager'],
+  'reagents': ['admin', 'reagent_manager'],
+  'training': ['admin', 'training_manager'],
+  'verification': ['admin', 'specialty_leader'],
+  'iso15189': ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader'],
+  'quality-requirements': ['admin'],
+}
+const MODULES = [
+  { key: 'test-items',          label: '项目库' },
+  { key: 'documents',           label: '文件' },
+  { key: 'instruments',         label: '仪器档案' },
+  { key: 'instrument-families', label: '仪器关联' },
+  { key: 'qc',                  label: '质控' },
+  { key: 'eqa',                 label: 'EQA' },
+  { key: 'reagents',            label: '试剂' },
+  { key: 'training',            label: '继教' },
+  { key: 'verification',        label: '性能验证' },
+  { key: 'iso15189',            label: '15189' },
+  { key: 'quality-requirements',label: '质量要求' },
+]
 
 const users = ref([])
 const loading = ref(false)
@@ -155,10 +285,13 @@ const total = ref(0)
 const searchQ = ref('')
 const roleOptions = ref([])
 const submitting = ref(false)
+const activeTab = ref('list')
 
 const showAdd = ref(false)
 const showRoles = ref(false)
 const showInfo = ref(false)
+const showPerm = ref(false)
+const permUser = ref(null)
 const editingUser = ref(null)
 
 const ROLE_LABELS = {
@@ -179,6 +312,71 @@ function roleLabel(code) {
 function parseRoles(rolesStr) {
   if (!rolesStr) return []
   return rolesStr.split(',').filter(Boolean)
+}
+
+// 把 role + roles 合并成完整角色集合（含 admin 推断）
+function fullRoles(row) {
+  const set = new Set()
+  if (row.role) set.add(row.role)
+  parseRoles(row.roles).forEach((r) => set.add(r))
+  return [...set]
+}
+
+function isAdmin(row) {
+  return !!(row && (row.role === 'admin' || fullRoles(row).includes('admin')))
+}
+
+// 单个模块的写权限判断（与 store/auth.js canWrite 逻辑一致）
+function canWriteModule(userRoles, moduleKey) {
+  if (userRoles.includes('admin')) return true
+  const allowed = MODULE_WRITE_ROLES[moduleKey]
+  if (!allowed) return true  // 未配置白名单 = 默认允许
+  return userRoles.some((r) => allowed.includes(r))
+}
+
+// 该用户能写哪些模块
+function userPerms(row) {
+  const roles = fullRoles(row)
+  const out = {}
+  for (const m of MODULES) out[m.key] = canWriteModule(roles, m.key)
+  return out
+}
+
+// 主表格"权限概览"列用：哪些模块 + 数量
+function permSummary(row) {
+  if (isAdmin(row)) return { count: MODULES.length, mods: [] }
+  const roles = fullRoles(row)
+  const allowed = MODULES.filter((m) => canWriteModule(roles, m.key))
+  return { count: allowed.length, mods: allowed }
+}
+
+// 权限矩阵 tab 用：行 = 用户
+const matrixRows = computed(() => users.value.map((row) => ({
+  ...row,
+  level: row.role,
+  isAdmin: isAdmin(row),
+  perm: userPerms(row),
+})))
+
+// 权限详情 dialog 用：行 = 模块
+const permDetail = computed(() => {
+  if (!permUser.value) return { count: 0, table: [] }
+  const roles = fullRoles(permUser.value)
+  const table = MODULES.map((m) => {
+    let reason = '无写权限（角色不在白名单）'
+    if (isAdmin(permUser.value)) reason = '管理员：所有模块通杀'
+    else if (canWriteModule(roles, m.key)) {
+      const hits = roles.filter((r) => (MODULE_WRITE_ROLES[m.key] || ['admin']).includes(r))
+      reason = `角色 ${hits.map((r) => roleLabel(r)).join(' / ')} 在「${m.label}」白名单内`
+    }
+    return { key: m.key, label: m.label, allowed: isAdmin(permUser.value) || canWriteModule(roles, m.key), reason }
+  })
+  return { count: table.filter((r) => r.allowed).length, table }
+})
+
+function onShowPerm(row) {
+  permUser.value = row
+  showPerm.value = true
 }
 
 async function loadData() {
@@ -332,4 +530,12 @@ onMounted(async () => {
 
 <style scoped>
 .card-header { display: flex; justify-content: space-between; align-items: center; }
+.perm-tabs { margin-bottom: 8px; }
+.perm-tabs :deep(.el-tabs__header) { margin-bottom: 4px; }
+.matrix-tip {
+  display: flex; align-items: center; gap: 6px;
+  background: #f5f7fa; padding: 8px 12px; border-radius: 4px;
+  color: #606266; font-size: 13px;
+}
+.perm-detail { padding: 0 4px; }
 </style>
