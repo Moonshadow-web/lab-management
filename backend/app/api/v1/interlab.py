@@ -204,6 +204,9 @@ def save_results(pid: int, body: InterlabResultsPayload, db: Session = Depends(g
     p = db.get(InterlabPlan, pid)
     if not p:
         raise HTTPException(404, "未找到计划")
+    # 防御：空载荷（无项目）时不执行「先删后插」，避免误清空已录入结果。
+    if not body.items:
+        return {"ok": True, "note": "未提供项目，已保留原有结果"}
     # 全量覆盖：删旧 levels 和 items
     for it in db.query(InterlabItem).filter_by(plan_id=pid).all():
         db.query(InterlabLevel).filter_by(item_id=it.id).delete()

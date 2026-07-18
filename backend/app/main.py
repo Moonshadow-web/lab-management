@@ -126,19 +126,17 @@ def _migrate_schema():
         except Exception:
             pass
         # 2026-07-17：interlab_items 表结构变更——移除 our_value/ref_value（改为 InterlabLevel 表）。
-        # SQLite 不支持 DROP COLUMN，采用删表重建。
-        # 关键修复：原代码 CREATE_ALL 用 bind=engine 另开连接，DROP 在 conn 未提交事务中
-        # 对新连接不可见 → 误以为表还在而跳过建表 → 提交后表消失 → 写入 500(no such table)。
-        # 现改为用同一个连接 conn 建表；且当「表缺失(len(cols)==0，上一轮误删所致)
-        # 或 检测到旧结构(our_value/ref_value 列)」时都重建，确保表一定存在。
-        # 仅当表已为「新结构且存在」时才跳过，避免容器重启清空已有比对结果。
+        # ！！重要：此迁移「绝不删除」interlab_items / interlab_levels 表，以免部署/重启清空已录入的比对结果。
+        # 采用「create_all(幂等、只建缺失表) + ALTER ADD COLUMN(补齐新列) + UPDATE(回填默认值)」的
+        # 增量方式演进 schema，保证已录入数据始终安全。
         try:
+            Base.metadata.create_all(bind=conn)
             res = conn.exec_driver_sql("PRAGMA table_info(interlab_items)")
             cols = {row[1] for row in res}
-            if len(cols) == 0 or "our_value" in cols or "ref_value" in cols:
-                conn.exec_driver_sql("DROP TABLE IF EXISTS interlab_levels")
-                conn.exec_driver_sql("DROP TABLE IF EXISTS interlab_items")
-                Base.metadata.create_all(bind=conn)
+            if "kind" not in cols:
+                conn.exec_driver_sql("ALTER TABLE interlab_items ADD COLUMN kind VARCHAR(20) NOT NULL DEFAULT '定量'")
+            if "note" not in cols:
+                conn.exec_driver_sql("ALTER TABLE interlab_items ADD COLUMN note VARCHAR(200) NOT NULL DEFAULT ''")
         except Exception:
             pass
         # 仪器替代关系：停用仪器不再作为任何家族成员（项目应挂在替代机而非停用机）。
