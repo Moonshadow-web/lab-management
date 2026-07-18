@@ -78,32 +78,24 @@
             <el-table-column type="expand">
               <template #default="{ row }">
                 <div class="lvl-editor">
-                  <div class="lvl-title">按水平设置（低浓度常用绝对偏倚，其他水平相对偏倚）</div>
-                  <table class="lvl-grid">
-                    <thead>
-                      <tr>
-                        <th>水平</th>
-                        <th v-for="lv in levelList" :key="lv">L{{ lv }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>允许偏倚</td>
-                        <td v-for="lv in levelList" :key="'te-'+lv">
-                          <el-input v-model="row.te_by_level[String(lv)]" size="small" placeholder="留空=项目级" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>偏倚方式</td>
-                        <td v-for="lv in levelList" :key="'mode-'+lv">
-                          <el-select v-model="row.mode_by_level[String(lv)]" size="small" clearable placeholder="项目级">
-                            <el-option label="相对%" value="relative" />
-                            <el-option label="绝对" value="absolute" />
-                          </el-select>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div class="lvl-title">低浓度用绝对偏倚（其他水平按项目级）</div>
+                  <el-row :gutter="12" align="middle">
+                    <el-col :span="11">
+                      <el-form-item label="靶机结果 ≤" label-width="100px" style="margin-bottom:8px">
+                        <el-input v-model="row.low_threshold" size="small" placeholder="如 3.3（留空=不启用）" />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="11">
+                      <el-form-item label="用绝对偏倚" label-width="100px" style="margin-bottom:8px">
+                        <el-input v-model="row.low_te" size="small" placeholder="如 0.2（留空=不启用）" />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                  <div class="lvl-hint">
+                    逻辑：当参考值 ≤ 「low_threshold」时，用绝对偏倚 = low_te；否则用项目级「允许偏倚」。两者都留空 → 整项目用项目级 TE。
+                    <br />
+                    示例（WS/T 403-2024 钾）："0.2 mmol/L (≤3.3 mmol/L)；6.0% (>3.3 mmol/L)" → low_threshold="3.3"、low_te="0.2"、te="6"
+                  </div>
                 </div>
               </template>
             </el-table-column>
@@ -190,16 +182,14 @@ function normItem(i) {
     te: i.te != null ? String(i.te) : '0',
     mode: i.mode || 'relative',
     instrument_ids: Array.isArray(i.instrument_ids) ? [...i.instrument_ids] : [],
-    te_by_level: i.te_by_level ? { ...i.te_by_level } : {},
-    mode_by_level: i.mode_by_level ? { ...i.mode_by_level } : {},
+    low_threshold: i.low_threshold != null ? String(i.low_threshold) : '',
+    low_te: i.low_te != null ? String(i.low_te) : '',
     __rk: (i.name || '') + '_' + Math.random().toString(36).slice(2, 8),
   }
 }
 
 function hasLevelCfg(row) {
-  const t = row.te_by_level && Object.values(row.te_by_level).some((v) => String(v || '').trim() !== '')
-  const m = row.mode_by_level && Object.values(row.mode_by_level).some((v) => !!v)
-  return !!(t || m)
+  return !!(String(row.low_threshold || '').trim() && String(row.low_te || '').trim())
 }
 
 function toggleExpand(row) {
@@ -212,25 +202,13 @@ function toggleExpand(row) {
 function addItem() {
   form.items.push({
     name: '', label: '', te: '0', mode: 'relative', instrument_ids: [],
-    te_by_level: {}, mode_by_level: {},
+    low_threshold: '', low_te: '',
     __rk: '_new_' + Math.random().toString(36).slice(2, 8),
   })
 }
 
 function onLevelsChange(newLv) {
-  // 水平数变化时清掉越界的 te/mode_by_level
-  for (const it of form.items) {
-    if (it.te_by_level) {
-      for (const k of Object.keys(it.te_by_level)) {
-        if (Number(k) > newLv) delete it.te_by_level[k]
-      }
-    }
-    if (it.mode_by_level) {
-      for (const k of Object.keys(it.mode_by_level)) {
-        if (Number(k) > newLv) delete it.mode_by_level[k]
-      }
-    }
-  }
+  // 新设计下水平数变化不需要清理 low_te/low_threshold（按参考值判定，不分水平）
 }
 
 function onOpen() {
@@ -290,15 +268,14 @@ async function onSave() {
     instrument_ids: form.instrument_ids, reference_instrument_id: form.reference_instrument_id || 0,
     levels: form.levels, sample_desc: form.sample_desc,
     items: form.items.filter((i) => i.name).map((i) => {
-      const t = { ...(i.te_by_level || {}) }
-      const m = { ...(i.mode_by_level || {}) }
-      // 清掉空值键
-      for (const k of Object.keys(t)) if (String(t[k] || '').trim() === '') delete t[k]
-      for (const k of Object.keys(m)) if (!m[k]) delete m[k]
+      const low_threshold = String(i.low_threshold || '').trim()
+      const low_te = String(i.low_te || '').trim()
       return {
-        name: i.name, label: i.label || '', te: String(i.te), mode: i.mode,
+        name: i.name, label: i.label || '',
+        te: String(i.te), mode: i.mode,
         instrument_ids: (i.instrument_ids || []).filter((x) => form.instrument_ids.includes(x)),
-        te_by_level: t, mode_by_level: m,
+        low_threshold,
+        low_te,
       }
     }),
   }
@@ -321,11 +298,6 @@ async function onSave() {
 .items-tip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .items-tip .hint { color: #909399; font-size: 12px; line-height: 1.4; }
 .lvl-editor { padding: 4px 12px 8px; }
-.lvl-title { font-size: 12px; color: #606266; margin-bottom: 6px; }
-.lvl-grid { width: 100%; border-collapse: collapse; }
-.lvl-grid th, .lvl-grid td {
-  border: 1px solid #ebeef5; padding: 4px 6px; font-size: 12px; text-align: center;
-}
-.lvl-grid th { background: #f5f7fa; }
-.lvl-grid td:first-child { background: #fafafa; text-align: right; color: #606266; }
+.lvl-title { font-size: 12px; color: #606266; margin-bottom: 6px; font-weight: 600; }
+.lvl-hint { font-size: 12px; color: #909399; line-height: 1.6; margin-top: 4px; padding: 6px 10px; background: #f5f7fa; border-radius: 4px; }
 </style>

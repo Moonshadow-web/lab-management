@@ -216,7 +216,7 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
             # 非靶机的比对仪器 → 正常计算偏倚
             for cid in compare_ids:
                 v = _load_json(r.values_json, {}).get(str(cid), "") if r else ""
-                bias, accepted = _compute_bias(ref_val, v, _resolve_te(it, lv), _resolve_mode(it, lv))
+                bias, accepted = _compute_bias(ref_val, v, _resolve_te(it, lv, ref_val), _resolve_mode(it, lv, ref_val))
                 insts[str(cid)] = {"value": v, "bias": bias, "accepted": accepted, "masked": False}
             # 其余不适用仪器 → masked（组参照仪不在 app 或其它不适用）
             for cid in [i for i in [ref_id] + compared if i != eff_ref and i not in compare_ids]:
@@ -224,8 +224,8 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
             rows.append({
                 "item": it["name"],
                 "label": it.get("label", ""),
-                "te": _resolve_te(it, lv),
-                "mode": _resolve_mode(it, lv),
+                "te": _resolve_te(it, lv, ref_val),
+                "mode": _resolve_mode(it, lv, ref_val),
                 "ref": ref_val,
                 "effective_ref_id": eff_ref,
                 "insts": insts,
@@ -251,7 +251,7 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
                 # 偏倚计算：对照该项目的实际靶机值（reference_value）
                 v = _load_json(r.values_json, {}).get(str(cid), "") if r else ""
                 ref_val = r.reference_value if r else ""
-                _, accepted = _compute_bias(r.reference_value if r else "", v, _resolve_te(it, lv), _resolve_mode(it, lv))
+                _, accepted = _compute_bias(r.reference_value if r else "", v, _resolve_te(it, lv, r.reference_value if r else ""), _resolve_mode(it, lv, r.reference_value if r else ""))
                 level_info.append({"ref": ref_val, "ok": accepted is True})
             per_item.append({"item": it["name"], "label": it.get("label", ""), "levels": level_info})
         if per_item:
@@ -889,18 +889,40 @@ QUANT_SYNONYMS = {
 _GROUP_TO_EXCEL = {v: k for k, v in QUANT_SYNONYMS.items()}
 
 
-def _resolve_te(it: dict, level: int = None):
-    """允许TE 解析：优先用分组里配置好的 te；若为空/0，则回退到内置 TE_LOOKUP
-    （含同义缩写映射，如分组 UREA → TE_LOOKUP 的 BUN=3）。保证缺配项目也能算出偏倚与判定。
+def _parse_float(s):
+    """从字符串中提取首个浮点数（如 "0.2 mmol/L" -> 0.2, "≤3.3" -> 3.3）。失败返回 None。"""
+    if s is None:
+        return None
+    m = re.search(r"-?\d+(?:\.\d+)?", str(s))
+    return float(m.group(0)) if m else None
 
-    若提供 `level`，先查 `it["te_by_level"][str(level)]`，再回退到 `it["te"]`，再 TE_LOOKUP。
+
+def _resolve_te(it: dict, level: int = None, ref_value: str = None):
+    """允许 TE 解析。
+
+    优先级：
+    1. 若传 ref_value 且 it 配置了 low_threshold + low_te，且 ref_value 数值 ≤ low_threshold，
+       返回 low_te（绝对偏倚）
+    2. it["te"] 配置的项目级 TE
+    3. 内置 TE_LOOKUP（同义缩写映射）
+    level 参数保留兼容（历史 per-level 配置已被低浓度绝对偏倚替代，但 API 仍接受）
     """
+    # 1) 低浓度绝对偏倚
+    low_th = _parse_float(it.get("low_threshold"))
+    low_te = it.get("low_te")
+    if low_th is not None and low_te is not None and str(low_te).strip() not in ("", "0", "0.0"):
+        ref_n = _parse_float(ref_value)
+        if ref_n is not None and ref_n <= low_th:
+            return str(low_te)
+    # 兼容旧 per-level 配置（若有遗留数据）
     by_lv = it.get("te_by_level") or {}
     if level is not None and str(level) in by_lv and str(by_lv.get(str(level), "")).strip() not in ("", "0", "0.0"):
         return by_lv[str(level)]
+    # 2) 项目级
     te = it.get("te")
     if str(te or "").strip() not in ("", "0", "0.0"):
         return te
+    # 3) 标准默认
     name = _norm_token(it.get("name", ""))
     up = name.upper()
     if up in TE_LOOKUP:
@@ -911,8 +933,21 @@ def _resolve_te(it: dict, level: int = None):
     return te or "0"
 
 
-def _resolve_mode(it: dict, level: int = None, default: str = "relative"):
-    """偏倚方式解析：先 `mode_by_level[str(level)]` > `mode` > default。"""
+def _resolve_mode(it: dict, level: int = None, ref_value: str = None, default: str = "relative"):
+    """偏倚方式解析。
+
+    优先级：
+    1. 若传 ref_value 且 it 配置了 low_threshold + low_te，且 ref_value 数值 ≤ low_threshold → 'absolute'
+    2. 旧 per-level 模式（兼容）
+    3. it["mode"] 项目级
+    4. default
+    """
+    low_th = _parse_float(it.get("low_threshold"))
+    low_te = it.get("low_te")
+    if low_th is not None and low_te is not None and str(low_te).strip() not in ("", "0", "0.0"):
+        ref_n = _parse_float(ref_value)
+        if ref_n is not None and ref_n <= low_th:
+            return "absolute"
     by_lv = it.get("mode_by_level") or {}
     if level is not None and str(level) in by_lv and by_lv[str(level)]:
         return by_lv[str(level)]

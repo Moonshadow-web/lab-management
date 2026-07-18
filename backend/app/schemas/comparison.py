@@ -11,18 +11,22 @@ from pydantic import BaseModel
 class GroupItem(BaseModel):
     """分组内单个比对项目：名称、允许偏倚(TE)、偏倚计算方式、适用仪器。
 
-    TE/mode 支持两级：
-    - `te` / `mode`：项目级默认（所有水平共用）
-    - `te_by_level` / `mode_by_level`：水平级覆盖（key 为水平号字符串，如 "1"/"2"）
-    解析顺序：te_by_level[str(level)] > te > TE_LOOKUP；mode_by_level[str(level)] > mode。
+    TE / mode 解析：
+    - 项目级 te + mode：默认（一般用于相对偏倚%）
+    - low_threshold + low_te：当靶机结果 ≤ low_threshold 时，用「绝对偏倚 = low_te」
+      留空或不可解析 → 不启用，按项目级 te + mode 计算
     """
     name: str
     label: str = ""  # 中文名（便于识别），name 可为项目代码
-    te: str = "0"  # 允许偏倚，数字字符串；如 "2"、"0.02"
-    mode: str = "relative"  # relative(相对%) / absolute(绝对)
-    instrument_ids: list[int] = []  # 该项目实际适用的仪器 id；空=组内全部仪器（录入/报告对不适用仪器遮蔽）
-    te_by_level: dict[str, str] = {}  # 按水平覆盖 TE，如 {"1":"绝对5","2":"10"}
-    mode_by_level: dict[str, str] = {}  # 按水平覆盖 mode，如 {"1":"absolute","2":"relative"}
+    te: str = "0"  # 项目级允许偏倚（一般用于高浓度相对%）；如 "2"、"0.02"
+    mode: str = "relative"  # relative(相对%) / absolute(绝对)，与 te 配合
+    instrument_ids: list[int] = []  # 该项目实际适用的仪器 id；空=组内全部仪器
+    # 低浓度用绝对偏倚：当参考值 ≤ low_threshold 时用绝对偏倚 = low_te
+    # 例：钾 "0.2 mmol/L (≤3.3 mmol/L)" → low_threshold="3.3", low_te="0.2"
+    #     钙 "0.1 mmol/L (≤2 mmol/L)"   → low_threshold="2",   low_te="0.1"
+    # 单位不强制，low_threshold 解析为浮点与参考值比较；low_te 直接作为绝对偏倚
+    low_threshold: str = ""  # 留空=不启用低浓度绝对偏倚
+    low_te: str = ""  # 留空=不启用低浓度绝对偏倚
 
 
 class ComparisonGroupBase(BaseModel):
