@@ -14,16 +14,16 @@ class InterlabPlanBase(BaseModel):
     year: int
     half: int = 1  # 1=上半年 2=下半年
     instrument_id: int = 0
-    reference_lab: str = ""
-    compared_instrument2: str = ""
-    compared_at: str = ""
-    operator: str = ""
-    reviewer: str = ""
-    summary: str = ""
-    conclusion: str = ""
-    handle_plan: str = ""
+    reference_lab: Optional[str] = ""
+    compared_instrument2: Optional[str] = ""
+    compared_at: Optional[str] = ""
+    operator: Optional[str] = ""
+    reviewer: Optional[str] = ""
+    summary: Optional[str] = ""
+    conclusion: Optional[str] = ""
+    handle_plan: Optional[str] = ""
     status: str = "draft"
-    report_filename: str = ""
+    report_filename: Optional[str] = ""
 
 
 class InterlabItemRow(BaseModel):
@@ -58,9 +58,9 @@ class InterlabPlanUpdate(BaseModel):
 
 class InterlabPlanRead(InterlabPlanBase):
     id: int
-    report_path: str = ""
-    compared_instrument2: str = ""
-    created_by: str = ""
+    report_path: Optional[str] = ""
+    compared_instrument2: Optional[str] = ""
+    created_by: Optional[str] = ""
     created_at: Any = None
     updated_at: Any = None
 

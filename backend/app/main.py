@@ -68,6 +68,11 @@ def _migrate_schema():
         "interlab_items": {
             "kind": "VARCHAR(20)",
         },
+        "interlab_levels": {
+            "ref2_y1": "VARCHAR(50)",
+            "ref2_y2": "VARCHAR(50)",
+            "ref2_mean": "VARCHAR(50)",
+        },
         "interlab_plans": {
             "compared_instrument2": "VARCHAR(200)",
         },
