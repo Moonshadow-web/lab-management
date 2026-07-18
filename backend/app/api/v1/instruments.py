@@ -479,3 +479,27 @@ def import_archives_folder(
         imported += 1
         matched_ids.add(matched.id)
     return {"imported": imported, "skipped": skipped, "total_files": len(files)}
+
+
+# ============ 临时诊断接口（排查线上 /instruments 500，修复后删除）============
+@router.get("/debug-raw")
+def debug_instruments_raw(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    import traceback as _tb
+    try:
+        rows = db.query(Instrument).order_by(*_instrument_order).all()
+    except Exception as e:
+        return {"stage": "query", "error": repr(e), "tb": _tb.format_exc()}
+    problems = []
+    for r in rows:
+        try:
+            InstrumentRead.model_validate(r, from_attributes=True)
+        except Exception as e:
+            problems.append({
+                "id": r.id,
+                "name": r.name,
+                "created_at": repr(r.created_at),
+                "updated_at": repr(r.updated_at),
+                "qc_instrument": repr(r.qc_instrument),
+                "error": repr(e),
+            })
+    return {"total": len(rows), "problems": problems}
