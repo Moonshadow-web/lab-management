@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import asyncio
 import logging
+import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -10,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .core.config import BACKEND_DIR, FRONTEND_ORIGIN, PROJECT_ROOT, UPLOAD_ROOT
+from .core.config import BACKEND_DIR, DB_PATH, FRONTEND_ORIGIN, PROJECT_ROOT, UPLOAD_ROOT
 from .core.database import Base, SessionLocal, engine
 from .models import *  # noqa: F401,F403 注册全部表
 from .models.test_item import TestItem
@@ -285,12 +286,35 @@ async def _background_init():
         logger.error("background init error (non-fatal, skipped): %s", e)
 
 
+def _self_heal_db():
+    """启动自愈：CFS 上 SQLite 偶发索引页损坏会导致查询 500/登录 500。
+    启动时检测 integrity_check，若损坏则 REINDEX 从完好表数据重建索引页。
+    轻量、快，不阻塞就绪探针；异常均吞掉，不影响启动。"""
+    try:
+        db_file = str(DB_PATH)
+        con = sqlite3.connect(db_file)
+        res = con.execute("PRAGMA integrity_check").fetchall()
+        if [r[0] for r in res] != ["ok"]:
+            logger.warning("DB 完整性异常，启动自愈 REINDEX: %s", res)
+            con.execute("PRAGMA writable_schema=ON")
+            con.execute("REINDEX")
+            con.commit()
+            res2 = con.execute("PRAGMA integrity_check").fetchall()
+            logger.warning("REINDEX 后 integrity_check: %s", [r[0] for r in res2])
+        else:
+            logger.info("DB integrity_check ok")
+        con.close()
+    except Exception as e:  # noqa: BLE001
+        logger.error("self-heal db failed (non-fatal): %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 同步、轻量初始化：建表 + 迁移补列（快，不阻塞就绪探针）
     try:
         Base.metadata.create_all(bind=engine)
         _migrate_schema()
+        _self_heal_db()
     except Exception as e:  # noqa: BLE001
         logger.error("init error (create_all/migrate): %s", e)
     # 重活放后台：关联打标 / 种子 / 刷新通知 / 提醒，避免启动过慢导致探针超时

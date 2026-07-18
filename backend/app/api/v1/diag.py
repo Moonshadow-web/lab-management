@@ -93,16 +93,16 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 @router.post("/db-recover")
 def diag_db_recover():
-    """恢复损坏的 SQLite：先 REINDEX 重建索引页，干净则 VACUUM 替换；
-    否则走逐表 dump 重建兜底。替换前先备份损坏文件，可回滚。
-    临时放开鉴权：DB 损坏时登录接口本身会因插入 refresh_tokens 失败而 500，
-    无法拿 token 调本接口，故允许无 token 调用（修复后将整路由删除）。"""
-    report: dict = {"db_path": _DB_PATH}
-    try:
-        engine.dispose()
-    except Exception as e:  # noqa: BLE001
-        report["engine_dispose_warn"] = repr(e)
+    """轻量恢复损坏的 SQLite（针对「仅索引页损坏、表数据完好」场景）：
+    1) 备份当前文件（可回滚）；2) 释放 ORM 连接池旧句柄；
+    3) REINDEX 重建全部索引（从完好表数据 → 修复坏掉的索引页）；
+    4) integrity_check 校验。
+    不做 VACUUM 整库复制 / 文件原子替换（CFS 上易超网关请求超时导致 504）。
+    临时放开鉴权：DB 损坏时登录接口会因插入 refresh_tokens 失败而 500，无法拿 token，
+    故允许无 token 调用（修复后将整路由删除）。"""
+    report: dict = {"db_path": _DB_PATH, "started_at": _dt.datetime.now().isoformat()}
 
+    # 0. 备份（快速，可回滚）
     ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     bak = f"{_DB_PATH}.corrupt-bak-{ts}"
     try:
@@ -111,62 +111,51 @@ def diag_db_recover():
     except Exception as e:  # noqa: BLE001
         report["backup_error"] = repr(e)
 
-    # ---- 第一步：REINDEX 全部索引（从完好表数据重建索引页）----
+    # 1. 释放 ORM 连接池（避免残留旧文件句柄）
+    try:
+        engine.dispose()
+    except Exception as e:  # noqa: BLE001
+        report["engine_dispose_warn"] = repr(e)
+
+    # 2. REINDEX 重建所有索引（从完好表数据修复索引页损坏）—— 通常几秒完成
     try:
         con = sqlite3.connect(_DB_PATH)
         con.execute("PRAGMA writable_schema=ON")
-        try:
-            con.execute("REINDEX")
-            report["reindex"] = "ok"
-        except Exception as e:  # noqa: BLE001
-            report["reindex_error"] = repr(e)
-            idxs = [r[0] for r in con.execute(
-                "SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'"
-            ).fetchall()]
-            per = {}
-            for ix in idxs:
-                try:
-                    con.execute(f'REINDEX "{ix}"')
-                    per[ix] = "ok"
-                except Exception as ex:  # noqa: BLE001
-                    per[ix] = f"fail: {ex}"
-            report["reindex_per_index"] = per
+        con.execute("REINDEX")
         con.commit()
+        report["reindex"] = "ok"
         report["integrity_after_reindex"] = [r[0] for r in con.execute("PRAGMA integrity_check").fetchall()]
         con.close()
     except Exception as e:  # noqa: BLE001
-        report["reindex_stage_error"] = repr(e)
+        report["reindex_error"] = repr(e)
+        report["integrity_after_reindex"] = None
 
-    # ---- 第二步：若已干净，VACUUM 压缩并原子替换 ----
-    if report.get("integrity_after_reindex") == ["ok"]:
+    # 3. 若 REINDEX 后仍不干净，原地 VACUUM 重写文件释放损坏页（不复制整库、不替换文件）
+    if report.get("integrity_after_reindex") != ["ok"]:
         try:
-            if os.path.exists(_RECOVERED):
-                os.remove(_RECOVERED)
+            c = sqlite3.connect(_DB_PATH)
+            c.execute("VACUUM")
+            c.close()
             c2 = sqlite3.connect(_DB_PATH)
-            c2.execute(f"VACUUM INTO '{_RECOVERED}'")
+            report["integrity_after_vacuum"] = [r[0] for r in c2.execute("PRAGMA integrity_check").fetchall()]
             c2.close()
-            v = sqlite3.connect(_RECOVERED)
-            ic2 = [r[0] for r in v.execute("PRAGMA integrity_check").fetchall()]
-            v.close()
-            if ic2 == ["ok"]:
-                _swap_in(report, _RECOVERED, "ok (reindex+vacuum)")
-                report["final_integrity"] = ic2
-                return report
-            report["vacuum_verify"] = ic2
         except Exception as e:  # noqa: BLE001
             report["vacuum_error"] = repr(e)
 
-    # ---- 兜底：逐表 dump 重建 ----
-    dump_path = "/tmp/recover_dump.db"
-    try:
-        _generic_dump_recover(_DB_PATH, dump_path, report)
-        if report.get("recovered_integrity") == ["ok"]:
-            _swap_in(report, dump_path, "ok (dump-recover)")
-        else:
-            report["swap"] = "skipped: dump 后仍不干净，保留损坏文件，请用 backup 回滚"
-    except Exception as e:  # noqa: BLE001
-        report["dump_stage_error"] = repr(e)
+    report["finished_at"] = _dt.datetime.now().isoformat()
     return report
+
+
+@router.post("/db-backup")
+def diag_db_backup():
+    """手动备份当前数据库文件到带时间戳的副本（可回滚）。免鉴权。"""
+    ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    bak = f"{_DB_PATH}.manual-bak-{ts}"
+    try:
+        shutil.copy2(_DB_PATH, bak)
+        return {"ok": True, "backup": bak, "size": os.path.getsize(bak)}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": repr(e)}
 
 
 
