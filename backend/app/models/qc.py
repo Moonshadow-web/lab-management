@@ -50,6 +50,7 @@ class QCMonthlySummary(Base):
     instrument: Mapped[str] = mapped_column(String(100), default="")  # 仪器名称（受控下拉填充）
     instrument_id: Mapped[int | None] = mapped_column(ForeignKey("instruments.id"), index=True, nullable=True)  # 关联仪器表
     instrument_no: Mapped[str] = mapped_column(String(100), default="")  # 仪器编号（dept_no）
+    operator: Mapped[str] = mapped_column(String(100), default="")  # 操作者（来自 LIS operatorPersonName，多测量取并集）
     target_mean: Mapped[float] = mapped_column(Float, default=0.0)  # 靶值
     target_sd: Mapped[float] = mapped_column(Float, default=0.0)  # 靶值SD
     target_cv: Mapped[float] = mapped_column(Float, default=0.0)  # 靶值CV%
@@ -78,6 +79,9 @@ class QCDailyValue(Base):
     value: Mapped[float] = mapped_column(Float, default=0.0)  # 测定值
     is_out_of_control: Mapped[bool] = mapped_column(default=False)  # 是否失控
     rule_violated: Mapped[str] = mapped_column(String(50), default="")  # 触发规则
+    operator: Mapped[str] = mapped_column(String(100), default="")  # 操作人（每次测量）
+    violate_reason: Mapped[str] = mapped_column(Text, default="")  # 失控原因（来自 LIS violateReason）
+    violate_deal: Mapped[str] = mapped_column(Text, default="")  # 失控处理（来自 LIS violateDeal）
 
 
 class QCMonthlyReport(Base):

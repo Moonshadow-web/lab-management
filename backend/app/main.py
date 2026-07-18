@@ -86,6 +86,14 @@ def _migrate_schema():
         "qc_target_results": {
             "manual": "BOOLEAN",
         },
+        "qc_daily_values": {
+            "operator": "VARCHAR(100)",
+            "violate_reason": "TEXT",
+            "violate_deal": "TEXT",
+        },
+        "qc_monthly_summaries": {
+            "operator": "VARCHAR(100)",
+        },
     }
     with engine.begin() as conn:
         for table, cols in alters.items():

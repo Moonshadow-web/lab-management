@@ -295,6 +295,7 @@ class QCMonthlySummaryBase(BaseModel):
     level: str = ""
     instrument: str = ""
     instrument_id: int | None = None
+    operator: str = ""
     instrument_no: str = ""
     target_mean: float = 0.0
     target_sd: float = 0.0
@@ -333,6 +334,9 @@ class QCDailyValueRead(BaseModel):
     value: float = 0.0
     is_out_of_control: bool = False
     rule_violated: str = ""
+    operator: str = ""
+    violate_reason: str = ""
+    violate_deal: str = ""
 
 
 # ---------------- QCMonthlyReport（月结文字部分） ----------------

@@ -170,24 +170,41 @@ def draft_report(instrument: str, year: int, month: int, summaries: list, daily_
         goal = _parse_goal_pct(s.quality_goal)
         dvs = daily_by_summary.get(s.id, []) or []
         rules = set()
+        ooc_details = []
         for dv in dvs:
             if dv.rule_violated:
                 for r in str(dv.rule_violated).split(";"):
                     r = r.strip()
                     if r:
                         rules.add(r)
+            if dv.is_out_of_control and (dv.violate_reason or dv.violate_deal or dv.rule_violated):
+                why = (dv.violate_reason or "").strip()
+                how = (dv.violate_deal or "").strip()
+                rule = (dv.rule_violated or "").strip()
+                seg = f"{s.test_item}({s.level}) {dv.qc_date}"
+                sub = []
+                if rule:
+                    sub.append(f"规则：{rule}")
+                if why:
+                    sub.append(f"原因：{why}")
+                if how:
+                    sub.append(f"处理：{how}")
+                ooc_details.append(seg + ("；".join(sub) if sub else ""))
         projects.append({
             "name": s.test_item, "level": s.level,
             "cv": s.cv, "target_cv": s.target_cv, "goal": goal,
             "n": s.n, "ooc": s.out_of_control_count, "rules": rules,
+            "ooc_details": ooc_details,
         })
         total_ooc += s.out_of_control_count
 
     # 一、仪器运行情况
     if total_ooc > 0:
+        all_details = [d for p in projects for d in p["ooc_details"]]
+        reason_text = ("失控明细：" + "；".join(all_details) + "。") if all_details else ""
         operation_status = (
             f"本月共出现 {total_ooc} 个失控点，均按 Westgard 规则判定并处置"
-            f"（详见各项目失控处理说明），处置后已恢复在控；仪器总体运行正常。"
+            f"{('，' + reason_text) if reason_text else ''}处置后已恢复在控；仪器总体运行正常。"
         )
     else:
         operation_status = "本仪器本月运行正常，各项质控在控，未出现失控。"

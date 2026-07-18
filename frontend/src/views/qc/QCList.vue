@@ -139,6 +139,7 @@
               <template #default="{ row }">{{ fmtPct(row.in_control_rate * 100) }}</template>
             </el-table-column>
             <el-table-column prop="quality_goal" label="质量目标" width="120" />
+            <el-table-column prop="operator" label="操作人" width="160" show-overflow-tooltip />
             <el-table-column label="操作" width="120" fixed="right">
               <template #default="{ row }">
                 <el-button v-if="auth.canWrite('qc')" size="small" type="danger" plain @click="delSummary(row)">删除</el-button>

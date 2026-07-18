@@ -75,6 +75,10 @@ _COLUMN_ALIASES = {
     "value": ["测值", "测定值", "浓度", "value", "结果", "result"],
     "target_mean": ["靶值", "定值", "靶值均值", "target", "target_mean", "averagevalue"],
     "target_sd": ["靶值sd", "靶值sd", "sd", "标准差", "target_sd", "standarddeviation"],
+    # 失控元数据（来自 LIS 导出）：operatorPersonName→操作人，violateReason→失控原因，violateDeal→失控处理
+    "operator": ["操作人", "操作者", "operator", "operatorpersonname", "operatorname", "检验者"],
+    "violate_reason": ["失控原因", "violatereason", "失控理由", "reason"],
+    "violate_deal": ["失控处理", "violatedeal", "处理", "deal", "处置"],
 }
 
 
@@ -282,7 +286,10 @@ def upload_qc_summary(
         key = (d.year, d.month, ti, lot, lvl, inst)
         groups.setdefault(key, [])
         groups[key].append(v)
-        daily_meta.setdefault(key, []).append((d.strftime("%Y-%m-%d"), v))
+        op = (get("operator") or "").strip()
+        vreason = (get("violate_reason") or "").strip()
+        vdeal = (get("violate_deal") or "").strip()
+        daily_meta.setdefault(key, []).append((d.strftime("%Y-%m-%d"), v, op, vreason, vdeal))
         if key not in meta:
             meta[key] = {
                 "unit": (get("unit") or "").strip(),
@@ -341,8 +348,22 @@ def upload_qc_summary(
         db.flush()
         # 重写每日测值（daily_meta[key] 与 values 同序，索引对齐 ooc）
         db.query(QCDailyValue).filter_by(summary_id=summ.id).delete()
-        for idx, (qc_date, val) in enumerate(daily_meta[key]):
+        operators = set()
+        ooc_details = []
+        for idx, (qc_date, val, op, vreason, vdeal) in enumerate(daily_meta[key]):
             rule = agg["ooc"].get(idx, "")
+            if op:
+                operators.add(op)
+            if rule:
+                parts = []
+                if vreason:
+                    parts.append(f"原因：{vreason}")
+                if vdeal:
+                    parts.append(f"处理：{vdeal}")
+                detail = f"{qc_date} {test_item}({level}) 失控「{rule}」"
+                if parts:
+                    detail += "；" + "；".join(parts)
+                ooc_details.append(detail)
             db.add(
                 QCDailyValue(
                     summary_id=summ.id,
@@ -350,8 +371,13 @@ def upload_qc_summary(
                     value=val,
                     is_out_of_control=bool(rule),
                     rule_violated=rule,
+                    operator=(op or ""),
+                    violate_reason=(vreason or "") if rule else "",
+                    violate_deal=(vdeal or "") if rule else "",
                 )
             )
+        summ.operator = "、".join(sorted(operators))
+        summ.handling_note = "\n".join(ooc_details)
         items.append({
             "id": summ.id, "year": year, "month": month, "test_item": test_item,
             "lot_no": lot_no, "level": level, "instrument": instrument,
