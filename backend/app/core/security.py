@@ -87,6 +87,7 @@ ROLE_LABELS = {
     "biosafety_officer": "生物安全员",
     "it_manager": "信息管理员",
     "staff": "职工",
+    "technical_support": "技术支持",
 }
 
 

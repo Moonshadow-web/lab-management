@@ -178,6 +178,7 @@
             <el-option label="管理员 admin" value="admin" />
             <el-option label="组长 leader" value="leader" />
             <el-option label="职工 member" value="member" />
+            <el-option label="技术支持 technical_support" value="technical_support" />
           </el-select>
         </el-form-item>
         <el-form-item label="角色">
@@ -207,6 +208,7 @@
             <el-option label="管理员 admin" value="admin" />
             <el-option label="组长 leader" value="leader" />
             <el-option label="职工 member" value="member" />
+            <el-option label="技术支持 technical_support" value="technical_support" />
           </el-select>
         </el-form-item>
         <el-form-item label="角色">

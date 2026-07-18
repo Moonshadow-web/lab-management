@@ -22,6 +22,7 @@ ROLE_OPTIONS = [
     {"code": "biosafety_officer", "label": "生物安全员"},
     {"code": "it_manager", "label": "信息管理员"},
     {"code": "staff", "label": "职工"},
+    {"code": "technical_support", "label": "技术支持"},
 ]
 
 
