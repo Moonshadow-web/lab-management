@@ -2,7 +2,7 @@
  * 试剂管理模块 API 调用
  */
 
-import request from '../api/request'
+import request from '../utils/request'
 
 // ── 试剂目录 ──
 export function listReagentItems(params) {
