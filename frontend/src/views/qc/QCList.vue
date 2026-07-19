@@ -151,6 +151,58 @@
               下载 Word (A4 横向)
             </el-button>
           </div>
+
+          <!-- 多水平质控速览（左：水平下拉；下：每日多水平状态） -->
+          <div v-if="g.rows && g.rows.length > 1" class="multilevel-box">
+            <div class="multilevel-head">
+              <span class="multilevel-title">多水平质控速览</span>
+              <el-select
+                v-model="multiLevelMap[g.key]"
+                placeholder="选择水平"
+                style="width: 160px"
+                size="small"
+              >
+                <el-option label="全部水平" value="__all__" />
+                <el-option
+                  v-for="lv in groupLevels(g)"
+                  :key="lv"
+                  :label="`${lv}水平`"
+                  :value="lv"
+                />
+              </el-select>
+            </div>
+            <table class="multilevel-table">
+              <thead>
+                <tr>
+                  <th class="date-col">日期</th>
+                  <th
+                    v-for="lv in displayLevels(g)"
+                    :key="`h-${lv}`"
+                    class="level-col"
+                  >{{ lv }}水平</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in multiLevelByDate(g)" :key="row.date">
+                  <td class="date-col">{{ row.date }}</td>
+                  <td
+                    v-for="lv in displayLevels(g)"
+                    :key="`c-${lv}-${row.date}`"
+                    class="level-col"
+                  >
+                    <template v-if="row.levels[lv]">
+                      <el-tag v-if="row.levels[lv].is_out_of_control" type="danger" size="small">
+                        失控 {{ row.levels[lv].rule_violated }}
+                      </el-tag>
+                      <el-tag v-else type="success" size="small">在控</el-tag>
+                      <div class="ml-val">{{ fmtNum(row.levels[lv].value) }}</div>
+                    </template>
+                    <span v-else class="text-muted">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </el-tab-pane>
 
@@ -193,24 +245,8 @@
               :value="opt.value"
             />
           </el-select>
-          <el-select
-            v-model="chartSelectedLevels"
-            multiple
-            collapse-tags
-            placeholder="全部水平"
-            style="width: 180px"
-            :disabled="!chartLevelOptions.length"
-            @change="onChartLevelChange"
-          >
-            <el-option
-              v-for="lv in chartLevelOptions"
-              :key="lv"
-              :label="`${lv}水平`"
-              :value="lv"
-            />
-          </el-select>
           <el-button :disabled="!chartProject" :loading="chartLoading" @click="loadChartData">查看质控图</el-button>
-          <span class="hint">选择一个项目，再勾选要显示的水平（默认全部），同一张 LJ 图用不同颜色区分多水平。</span>
+          <span class="hint">选择项目后同一张 LJ 图用不同颜色区分多水平；每月多水平状态见左侧表格。</span>
         </div>
 
         <div v-if="!chartProject" class="empty-tip">请选择年月、仪器和项目后查看质控图。</div>
@@ -768,6 +804,48 @@ const uploadInstrumentId = ref(null)   // 上传时选定的受控仪器
 const csvInput = ref(null)
 const reportMap = reactive({})         // blockKey -> 文字报告对象
 
+// 多水平质控速览：blockKey -> 选中的水平（'__all__' 表示全部）
+const multiLevelMap = reactive({})
+
+function groupLevels(g) {
+  // 从该仪器分块下的所有 summary 提取去重水平，保持出现顺序
+  const seen = new Set()
+  const out = []
+  for (const r of g.rows || []) {
+    const lv = r.level || ''
+    if (lv && !seen.has(lv)) { seen.add(lv); out.push(lv) }
+  }
+  return out
+}
+
+function displayLevels(g) {
+  const sel = multiLevelMap[g.key]
+  if (!sel || sel === '__all__') return groupLevels(g)
+  // 只显示选中的水平
+  return groupLevels(g).filter((lv) => lv === sel)
+}
+
+function multiLevelByDate(g) {
+  // 汇总每日×水平的在控/失控状态；只对当前 displayLevels 输出
+  const lvSet = new Set(displayLevels(g))
+  const byDate = new Map()
+  for (const r of g.rows || []) {
+    if (!lvSet.has(r.level)) continue
+    const dvals = r._daily || []
+    for (const dv of dvals) {
+      const date = (dv.qc_date || '').slice(0, 10)
+      if (!date) continue
+      if (!byDate.has(date)) byDate.set(date, { date, levels: {} })
+      byDate.get(date).levels[r.level] = {
+        value: dv.value,
+        is_out_of_control: !!dv.is_out_of_control,
+        rule_violated: dv.rule_violated || '',
+      }
+    }
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
+
 // CZ-012 月小结预览 / Word 下载
 const docxPreview = ref(false)
 const docxGroup = ref(null)
@@ -781,8 +859,37 @@ const docxInst = computed(() => {
 })
 const docxReport = computed(() => (docxGroup.value ? (reportMap[docxGroup.value.key] || {}) : {}))
 function openDocxPreview(g) {
-  docxGroup.value = g
+  // 防御：若该分块还没加载过文字报告，先异步拉一次确保有数据
+  if (!g) {
+    ElMessage.warning('未选中月结分块')
+    return
+  }
+  if (!docxGroup.value || docxGroup.value.key !== g.key) {
+    docxGroup.value = g
+  }
   docxPreview.value = true
+  // 异步补齐文字报告（若 reportMap 中没有该分块的报告对象）
+  const cur = reportMap[g.key]
+  if (!cur) {
+    loadReportFor(g).catch((e) => {
+      console.error('loadReportFor 失败', e)
+    })
+  }
+}
+
+async function loadReportFor(g) {
+  // 拉取该 (instrument_id, year, month) 的文字报告（不存在则后端自动草拟）
+  if (!g || !g.rows || !g.rows.length) return
+  const instId = g.rows[0]?.instrument_id
+  const { year, month } = parseMonth()
+  if (!year || !month) return
+  try {
+    const rep = await getQCReport(instId || null, year, month)
+    if (rep) reportMap[g.key] = { ...(rep || {}), _saving: false, _docxing: false }
+  } catch (e) {
+    console.error('getQCReport 失败', e)
+    ElMessage.error('加载文字报告失败：' + (e.response?.data?.detail || e.message))
+  }
 }
 async function downloadDocx(g) {
   const grp = g || docxGroup.value
@@ -2294,4 +2401,22 @@ watch(activeTab, (t) => {
 .level-cell { display: flex; flex-direction: column; gap: 2px; }
 .level-cell .level-val { font-weight: 500; }
 .text-muted { color: #c0c4cc; }
+
+/* 多水平质控速览（室内质控月结界面） */
+.multilevel-box {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  border-radius: 6px;
+}
+.multilevel-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.multilevel-title { font-weight: 600; color: #5b4500; }
+.multilevel-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.multilevel-table th,
+.multilevel-table td { border: 1px solid #ffe58f; padding: 6px 10px; text-align: center; }
+.multilevel-table th { background: #fff7d6; color: #5b4500; }
+.multilevel-table .date-col { min-width: 100px; font-weight: 600; background: #fffbe6; }
+.multilevel-table .level-col { min-width: 140px; }
+.multilevel-table .ml-val { font-size: 12px; color: #606266; margin-top: 2px; }
 </style>
