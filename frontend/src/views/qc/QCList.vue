@@ -146,62 +146,9 @@
             <el-button type="primary" size="small" :loading="reportMap[g.key]._saving" @click="saveReport(g)">
               保存总结文字
             </el-button>
-            <el-button size="small" @click="openDocxPreview(g)">预览月小结</el-button>
             <el-button type="success" size="small" :loading="reportMap[g.key]._docxing" @click="downloadDocx(g)">
               下载 Word (A4 横向)
             </el-button>
-          </div>
-
-          <!-- 多水平质控速览（左：水平下拉；下：每日多水平状态） -->
-          <div v-if="g.rows && g.rows.length > 1" class="multilevel-box">
-            <div class="multilevel-head">
-              <span class="multilevel-title">多水平质控速览</span>
-              <el-select
-                v-model="multiLevelMap[g.key]"
-                placeholder="选择水平"
-                style="width: 160px"
-                size="small"
-              >
-                <el-option label="全部水平" value="__all__" />
-                <el-option
-                  v-for="lv in groupLevels(g)"
-                  :key="lv"
-                  :label="`${lv}水平`"
-                  :value="lv"
-                />
-              </el-select>
-            </div>
-            <table class="multilevel-table">
-              <thead>
-                <tr>
-                  <th class="date-col">日期</th>
-                  <th
-                    v-for="lv in displayLevels(g)"
-                    :key="`h-${lv}`"
-                    class="level-col"
-                  >{{ lv }}水平</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in multiLevelByDate(g)" :key="row.date">
-                  <td class="date-col">{{ row.date }}</td>
-                  <td
-                    v-for="lv in displayLevels(g)"
-                    :key="`c-${lv}-${row.date}`"
-                    class="level-col"
-                  >
-                    <template v-if="row.levels[lv]">
-                      <el-tag v-if="row.levels[lv].is_out_of_control" type="danger" size="small">
-                        失控 {{ row.levels[lv].rule_violated }}
-                      </el-tag>
-                      <el-tag v-else type="success" size="small">在控</el-tag>
-                      <div class="ml-val">{{ fmtNum(row.levels[lv].value) }}</div>
-                    </template>
-                    <span v-else class="text-muted">—</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
           </div>
         </div>
       </el-tab-pane>
@@ -587,34 +534,6 @@
           </div>
         </el-dialog>
 
-        <!-- CZ-012 月小结预览（HTML，与 Word 版一致） -->
-        <el-dialog v-model="docxPreview" title="月小结预览（与 Word 版一致）" width="92%" top="3vh">
-          <div class="docx-preview" v-if="docxGroup">
-            <h2 class="prev-title">{{ docxYear }}年{{ String(docxMonth).padStart(2, '0') }}月　仪器：{{ docxInst }}</h2>
-            <table class="prev-table">
-              <tr>
-                <th>项目</th><th>质控批号</th><th>单位</th><th>水平</th><th>靶值</th><th>靶值SD</th>
-                <th>靶值CV%</th><th>均值</th><th>SD</th><th>CV%</th><th>n</th><th>失控数</th><th>在控率</th><th>质量目标</th>
-              </tr>
-              <tr v-for="r in docxGroup.rows" :key="r.id">
-                <td>{{ r.test_item }}</td><td>{{ r.lot_no }}</td><td>{{ r.unit }}</td><td>{{ r.level }}</td>
-                <td>{{ fmtNum(r.target_mean) }}</td><td>{{ fmtNum(r.target_sd) }}</td><td>{{ r.target_cv?.toFixed(2) }}%</td>
-                <td>{{ fmtNum(r.mean) }}</td><td>{{ fmtNum(r.sd) }}</td><td>{{ r.cv?.toFixed(2) }}%</td>
-                <td>{{ r.n }}</td><td>{{ r.out_of_control_count }}</td><td>{{ (r.in_control_rate * 100).toFixed(1) }}%</td><td>{{ r.quality_goal }}</td>
-              </tr>
-            </table>
-            <h3>文字部分</h3>
-            <p><b>一、仪器运行情况：</b>{{ (docxReport.operation_status || '（未填写）') }}</p>
-            <p><b>二、各项目是否出现漂移或趋势性改变：</b>{{ (docxReport.drift_trend || '（未填写）') }}</p>
-            <p><b>三、各项目CV%设置是否达标：</b>{{ (docxReport.cv_setting_ok || '（未填写）') }}</p>
-            <p><b>四、各项目计算CV%是否达标：</b>{{ (docxReport.cv_calc_ok || '（未填写）') }}</p>
-            <p><b>五、各项目质控频次是否达标：</b>{{ (docxReport.freq_ok || '（未填写）') }}</p>
-            <div class="prev-foot">
-              <el-button type="success" :loading="docxDownloading" @click="downloadDocx(docxGroup)">下载 Word (A4 横向打印)</el-button>
-            </div>
-          </div>
-        </el-dialog>
-
         <!-- 录入结果（样本×项目矩阵 + 双人签字审核单打印） -->
         <el-dialog
           v-model="resultDialog"
@@ -804,106 +723,20 @@ const uploadInstrumentId = ref(null)   // 上传时选定的受控仪器
 const csvInput = ref(null)
 const reportMap = reactive({})         // blockKey -> 文字报告对象
 
-// 多水平质控速览：blockKey -> 选中的水平（'__all__' 表示全部）
-const multiLevelMap = reactive({})
-
-function groupLevels(g) {
-  // 从该仪器分块下的所有 summary 提取去重水平，保持出现顺序
-  const seen = new Set()
-  const out = []
-  for (const r of g.rows || []) {
-    const lv = r.level || ''
-    if (lv && !seen.has(lv)) { seen.add(lv); out.push(lv) }
-  }
-  return out
-}
-
-function displayLevels(g) {
-  const sel = multiLevelMap[g.key]
-  if (!sel || sel === '__all__') return groupLevels(g)
-  // 只显示选中的水平
-  return groupLevels(g).filter((lv) => lv === sel)
-}
-
-function multiLevelByDate(g) {
-  // 汇总每日×水平的在控/失控状态；只对当前 displayLevels 输出
-  const lvSet = new Set(displayLevels(g))
-  const byDate = new Map()
-  for (const r of g.rows || []) {
-    if (!lvSet.has(r.level)) continue
-    const dvals = r._daily || []
-    for (const dv of dvals) {
-      const date = (dv.qc_date || '').slice(0, 10)
-      if (!date) continue
-      if (!byDate.has(date)) byDate.set(date, { date, levels: {} })
-      byDate.get(date).levels[r.level] = {
-        value: dv.value,
-        is_out_of_control: !!dv.is_out_of_control,
-        rule_violated: dv.rule_violated || '',
-      }
-    }
-  }
-  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
-}
-
-// CZ-012 月小结预览 / Word 下载
-const docxPreview = ref(false)
-const docxGroup = ref(null)
+// CZ-012 Word 下载
 const docxDownloading = ref(false)
-const docxYear = computed(() => { const { year } = parseMonth(); return year || '—' })
-const docxMonth = computed(() => { const { month } = parseMonth(); return month || 0 })
-const docxInst = computed(() => {
-  const g = docxGroup.value
-  if (!g) return ''
-  return g.instrument || '—' + (g.deptNo ? '（编号：' + g.deptNo + '）' : '')
-})
-const docxReport = computed(() => (docxGroup.value ? (reportMap[docxGroup.value.key] || {}) : {}))
-function openDocxPreview(g) {
-  // 防御：若该分块还没加载过文字报告，先异步拉一次确保有数据
-  if (!g) {
-    ElMessage.warning('未选中月结分块')
-    return
-  }
-  if (!docxGroup.value || docxGroup.value.key !== g.key) {
-    docxGroup.value = g
-  }
-  docxPreview.value = true
-  // 异步补齐文字报告（若 reportMap 中没有该分块的报告对象）
-  const cur = reportMap[g.key]
-  if (!cur) {
-    loadReportFor(g).catch((e) => {
-      console.error('loadReportFor 失败', e)
-    })
-  }
-}
-
-async function loadReportFor(g) {
-  // 拉取该 (instrument_id, year, month) 的文字报告（不存在则后端自动草拟）
-  if (!g || !g.rows || !g.rows.length) return
-  const instId = g.rows[0]?.instrument_id
-  const { year, month } = parseMonth()
-  if (!year || !month) return
-  try {
-    const rep = await getQCReport(instId || null, year, month)
-    if (rep) reportMap[g.key] = { ...(rep || {}), _saving: false, _docxing: false }
-  } catch (e) {
-    console.error('getQCReport 失败', e)
-    ElMessage.error('加载文字报告失败：' + (e.response?.data?.detail || e.message))
-  }
-}
 async function downloadDocx(g) {
-  const grp = g || docxGroup.value
-  if (!grp) return
+  if (!g) return
   const { year, month } = parseMonth()
-  const rep = reportMap[grp.key]
+  const rep = reportMap[g.key]
   if (rep) rep._docxing = true
   docxDownloading.value = true
   try {
-    const blob = await exportQCReportDocx(year, month, grp.rows[0]?.instrument_id || undefined)
+    const blob = await exportQCReportDocx(year, month, g.rows[0]?.instrument_id || undefined)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    const instId = grp.rows[0]?.instrument_id
+    const instId = g.rows[0]?.instrument_id
     a.download = `室内质控月小结_${year}年${String(month).padStart(2, '0')}月${instId ? '_' + instId : ''}.docx`
     a.click()
     URL.revokeObjectURL(url)
@@ -1113,25 +946,29 @@ function renderChart(rows) {
     })
     // 为每个水平添加均值/SD 参考线（仅首个水平显示在图例，避免重复）
     if (tm && ts) {
+      // 警告限=±2SD（黄色虚线）、失控限=±3SD（红色虚线）、均值=实线
       const refs = [
-        { value: tm, label: `${lv} 均值` },
-        { value: tm + ts, label: `${lv} +1SD` },
-        { value: tm - ts, label: `${lv} -1SD` },
-        { value: tm + 2 * ts, label: `${lv} +2SD` },
-        { value: tm - 2 * ts, label: `${lv} -2SD` },
-        { value: tm + 3 * ts, label: `${lv} +3SD` },
-        { value: tm - 3 * ts, label: `${lv} -3SD` },
+        { value: tm, label: `${lv} 均值`, kind: 'mean' },
+        { value: tm + ts, label: `${lv} +1SD`, kind: 'sd' },
+        { value: tm - ts, label: `${lv} -1SD`, kind: 'sd' },
+        { value: tm + 2 * ts, label: `${lv} +2SD 警告限`, kind: 'warn' },
+        { value: tm - 2 * ts, label: `${lv} -2SD 警告限`, kind: 'warn' },
+        { value: tm + 3 * ts, label: `${lv} +3SD 失控限`, kind: 'ooc' },
+        { value: tm - 3 * ts, label: `${lv} -3SD 失控限`, kind: 'ooc' },
       ]
-      refs.forEach((ref, ridx) => {
+      refs.forEach((ref) => {
+        const styleMap = {
+          mean: { type: 'solid', width: 1.8, color },
+          sd:   { type: 'dashed', width: 1, color: '#aaa' },
+          warn: { type: 'dashed', width: 1.4, color: '#faad14' },
+          ooc:  { type: 'dashed', width: 1.6, color: '#f5222d' },
+        }
+        const s = styleMap[ref.kind]
         markLineData.push({
           yAxis: ref.value,
           name: ref.label,
-          lineStyle: {
-            type: ridx === 0 ? 'solid' : 'dashed',
-            width: ridx === 0 ? 1.5 : 1,
-            color,
-          },
-          label: { formatter: ref.label, position: 'insideEndTop', fontSize: 10, color },
+          lineStyle: s,
+          label: { formatter: ref.label, position: 'insideEndTop', fontSize: 10, color: s.color },
         })
       })
     }
@@ -1189,11 +1026,28 @@ function renderChart(rows) {
     },
     legend: { data: levels, top: 30 },
     grid: { left: '8%', right: '5%', bottom: '10%', top: '18%', containLabel: true },
-    xAxis: { type: 'category', data: allDates, name: '日期' },
+    xAxis: {
+      type: 'category',
+      data: allDates,
+      name: '日期',
+      // 限制 x 轴到最后一个数据点，避免参考线/截止标记延伸到右侧空白区
+      min: 0,
+      max: allDates.length - 1,
+      axisLabel: { rotate: allDates.length > 15 ? 45 : 0 },
+    },
     yAxis: { type: 'value', name: yAxisName, scale: true },
     series,
   }
   if (markLineData.length) {
+    // 截止点：最后一个日期画一条垂直线，标记当月数据截止
+    if (allDates.length) {
+      markLineData.push({
+        xAxis: allDates[allDates.length - 1],
+        name: '截止点',
+        lineStyle: { type: 'solid', width: 1.5, color: '#52c41a' },
+        label: { formatter: '截止点', position: 'end', fontSize: 11, color: '#52c41a' },
+      })
+    }
     option.series.push({
       type: 'line',
       data: [],
@@ -2401,22 +2255,4 @@ watch(activeTab, (t) => {
 .level-cell { display: flex; flex-direction: column; gap: 2px; }
 .level-cell .level-val { font-weight: 500; }
 .text-muted { color: #c0c4cc; }
-
-/* 多水平质控速览（室内质控月结界面） */
-.multilevel-box {
-  margin-top: 10px;
-  padding: 12px 14px;
-  background: #fffbe6;
-  border: 1px solid #ffe58f;
-  border-radius: 6px;
-}
-.multilevel-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
-.multilevel-title { font-weight: 600; color: #5b4500; }
-.multilevel-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.multilevel-table th,
-.multilevel-table td { border: 1px solid #ffe58f; padding: 6px 10px; text-align: center; }
-.multilevel-table th { background: #fff7d6; color: #5b4500; }
-.multilevel-table .date-col { min-width: 100px; font-weight: 600; background: #fffbe6; }
-.multilevel-table .level-col { min-width: 140px; }
-.multilevel-table .ml-val { font-size: 12px; color: #606266; margin-top: 2px; }
 </style>

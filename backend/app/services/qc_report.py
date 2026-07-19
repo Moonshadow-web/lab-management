@@ -100,32 +100,32 @@ def build_docx(out_path, summaries, report, instrument_name, instrument_no, year
         _run_font(p.add_run(label + "："), 11, bold=True)
         _run_font(p.add_run(text or "（未填写）"), 11)
 
-    # 落款/签字审批区（右下方）
+    # 落款/签字审批区（左对齐，2026-07-19 调整：去除"签字"二字，改为普通落款）
     # 仪器日常管理人
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     p.paragraph_format.space_before = Pt(12)
-    _run_font(p.add_run("仪器日常管理人：签字"), 11)
+    _run_font(p.add_run("仪器日常管理人："), 11)
 
     # 质控总负责人审批意见（标签 + 空行）
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     p.paragraph_format.space_before = Pt(8)
     _run_font(p.add_run("质控总负责人审批意见："), 11)
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     _run_font(p.add_run(""), 11)
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     _run_font(p.add_run(""), 11)
 
-    # 审批人签字 + 年月日
+    # 审批人 + 年月日
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     p.paragraph_format.space_before = Pt(8)
-    _run_font(p.add_run("审批人签字："), 11)
+    _run_font(p.add_run("审批人："), 11)
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     _run_font(p.add_run("年    月    日"), 11)
 
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
