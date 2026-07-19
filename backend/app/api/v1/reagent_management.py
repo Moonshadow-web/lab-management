@@ -437,7 +437,7 @@ def calculate_consumption(
 def import_reagent_from_excel(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
-    _file: UploadFile = File(...),
+    file: UploadFile = File(...),
 ):
     """从 Excel 导入试剂目录（要求：第1行表头，需含 'name' 或 '试剂名称' 列）。"""
     result = ImportResult()
@@ -445,7 +445,7 @@ def import_reagent_from_excel(
         import openpyxl
     except ImportError:
         raise HTTPException(400, "服务端未安装 openpyxl，无法处理 Excel")
-    wb = openpyxl.load_workbook(_file.file)
+    wb = openpyxl.load_workbook(file.file)
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
