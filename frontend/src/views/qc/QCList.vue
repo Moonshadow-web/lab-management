@@ -891,6 +891,8 @@ function renderChart(rows) {
   const series = []
   const markLineData = []
   let yAxisName = '测值'
+  // 是否用 SDI（多水平且靶值差异大时自动切换）；必须先定义，forEach 回调中的 overPoints 逻辑需要它
+  const useSDI = levels.length > 1 && chartData.value.length > 0
 
   levels.forEach((lv, idx) => {
     const data = byLevel[lv]
@@ -981,8 +983,6 @@ function renderChart(rows) {
     }
   })
 
-  // 若多水平且靶值差异大，用标准差指数（SDI）统一坐标更直观
-  const useSDI = levels.length > 1 && chartData.value.length > 0
   if (useSDI) {
     yAxisName = '标准差指数 (SDI)'
     // 重新计算 SDI 序列
