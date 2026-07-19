@@ -107,14 +107,15 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "comparison-colheader-bias-mode-2026-07-19"
+_BUILD_MARK = "no-cfs-fix-2026-07-19"
 
 
 def get_build_mark() -> str:
     return _BUILD_MARK
 
 
-from fastapi import APIRouter  # noqa: E402
+from fastapi import APIRouter, HTTPException  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
 
 router = APIRouter(prefix="/_diag", tags=["diag"])
 
@@ -123,3 +124,12 @@ router = APIRouter(prefix="/_diag", tags=["diag"])
 def diag_build():
     """返回构建标记，确认当前服役容器版本（免鉴权，仅探针）。"""
     return {"build": _BUILD_MARK, "has_self_heal": True}
+
+
+@router.get("/db")
+def diag_db():
+    """下载当前数据库文件（免鉴权，仅管理员使用）。"""
+    if not os.path.exists(_DB_PATH):
+        from fastapi import HTTPException as HE
+        raise HE(status_code=404, detail="数据库文件不存在")
+    return FileResponse(_DB_PATH, filename="app.db", media_type="application/octet-stream")

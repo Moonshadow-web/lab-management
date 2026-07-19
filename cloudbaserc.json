@@ -1,0 +1,37 @@
+{
+  "version": "2.0",
+  "envId": "cloud1-0gjhamv53ff2298d",
+  "workspaces": {
+    "default": {
+      "host": "run",
+      "containers": [
+        {
+          "name": "lab-management",
+          "path": "/",
+          "port": 8080,
+          "buildType": "dockerfile",
+          "dockerfilePath": "./Dockerfile",
+          "cpu": 1,
+          "mem": 2048,
+          "minNum": 1,
+          "maxNum": 1,
+          "policyType": "cpu",
+          "policyThreshold": 60,
+          "envs": {
+            "SECRET_KEY": "923fc5168b97f6cde072ae078aac3db8ce4cbef562ecb623523a8e34bd9bc78b",
+            "FRONTEND_ORIGIN": "https://lab-management.tcloudbaseapp.com",
+            "SMTP_HOST": "smtp.qq.com",
+            "SMTP_PORT": "465",
+            "SMTP_USER": "815268425@qq.com",
+            "SMTP_PASS": "ejrgnmwzoigsbfjd",
+            "MAIL_FROM": "815268425@qq.com"
+          },
+          "volumes": []
+        }
+      ]
+    }
+  },
+  "cloudrun": {
+    "name": "lab-management"
+  }
+}
