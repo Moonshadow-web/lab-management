@@ -385,7 +385,13 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
                     bias = c.get("bias"); acc = c.get("accepted")
                     bias = c.get("bias")
                     acc = c.get("accepted")
-                    bias_s = f"{bias}%" if bias is not None else "-"
+                    if bias is None:
+                        bias_s = "-"
+                    elif r.get("mode") == "absolute":
+                        # 绝对偏倚（如靶机值<10/低浓度）：报告上明确标注，区别于相对%
+                        bias_s = f"{bias}（绝对偏倚）"
+                    else:
+                        bias_s = f"{bias}%"
                     acc_cls = "yes" if acc is True else ("no" if acc is False else "")
                     acc_s = {True: "Y", False: "N", None: "-"}[acc]
                     html.append(f'<td>{c.get("value","")}</td><td>{bias_s}</td><td class="{acc_cls}">{acc_s}</td>')
@@ -709,7 +715,13 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
                         _fill(cells[ci + 1], "参照", size=9, color=RGBColor(0x40, 0x9e, 0xff));
                         _fill(cells[ci + 2], "—", size=9)
                     bias = c.get("bias"); acc = c.get("accepted")
-                    bias_s = f"{bias}%" if bias is not None else "-"
+                    if bias is None:
+                        bias_s = "-"
+                    elif r.get("mode") == "absolute":
+                        # 绝对偏倚（如靶机值<10/低浓度）：报告上明确标注，区别于相对%
+                        bias_s = f"{bias}（绝对偏倚）"
+                    else:
+                        bias_s = f"{bias}%"
                     acc_s = {True: "Y", False: "N", None: "-"}[acc]
                     _fill(cells[ci], c.get("value", ""))
                     _fill(cells[ci + 1], bias_s)
