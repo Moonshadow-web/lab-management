@@ -686,7 +686,8 @@ def export_qc_report_docx(
     - instrument_id / instrument：仅导出该台仪器的月小结（逐台留档/上交）。
     - 文字部分取自 qc_monthly_reports（无则留空，由人工补录）。
     """
-    from ..services.qc_report import build_docx
+    from ...services.qc_report import build_docx
+    from types import SimpleNamespace
 
     q = db.query(QCMonthlySummary).filter_by(year=year, month=month)
     if instrument_id:
@@ -700,6 +701,14 @@ def export_qc_report_docx(
     inst_name = summaries[0].instrument or ""
     inst_no = summaries[0].instrument_no or ""
     rep = _find_report(db, instrument_id, instrument, year, month)
+    if rep is None:
+        # 报告尚未保存时，按当前数据临时草拟一份（不持久化）供导出，避免 build_docx 接收 None
+        dvs = db.query(QCDailyValue).filter(QCDailyValue.summary_id.in_([s.id for s in summaries])).all()
+        daily = {}
+        for dv in dvs:
+            daily.setdefault(dv.summary_id, []).append(dv)
+        drafted = draft_report(inst_name or summaries[0].instrument, year, month, summaries, daily)
+        rep = SimpleNamespace(**drafted)
 
     fd, out_path = tempfile.mkstemp(suffix=".docx", prefix=f"cz012_{year}_{month}_")
     os.close(fd)

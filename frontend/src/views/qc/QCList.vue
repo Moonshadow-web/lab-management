@@ -148,7 +148,7 @@
           </el-table>
 
           <!-- 文字部分（CZ-012 月小结） -->
-          <div v-if="reportMap[g.key]" class="report-box">
+          <div v-if="g.rows && g.rows.length" class="report-box">
             <div class="report-title">文字部分（CZ-012 月小结）</div>
             <el-form label-position="top" class="report-form">
               <el-form-item label="一、仪器运行情况">
@@ -776,8 +776,8 @@ async function loadSummary() {
       seen.add(key)
       try {
         const rep = await getQCReport(r.instrument_id || null, year, month)
-        reportMap[key] = rep
-      } catch (e) { /* 暂无报告 */ }
+        reportMap[key] = rep && Object.keys(rep).length ? rep : {}
+      } catch (e) { reportMap[key] = {} }
     }
   } finally {
     loadingSummary.value = false

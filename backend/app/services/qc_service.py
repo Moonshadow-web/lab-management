@@ -204,8 +204,8 @@ def draft_report(instrument: str, year: int, month: int, summaries: list, daily_
         all_details = [d for p in projects for d in p["ooc_details"]]
         reason_text = ("失控明细：" + "；".join(all_details) + "。") if all_details else ""
         operation_status = (
-            f"本月共出现 {total_ooc} 个失控点，均按 Westgard 规则判定并处置"
-            f"{('，' + reason_text) if reason_text else ''}处置后已恢复在控；仪器总体运行正常。"
+            f"本月共出现 {total_ooc} 个失控点，均按 Westgard 规则判定"
+            f"{('，' + reason_text) if reason_text else ''}；处置后已恢复在控；仪器总体运行正常。"
             + RUN_SUFFIX
         )
     else:
