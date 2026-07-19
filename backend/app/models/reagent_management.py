@@ -7,7 +7,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -87,8 +87,8 @@ class InventoryCheckItem(Base):
     __tablename__ = "reagent_inventory_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    check_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # FK → reagent_inventory_checks.id
-    item_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # FK → reagent_items.id
+    check_id: Mapped[int] = mapped_column(ForeignKey("reagent_inventory_checks.id"), nullable=False, index=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
     batch_no: Mapped[str] = mapped_column(String(100), default="")
     expiry_date: Mapped[date] = mapped_column(Date, nullable=True)
     recorded_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
