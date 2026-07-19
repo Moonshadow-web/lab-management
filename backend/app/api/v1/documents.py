@@ -357,7 +357,15 @@ def preview(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get
     p = storage.get_path(d.file_path)
     if not p.exists():
         raise HTTPException(status_code=404, detail="文件不存在")
-    media = "application/pdf" if p.suffix.lower() == ".pdf" else None
+    suffix = p.suffix.lower()
+    if suffix == ".pdf":
+        media = "application/pdf"
+    elif suffix == ".xlsx":
+        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif suffix == ".xls":
+        media = "application/vnd.ms-excel"
+    else:
+        media = None
     return FileResponse(
         p, media_type=media, filename=d.original_filename or p.name,
         headers={"Cache-Control": "no-store"},

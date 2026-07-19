@@ -426,6 +426,58 @@ async function onPreview(row) {
     }
     return
   }
+  // xlsx/xls：前端用 exceljs 读 arrayBuffer 转 HTML 表格渲染（与 docx 一致），避免二进制被当文本打开乱码
+  if (ext === 'xlsx' || ext === 'xls') {
+    previewOpen.value = true
+    previewTitle.value = row.title || '预览'
+    previewHtml.value = ''
+    previewing.value = true
+    try {
+      const blob = await fetchDocumentBlob(row.id, 'preview')
+      const buf = await blob.arrayBuffer()
+      const head = new Uint8Array(buf.slice(0, 4))
+      const isZip = head[0] === 0x50 && head[1] === 0x4B // PK -> xlsx
+      const isOle = head[0] === 0xD0 && head[1] === 0xCF && head[2] === 0x11 && head[3] === 0xE0 // 真 .xls(BIFF)
+      let html = ''
+      if (isZip) {
+        const mod = await import('exceljs')
+        const ExcelJS = mod.default || mod
+        const wb = new ExcelJS.Workbook()
+        await wb.xlsx.load(buf)
+        wb.eachSheet((sheet) => {
+          html += '<h3 style="margin:8px 0">' + (sheet.name || '') + '</h3>'
+          html += '<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;font-size:13px">'
+          sheet.eachRow((r, ri) => {
+            html += '<tr>'
+            r.eachCell({ includeEmpty: true }, (cell) => {
+              const tag = ri === 1 ? 'th' : 'td'
+              let v = cell.value
+              if (v == null) v = ''
+              else if (typeof v === 'object') v = v.text != null ? v.text : (v.result != null ? v.result : '')
+              v = String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+              html += '<' + tag + '>' + v + '</' + tag + '>'
+            })
+            html += '</tr>'
+          })
+          html += '</table><br/>'
+        })
+      } else if (!isOle) {
+        // 非 OLE 的 .xls：多为 GBK 编码 Tab 文本（爱康 LIS 式），按 gbk 解码渲染
+        let text
+        try { text = new TextDecoder('gbk').decode(buf) } catch (e) { text = new TextDecoder('utf-8').decode(buf) }
+        html = '<pre style="white-space:pre-wrap;word-break:break-all;font-size:13px">' + text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>'
+      } else {
+        html = '<p style="color:#e6a23c">该 .xls 为旧版二进制格式，浏览器无法在线预览，请下载后查看。</p>'
+      }
+      previewHtml.value = html || '<p style="color:#909399">（文档内容为空）</p>'
+    } catch (e) {
+      console.error(e)
+      previewHtml.value = '<p style="color:#f56c6c">预览失败：' + (e && e.message ? e.message : '该文档格式不支持，请下载后查看') + '</p>'
+    } finally {
+      previewing.value = false
+    }
+    return
+  }
   // 其他（含老 .doc）：回退，由系统用 Word/WPS 打开
   try {
     const blob = await fetchDocumentBlob(row.id, 'preview')
