@@ -41,11 +41,8 @@
           </el-select>
           <el-button v-if="auth.canWrite('qc')" type="primary" @click="triggerCsv">上传该仪器 LIS 数据(CSV/XLSX)</el-button>
           <input ref="csvInput" type="file" accept=".csv,.xlsx,.xls" hidden @change="onCsvChange" />
-          <el-button :disabled="!monthValue" @click="onExport">
-            导出 CZ-012 月小结{{ filterInstrumentId ? '（本仪器）' : '' }}(Excel)
-          </el-button>
           <span class="hint">
-            月结按「每一台仪器」分块；上传前先在下拉中选好受控仪器（绑定仪器台账），系统按每日测值跑 Westgard 判失控并自动草拟文字小结；质控图 PDF 在每行「查看」中上传存档。
+            月结按「每一台仪器」分块；上传前先在下拉中选好受控仪器（绑定仪器台账），系统按每日测值跑 Westgard 判失控并自动草拟文字小结。
           </span>
         </div>
 
@@ -68,27 +65,6 @@
                 <div class="daily-wrap">
                   <div class="daily-head">
                     <strong>每日测值（失控点已标红）</strong>
-                    <el-upload
-                      :show-file-list="false"
-                      :before-upload="(f) => onPdfUpload(row, f)"
-                      accept=".pdf"
-                    >
-                      <el-button v-if="auth.canWrite('qc')" size="small" type="primary" plain>上传质控图PDF</el-button>
-                    </el-upload>
-                    <el-button
-                      v-if="row.pdf_filename"
-                      size="small"
-                      type="success"
-                      plain
-                      @click="previewPdf(row)"
-                    >预览质控图</el-button>
-                    <el-button
-                      v-if="row.pdf_filename"
-                      size="small"
-                      type="danger"
-                      plain
-                      @click="removePdf(row)"
-                    >删除质控图</el-button>
                   </div>
                   <el-table :data="row._daily" size="small" border>
                     <el-table-column prop="qc_date" label="日期" width="120" />
@@ -206,9 +182,9 @@
           <el-select
             v-model="chartProject"
             placeholder="选择项目"
-            style="width: 240px"
+            style="width: 220px"
             :disabled="!chartProjectOptions.length"
-            @change="loadChartData"
+            @change="onChartProjectChange"
           >
             <el-option
               v-for="opt in chartProjectOptions"
@@ -217,25 +193,67 @@
               :value="opt.value"
             />
           </el-select>
+          <el-select
+            v-model="chartSelectedLevels"
+            multiple
+            collapse-tags
+            placeholder="全部水平"
+            style="width: 180px"
+            :disabled="!chartLevelOptions.length"
+            @change="onChartLevelChange"
+          >
+            <el-option
+              v-for="lv in chartLevelOptions"
+              :key="lv"
+              :label="`${lv}水平`"
+              :value="lv"
+            />
+          </el-select>
           <el-button :disabled="!chartProject" :loading="chartLoading" @click="loadChartData">查看质控图</el-button>
-          <span class="hint">选择一个项目，显示该项目全部水平在同一张 LJ 质控图（多水平用不同颜色）。</span>
+          <span class="hint">选择一个项目，再勾选要显示的水平（默认全部），同一张 LJ 图用不同颜色区分多水平。</span>
         </div>
 
         <div v-if="!chartProject" class="empty-tip">请选择年月、仪器和项目后查看质控图。</div>
         <div v-else class="chart-layout">
           <div class="chart-left">
             <div class="chart-section-title">{{ chartProject }} 各水平测值</div>
-            <el-table :data="chartData" size="small" border height="520">
-              <el-table-column prop="qc_date" label="日期" width="120" />
-              <el-table-column prop="level" label="水平" width="90" />
-              <el-table-column prop="value" label="测值" width="110" />
-              <el-table-column label="状态" width="120">
+            <el-table :data="chartDataByDate" size="small" border height="420">
+              <el-table-column prop="qc_date" label="日期" width="110" fixed />
+              <el-table-column
+                v-for="lv in chartDisplayLevels"
+                :key="lv"
+                :label="`${lv}水平`"
+                min-width="150"
+              >
                 <template #default="{ row }">
-                  <el-tag v-if="row.is_out_of_control" type="danger" size="small">失控 {{ row.rule_violated }}</el-tag>
-                  <el-tag v-else type="success" size="small">在控</el-tag>
+                  <div v-if="row.levels[lv]" class="level-cell">
+                    <div class="level-val">{{ fmtNum(row.levels[lv].value) }}</div>
+                    <el-tag v-if="row.levels[lv].is_out_of_control" type="danger" size="small">失控 {{ row.levels[lv].rule_violated }}</el-tag>
+                    <el-tag v-else type="success" size="small">在控</el-tag>
+                  </div>
+                  <span v-else class="text-muted">—</span>
                 </template>
               </el-table-column>
             </el-table>
+
+            <div class="daily-status-summary">
+              <div class="chart-section-title">每日多水平状态汇总</div>
+              <div v-for="row in chartDataByDate" :key="row.qc_date" class="status-line">
+                <span class="date-label">{{ row.qc_date }}</span>
+                <span
+                  v-for="lv in chartDisplayLevels"
+                  :key="lv"
+                  class="level-status"
+                >
+                  {{ lv }}水平：
+                  <template v-if="row.levels[lv]">
+                    <el-tag v-if="row.levels[lv].is_out_of_control" type="danger" size="small">失控 {{ row.levels[lv].rule_violated }}</el-tag>
+                    <el-tag v-else type="success" size="small">在控</el-tag>
+                  </template>
+                  <span v-else class="text-muted">无数据</span>
+                </span>
+              </div>
+            </div>
           </div>
           <div class="chart-right">
             <div ref="chartRef" class="chart-box"></div>
@@ -674,7 +692,6 @@ import ExcelJS from 'exceljs'
 import * as echarts from 'echarts'
 import {
   listQCSummaries, uploadQCSummary, getQCDaily, updateQCSummary, deleteQCSummary,
-  uploadQCPdf, downloadQCPdf, deleteQCPdf, exportQCSummary,
   getQCReport, upsertQCReport, exportQCReportDocx, getQCProjectDaily,
 } from '../../api/qc'
 import { getQCInstruments } from '../../api/qc'
@@ -697,6 +714,7 @@ const auth = useAuthStore()
 const chartMonth = ref('')
 const chartInstrumentId = ref(null)
 const chartProject = ref('')
+const chartSelectedLevels = ref([])   // 多选：当前项目下要显示的水平（空=全选）
 const chartLoading = ref(false)
 const chartData = ref([])
 let chartInstance = null
@@ -853,6 +871,45 @@ const chartProjectOptions = computed(() => {
     }))
 })
 
+const chartLevelOptions = computed(() => {
+  const set = new Set()
+  for (const r of chartSummaryRows.value) {
+    if (r.test_item === chartProject.value) set.add(r.level)
+  }
+  return Array.from(set).sort((a, b) => String(a).localeCompare(String(b), 'zh'))
+})
+
+const chartDisplayLevels = computed(() => {
+  if (chartSelectedLevels.value.length) return chartSelectedLevels.value.slice().sort()
+  return chartLevelOptions.value
+})
+
+const chartDataByDate = computed(() => {
+  const map = {}
+  for (const r of chartData.value) {
+    if (!chartDisplayLevels.value.includes(r.level)) continue
+    if (!map[r.qc_date]) map[r.qc_date] = { qc_date: r.qc_date, levels: {} }
+    map[r.qc_date].levels[r.level] = r
+  }
+  return Object.values(map).sort((a, b) => a.qc_date.localeCompare(b.qc_date))
+})
+
+function onChartProjectChange() {
+  chartSelectedLevels.value = []
+  chartData.value = []
+  disposeChart()
+  loadChartData()
+}
+
+function onChartLevelChange() {
+  // 水平选择变化时，用已有 chartData 重新渲染即可；无数据时重新拉取
+  if (chartData.value.length) {
+    renderChart(chartData.value)
+  } else {
+    loadChartData()
+  }
+}
+
 async function loadChartSummaryRows() {
   const { year, month } = parseChartMonth()
   if (!year || !month || !chartInstrumentId.value) {
@@ -913,14 +970,15 @@ function renderChart(rows) {
   disposeChart()
   if (!chartRef.value || !rows.length) return
 
-  // 按水平分组并生成 series
+  // 按水平分组并生成 series（只绘制当前选中的水平）
   const byLevel = {}
   for (const r of rows) {
+    if (!chartDisplayLevels.value.includes(r.level)) continue
     if (!byLevel[r.level]) byLevel[r.level] = []
     byLevel[r.level].push(r)
   }
   const levels = Object.keys(byLevel).sort()
-  const allDates = [...new Set(rows.map((r) => r.qc_date).sort())]
+  const allDates = [...new Set(rows.filter((r) => chartDisplayLevels.value.includes(r.level)).map((r) => r.qc_date).sort())]
 
   const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272']
   const series = []
@@ -1101,52 +1159,10 @@ async function onCsvChange(e) {
     e.target.value = ''
   }
 }
-async function onExport() {
-  const { year, month } = parseMonth()
-  try {
-    const blob = await exportQCSummary(year, month, filterInstrumentId.value || undefined)
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `室内质控月小结_${year || 'ALL'}_${month || 'ALL'}${filterInstrumentId.value ? '_' + filterInstrumentId.value : ''}.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch (err) {
-    ElMessage.error('导出失败：' + (err.response?.data?.detail || err.message))
-  }
-}
 async function saveNote(row) {
   try {
     await updateQCSummary(row.id, { handling_note: row.handling_note || '' })
   } catch (e) { ElMessage.error('保存说明失败') }
-}
-async function onPdfUpload(row, file) {
-  try {
-    const res = await uploadQCPdf(row.id, file)
-    row.pdf_path = res.pdf_path
-    row.pdf_filename = res.pdf_filename
-    ElMessage.success('质控图已上传')
-  } catch (e) {
-    ElMessage.error('上传失败：' + (e.response?.data?.detail || e.message))
-  }
-  return false
-}
-async function previewPdf(row) {
-  try {
-    const blob = await downloadQCPdf(row.id)
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank')
-    setTimeout(() => URL.revokeObjectURL(url), 60000)
-  } catch (e) {
-    ElMessage.error('预览失败：' + (e.response?.data?.detail || e.message))
-  }
-}
-async function removePdf(row) {
-  await ElMessageBox.confirm('确认删除该质控图？', '提示', { type: 'warning' })
-  await deleteQCPdf(row.id)
-  row.pdf_path = ''
-  row.pdf_filename = ''
-  ElMessage.success('已删除')
 }
 async function delSummary(row) {
   await ElMessageBox.confirm(`确认删除「${row.instrument || ''} / ${row.test_item} ${row.level}」月结记录？`, '提示', { type: 'warning' })
@@ -2269,4 +2285,13 @@ watch(activeTab, (t) => {
 .re-meta-item { display: flex; align-items: center; gap: 6px; }
 .re-meta-item > span { font-size: 12px; color: #606266; white-space: nowrap; }
 .re-meta-item .el-input, .re-meta-item .el-date-editor { width: 130px; }
+.daily-status-summary { margin-top: 12px; padding: 12px; border: 1px solid #e4e7ed; border-radius: 4px; background: #f8f9fa; max-height: 260px; overflow-y: auto; }
+.daily-status-summary .status-line { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 6px 0; border-bottom: 1px dashed #e4e7ed; font-size: 13px; }
+.daily-status-summary .status-line:last-child { border-bottom: none; }
+.daily-status-summary .date-label { font-weight: 600; color: #303133; min-width: 90px; }
+.daily-status-summary .level-status { display: inline-flex; align-items: center; gap: 4px; }
+.daily-status-summary .level-status .el-tag { font-size: 12px; }
+.level-cell { display: flex; flex-direction: column; gap: 2px; }
+.level-cell .level-val { font-weight: 500; }
+.text-muted { color: #c0c4cc; }
 </style>

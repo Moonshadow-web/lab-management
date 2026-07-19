@@ -114,11 +114,38 @@ def _parse_date(s):
     s = (s or "").strip()
     if not s:
         return None
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y-%m", "%Y/%m", "%Y.%m"):
+    # 标准格式（允许 0/1 开头、带时间）
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y/%m/%d %H:%M:%S",
+        "%Y/%m/%d %H:%M",
+        "%Y.%m.%d %H:%M:%S",
+        "%Y.%m.%d %H:%M",
+        "%Y-%m-%d",
+        "%Y/%m/%d",
+        "%Y.%m.%d",
+        "%Y-%m",
+        "%Y/%m",
+        "%Y.%m",
+    ):
         try:
             return datetime.datetime.strptime(s, fmt)
         except ValueError:
             continue
+    # 爱康 LIS 常见格式：2026-6-1 10:10 / 2026/6/1 10:10 / 2026.6.1
+    m = re.search(r"(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})(?:[^\d]*(\d{1,2})[^\d]*(\d{1,2})(?:[^\d]*(\d{1,2}))?)?", s)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        h = int(m.group(4) or 0)
+        mi = int(m.group(5) or 0)
+        sec = int(m.group(6) or 0)
+        if 1 <= mo <= 12 and 1 <= d <= 31:
+            try:
+                return datetime.datetime(y, mo, d, h, mi, sec)
+            except ValueError:
+                pass
+    # 仅年月
     m = re.search(r"(\d{4})[^\d]*(\d{1,2})", s)
     if m:
         y, mo = int(m.group(1)), int(m.group(2))
@@ -593,123 +620,6 @@ def upsert_qc_report(
     db.refresh(rep)
     return rep
 
-
-@router.get("/export")
-def export_qc_summary(
-    year: int | None = None,
-    month: int | None = None,
-    instrument: str | None = None,
-    instrument_id: int | None = None,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """导出 CZ-012 室内质控月小结 Excel（14 列表格 + 文字部分），按 仪器/年/月 分块。
-
-    - instrument_id / instrument：仅导出该台仪器的分块（逐台留档/上交）。
-    - 每块表格之后附加「文字部分」：仪器运行情况、漂移趋势、CV%设置达标、
-      计算CV%达标、质控频次达标。
-    """
-    import openpyxl
-    from openpyxl.styles import Font, Alignment, Border, Side
-
-    q = db.query(QCMonthlySummary)
-    if year is not None:
-        q = q.filter(QCMonthlySummary.year == year)
-    if month is not None:
-        q = q.filter(QCMonthlySummary.month == month)
-    if instrument_id:
-        q = q.filter(QCMonthlySummary.instrument_id == instrument_id)
-    elif instrument:
-        q = q.filter(QCMonthlySummary.instrument == instrument)
-    summaries = q.order_by(
-        QCMonthlySummary.instrument, QCMonthlySummary.year,
-        QCMonthlySummary.month, QCMonthlySummary.test_item, QCMonthlySummary.level,
-    ).all()
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "室内质控月小结"
-    thin = Side(style="thin", color="000000")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    header_font = Font(bold=True)
-    title_font = Font(bold=True, size=14)
-    center = Alignment(horizontal="center", vertical="center")
-    left_wrap = Alignment(horizontal="left", vertical="top", wrap_text=True)
-
-    headers = ["项目", "质控批号", "单位", "水平", "靶值", "靶值SD", "靶值CV%",
-               "均值", "SD", "CV%", "n", "失控数", "在控率", "质量目标（允许不精密度）"]
-
-    # 按 (仪器, 年, 月) 分块
-    blocks: dict[tuple, list] = {}
-    for s in summaries:
-        blocks.setdefault((s.instrument, s.year, s.month), []).append(s)
-
-    row = 1
-    for (instrument, y, mo), items in blocks.items():
-        inst_no = items[0].instrument_no or ""
-        ws.cell(row=row, column=1, value="生化免疫组室内质控月小结").font = title_font
-        row += 1
-        ws.cell(row=row, column=1,
-                value=f"{y or '—'}年{str(mo).zfill(2) if mo else '—'}月　　仪器：{instrument or '—'}{('（编号：' + inst_no + '）') if inst_no else ''}")
-        row += 1
-        # 质控批号已在表格列中体现，不单独成句
-        # 表头
-        for c, h in enumerate(headers, 1):
-            cell = ws.cell(row=row, column=c, value=h)
-            cell.font = header_font
-            cell.alignment = center
-            cell.border = border
-        row += 1
-        for s in items:
-            vals = [
-                s.test_item, s.lot_no, s.unit, s.level,
-                round(s.target_mean, 4), round(s.target_sd, 4), f"{s.target_cv:.2f}%",
-                round(s.mean, 4), round(s.sd, 4), f"{s.cv:.2f}%",
-                s.n, s.out_of_control_count, f"{s.in_control_rate*100:.1f}%",
-                s.quality_goal,
-            ]
-            for c, v in enumerate(vals, 1):
-                cell = ws.cell(row=row, column=c, value=v)
-                cell.alignment = center
-                cell.border = border
-            row += 1
-        # 文字部分
-        rep = _fetch_report(db, items[0].instrument_id, instrument, y, mo)
-        text_sections = [
-            ("一、仪器运行情况", rep.operation_status if rep else ""),
-            ("二、各项目是否出现漂移或趋势性改变", rep.drift_trend if rep else ""),
-            ("三、各项目CV%设置是否达标", rep.cv_setting_ok if rep else ""),
-            ("四、各项目计算CV%是否达标", rep.cv_calc_ok if rep else ""),
-            ("五、各项目质控频次是否达标", rep.freq_ok if rep else ""),
-        ]
-        for label, text in text_sections:
-            ws.cell(row=row, column=1, value=label).font = Font(bold=True)
-            ws.cell(row=row, column=1).alignment = left_wrap
-            tc = ws.cell(row=row, column=2, value=text or "（未填写）")
-            tc.alignment = left_wrap
-            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=14)
-            row += 1
-        row += 1  # 块间空行
-
-    # 列宽
-    widths = [16, 12, 8, 8, 10, 10, 10, 10, 10, 10, 6, 8, 10, 22]
-    for i, w in enumerate(widths, 1):
-        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    fname = f"室内质控月小结_{year or 'ALL'}_{month or 'ALL'}"
-    if instrument_id:
-        fname += f"_{instrument_id}"
-    elif instrument:
-        fname += f"_{instrument}"
-    fname += ".xlsx"
-    from urllib.parse import quote
-    return Response(
-        content=buf.getvalue(),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
-    )
 
 
 # ---------------------------------------------------------------------------
