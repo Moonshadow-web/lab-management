@@ -116,11 +116,11 @@ def _extract_first_pct(s: str) -> float | None:
 
 def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
     """从 QualityRequirement 表中按项目名查找质量目标。
-    
+
     优先级：wst403-2024.cv > bj-hr-2025.cv > nccl-2026.tea/3。
     匹配策略：精确匹配 > 子串含（主名或别名中有一段）。
     """
-    from ..services.comparison_report import WST403_2024
+    from .comparison_report import WST403_2024
 
     def _match(items, source: str, field: str):
         """在 items 中匹配第一条非空的目标字段值。"""

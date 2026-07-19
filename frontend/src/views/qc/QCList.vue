@@ -936,7 +936,12 @@ function renderChart(rows) {
       symbolSize: 7,
       data: allDates.map((d) => {
         const pt = data.find((x) => x.qc_date === d)
-        return pt ? pt.value : null
+        if (!pt) return null
+        // 失控点标红（带白边强调）
+        if (pt.is_out_of_control) {
+          return { value: pt.value, itemStyle: { color: '#f5222d', borderColor: '#fff', borderWidth: 1.5, borderType: 'solid' }, symbolSize: 9 }
+        }
+        return pt.value
       }),
       itemStyle: { color },
       lineStyle: { width: 2, color },
@@ -998,30 +1003,45 @@ function renderChart(rows) {
         type: 'line',
         symbol: 'circle',
         symbolSize: 7,
-        data: data.map((r) => (ts ? ((r.value - tm) / ts).toFixed(2) : null)),
+        data: data.map((r) => {
+          if (!ts) return null
+          const sdi = ((r.value - tm) / ts).toFixed(2)
+          if (r.is_out_of_control) {
+            return { value: sdi, itemStyle: { color: '#f5222d', borderColor: '#fff', borderWidth: 1.5 }, symbolSize: 9 }
+          }
+          return sdi
+        }),
         itemStyle: { color },
         lineStyle: { width: 2, color },
       })
     })
-    ;[3, 2, 1, 0, -1, -2, -3].forEach((sd) => {
+    ;[-3, -2, -1, 0, 1, 2, 3].forEach((sd) => {
+      // SDI 模式下：±2SD 黄色警告限、±3SD 红色失控限、±1SD 浅灰、0SD 中线
+      const abs = Math.abs(sd)
+      let s
+      if (sd === 0) s = { type: 'solid', width: 2, color: '#666' }
+      else if (abs === 3) s = { type: 'dashed', width: 2.2, color: '#f5222d' }   // 失控限
+      else if (abs === 2) s = { type: 'dashed', width: 1.8, color: '#faad14' }   // 警告限
+      else s = { type: 'dashed', width: 1, color: '#bbb' }
+      const labelText = abs === 3 ? `${sd}SD 失控限` : abs === 2 ? `${sd}SD 警告限` : `${sd}SD`
       markLineData.push({
         yAxis: sd,
-        name: `${sd}SD`,
-        lineStyle: { type: sd === 0 ? 'solid' : 'dashed', width: sd === 0 ? 2 : 1, color: '#999' },
-        label: { formatter: `${sd}SD`, position: 'insideEndTop', fontSize: 10 },
+        name: labelText,
+        lineStyle: s,
+        label: { formatter: labelText, position: 'insideEndTop', fontSize: abs >= 2 ? 11 : 10, color: s.color, fontWeight: abs >= 2 ? 700 : 400 },
       })
     })
   }
 
   chartInstance = echarts.init(chartRef.value)
-  // 计算标题副标题（靶值/标准差）
+  // 计算标题副标题（仅显示靶值/SD，不含范围）
   const subtitleLines = []
   for (const lv of levels) {
     const data = byLevel[lv]
     const tm = data[0]?.target_mean ?? 0
     const ts = data[0]?.target_sd ?? 0
     if (tm) {
-      subtitleLines.push(`${lv}水平：靶值 ${tm}　SD ${ts}　范围 ${(tm - 4 * ts).toFixed(2)} ~ ${(tm + 4 * ts).toFixed(2)}`)
+      subtitleLines.push(`${lv}水平：靶值 ${tm}　SD ${ts}`)
     }
   }
   const option = {
