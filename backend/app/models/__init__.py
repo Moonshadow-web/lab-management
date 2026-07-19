@@ -20,6 +20,7 @@ from .interlab import InterlabPlan, InterlabItem, InterlabLevel
 from .qc_target import QCTargetBatch, QCTargetResult
 from .qc_material import QcMaterial
 from .refresh_token import RefreshToken
+from .quality_requirement import QualityRequirement  # 修复 models 导入，但 __init__ 里没加 import
 from .reagent_management import (
     ReagentItem, ReagentStock, InventoryCheck, InventoryCheckItem,
     ReagentOrder, ReagentOrderItem, Receiving, ReceivingItem, ReagentConsumption,
