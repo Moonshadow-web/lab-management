@@ -5,6 +5,7 @@ __pycache__
 .gitignore
 node_modules
 frontend/node_modules
+backend/venv
 backend/__pycache__
 backend/**/__pycache__
 # 排除本地运行时数据目录：backend/data/ 含 app.db 与 uploads/，会随
