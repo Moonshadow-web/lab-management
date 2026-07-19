@@ -8,6 +8,7 @@ GET /matrix：综合矩阵视图——以 test_items 为行，三个标准源为
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+import re
 
 from ...core.crud_base import make_router, paginate
 from ...core.database import get_db
@@ -115,7 +116,15 @@ def matrix_view(
         )
         qr_maps[src] = {r.item_name: r for r in rows}
 
-    # 模糊匹配辅助：item_name 不完全一致时按包含关系兜底；并应用同义词映射
+    # 预计算归一化映射：去空格/连字符/括号/全角后统一小写，打通名字差异
+    def _norm(s: str) -> str:
+        return re.sub(r"[\s\-‐—()（）\[\]【】　]", "", s).lower()
+
+    qr_norm_maps = {}
+    for src in _SOURCES:
+        qr_norm_maps[src] = {_norm(k): v for k, v in qr_maps[src].items()}
+
+    # 模糊匹配辅助：item_name 不完全一致时按包含关系兜底；并应用同义词和归一化匹配
     def _find_best(src: str, name: str) -> QualityRequirement | None:
         candidates = [name] + _SYNONYMS.get(name, [])
         # 1) 候选精确匹配
@@ -127,6 +136,23 @@ def matrix_view(
         for cand in candidates:
             for k, v in qr_maps[src].items():
                 if cand in k or k in cand:
+                    return v
+        # 3) 归一化精确匹配（补体C3 ↔ 补体 C3；C肽 ↔ C-肽；免疫球蛋白G ↔ 免疫球蛋白 G 等）
+        n_name = _norm(name)
+        hit = qr_norm_maps[src].get(n_name)
+        if hit:
+            return hit
+        # 4) 归一化同义词精确匹配
+        for cand in candidates:
+            n_cand = _norm(cand)
+            hit = qr_norm_maps[src].get(n_cand)
+            if hit:
+                return hit
+        # 5) 归一化包含匹配
+        for cand in candidates:
+            n_cand = _norm(cand)
+            for nk, v in qr_norm_maps[src].items():
+                if n_cand in nk or nk in n_cand:
                     return v
         return None
 
