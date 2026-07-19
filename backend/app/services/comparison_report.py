@@ -361,12 +361,17 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
         inst_name_map = {i["id"]: i["name"] for i in data["instruments"]}
         for blk in data["matrix"]:
             html.append(f"<h2>水平{blk['level']}</h2>")
+            # 列头按本水平块的偏倚方式标注：全绝对→（绝对偏倚），否则默认（相对偏倚）
+            _blk_modes = {r.get("mode") for r in blk["rows"]}
+            _all_abs = _blk_modes == {"absolute"}
+            _te_hdr = "允许偏倚（绝对偏倚）" if _all_abs else "允许偏倚%（相对偏倚）"
+            _bias_hdr = "偏倚（绝对偏倚）" if _all_abs else "偏倚%（相对偏倚）"
             html.append('<table><thead><tr><th class="item">项目</th>'
-                        '<th>参照值（靶机）</th><th>允许偏倚%</th>')
+                        f'<th>参照值（靶机）</th><th>{_te_hdr}</th>')
             for ins in data["instruments"]:
                 if ins["is_reference"]:
                     continue
-                html.append(f'<th>{ins["name"]}</th><th>偏倚%</th><th>是否允许</th>')
+                html.append(f'<th>{ins["name"]}</th><th>{_bias_hdr}</th><th>是否允许</th>')
             html.append("</tr></thead><tbody>")
             for r in blk["rows"]:
                 eff_name = inst_name_map.get(r.get("effective_ref_id"), "")
@@ -687,12 +692,17 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
             t.style = "Table Grid"
             t.alignment = WD_TABLE_ALIGNMENT.CENTER
             hdr = t.rows[0].cells
+            # 列头按本水平块的偏倚方式标注：全绝对→（绝对偏倚），否则默认（相对偏倚）
+            _blk_modes = {r.get("mode") for r in blk["rows"]}
+            _all_abs = _blk_modes == {"absolute"}
+            _te_hdr = "允许偏倚（绝对偏倚）" if _all_abs else "允许偏倚%（相对偏倚）"
+            _bias_hdr = "偏倚（绝对偏倚）" if _all_abs else "偏倚%（相对偏倚）"
             _fill(hdr[0], "项目", bold=True)
             _fill(hdr[1], "参照值（靶机）", bold=True)
-            _fill(hdr[2], "允许偏倚%", bold=True)
+            _fill(hdr[2], _te_hdr, bold=True)
             ci = 3
             for ins in compared:
-                _fill(hdr[ci], ins["name"], bold=True); _fill(hdr[ci + 1], "偏倚%", bold=True); _fill(hdr[ci + 2], "是否允许", bold=True)
+                _fill(hdr[ci], ins["name"], bold=True); _fill(hdr[ci + 1], _bias_hdr, bold=True); _fill(hdr[ci + 2], "是否允许", bold=True)
                 ci += 3
             for r in blk["rows"]:
                 cells = t.add_row().cells
