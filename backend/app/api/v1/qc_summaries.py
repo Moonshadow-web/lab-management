@@ -219,9 +219,18 @@ def _fetch_report(db: Session, instrument_id, instrument: str, year: int, month:
 
 
 def _ensure_report_draft(db: Session, instrument_id, instrument: str, year: int, month: int):
-    """若报告不存在则按当前数据草拟一份（不覆盖已有编辑）。"""
-    if _find_report(db, instrument_id, instrument, year, month):
-        return
+    """若报告不存在或五段文字全为空，则按当前数据草拟并落库（不覆盖用户已编辑的字段）。
+
+    修复：之前只判「报告不存在」，导致历史遗留的空文本报告永远不会被补字。
+    现增加「五段文字全为空」判定，重传/重生成时主动回填。
+    """
+    rep = _find_report(db, instrument_id, instrument, year, month)
+    if rep:
+        # 已有报告：仅当五段文字全为空时才回填（保护用户已编辑内容）
+        if any((getattr(rep, f, "") or "").strip() for f in
+               ("operation_status", "drift_trend", "cv_setting_ok", "cv_calc_ok", "freq_ok")):
+            return
+        # 落到下面走"草拟并落库"逻辑（覆盖空文本）
     q = db.query(QCMonthlySummary).filter_by(year=year, month=month)
     if instrument_id:
         q = q.filter_by(instrument_id=instrument_id)
@@ -229,6 +238,8 @@ def _ensure_report_draft(db: Session, instrument_id, instrument: str, year: int,
         q = q.filter_by(instrument=(instrument or ""))
     summaries = q.all()
     if not summaries:
+        if rep:
+            return
         rep = QCMonthlyReport(instrument_id=instrument_id, instrument=instrument or "", year=year, month=month)
         db.add(rep)
         db.commit()
@@ -239,13 +250,19 @@ def _ensure_report_draft(db: Session, instrument_id, instrument: str, year: int,
     for dv in dvs:
         daily.setdefault(dv.summary_id, []).append(dv)
     drafted = draft_report(instrument or summaries[0].instrument, year, month, summaries, daily)
-    rep = QCMonthlyReport(
-        instrument_id=instrument_id,
-        instrument=instrument or summaries[0].instrument,
-        instrument_no=summaries[0].instrument_no,
-        year=year, month=month, **drafted,
-    )
-    db.add(rep)
+    if not rep:
+        rep = QCMonthlyReport(
+            instrument_id=instrument_id,
+            instrument=instrument or summaries[0].instrument,
+            instrument_no=summaries[0].instrument_no,
+            year=year, month=month, **drafted,
+        )
+        db.add(rep)
+    else:
+        # 覆盖空文本（保留用户已编辑字段）
+        for k, v in drafted.items():
+            if not (getattr(rep, k, "") or "").strip():
+                setattr(rep, k, v)
     db.commit()
 
 
@@ -495,61 +512,8 @@ def list_daily(
     )
 
 
-@router.post("/{summary_id}/pdf", status_code=201)
-def upload_qc_pdf(
-    summary_id: int,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """为某月结上传/替换质控图 PDF（源文件存档，月结页内嵌预览）。"""
-    summ = db.get(QCMonthlySummary, summary_id)
-    if not summ:
-        raise HTTPException(status_code=404, detail="未找到月结记录")
-    content = file.file.read()
-    if not content:
-        raise HTTPException(status_code=400, detail="文件内容为空")
-    rel = storage.save("qc_qccharts", file.filename or "qcchart.pdf", content)
-    if summ.pdf_path:
-        storage.delete(summ.pdf_path)
-    summ.pdf_path = rel
-    summ.pdf_filename = file.filename or "qcchart.pdf"
-    db.commit()
-    write_audit(db, user, "create", "qc_monthly_summaries", summ.id, {"pdf": rel})
-    return {"id": summ.id, "pdf_path": summ.pdf_path, "pdf_filename": summ.pdf_filename}
-
-
-@router.get("/{summary_id}/pdf")
-def download_qc_pdf(
-    summary_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    summ = db.get(QCMonthlySummary, summary_id)
-    if not summ or not summ.pdf_path:
-        raise HTTPException(status_code=404, detail="未找到质控图")
-    p = storage.get_path(summ.pdf_path)
-    if not p.exists():
-        raise HTTPException(status_code=404, detail="文件不存在")
-    return FileResponse(p, filename=summ.pdf_filename or p.name, headers={"Cache-Control": "no-store"})
-
-
-@router.delete("/{summary_id}/pdf")
-def delete_qc_pdf(
-    summary_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    summ = db.get(QCMonthlySummary, summary_id)
-    if not summ:
-        raise HTTPException(status_code=404, detail="未找到月结记录")
-    if summ.pdf_path:
-        storage.delete(summ.pdf_path)
-    summ.pdf_path = ""
-    summ.pdf_filename = ""
-    db.commit()
-    return {"ok": True}
-
+# 注：质控图 PDF 上传/预览/下载/删除 已在 2026-07-19 移除（d3e93eb）—— 前端按钮 + 后端三路由
+# （POST/GET/DELETE /{summary_id}/pdf）一并删除。月结改用 build_docx 内嵌 14 列表格 + 5 段文字。
 
 @router.get("/report", response_model=QCMonthlyReportRead)
 def get_qc_report(
@@ -560,10 +524,16 @@ def get_qc_report(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """获取某(仪器,年,月)的月结文字报告；不存在则按当前数据自动草拟并保存。"""
+    """获取某(仪器,年,月)的月结文字报告；不存在则按当前数据自动草拟并保存。
+
+    修复：若报告存在但五段文字全为空，也触发自动草拟（覆盖空文本，保留用户编辑）。
+    """
     rep = _find_report(db, instrument_id, instrument, year, month)
     if rep:
-        return rep
+        if any((getattr(rep, f, "") or "").strip() for f in
+               ("operation_status", "drift_trend", "cv_setting_ok", "cv_calc_ok", "freq_ok")):
+            return rep
+        # 文本全空：落到下面草拟逻辑并覆盖
     # 自动草拟
     q = db.query(QCMonthlySummary).filter_by(year=year, month=month)
     if instrument_id:
@@ -572,6 +542,8 @@ def get_qc_report(
         q = q.filter_by(instrument=(instrument or ""))
     summaries = q.all()
     if not summaries:
+        if rep:
+            return rep
         rep = QCMonthlyReport(instrument_id=instrument_id, instrument=instrument or "", year=year, month=month)
         db.add(rep)
         db.commit()
@@ -583,13 +555,19 @@ def get_qc_report(
     for dv in dvs:
         daily.setdefault(dv.summary_id, []).append(dv)
     drafted = draft_report(instrument or summaries[0].instrument, year, month, summaries, daily)
-    rep = QCMonthlyReport(
-        instrument_id=instrument_id,
-        instrument=instrument or summaries[0].instrument,
-        instrument_no=summaries[0].instrument_no,
-        year=year, month=month, **drafted,
-    )
-    db.add(rep)
+    if not rep:
+        rep = QCMonthlyReport(
+            instrument_id=instrument_id,
+            instrument=instrument or summaries[0].instrument,
+            instrument_no=summaries[0].instrument_no,
+            year=year, month=month, **drafted,
+        )
+        db.add(rep)
+    else:
+        # 报告存在但文本全空：覆盖空字段
+        for k, v in drafted.items():
+            if not (getattr(rep, k, "") or "").strip():
+                setattr(rep, k, v)
     db.commit()
     db.refresh(rep)
     return rep
