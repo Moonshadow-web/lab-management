@@ -51,7 +51,7 @@ class ReagentStock(Base):
     __tablename__ = "reagent_stock"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    item_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # FK → reagent_items.id
+    item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
     batch_no: Mapped[str] = mapped_column(String(100), default="", index=True)
     expiry_date: Mapped[date] = mapped_column(Date, nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -130,8 +130,8 @@ class ReagentOrderItem(Base):
     __tablename__ = "reagent_order_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    order_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # FK → reagent_orders.id
-    item_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # FK → reagent_items.id
+    order_id: Mapped[int] = mapped_column(ForeignKey("reagent_orders.id"), nullable=False, index=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
     ordered_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     received_quantity: Mapped[int] = mapped_column(Integer, default=0)
@@ -151,7 +151,7 @@ class Receiving(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     receipt_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     receipt_date: Mapped[date] = mapped_column(Date, nullable=False)
-    order_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 可选关联订购单
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("reagent_orders.id"), nullable=True)  # 可选关联订购单
     delivery_person: Mapped[str] = mapped_column(String(100), default="")
     receiver: Mapped[str] = mapped_column(String(100), nullable=False)
     remark: Mapped[str] = mapped_column(Text, default="")
@@ -168,8 +168,8 @@ class ReceivingItem(Base):
     __tablename__ = "reagent_receiving_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    receiving_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # FK → reagent_receivings.id
-    item_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # FK → reagent_items.id
+    receiving_id: Mapped[int] = mapped_column(ForeignKey("reagent_receivings.id"), nullable=False, index=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
     batch_no: Mapped[str] = mapped_column(String(100), default="")
     expiry_date: Mapped[date] = mapped_column(Date, nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -187,7 +187,7 @@ class ReagentConsumption(Base):
     __tablename__ = "reagent_consumption"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    item_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # FK → reagent_items.id
+    item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
     year_month: Mapped[str] = mapped_column(String(7), nullable=False, index=True)  # YYYY-MM
     opening_balance: Mapped[int] = mapped_column(Integer, default=0)  # 月初库存（上期末结余）
     total_received: Mapped[int] = mapped_column(Integer, default=0)  # 本月入库

@@ -1,0 +1,4 @@
+qc_date,test_item,lot_no,level,value,unit,target_mean,target_sd,operator
+2026-07-01,丙氨酸氨基转移酶(ALT),LOT2411,1,45,U/L,44,2,张三
+2026-07-02,丙氨酸氨基转移酶(ALT),LOT2411,1,46,U/L,44,2,张三
+2026-07-03,丙氨酸氨基转移酶(ALT),LOT2411,1,44,U/L,44,2,张三
