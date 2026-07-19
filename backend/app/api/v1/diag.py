@@ -10,6 +10,9 @@ recover-table 等) 已移除，收敛攻击面。
 import os
 import shutil
 import sqlite3
+from fastapi.responses import FileResponse
+from ...core.security import get_current_user
+from ...models.user import User
 
 _DB_PATH = "/app/data/app.db"
 # CFS 持久卷 /app/data 与本机 /tmp 是不同设备，临时文件放在同设备内，
@@ -114,7 +117,7 @@ def get_build_mark() -> str:
     return _BUILD_MARK
 
 
-from fastapi import APIRouter  # noqa: E402
+from fastapi import APIRouter, Depends, HTTPException  # noqa: E402
 
 router = APIRouter(prefix="/_diag", tags=["diag"])
 
@@ -123,3 +126,28 @@ router = APIRouter(prefix="/_diag", tags=["diag"])
 def diag_build():
     """返回构建标记，确认当前服役容器版本（免鉴权，仅探针）。"""
     return {"build": _BUILD_MARK, "has_self_heal": True}
+
+
+@router.get("/db")
+def diag_db_download(user: User = Depends(get_current_user)):
+    """[临时] 导出线上数据库文件（仅管理员）。用于把线上库导回仓库做镜像备份。
+
+    用完即删：该端点仅在一次性的「线上库导回 .data/app.db」操作期间存在，
+    操作完成后会从代码中移除，避免持久暴露数据库下载能力。
+    """
+    if "admin" not in (user.roles or "").split(","):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    if not os.path.exists(_DB_PATH):
+        raise HTTPException(status_code=404, detail="数据库文件不存在")
+    # 合并 WAL 到主库，确保导出文件包含全部已提交数据
+    try:
+        c = sqlite3.connect(_DB_PATH)
+        c.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        c.close()
+    except Exception:  # noqa: BLE001
+        pass
+    return FileResponse(
+        _DB_PATH,
+        filename="app.db",
+        media_type="application/octet-stream",
+    )
