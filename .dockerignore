@@ -7,7 +7,10 @@ node_modules
 frontend/node_modules
 backend/__pycache__
 backend/**/__pycache__
-backend/data/app.db
+# 排除本地运行时数据目录：backend/data/ 含 app.db 与 uploads/，会随
+# COPY backend/ ./ 进入镜像 /app/data/，与 CFS 持久卷挂载点 /app/data 冲突。
+# 持久化数据改由 entrypoint 运行时在已挂载卷上从 /app/backup 恢复。
+backend/data/
 *.log
 .env
 .vscode
