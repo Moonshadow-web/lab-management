@@ -87,6 +87,8 @@ def matrix_view(
     """综合矩阵视图：以 test_items 为行，三个标准源（行标/北京/卫健委）为列。
 
     返回每行的项目基本信息 + 三个源各自的 CV/Bias/TEa/unit。
+    排序规则：被至少一个标准源提及的项目在前，三个源均未提及的沉底；
+    同组内按 category、id 升序。
     前端可用此接口渲染「一个表格看全部标准」的综合比对页。
     """
     base = db.query(TestItem)
@@ -96,9 +98,6 @@ def matrix_view(
         base = base.filter(
             or_(TestItem.name.like(kw), TestItem.code.like(kw), TestItem.aliases.like(kw))
         )
-
-    total = base.count()
-    items = base.order_by(TestItem.category, TestItem.id).offset((page - 1) * page_size).limit(page_size).all()
 
     # 批量查出每个 source 下按 item_name 索引的 quality_requirements
     qr_maps = {}
@@ -121,14 +120,34 @@ def matrix_view(
                 return v
         return None
 
+    # 先取全部符合搜索条件的项目（数量不大，应用层排序后再分页）
+    all_items = base.order_by(TestItem.category, TestItem.id).all()
+    total = len(all_items)
+
+    # 统计每个项目被多少源提及（有任一要求字段非空才计入）
+    def _mentioned_count(name: str) -> int:
+        cnt = 0
+        for src in _SOURCES:
+            qr = _find_best(src, name)
+            if qr is not None and (qr.cv or qr.bias or qr.tea or qr.unit):
+                cnt += 1
+        return cnt
+
+    annotated = [( _mentioned_count(ti.name), ti) for ti in all_items]
+    # 排序：被提及源数降序（均未提及=0 沉底），其次按 category、id 升序
+    annotated.sort(key=lambda x: (-x[0], x[1].category, x[1].id))
+
+    page_items = annotated[(page - 1) * page_size: (page - 1) * page_size + page_size]
+
     rows_out = []
-    for ti in items:
+    for mc, ti in page_items:
         rec = {
             "item_id": ti.id,
             "item_code": ti.code or "",
             "item_name": ti.name or "",
             "category": ti.category or "",
             "specimen": ti.specimen or "",
+            "mentioned_count": mc,
         }
         for src in _SOURCES:
             qr = _find_best(src, ti.name)

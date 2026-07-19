@@ -54,6 +54,7 @@
           <template #default="{ row }">
             <span class="item-name-cell">{{ row.item_name }}</span>
             <span v-if="row.item_code" class="item-code-sub">{{ row.item_code }}</span>
+            <el-tag v-if="row.mentioned_count === 0" size="small" type="info" effect="plain" class="unrecorded-tag">未收录</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="category" label="分类" width="90" />
@@ -473,6 +474,7 @@ onMounted(async () => {
 
 .item-name-cell { font-weight: 600; color: #1e293b; }
 .item-code-sub { display: block; font-size: 11px; color: #94a3b8; margin-top: 2px; font-weight: 400; }
+.unrecorded-tag { margin-left: 6px; vertical-align: middle; }
 .qr-filled { color: #0f766e; font-weight: 500; }
 .qr-empty { color: #cbd5e1; }
 </style>
