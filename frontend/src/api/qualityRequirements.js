@@ -21,3 +21,6 @@ export function listQualitySources() {
 export function seedQualityRequirements() {
   return request.post('/api/v1/quality-requirements/_meta/seed')
 }
+export function getQualityMatrix(params) {
+  return request.get('/api/v1/quality-requirements/_meta/matrix', { params })
+}
