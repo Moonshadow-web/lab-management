@@ -170,7 +170,11 @@ def _render_html(items):
 
 
 def _sync_notifications(db: Session, notif_active, active_keys):
-    """upsert 站内提醒（reminder_*），删除不再活跃的记录。"""
+    """upsert 站内提醒（reminder_*），删除不再活跃的记录。
+
+    同时清理与此引擎重叠的旧版通知类型（instrument_calibration / eqa_return），
+    避免同一事项显示两条（一条来自旧 refresh_* 函数，一条来自 reminder_*）。
+    """
     existing = {
         (n.ref_type, n.ref_id): n
         for n in db.query(Notification).filter(Notification.ref_type.like("reminder_%")).all()
@@ -186,6 +190,23 @@ def _sync_notifications(db: Session, notif_active, active_keys):
             ))
     for n in existing.values():
         db.delete(n)
+
+    # 清理旧版通知类型：reminder_calibration → instrument_calibration
+    cal_ref_ids = {k[1] for k in active_keys if k[0].startswith("reminder_calibration")}
+    if cal_ref_ids:
+        for n in db.query(Notification).filter(
+            Notification.ref_type == "instrument_calibration",
+            Notification.ref_id.in_(cal_ref_ids),
+        ).all():
+            db.delete(n)
+    # reminder_eqA_* → eqa_return
+    eqa_ref_ids = {k[1] for k in active_keys if k[0].startswith("reminder_eqA_")}
+    if eqa_ref_ids:
+        for n in db.query(Notification).filter(
+            Notification.ref_type == "eqa_return",
+            Notification.ref_id.in_(eqa_ref_ids),
+        ).all():
+            db.delete(n)
 
 
 def run_reminders(db: Session, as_of: Optional[date] = None, dry_run: bool = False) -> dict:

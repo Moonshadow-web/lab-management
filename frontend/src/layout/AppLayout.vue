@@ -71,7 +71,7 @@ const menus = computed(() => {
     { path: '/instruments', title: '仪器档案', icon: 'Cpu', moduleKey: 'instruments' },
     // 质控管理是聚合菜单：含 月结/质评/仪器间比对/室间比对/累靶 多个权限模块，任一可见即显示
     { path: '/qc', title: '质控管理', icon: 'DataLine', moduleKeys: ['qc-monthly', 'eqa', 'comparison', 'interlab', 'qc-target'] },
-    { path: '/reagents', title: '试剂管理', icon: 'ShoppingCart', moduleKey: 'reagents' },
+    { path: '/reagent/items', title: '试剂管理', icon: 'ShoppingCart', moduleKey: 'reagents' },
     { path: '/training', title: '继教培训', icon: 'Reading', moduleKey: 'training' },
     { path: '/verification', title: '性能验证', icon: 'DataAnalysis', moduleKey: 'verification' },
     { path: '/iso15189', title: '15189专项', icon: 'Stamp', moduleKey: 'iso15189' },

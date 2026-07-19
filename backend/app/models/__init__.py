@@ -20,7 +20,10 @@ from .interlab import InterlabPlan, InterlabItem, InterlabLevel
 from .qc_target import QCTargetBatch, QCTargetResult
 from .qc_material import QcMaterial
 from .refresh_token import RefreshToken
-from .quality_requirement import QualityRequirement
+from .reagent_management import (
+    ReagentItem, ReagentStock, InventoryCheck, InventoryCheckItem,
+    ReagentOrder, ReagentOrderItem, Receiving, ReceivingItem, ReagentConsumption,
+)
 from .module_permission import ModulePermission, DEFAULT_MODULE_PERMISSIONS, ALL_MODULES, ALL_ROLES
 
 __all__ = [
@@ -61,4 +64,8 @@ __all__ = [
     "RefreshToken",
     "QualityRequirement",
     "ModulePermission",
+    # 试剂管理
+    "ReagentItem", "ReagentStock", "InventoryCheck", "InventoryCheckItem",
+    "ReagentOrder", "ReagentOrderItem", "Receiving", "ReceivingItem",
+    "ReagentConsumption",
 ]
