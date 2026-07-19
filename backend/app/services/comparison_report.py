@@ -81,18 +81,11 @@ def _compared_ids(group: ComparisonGroup):
     return [i for i in ids if i != group.reference_instrument_id]
 
 
-def _parse_float(x):
-    try:
-        return float(str(x).strip())
-    except Exception:
-        return None
-
-
 def _compute_bias(ref, val, te, mode):
     """返回 (偏倚值或None, 是否允许或None)。"""
-    rf = _parse_float(ref)
-    vf = _parse_float(val)
-    tf = _parse_float(te)
+    rf = _extract_float(ref)
+    vf = _extract_float(val)
+    tf = _extract_float(te)
     if rf is None or vf is None or tf is None:
         return None, None
     if mode == "absolute":
@@ -889,11 +882,14 @@ QUANT_SYNONYMS = {
 _GROUP_TO_EXCEL = {v: k for k, v in QUANT_SYNONYMS.items()}
 
 
-def _parse_float(s):
-    """从字符串中提取首个浮点数（如 "0.2 mmol/L" -> 0.2, "≤3.3" -> 3.3）。失败返回 None。"""
+def _extract_float(s):
+    """从字符串中提取首个浮点数（如 "0.2 mmol/L" -> 0.2, "≤3.3" -> 3.3）。失败返回 None。
+
+    注意：不要与上方 _parse_float（简单 float() 解析）同名，否则会相互覆盖导致
+    _compute_bias 误用本函数并触发 NameError('re')。"""
     if s is None:
         return None
-    m = re.search(r"-?\d+(?:\.\d+)?", str(s))
+    m = _re.search(r"-?\d+(?:\.\d+)?", str(s))
     return float(m.group(0)) if m else None
 
 
@@ -908,10 +904,10 @@ def _resolve_te(it: dict, level: int = None, ref_value: str = None):
     level 参数保留兼容（历史 per-level 配置已被低浓度绝对偏倚替代，但 API 仍接受）
     """
     # 1) 低浓度绝对偏倚
-    low_th = _parse_float(it.get("low_threshold"))
+    low_th = _extract_float(it.get("low_threshold"))
     low_te = it.get("low_te")
     if low_th is not None and low_te is not None and str(low_te).strip() not in ("", "0", "0.0"):
-        ref_n = _parse_float(ref_value)
+        ref_n = _extract_float(ref_value)
         if ref_n is not None and ref_n <= low_th:
             return str(low_te)
     # 兼容旧 per-level 配置（若有遗留数据）
@@ -942,10 +938,10 @@ def _resolve_mode(it: dict, level: int = None, ref_value: str = None, default: s
     3. it["mode"] 项目级
     4. default
     """
-    low_th = _parse_float(it.get("low_threshold"))
+    low_th = _extract_float(it.get("low_threshold"))
     low_te = it.get("low_te")
     if low_th is not None and low_te is not None and str(low_te).strip() not in ("", "0", "0.0"):
-        ref_n = _parse_float(ref_value)
+        ref_n = _extract_float(ref_value)
         if ref_n is not None and ref_n <= low_th:
             return "absolute"
     by_lv = it.get("mode_by_level") or {}
