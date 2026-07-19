@@ -363,7 +363,7 @@ def upload_qc_summary(
             tm = agg["mean"]
             ts = agg["sd"]
         target_cv = (ts / tm * 100) if tm else 0.0
-        quality_goal = lookup_quality_goal(test_item, m.get("test_item_aliases", ""))
+        quality_goal = lookup_quality_goal(test_item, m.get("test_item_aliases", ""), db)
         existing = (
             db.query(QCMonthlySummary)
             .filter_by(year=year, month=month, test_item=test_item, lot_no=lot_no, level=level, instrument=instrument)

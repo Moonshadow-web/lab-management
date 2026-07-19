@@ -16,6 +16,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from ..models.test_item import TestItem
+from ..models.quality_requirement import QualityRequirement
 
 _QUALITY_GOALS_PATH = Path(__file__).resolve().parent.parent / "data" / "qc_quality_goals.json"
 _goals_cache: dict | None = None
@@ -100,15 +101,123 @@ def find_test_item_by_name(db: Session, name: str) -> TestItem | None:
     return None
 
 
-def lookup_quality_goal(test_item: str, aliases: str = "") -> str:
+def _extract_first_pct(s: str) -> float | None:
+    """从字符串中提取第一个百分比数值。
+    支持 "2.5%", "靶值 ±20% 或 ±5μg/L", "正常6.5%/异常10.0%" 等。
+    返回 float（如 2.5, 20），提取失败返回 None。
+    """
+    if not s:
+        return None
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%", s)
+    if m:
+        return float(m.group(1))
+    return None
+
+
+def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
+    """从 QualityRequirement 表中按项目名查找质量目标。
+    
+    优先级：wst403-2024.cv > bj-hr-2025.cv > nccl-2026.tea/3。
+    匹配策略：精确匹配 > 子串含（主名或别名中有一段）。
+    """
+    from ..services.comparison_report import WST403_2024
+
+    def _match(items, source: str, field: str):
+        """在 items 中匹配第一条非空的目标字段值。"""
+        for r in items:
+            if r.source == source:
+                val = getattr(r, field, None)
+                if val and str(val).strip() not in ("", "/"):
+                    return str(val).strip()
+        return None
+
+    def _all(name: str) -> list:
+        """查询指定名称的所有 quality_requirements 记录。"""
+        # 精确匹配
+        rows = db.query(QualityRequirement).filter(
+            QualityRequirement.item_name == name
+        ).all()
+        # 子串匹配（含 name 或被 name 含）
+        if not rows:
+            rows = db.query(QualityRequirement).filter(
+                QualityRequirement.item_name.contains(name)
+            ).all()
+        if not rows:
+            rows = db.query(QualityRequirement).filter(
+                name.contains(QualityRequirement.item_name)
+            ).all()
+        # 再试别名中的每个词
+        if not rows:
+            for a in (aliases or "").replace("，", ",").split(","):
+                a = a.strip()
+                if not a:
+                    continue
+                rows = db.query(QualityRequirement).filter(
+                    QualityRequirement.item_name.contains(a)
+                ).all()
+                if rows:
+                    break
+        return rows or []
+
+    items = _all(test_item)
+    if not items:
+        return None
+
+    # 1) wst403-2024.cv
+    v = _match(items, "wst403-2024", "cv")
+    if v:
+        pct = _extract_first_pct(v)
+        if pct is not None:
+            return f"{pct:g}%"
+
+    # 2) bj-hr-2025.cv
+    v = _match(items, "bj-hr-2025", "cv")
+    if v:
+        pct = _extract_first_pct(v)
+        if pct is not None:
+            return f"{pct:g}%"
+
+    # 3) nccl-2026.tea/3
+    v = _match(items, "nccl-2026", "tea")
+    if v:
+        pct = _extract_first_pct(v)
+        if pct is not None:
+            return f"{pct / 3:.1f}%"
+
+    # 4) 尝试 WST403_2024 TE/3（通过别名匹配英文代码）
+    for a in (aliases or "").replace("，", ",").split(","):
+        a = a.strip().upper()
+        if a and a in WST403_2024:
+            te = WST403_2024[a]
+            if isinstance(te, tuple):
+                te_val, mode = te
+            else:
+                te_val, mode = te, "relative"
+            if mode == "relative":
+                return f"{te_val / 3:.1f}%"
+
+    return None
+
+
+def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None) -> str:
     """按项目名/别名查允许不精密度（质量目标）。
 
-    匹配优先级：精确 → 本项目名是某条目名的一部分 → 别名命中。同名下可能存在
-    多条（如某条目注明「试验(尿液)」其允许不精密度为「/」非适用），故优先
-    选非空（非「/」）的命中，避免误取无效的「/」。
+    优先级：
+    1. quality_requirements 表：wst403-2024.cv > bj-hr-2025.cv > nccl-2026.tea/3
+    2. 原有 qc_quality_goals.json 精确/子串匹配（保留兼容）
+    3. WST403_2024 TE 字典 / 3
+    4. 默认 "10%"
     """
     if not test_item:
         return ""
+
+    # Step 1: QualityRequirement 表查询
+    if db is not None:
+        qr_goal = _lookup_qr_goal(db, test_item, aliases)
+        if qr_goal:
+            return qr_goal
+
+    # Step 2: 原有 JSON 文件匹配（保留兼容）
     goals = _load_goals()
     keys = {test_item}
     for a in (aliases or "").replace("，", ",").split(","):
@@ -130,7 +239,25 @@ def lookup_quality_goal(test_item: str, aliases: str = "") -> str:
         pool = non_empty if non_empty else candidates
         pool.sort(key=lambda c: len(c[0]))
         return pool[0][1]
-    return ""
+
+    # Step 3: WST403_2024 TE/3（兜底，通过别名匹配英文代码）
+    try:
+        from .comparison_report import WST403_2024
+        for a in (aliases or "").replace("，", ",").split(","):
+            a = a.strip().upper()
+            if a and a in WST403_2024:
+                te = WST403_2024[a]
+                if isinstance(te, tuple):
+                    te_val, mode = te
+                else:
+                    te_val, mode = te, "relative"
+                if mode == "relative":
+                    return f"{te_val / 3:.1f}%"
+    except ImportError:
+        pass
+
+    # Step 4: 默认 "10%"
+    return "10%"
 
 
 def _fmt(v) -> str:
