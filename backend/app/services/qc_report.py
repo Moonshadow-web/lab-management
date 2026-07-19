@@ -68,7 +68,7 @@ def build_docx(out_path, summaries, report, instrument_name, instrument_no, year
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     t.autofit = False
     for c, h in enumerate(CZ012_HEADERS):
-        _fill(t.rows[0].cells[c], h, bold=True, size=9)
+        _fill(t.rows[0].cells[c], h, bold=True, size=9, align="center")
     for s in summaries:
         cells = t.add_row().cells
         vals = [
@@ -85,8 +85,7 @@ def build_docx(out_path, summaries, report, instrument_name, instrument_no, year
         for i, c in enumerate(row.cells):
             c.width = widths[i]
 
-    # 文字部分
-    _heading(doc, "文字部分", size=13)
+    # 文字部分（无独立标题）
     sections = [
         ("一、仪器运行情况", report.operation_status if report else ""),
         ("二、各项目是否出现漂移或趋势性改变", report.drift_trend if report else ""),
