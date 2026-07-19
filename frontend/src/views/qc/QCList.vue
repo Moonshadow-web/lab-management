@@ -193,7 +193,7 @@
             />
           </el-select>
           <el-button :disabled="!chartProject" :loading="chartLoading" @click="loadChartData">查看质控图</el-button>
-          <span class="hint">选择项目后同一张 LJ 图用不同颜色区分多水平；每月多水平状态见左侧表格。</span>
+          <span class="hint">选择项目后同一张 LJ 图用不同颜色区分多水平；左侧表格显示各日各水平测值与在控状态。</span>
         </div>
 
         <div v-if="!chartProject" class="empty-tip">请选择年月、仪器和项目后查看质控图。</div>
@@ -218,25 +218,6 @@
                 </template>
               </el-table-column>
             </el-table>
-
-            <div class="daily-status-summary">
-              <div class="chart-section-title">每日多水平状态汇总</div>
-              <div v-for="row in chartDataByDate" :key="row.qc_date" class="status-line">
-                <span class="date-label">{{ row.qc_date }}</span>
-                <span
-                  v-for="lv in chartDisplayLevels"
-                  :key="lv"
-                  class="level-status"
-                >
-                  {{ lv }}水平：
-                  <template v-if="row.levels[lv]">
-                    <el-tag v-if="row.levels[lv].is_out_of_control" type="danger" size="small">失控 {{ row.levels[lv].rule_violated }}</el-tag>
-                    <el-tag v-else type="success" size="small">在控</el-tag>
-                  </template>
-                  <span v-else class="text-muted">无数据</span>
-                </span>
-              </div>
-            </div>
           </div>
           <div class="chart-right">
             <div ref="chartRef" class="chart-box"></div>
@@ -2246,12 +2227,6 @@ watch(activeTab, (t) => {
 .re-meta-item { display: flex; align-items: center; gap: 6px; }
 .re-meta-item > span { font-size: 12px; color: #606266; white-space: nowrap; }
 .re-meta-item .el-input, .re-meta-item .el-date-editor { width: 130px; }
-.daily-status-summary { margin-top: 12px; padding: 12px; border: 1px solid #e4e7ed; border-radius: 4px; background: #f8f9fa; max-height: 260px; overflow-y: auto; }
-.daily-status-summary .status-line { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 6px 0; border-bottom: 1px dashed #e4e7ed; font-size: 13px; }
-.daily-status-summary .status-line:last-child { border-bottom: none; }
-.daily-status-summary .date-label { font-weight: 600; color: #303133; min-width: 90px; }
-.daily-status-summary .level-status { display: inline-flex; align-items: center; gap: 4px; }
-.daily-status-summary .level-status .el-tag { font-size: 12px; }
 .level-cell { display: flex; flex-direction: column; gap: 2px; }
 .level-cell .level-val { font-weight: 500; }
 .text-muted { color: #c0c4cc; }
