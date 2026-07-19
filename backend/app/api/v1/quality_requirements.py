@@ -61,6 +61,12 @@ def seed_defaults(db: Session = Depends(get_db), user: User = Depends(get_curren
 # ── 三个标准源的 source 常量，与 QUALITY_SOURCES 顺序一致 ──
 _SOURCES = [s[0] for s in QUALITY_SOURCES]  # ["wst403-2024", "bj-hr-2025", "nccl-2026"]
 
+# ── 项目库名 → 标准源中可能的同义叫法（打通综合比对匹配）──
+# 例：项目库「二氧化碳」在临床生化里即标准源的「碳酸氢根 / HCO3 / 二氧化碳结合力」
+_SYNONYMS = {
+    "二氧化碳": ["碳酸氢根", "HCO3", "Bicarbonate", "总二氧化碳", "二氧化碳结合力", "CO2"],
+}
+
 
 def _qr_row_dict(row: QualityRequirement | None) -> dict:
     """把 QualityRequirement 行转为字典；NULL 时返回全空。"""
@@ -109,15 +115,19 @@ def matrix_view(
         )
         qr_maps[src] = {r.item_name: r for r in rows}
 
-    # 模糊匹配辅助：item_name 不完全一致时按包含关系兜底
+    # 模糊匹配辅助：item_name 不完全一致时按包含关系兜底；并应用同义词映射
     def _find_best(src: str, name: str) -> QualityRequirement | None:
-        m = qr_maps[src].get(name)
-        if m:
-            return m
-        # 尝试反向包含（标准名包含项目名 或 项目名包含标准名）
-        for k, v in qr_maps[src].items():
-            if name in k or k in name:
-                return v
+        candidates = [name] + _SYNONYMS.get(name, [])
+        # 1) 候选精确匹配
+        for cand in candidates:
+            m = qr_maps[src].get(cand)
+            if m:
+                return m
+        # 2) 候选与标准名互相包含
+        for cand in candidates:
+            for k, v in qr_maps[src].items():
+                if cand in k or k in cand:
+                    return v
         return None
 
     # 先取全部符合搜索条件的项目（数量不大，应用层排序后再分页）
