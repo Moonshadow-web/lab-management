@@ -1,6 +1,9 @@
-"""项目查询库(test_items)与室间质评库(eqa_plans)的关联查询。
+"""项目查询库(test_items)与室间质评库(eqa_plans)的关联查询 + 质量要求标准整合。
 
-该模块只提供只读接口，返回项目与 EQA 计划的匹配关系（按项目名称/别名归一化匹配）。
+该模块只提供只读接口，返回：
+  1) 项目与 EQA 计划的匹配关系（按项目名称/别名归一化匹配）
+  2) 三个质量标准源（WS/T 403-2024 / 北京市互认 / 卫健委 NCCL）的允许误差指标
+形成「一行看全景」的项目质控总览。
 """
 import re
 from typing import Optional
@@ -12,6 +15,7 @@ from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...core.security import get_current_user
 from ...models.eqa import EqaPlan
+from ...models.quality_requirement import QualityRequirement
 from ...models.test_item import TestItem
 
 router = APIRouter(prefix="/eqa-associations", tags=["eqa-associations"])
@@ -107,8 +111,43 @@ _MANUAL_ASSOCIATIONS = {
 
 
 # ---------------------------------------------------------------------------
+# 质量标准源常量
+# ---------------------------------------------------------------------------
+_QR_SOURCES = ["wst403-2024", "bj-hr-2025", "nccl-2026"]
+
+# 同义词：项目库名称 → 标准源可能用名（与 quality_requirements matrix 接口一致）
+_QR_SYNONYMS = {
+    "二氧化碳": ["碳酸氢根", "HCO3", "Bicarbonate", "总二氧化碳", "二氧化碳结合力", "CO2"],
+}
+
+
+# ---------------------------------------------------------------------------
 # 响应模型
 # ---------------------------------------------------------------------------
+class QualityReqDetail(BaseModel):
+    """单个质量标准源的允许误差指标。"""
+    cv: Optional[str] = None      # 允许不精密度
+    bias: Optional[str] = None    # 允许偏倚
+    tea: Optional[str] = None     # 允许总误差 / 可接受范围 / EQA评价标准
+    unit: Optional[str] = None    # 单位（北京互认独有）
+    item_name: Optional[str] = None  # 标准源中的原始项目名
+
+    class Config:
+        from_attributes = True
+
+
+def _qr_to_detail(qr: Optional[QualityRequirement]) -> Optional[QualityReqDetail]:
+    if not qr:
+        return None
+    return QualityReqDetail(
+        cv=qr.cv or None,
+        bias=qr.bias or None,
+        tea=qr.tea or None,
+        unit=qr.unit or None,
+        item_name=qr.item_name or None,
+    )
+
+
 class EqaAssociationItem(BaseModel):
     id: int
     name: str
@@ -123,6 +162,10 @@ class EqaAssociationItem(BaseModel):
     wjw_tokens: list[str]
     bj_tokens: list[str]
     match_score: str  # 'exact' / 'alias' / 'substring' / 'curated'
+    # ── 质量要求标准整合 ──
+    wst403: Optional[QualityReqDetail] = None   # 行标 WS/T 403—2024
+    bj_hr: Optional[QualityReqDetail] = None     # 北京市互认 2025
+    nccl: Optional[QualityReqDetail] = None      # 卫健委 NCCL EQA 2026
 
     class Config:
         from_attributes = True
@@ -146,6 +189,50 @@ def _strip_specimen(s: str) -> str:
 def _split_eqa_items(raw: str) -> list[str]:
     raw = re.sub(r"^(具体项目|项目|检测项目)[：:]\s*", "", raw or "")
     return [p.strip() for p in re.split(r"[、,，/]", raw) if p.strip()]
+
+
+# ---------------------------------------------------------------------------
+# 质量要求匹配辅助（与 matrix_view 逻辑一致）
+# ---------------------------------------------------------------------------
+def _norm_qr(s: str) -> str:
+    """归一化：去括号/空格/连字符，用于模糊匹配。"""
+    return re.sub(r"[\s\-（）().]", "", s or "").lower()
+
+
+def _find_qr_for_item(item_name: str, qr_map: dict) -> Optional[QualityRequirement]:
+    """从某标准源的 item_name→QR 字典中查找匹配项。"""
+    # 精确
+    hit = qr_map.get(item_name)
+    if hit:
+        return hit
+    # 归一化精确
+    n = _norm_qr(item_name)
+    for k, v in qr_map.items():
+        if _norm_qr(k) == n:
+            return v
+    # 包含匹配（双向）
+    for k, v in qr_map.items():
+        if item_name in k or k in item_name:
+            return v
+    # 同义词
+    syns = _QR_SYNONYMS.get(item_name, [])
+    for s in syns:
+        hit = qr_map.get(s)
+        if hit:
+            return hit
+        for k, v in qr_map.items():
+            if s in k or k in s:
+                return v
+    return None
+
+
+def _build_qr_maps(db: Session) -> dict[str, dict]:
+    """构建三个标准源的 {item_name: QualityRequirement} 快速索引。"""
+    maps = {}
+    for src in _QR_SOURCES:
+        rows = db.query(QualityRequirement).filter(QualityRequirement.source == src).all()
+        maps[src] = {r.item_name: r for r in rows}
+    return maps
 
 
 def _build_test_item_index(db: Session):
@@ -295,6 +382,14 @@ def _compute_associations(db: Session, category: Optional[str] = None,
         if rec["match_score"] in ("", "none"):
             rec["match_score"] = "manual"
 
+    # ── 质量要求标准整合 ──
+    qr_maps = _build_qr_maps(db)
+    for tid, rec in assoc_map.items():
+        name = rec["name"]
+        rec["wst403"] = _qr_to_detail(_find_qr_for_item(name, qr_maps.get("wst403-2024", {})))
+        rec["bj_hr"] = _qr_to_detail(_find_qr_for_item(name, qr_maps.get("bj-hr-2025", {})))
+        rec["nccl"] = _qr_to_detail(_find_qr_for_item(name, qr_maps.get("nccl-2026", {})))
+
     results = []
     for rec in assoc_map.values():
         rec["has_eqa"] = rec["has_wjw"] or rec["has_bj"]
@@ -315,31 +410,51 @@ def _compute_associations(db: Session, category: Optional[str] = None,
         if keyword:
             kw = keyword.lower()
             hay = (rec["name"] + rec["category"] + rec["specimen"] + rec["instrument"] +
-                   "".join(rec["wjw_tokens"] + rec["bj_tokens"])).lower()
-            if kw not in hay:
+                   "".join(rec["wjw_tokens"] + rec["bj_tokens"]))
+            # 也搜索质量要求中的文字
+            for src_key in ("wst403", "bj_hr", "nccl"):
+                d = rec.get(src_key)
+                if d:
+                    hay += (d.cv or "") + (d.bias or "") + (d.tea or "") + (d.item_name or "")
+            if kw not in hay.lower():
                 continue
 
         results.append(EqaAssociationItem(**{k: rec[k] for k in [
             "id", "name", "category", "specimen", "unit", "instrument", "brand",
-            "has_eqa", "has_wjw", "has_bj", "wjw_tokens", "bj_tokens", "match_score"
+            "has_eqa", "has_wjw", "has_bj", "wjw_tokens", "bj_tokens", "match_score",
+            "wst403", "bj_hr", "nccl",
         ]}))
 
-    # 排序：有 EQA 优先，再按类别、名称
-    results.sort(key=lambda x: (not x.has_eqa, x.category, x.name))
+    # 排序：有质量要求的项目优先（被提及源数降序），再按类别、名称
+    def _sort_key(x):
+        n = 0
+        if x.wst403: n += 1
+        if x.bj_hr: n += 1
+        if x.nccl: n += 1
+        return (-n, x.category or "", x.name)
+
+    results.sort(key=_sort_key)
     return results
 
 
 # ---------------------------------------------------------------------------
 # 路由
 # ---------------------------------------------------------------------------
-@router.get("", response_model=list[EqaAssociationItem], summary="项目库与室间质评关联查询")
+@router.get("", response_model=list[EqaAssociationItem], summary="项目库与室间质评关联查询（含质量标准）")
 def list_eqa_associations(
     category: Optional[str] = Query(None, description="项目类别：生化/免疫/凝血/其他"),
     has_eqa: Optional[str] = Query(None, description="全部all/有yes/无no"),
     org: Optional[str] = Query(None, description="全部all/卫健委wjw/北京市bj"),
-    keyword: Optional[str] = Query(None, description="关键词搜索"),
+    keyword: Optional[str] = Query(None, description="关键词搜索（也搜质量要求中的文字）"),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """返回 test_items 与 eqa_plans 的自动匹配关联，用于"哪些项目有质评、哪些没有"的总览。"""
+    """返回 test_items 与 eqa_plans 的自动匹配关联 + 三个质量标准的允许误差指标。
+
+    每行包含：
+    - EQA 计划覆盖情况（卫健委/北京市 有无 + 细项名）
+    - WS/T 403—2024 行标（CV / Bias / TEa）
+    - 北京市互认标准（CV / EQA评价标准）
+    - 卫健委 NCCL EQA 标准（可接受范围）
+    """
     return _compute_associations(db, category=category, has_eqa=has_eqa, org=org, keyword=keyword)
