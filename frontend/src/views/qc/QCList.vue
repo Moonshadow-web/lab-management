@@ -14,23 +14,10 @@
             style="width: 160px"
           />
           <el-select
-            v-model="filterInstrumentId"
-            placeholder="按仪器筛选"
-            style="width: 240px"
-            @change="loadSummary"
-          >
-            <el-option label="全部仪器" :value="0" />
-            <el-option
-              v-for="opt in instrumentList"
-              :key="opt.id"
-              :label="instLabel(opt)"
-              :value="opt.id"
-            />
-          </el-select>
-          <el-select
             v-model="uploadInstrumentId"
-            placeholder="先选择质控仪器"
-            style="width: 240px"
+            placeholder="选择仪器"
+            style="width: 260px"
+            @change="onUploadInstChange"
           >
             <el-option
               v-for="opt in instrumentList"
@@ -39,10 +26,10 @@
               :value="opt.id"
             />
           </el-select>
-          <el-button v-if="auth.canWrite('qc')" type="primary" @click="triggerCsv">上传该仪器 LIS 数据(CSV/XLSX)</el-button>
+          <el-button v-if="auth.canWrite('qc')" type="primary" :disabled="!uploadInstrumentId" @click="triggerCsv">上传该仪器 LIS 数据(CSV/XLSX)</el-button>
           <input ref="csvInput" type="file" accept=".csv,.xlsx,.xls" hidden @change="onCsvChange" />
           <span class="hint">
-            月结按「每一台仪器」分块；上传前先在下拉中选好受控仪器（绑定仪器台账），系统按每日测值跑 Westgard 判失控并自动草拟文字小结。
+            月结按所选仪器分块；上传前先在下拉中选好受控仪器（绑定仪器台账），系统按每日测值跑 Westgard 判失控并自动草拟文字小结。
           </span>
         </div>
 
@@ -699,8 +686,7 @@ function instLabel(opt) {
 const monthValue = ref('')
 const summaryRows = ref([])
 const loadingSummary = ref(false)
-const filterInstrumentId = ref(0)      // 0 = 全部
-const uploadInstrumentId = ref(null)   // 上传时选定的受控仪器
+const uploadInstrumentId = ref(null)   // 月结筛选 + 上传 时选定的受控仪器
 const csvInput = ref(null)
 const reportMap = reactive({})         // blockKey -> 文字报告对象
 
@@ -911,6 +897,35 @@ function renderChart(rows) {
     const tm = data[0]?.target_mean ?? 0
     const ts = data[0]?.target_sd ?? 0
     const color = colors[idx % colors.length]
+    // 收集超过 ±4SD 的点（SDI 模式：|x|>4；实测模式：|x-tm|>4*ts）
+    const overPoints = []
+    data.forEach((r) => {
+      let isOver = false
+      let clipped = r.value
+      if (useSDI) {
+        if (ts) {
+          const sdi = (r.value - tm) / ts
+          if (Math.abs(sdi) > 4) {
+            isOver = true
+            clipped = sdi > 4 ? 4 : -4
+          }
+        }
+      } else {
+        if (tm && ts) {
+          if (r.value > tm + 4 * ts) { isOver = true; clipped = tm + 4 * ts }
+          else if (r.value < tm - 4 * ts) { isOver = true; clipped = tm - 4 * ts }
+        }
+      }
+      if (isOver) {
+        overPoints.push({
+          name: '超4SD',
+          coord: [r.qc_date, clipped],
+          value: `原始 ${r.value}`,
+          itemStyle: { color: '#f5222d', borderColor: '#fff', borderWidth: 1 },
+          label: { show: true, formatter: '↑', position: 'top', color: '#f5222d', fontWeight: 700, fontSize: 14 },
+        })
+      }
+    })
     series.push({
       name: lv,
       type: 'line',
@@ -924,6 +939,14 @@ function renderChart(rows) {
       itemStyle: { color },
       lineStyle: { width: 2, color },
       connectNulls: false,
+      markPoint: overPoints.length
+        ? {
+            symbol: 'pin',
+            symbolSize: 26,
+            data: overPoints,
+            animation: false,
+          }
+        : undefined,
     })
     // 为每个水平添加均值/SD 参考线（仅首个水平显示在图例，避免重复）
     if (tm && ts) {
@@ -936,20 +959,23 @@ function renderChart(rows) {
         { value: tm - 2 * ts, label: `${lv} -2SD 警告限`, kind: 'warn' },
         { value: tm + 3 * ts, label: `${lv} +3SD 失控限`, kind: 'ooc' },
         { value: tm - 3 * ts, label: `${lv} -3SD 失控限`, kind: 'ooc' },
+        { value: tm + 4 * ts, label: `${lv} +4SD`, kind: 'clip' },
+        { value: tm - 4 * ts, label: `${lv} -4SD`, kind: 'clip' },
       ]
       refs.forEach((ref) => {
         const styleMap = {
-          mean: { type: 'solid', width: 1.8, color },
-          sd:   { type: 'dashed', width: 1, color: '#aaa' },
-          warn: { type: 'dashed', width: 1.4, color: '#faad14' },
-          ooc:  { type: 'dashed', width: 1.6, color: '#f5222d' },
+          mean: { type: 'solid', width: 2, color },
+          sd:   { type: 'dashed', width: 1, color: '#999' },
+          warn: { type: 'dashed', width: 1.8, color: '#faad14' },   // 警告线加粗
+          ooc:  { type: 'dashed', width: 2.2, color: '#f5222d' },   // 失控线加粗
+          clip: { type: 'dotted', width: 1.2, color: '#bbb' },
         }
         const s = styleMap[ref.kind]
         markLineData.push({
           yAxis: ref.value,
           name: ref.label,
           lineStyle: s,
-          label: { formatter: ref.label, position: 'insideEndTop', fontSize: 10, color: s.color },
+          label: { formatter: ref.label, position: 'insideEndTop', fontSize: ref.kind === 'ooc' || ref.kind === 'warn' ? 11 : 10, color: s.color, fontWeight: ref.kind === 'ooc' || ref.kind === 'warn' ? 700 : 400 },
         })
       })
     }
@@ -988,8 +1014,23 @@ function renderChart(rows) {
   }
 
   chartInstance = echarts.init(chartRef.value)
+  // 计算标题副标题（靶值/标准差）
+  const subtitleLines = []
+  for (const lv of levels) {
+    const data = byLevel[lv]
+    const tm = data[0]?.target_mean ?? 0
+    const ts = data[0]?.target_sd ?? 0
+    if (tm) {
+      subtitleLines.push(`${lv}水平：靶值 ${tm}　SD ${ts}　范围 ${(tm - 4 * ts).toFixed(2)} ~ ${(tm + 4 * ts).toFixed(2)}`)
+    }
+  }
   const option = {
-    title: { text: `${chartProject.value} LJ 质控图`, left: 'center' },
+    title: {
+      text: `${chartProject.value} LJ 质控图`,
+      subtext: subtitleLines.join('　　'),
+      left: 'center',
+      subtextStyle: { fontSize: 11, color: '#666' },
+    },
     tooltip: {
       trigger: 'axis',
       formatter: (params) => {
@@ -1000,13 +1041,16 @@ function renderChart(rows) {
           const unit = chartData.value.find((r) => r.qc_date === date && r.level === p.seriesName)
           const raw = unit ? unit.value : ''
           const rule = unit && unit.is_out_of_control ? `（失控 ${unit.rule_violated}）` : ''
-          html += `<div style="color:${p.color}">● ${p.seriesName}: ${p.value}${useSDI ? 'SDI' : ''}${raw ? ' （原始 ' + raw + '）' : ''}${rule}</div>`
+          const tm = unit ? unit.target_mean : ''
+          const ts = unit ? unit.target_sd : ''
+          const meta = (tm !== '' && ts !== '') ? `（靶值 ${tm} ±${ts}）` : ''
+          html += `<div style="color:${p.color}">● ${p.seriesName}: ${p.value}${useSDI ? 'SDI' : ''}${raw ? ' （原始 ' + raw + '）' : ''}${meta}${rule}</div>`
         })
         return html
       },
     },
     legend: { data: levels, top: 30 },
-    grid: { left: '8%', right: '5%', bottom: '10%', top: '18%', containLabel: true },
+    grid: { left: '8%', right: '5%', bottom: '10%', top: '22%', containLabel: true },
     xAxis: {
       type: 'category',
       data: allDates,
@@ -1016,7 +1060,23 @@ function renderChart(rows) {
       max: allDates.length - 1,
       axisLabel: { rotate: allDates.length > 15 ? 45 : 0 },
     },
-    yAxis: { type: 'value', name: yAxisName, scale: true },
+    yAxis: useSDI
+      ? { type: 'value', name: yAxisName, min: -4, max: 4 }
+      : (() => {
+          // 实测模式：纵轴固定 ±4SD，并保证所有 ±2SD/±3SD 警告限/失控限都在范围内
+          let lo = Infinity, hi = -Infinity
+          for (const lv of levels) {
+            const d = byLevel[lv]
+            const tm = d[0]?.target_mean ?? 0, ts = d[0]?.target_sd ?? 0
+            if (!tm) continue
+            lo = Math.min(lo, tm - 4 * ts)
+            hi = Math.max(hi, tm + 4 * ts)
+          }
+          if (!isFinite(lo) || !isFinite(hi)) {
+            return { type: 'value', name: yAxisName, scale: true }
+          }
+          return { type: 'value', name: yAxisName, min: lo, max: hi }
+        })(),
     series,
   }
   if (markLineData.length) {
@@ -1050,7 +1110,7 @@ async function loadSummary() {
     const params = {}
     if (year) params.year = year
     if (month) params.month = month
-    if (filterInstrumentId.value) params.instrument_id = filterInstrumentId.value
+    if (uploadInstrumentId.value) params.instrument_id = uploadInstrumentId.value
     params.page_size = 500
     const res = await listQCSummaries(params)
     const rows = (res.items || []).map((it) => ({ ...it, _daily: [] }))
@@ -1111,6 +1171,10 @@ async function delSummary(row) {
   await deleteQCSummary(row.id)
   ElMessage.success('已删除')
   await loadSummary()
+}
+function onUploadInstChange() {
+  // 选择/切换仪器时重载月结与图表
+  loadSummary()
 }
 async function saveReport(g) {
   const rep = reportMap[g.key]
