@@ -4,9 +4,10 @@ import re
 
 from .config import DATABASE_URL
 
-# SQLite 需要关闭同线程检查以在 FastAPI 异步事件循环中使用
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-
+# SQLite 需要关闭同线程检查以在 FastAPI 异步事件循环中使用；
+# MySQL 不需要这个参数（会报错）
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
+connect_args = {"check_same_thread": False} if IS_SQLITE else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 Base = declarative_base()
@@ -22,6 +23,8 @@ def _doc_number_sort(s):
 
 @event.listens_for(engine, "connect")
 def _register_sqlite_functions(dbapi_conn, conn_record):
+    if not IS_SQLITE:
+        return
     # 注册自定义排序函数
     dbapi_conn.create_function("doc_number_sort", 1, _doc_number_sort)
     # 以下 PRAGMA 优化 SQLite 在 CFS（网络文件系统）上的并发与稳定性：

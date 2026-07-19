@@ -24,7 +24,8 @@
             "SMTP_PORT": "465",
             "SMTP_USER": "815268425@qq.com",
             "SMTP_PASS": "ejrgnmwzoigsbfjd",
-            "MAIL_FROM": "815268425@qq.com"
+            "MAIL_FROM": "815268425@qq.com",
+            "DATABASE_URL": "mysql+pymysql://labapp:Jzz6827556@10.0.1.18:3306/cloud1-0gjhamv53ff2298d"
           },
           "volumes": []
         }
