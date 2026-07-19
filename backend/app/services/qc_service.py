@@ -143,9 +143,9 @@ def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
                 QualityRequirement.item_name.contains(name)
             ).all()
         if not rows:
-            rows = db.query(QualityRequirement).filter(
-                name.contains(QualityRequirement.item_name)
-            ).all()
+            # 反向匹配：name 中包含某 item_name（用 Python 过滤，因 SQL 侧无法参数化列值）
+            all_qr = db.query(QualityRequirement).all()
+            rows = [r for r in all_qr if r.item_name and r.item_name in name]
         # 再试别名中的每个词
         if not rows:
             for a in (aliases or "").replace("，", ",").split(","):
@@ -213,9 +213,12 @@ def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None) -
 
     # Step 1: QualityRequirement 表查询
     if db is not None:
-        qr_goal = _lookup_qr_goal(db, test_item, aliases)
-        if qr_goal:
-            return qr_goal
+        try:
+            qr_goal = _lookup_qr_goal(db, test_item, aliases)
+            if qr_goal:
+                return qr_goal
+        except Exception:
+            pass  # QR 表查询失败不影响主流程，回退到 JSON 文件
 
     # Step 2: 原有 JSON 文件匹配（保留兼容）
     goals = _load_goals()
