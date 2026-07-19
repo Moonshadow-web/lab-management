@@ -23,8 +23,10 @@ data/
 .vscode/
 .DS_Store
 
-# WorkBuddy internal
-.workbuddy/
+# WorkBuddy local outputs / samples
+outputs/
+backend/sample_cz012*.docx
+
 
 # CloudBase deploy config (contains secrets: SECRET_KEY, SMTP auth code)
 cloudbaserc.json

@@ -73,7 +73,11 @@ export function exportQCReportDocx(year, month, instrumentId) {
     responseType: 'blob',
   })
 }
-// 月结下拉专用：仅室内质控受控仪器
+export function getQCProjectDaily(year, month, instrumentId, testItem) {
+  const params = { year, month, instrument_id: instrumentId, test_item: testItem }
+  return request.get('/api/v1/qc-summaries/daily/project', { params })
+}
+
 export function getQCInstruments() {
   return request.get('/api/v1/qc-summaries/instruments')
 }

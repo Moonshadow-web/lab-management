@@ -22,7 +22,7 @@ CZ012_HEADERS = [
 _CZ012_WIDTHS = [3.0, 2.2, 1.4, 1.6, 2.0, 2.0, 2.0, 2.0, 2.0, 1.8, 1.2, 1.8, 1.8, 2.3]
 
 
-def _fmt(v, nd=4):
+def _fmt(v, nd=2):
     try:
         f = float(v)
     except (TypeError, ValueError):
@@ -100,10 +100,33 @@ def build_docx(out_path, summaries, report, instrument_name, instrument_no, year
         _run_font(p.add_run(label + "："), 11, bold=True)
         _run_font(p.add_run(text or "（未填写）"), 11)
 
-    # 落款
+    # 落款/签字审批区（右下方）
+    # 仪器日常管理人
     p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     p.paragraph_format.space_before = Pt(12)
-    _run_font(p.add_run("操作者：　　　　　　审核者：　　　　　　日期："), 11)
+    _run_font(p.add_run("仪器日常管理人：签字"), 11)
+
+    # 质控总负责人审批意见（标签 + 空行）
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.paragraph_format.space_before = Pt(8)
+    _run_font(p.add_run("质控总负责人审批意见："), 11)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    _run_font(p.add_run(""), 11)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    _run_font(p.add_run(""), 11)
+
+    # 审批人签字 + 年月日
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.paragraph_format.space_before = Pt(8)
+    _run_font(p.add_run("审批人签字："), 11)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    _run_font(p.add_run("年    月    日"), 11)
 
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     doc.save(out_path)

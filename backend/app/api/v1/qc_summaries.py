@@ -25,7 +25,7 @@ from ...schemas import (
     QCMonthlyReportRead,
     QCMonthlyReportUpdate,
 )
-from ...services.qc_service import aggregate, lookup_quality_goal, draft_report
+from ...services.qc_service import aggregate, lookup_quality_goal, draft_report, find_test_item_by_name
 
 router = make_router(
     QCMonthlySummary,
@@ -292,11 +292,16 @@ def upload_qc_summary(
         vdeal = (get("violate_deal") or "").strip()
         daily_meta.setdefault(key, []).append((d.strftime("%Y-%m-%d"), v, op, vreason, vdeal))
         if key not in meta:
+            ti_name = (get("test_item") or "").strip()
+            matched = find_test_item_by_name(db, ti_name) if ti_name else None
+            file_unit = (get("unit") or "").strip()
+            unit = file_unit or (matched.unit if matched else "")
             meta[key] = {
-                "unit": (get("unit") or "").strip(),
+                "unit": unit,
                 "target_mean": _to_float(get("target_mean")) or 0.0,
                 "target_sd": _to_float(get("target_sd")) or 0.0,
                 "instrument_no": inst_no,
+                "test_item_aliases": matched.aliases if matched else "",
             }
         block_keys.add((instrument_id if sel_inst else None, inst, d.year, d.month))
 
@@ -314,7 +319,7 @@ def upload_qc_summary(
             tm = agg["mean"]
             ts = agg["sd"]
         target_cv = (ts / tm * 100) if tm else 0.0
-        quality_goal = lookup_quality_goal(test_item)
+        quality_goal = lookup_quality_goal(test_item, m.get("test_item_aliases", ""))
         existing = (
             db.query(QCMonthlySummary)
             .filter_by(year=year, month=month, test_item=test_item, lot_no=lot_no, level=level, instrument=instrument)
@@ -403,6 +408,50 @@ def upload_qc_summary(
         "groups": len(groups),
         "items": items,
     }
+
+
+@router.get("/daily/project")
+def list_project_daily(
+    year: int,
+    month: int,
+    instrument_id: int,
+    test_item: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """按（仪器,年,月,项目）取所有水平(level)的每日测值，用于 LJ 质控图。
+
+    返回每个测值的日期、测值、水平、靶值均值、靶值SD、失控标记及触发规则。
+    """
+    summaries = (
+        db.query(QCMonthlySummary)
+        .filter_by(year=year, month=month, instrument_id=instrument_id, test_item=test_item)
+        .order_by(QCMonthlySummary.level)
+        .all()
+    )
+    if not summaries:
+        return []
+    sids = [s.id for s in summaries]
+    summary_map = {s.id: s for s in summaries}
+    rows = (
+        db.query(QCDailyValue)
+        .filter(QCDailyValue.summary_id.in_(sids))
+        .order_by(QCDailyValue.qc_date, QCDailyValue.summary_id)
+        .all()
+    )
+    result = []
+    for dv in rows:
+        s = summary_map[dv.summary_id]
+        result.append({
+            "qc_date": dv.qc_date,
+            "value": dv.value,
+            "level": s.level,
+            "target_mean": s.target_mean,
+            "target_sd": s.target_sd,
+            "is_out_of_control": dv.is_out_of_control,
+            "rule_violated": dv.rule_violated,
+        })
+    return result
 
 
 @router.get("/{summary_id}/daily", response_model=list[QCDailyValueRead])

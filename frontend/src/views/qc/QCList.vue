@@ -119,13 +119,13 @@
             <el-table-column prop="lot_no" label="质控批号" width="110" />
             <el-table-column prop="unit" label="单位" width="70" />
             <el-table-column prop="level" label="水平" width="70" />
-            <el-table-column prop="target_mean" label="靶值" width="90" />
-            <el-table-column prop="target_sd" label="靶值SD" width="80" />
+            <el-table-column label="靶值" width="90"><template #default="{ row }">{{ fmtNum(row.target_mean) }}</template></el-table-column>
+            <el-table-column label="靶值SD" width="80"><template #default="{ row }">{{ fmtNum(row.target_sd) }}</template></el-table-column>
             <el-table-column label="靶值CV%" width="90">
               <template #default="{ row }">{{ fmtPct(row.target_cv) }}</template>
             </el-table-column>
-            <el-table-column prop="mean" label="均值" width="90" />
-            <el-table-column prop="sd" label="SD" width="80" />
+            <el-table-column label="均值" width="90"><template #default="{ row }">{{ fmtNum(row.mean) }}</template></el-table-column>
+            <el-table-column label="SD" width="80"><template #default="{ row }">{{ fmtNum(row.sd) }}</template></el-table-column>
             <el-table-column label="CV%" width="90">
               <template #default="{ row }">{{ fmtPct(row.cv) }}</template>
             </el-table-column>
@@ -174,6 +174,71 @@
             <el-button type="success" size="small" :loading="reportMap[g.key]._docxing" @click="downloadDocx(g)">
               下载 Word (A4 横向)
             </el-button>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <!-- ============ LJ 质控图 ============ -->
+      <el-tab-pane label="LJ 质控图" name="chart" v-if="auth.canAccessMenu('qc-monthly')">
+        <div class="toolbar">
+          <el-date-picker
+            v-model="chartMonth"
+            type="month"
+            placeholder="选择年月"
+            format="YYYY-MM"
+            value-format="YYYY-MM"
+            @change="onChartMonthChange"
+            style="width: 160px"
+          />
+          <el-select
+            v-model="chartInstrumentId"
+            placeholder="选择仪器"
+            style="width: 240px"
+            @change="onChartInstrumentChange"
+          >
+            <el-option
+              v-for="opt in instrumentList"
+              :key="opt.id"
+              :label="instLabel(opt)"
+              :value="opt.id"
+            />
+          </el-select>
+          <el-select
+            v-model="chartProject"
+            placeholder="选择项目"
+            style="width: 240px"
+            :disabled="!chartProjectOptions.length"
+            @change="loadChartData"
+          >
+            <el-option
+              v-for="opt in chartProjectOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+          <el-button :disabled="!chartProject" :loading="chartLoading" @click="loadChartData">查看质控图</el-button>
+          <span class="hint">选择一个项目，显示该项目全部水平在同一张 LJ 质控图（多水平用不同颜色）。</span>
+        </div>
+
+        <div v-if="!chartProject" class="empty-tip">请选择年月、仪器和项目后查看质控图。</div>
+        <div v-else class="chart-layout">
+          <div class="chart-left">
+            <div class="chart-section-title">{{ chartProject }} 各水平测值</div>
+            <el-table :data="chartData" size="small" border height="520">
+              <el-table-column prop="qc_date" label="日期" width="120" />
+              <el-table-column prop="level" label="水平" width="90" />
+              <el-table-column prop="value" label="测值" width="110" />
+              <el-table-column label="状态" width="120">
+                <template #default="{ row }">
+                  <el-tag v-if="row.is_out_of_control" type="danger" size="small">失控 {{ row.rule_violated }}</el-tag>
+                  <el-tag v-else type="success" size="small">在控</el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+          <div class="chart-right">
+            <div ref="chartRef" class="chart-box"></div>
           </div>
         </div>
       </el-tab-pane>
@@ -603,13 +668,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ExcelJS from 'exceljs'
+import * as echarts from 'echarts'
 import {
   listQCSummaries, uploadQCSummary, getQCDaily, updateQCSummary, deleteQCSummary,
   uploadQCPdf, downloadQCPdf, deleteQCPdf, exportQCSummary,
-  getQCReport, upsertQCReport, exportQCReportDocx,
+  getQCReport, upsertQCReport, exportQCReportDocx, getQCProjectDaily,
 } from '../../api/qc'
 import { getQCInstruments } from '../../api/qc'
 import {
@@ -627,10 +693,19 @@ import TargetValueBoard from './TargetValueBoard.vue'
 const activeTab = ref('summary')
 const auth = useAuthStore()
 
+// LJ 质控图状态
+const chartMonth = ref('')
+const chartInstrumentId = ref(null)
+const chartProject = ref('')
+const chartLoading = ref(false)
+const chartData = ref([])
+let chartInstance = null
+
 // 按权限收口可见页签：technical_support 仅见其被授权的页签
 const visibleTabs = computed(() => {
   const map = {
     summary: 'qc-monthly',
+    chart: 'qc-monthly',
     eqa: 'eqa',
     cmp: 'comparison',
     interlab: 'interlab',
@@ -717,7 +792,7 @@ async function downloadDocx(g) {
 }
 function fmtNum(v) {
   if (v === null || v === undefined || v === '') return '-'
-  return Number(v).toFixed(4)
+  return Number(v).toFixed(2)
 }
 
 // 按仪器分块（受控：优先用 instrument_id 作为块键）；显示仪器编号
@@ -751,6 +826,222 @@ function fmtPct(v) {
   if (v === null || v === undefined || v === '') return '-'
   return Number(v).toFixed(2) + '%'
 }
+
+// ---------- LJ 质控图 ----------
+const chartSummaryRows = ref([])
+const chartRef = ref(null)
+
+function parseChartMonth() {
+  if (!chartMonth.value) return { year: null, month: null }
+  const [y, m] = chartMonth.value.split('-').map(Number)
+  return { year: y, month: m }
+}
+
+const chartProjectOptions = computed(() => {
+  const map = {}
+  for (const r of chartSummaryRows.value) {
+    if (!map[r.test_item]) {
+      map[r.test_item] = { test_item: r.test_item, levels: new Set() }
+    }
+    map[r.test_item].levels.add(r.level)
+  }
+  return Object.values(map)
+    .sort((a, b) => a.test_item.localeCompare(b.test_item, 'zh'))
+    .map((it) => ({
+      value: it.test_item,
+      label: `${it.test_item}（${Array.from(it.levels).sort().join(' / ')}）`,
+    }))
+})
+
+async function loadChartSummaryRows() {
+  const { year, month } = parseChartMonth()
+  if (!year || !month || !chartInstrumentId.value) {
+    chartSummaryRows.value = []
+    return
+  }
+  try {
+    const res = await listQCSummaries({
+      year,
+      month,
+      instrument_id: chartInstrumentId.value,
+      page_size: 500,
+    })
+    chartSummaryRows.value = res.items || []
+  } catch (e) {
+    chartSummaryRows.value = []
+  }
+}
+
+function onChartMonthChange() {
+  chartProject.value = ''
+  chartData.value = []
+  disposeChart()
+  loadChartSummaryRows()
+}
+
+function onChartInstrumentChange() {
+  chartProject.value = ''
+  chartData.value = []
+  disposeChart()
+  loadChartSummaryRows()
+}
+
+function disposeChart() {
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
+}
+
+async function loadChartData() {
+  if (!chartProject.value) return
+  const { year, month } = parseChartMonth()
+  if (!year || !month || !chartInstrumentId.value) return
+  chartLoading.value = true
+  try {
+    const rows = await getQCProjectDaily(year, month, chartInstrumentId.value, chartProject.value)
+    chartData.value = rows || []
+    renderChart(rows || [])
+  } catch (e) {
+    ElMessage.error('加载质控图数据失败：' + (e.message || e))
+  } finally {
+    chartLoading.value = false
+  }
+}
+
+function renderChart(rows) {
+  disposeChart()
+  if (!chartRef.value || !rows.length) return
+
+  // 按水平分组并生成 series
+  const byLevel = {}
+  for (const r of rows) {
+    if (!byLevel[r.level]) byLevel[r.level] = []
+    byLevel[r.level].push(r)
+  }
+  const levels = Object.keys(byLevel).sort()
+  const allDates = [...new Set(rows.map((r) => r.qc_date).sort())]
+
+  const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272']
+  const series = []
+  const markLineData = []
+  let yAxisName = '测值'
+
+  levels.forEach((lv, idx) => {
+    const data = byLevel[lv]
+    const tm = data[0]?.target_mean ?? 0
+    const ts = data[0]?.target_sd ?? 0
+    const color = colors[idx % colors.length]
+    series.push({
+      name: lv,
+      type: 'line',
+      smooth: false,
+      symbol: 'circle',
+      symbolSize: 7,
+      data: allDates.map((d) => {
+        const pt = data.find((x) => x.qc_date === d)
+        return pt ? pt.value : null
+      }),
+      itemStyle: { color },
+      lineStyle: { width: 2, color },
+      connectNulls: false,
+    })
+    // 为每个水平添加均值/SD 参考线（仅首个水平显示在图例，避免重复）
+    if (tm && ts) {
+      const refs = [
+        { value: tm, label: `${lv} 均值` },
+        { value: tm + ts, label: `${lv} +1SD` },
+        { value: tm - ts, label: `${lv} -1SD` },
+        { value: tm + 2 * ts, label: `${lv} +2SD` },
+        { value: tm - 2 * ts, label: `${lv} -2SD` },
+        { value: tm + 3 * ts, label: `${lv} +3SD` },
+        { value: tm - 3 * ts, label: `${lv} -3SD` },
+      ]
+      refs.forEach((ref, ridx) => {
+        markLineData.push({
+          yAxis: ref.value,
+          name: ref.label,
+          lineStyle: {
+            type: ridx === 0 ? 'solid' : 'dashed',
+            width: ridx === 0 ? 1.5 : 1,
+            color,
+          },
+          label: { formatter: ref.label, position: 'insideEndTop', fontSize: 10, color },
+        })
+      })
+    }
+  })
+
+  // 若多水平且靶值差异大，用标准差指数（SDI）统一坐标更直观
+  const useSDI = levels.length > 1 && chartData.value.length > 0
+  if (useSDI) {
+    yAxisName = '标准差指数 (SDI)'
+    // 重新计算 SDI 序列
+    series.length = 0
+    markLineData.length = 0
+    levels.forEach((lv, idx) => {
+      const data = byLevel[lv]
+      const tm = data[0]?.target_mean ?? 0
+      const ts = data[0]?.target_sd ?? 0
+      const color = colors[idx % colors.length]
+      series.push({
+        name: lv,
+        type: 'line',
+        symbol: 'circle',
+        symbolSize: 7,
+        data: data.map((r) => (ts ? ((r.value - tm) / ts).toFixed(2) : null)),
+        itemStyle: { color },
+        lineStyle: { width: 2, color },
+      })
+    })
+    ;[3, 2, 1, 0, -1, -2, -3].forEach((sd) => {
+      markLineData.push({
+        yAxis: sd,
+        name: `${sd}SD`,
+        lineStyle: { type: sd === 0 ? 'solid' : 'dashed', width: sd === 0 ? 2 : 1, color: '#999' },
+        label: { formatter: `${sd}SD`, position: 'insideEndTop', fontSize: 10 },
+      })
+    })
+  }
+
+  chartInstance = echarts.init(chartRef.value)
+  const option = {
+    title: { text: `${chartProject.value} LJ 质控图`, left: 'center' },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        const date = params[0].axisValue
+        let html = `<div style="font-weight:bold">${date}</div>`
+        params.forEach((p) => {
+          if (p.value === null || p.value === undefined) return
+          const unit = chartData.value.find((r) => r.qc_date === date && r.level === p.seriesName)
+          const raw = unit ? unit.value : ''
+          const rule = unit && unit.is_out_of_control ? `（失控 ${unit.rule_violated}）` : ''
+          html += `<div style="color:${p.color}">● ${p.seriesName}: ${p.value}${useSDI ? 'SDI' : ''}${raw ? ' （原始 ' + raw + '）' : ''}${rule}</div>`
+        })
+        return html
+      },
+    },
+    legend: { data: levels, top: 30 },
+    grid: { left: '8%', right: '5%', bottom: '10%', top: '18%', containLabel: true },
+    xAxis: { type: 'category', data: allDates, name: '日期' },
+    yAxis: { type: 'value', name: yAxisName, scale: true },
+    series,
+  }
+  if (markLineData.length) {
+    option.series.push({
+      type: 'line',
+      data: [],
+      markLine: { data: markLineData, symbol: 'none', animation: false },
+      silent: true,
+    })
+  }
+  chartInstance.setOption(option)
+}
+
+onUnmounted(() => {
+  disposeChart()
+})
 
 async function loadSummary() {
   const { year, month } = parseMonth()
@@ -1946,6 +2237,13 @@ watch(activeTab, (t) => {
 .docx-preview h3 { font-size: 15px; margin: 16px 0 8px; border-left: 3px solid #409eff; padding-left: 8px; }
 .docx-preview p { margin: 6px 0; }
 .prev-foot { margin-top: 16px; text-align: right; }
+
+/* LJ 质控图 */
+.chart-layout { display: flex; gap: 16px; margin-top: 12px; }
+.chart-left { flex: 0 0 460px; }
+.chart-right { flex: 1 1 auto; min-width: 0; }
+.chart-box { width: 100%; height: 560px; border: 1px solid #e4e7ed; border-radius: 4px; background: #fff; }
+.chart-section-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #303133; }
 
 /* 录入结果矩阵 */
 .result-entry { font-size: 13px; }
