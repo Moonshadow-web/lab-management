@@ -40,11 +40,23 @@ def get_structure(db: Session = Depends(get_db), _: User = Depends(get_current_u
     by_mod: dict[str, list[str]] = {}
     for p in pairs:
         by_mod.setdefault(p.module_key, []).append(p.role_code)
-    # 合并默认（默认里有的模块如果表里没数据就灌入；表里有数据则用表的）
+    # 合并默认：对每一个模块键，取「DB 已配置角色」与「出厂默认角色」的**并集**。
+    # 目的：
+    #   1. 新分级键（如 comparison-create / interlab-create）即使 DB 无记录也始终返回默认角色，
+    #      避免前端 canWrite 命中「缺键→默认允许」分支，导致 staff/member 被误判可写。
+    #   2. 视图级键（comparison/interlab/qc-monthly/qc-target）的默认含 member/staff，
+    #      取并集后不会被 DB 里的部分配置意外收窄，保证职工始终可查看。
+    #   注：并集只会「放宽」不会「收窄」——管理员无法把角色限制到默认之下，以安全兜底为准。
     modules_out = []
     for key, label in ALL_MODULES:
-        roles = by_mod.get(key) or list(DEFAULT_MODULE_PERMISSIONS.get(key, ["admin"]))
-        modules_out.append({"key": key, "label": label, "roles": roles})
+        db_roles = by_mod.get(key) or []
+        default_roles = DEFAULT_MODULE_PERMISSIONS.get(key, ["admin"])
+        union, seen = [], set()
+        for r in db_roles + default_roles:
+            if r not in seen:
+                seen.add(r)
+                union.append(r)
+        modules_out.append({"key": key, "label": label, "roles": union})
     return StructureResponse(modules=modules_out, roles=[{"code": c, "label": l} for c, l in ALL_ROLES])
 
 

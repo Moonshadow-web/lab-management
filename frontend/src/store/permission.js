@@ -56,7 +56,9 @@ export const usePermissionStore = defineStore('permissions', {
         for (const m of r.modules) {
           map[m.key] = m.roles
         }
-        this.moduleRoles = map
+        // 与 FALLBACK 取并集（后端 map 覆盖 FALLBACK）：保证即使后端漏返回某键，
+        // 本地仍有完整默认角色表，canWrite 不会命中「缺键→默认允许」分支。
+        this.moduleRoles = { ...FALLBACK, ...map }
         this.loaded = true
       } catch (e) {
         this.error = e?.response?.data?.detail || e.message
