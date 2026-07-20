@@ -177,7 +177,7 @@ class ReceivingBase(BaseModel):
     receipt_date: date
     order_id: Optional[int] = None
     delivery_person: str = ""
-    receiver: str
+    receiver: Optional[str] = None
     remark: str = ""
 
 

@@ -19,11 +19,20 @@
         text-color="#cbd5e1"
         active-text-color="#ffd04b"
       >
-        <el-menu-item v-for="m in menus" :key="m.path" :index="m.path">
-          <el-icon><component :is="m.icon" /></el-icon>
-          <span>{{ m.title }}</span>
-          <el-tag v-if="m.wip" size="small" type="info" class="wip">建设中</el-tag>
-        </el-menu-item>
+        <template v-for="m in menus" :key="m.path">
+          <el-sub-menu v-if="m.children" :index="m.path">
+            <template #title>
+              <el-icon><component :is="m.icon" /></el-icon>
+              <span>{{ m.title }}</span>
+            </template>
+            <el-menu-item v-for="c in m.children" :key="c.path" :index="c.path">{{ c.title }}</el-menu-item>
+          </el-sub-menu>
+          <el-menu-item v-else :index="m.path">
+            <el-icon><component :is="m.icon" /></el-icon>
+            <span>{{ m.title }}</span>
+            <el-tag v-if="m.wip" size="small" type="info" class="wip">建设中</el-tag>
+          </el-menu-item>
+        </template>
       </el-menu>
       <div class="aside-footer" v-if="auth.canAccessMenu('instrument-families') || auth.canAccessMenu('quality-requirements')">
         <el-button v-if="auth.canAccessMenu('instrument-families')" class="families-btn" size="small" :icon="Connection" @click="goEqaAssociations">项目库与质评关联</el-button>
@@ -71,7 +80,14 @@ const menus = computed(() => {
     { path: '/instruments', title: '仪器档案', icon: 'Cpu', moduleKey: 'instruments' },
     // 质控管理是聚合菜单：含 月结/质评/仪器间比对/室间比对/累靶 多个权限模块，任一可见即显示
     { path: '/qc', title: '质控管理', icon: 'DataLine', moduleKeys: ['qc-monthly', 'eqa', 'comparison', 'interlab', 'qc-target'] },
-    { path: '/reagent/items', title: '试剂管理', icon: 'ShoppingCart', moduleKey: 'reagents' },
+    { path: '/reagent', title: '试剂管理', icon: 'ShoppingCart', moduleKey: 'reagents', children: [
+      { path: '/reagent/items', title: '试剂目录' },
+      { path: '/reagent/stock', title: '实时库存' },
+      { path: '/reagent/inventory', title: '盘库管理' },
+      { path: '/reagent/orders', title: '订购管理' },
+      { path: '/reagent/receivings', title: '到货接收' },
+      { path: '/reagent/consumption', title: '月消耗' },
+    ] },
     { path: '/training', title: '继教培训', icon: 'Reading', moduleKey: 'training' },
     { path: '/verification', title: '性能验证', icon: 'DataAnalysis', moduleKey: 'verification' },
     { path: '/iso15189', title: '15189专项', icon: 'Stamp', moduleKey: 'iso15189' },

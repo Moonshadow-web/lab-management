@@ -74,7 +74,7 @@ const auth = useAuthStore()
 const canWrite = computed(() => auth.canWrite('reagents'))
 const receivings = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
 const dialogVisible = ref(false), submitting = ref(false), searchItem = ref(''), allItems = ref([])
-const form = ref({ receipt_no: '', receipt_date: '', delivery_person: '', remark: '' })
+const form = ref({ receipt_no: '', receipt_date: '', delivery_person: '', receiver: (auth.user?.full_name || auth.user?.username || ''), remark: '' })
 const items = ref([])
 
 async function refresh() {

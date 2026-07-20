@@ -3,8 +3,11 @@
 from datetime import date, datetime
 from typing import Optional
 
+from io import BytesIO
+
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from sqlalchemy import or_
+from fastapi.responses import StreamingResponse
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from ...core.crud_base import paginate
@@ -129,6 +132,12 @@ def list_stock(
     if type:
         item_ids2 = [r[0] for r in db.query(ReagentItem.id).filter(ReagentItem.type == type).all()]
         base = base.filter(ReagentStock.item_id.in_(item_ids2))
+    if low_stock_only:
+        # 仅显示低于最低库存预警的：join 试剂目录，按 min_stock>0 且 数量<min_stock 过滤
+        base = base.join(ReagentItem, ReagentItem.id == ReagentStock.item_id).filter(
+            ReagentItem.min_stock > 0,
+            ReagentStock.quantity < ReagentItem.min_stock,
+        )
     total = base.count()
     items = base.order_by(ReagentStock.item_id).offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size, "items": items}
@@ -282,12 +291,58 @@ def export_order_form(
     order_id: int, db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """导出向设备科提交的订购表（后续实现 openpyxl 下载）。"""
+    """导出向设备科提交的订购表（含材料编码/名称/规格/品牌/数量/单位）。"""
     order = db.query(ReagentOrder).get(order_id)
     if not order:
         raise HTTPException(404, "订购单未找到")
-    # TODO: 返回 Excel 文件下载
-    return {"msg": "导出功能将在后续实现"}
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, Border, Side
+    except ImportError:
+        raise HTTPException(400, "服务端未安装 openpyxl，无法导出 Excel")
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "设备科订购表"
+    headers = ["材料编码", "试剂名称", "规格", "品牌", "订购数量", "单位", "备注"]
+    ws.append(headers)
+    head_font = Font(bold=True, color="FFFFFF")
+    head_fill = openpyxl.styles.PatternFill("solid", fgColor="1A365D")
+    thin = Side(style="thin", color="D0D5DD")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    for c in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=c)
+        cell.font = head_font
+        cell.fill = head_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+    for it in order.items:
+        item = db.query(ReagentItem).get(it.item_id)
+        ws.append([
+            item.material_code if item else "",
+            item.name if item else f"(id={it.item_id})",
+            item.spec if item else "",
+            item.brand if item else "",
+            it.ordered_quantity,
+            item.unit if item else "",
+            it.remark or "",
+        ])
+    for r in range(2, ws.max_row + 1):
+        for c in range(1, len(headers) + 1):
+            ws.cell(row=r, column=c).border = border
+    widths = [16, 28, 22, 14, 12, 8, 24]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"设备科订购表_{order.order_no}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # =============================================================================
@@ -324,7 +379,7 @@ def create_receiving(
     rec = Receiving(
         receipt_no=data.receipt_no, receipt_date=data.receipt_date,
         order_id=data.order_id, delivery_person=data.delivery_person,
-        receiver=user.full_name or user.username, remark=data.remark,
+        receiver=data.receiver or user.full_name or user.username, remark=data.remark,
     )
     db.add(rec)
     db.flush()
@@ -379,54 +434,70 @@ def calculate_consumption(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "lab_technician")),
 ):
-    """盘库后触发：对所有 reagent_items 计算月消耗。"""
+    """盘库后触发：对所有 reagent_items 计算月消耗。
+
+    公式：月消耗 = 期初库存(opening) + 本月入库(received) - 期末库存(closing)
+      - 期末库存 = 当前实时库存合计（月末盘库已回写 ReagentStock）
+      - 本月入库 = 当月到货接收合计（Receiving.receipt_date 在区间内）
+      - 期初库存 = 上月消耗记录的期末库存
+    """
+    if not (len(year_month) == 7 and year_month[4] == "-"):
+        raise HTTPException(400, "year_month 格式应为 YYYY-MM")
+    try:
+        y, m = int(year_month[:4]), int(year_month[5:7])
+    except ValueError:
+        raise HTTPException(400, "year_month 格式应为 YYYY-MM")
+    month_start = date(y, m, 1)
+    if m == 12:
+        month_end = date(y + 1, 1, 1)
+    else:
+        month_end = date(y, m + 1, 1)
+
     items = db.query(ReagentItem).filter(ReagentItem.is_active == True).all()
-    added = 0
+    added, updated = 0, 0
     for it in items:
-        # 本期入库汇总
-        total_recv = db.query(ReagentStock).filter(ReagentStock.item_id == it.id).with_entities(ReagentStock.quantity).all()
-        closing = sum(r[0] for r in total_recv)
-        # 上月消耗记录的 closing 作为本期 opening
+        # 期末库存：当前实时库存合计
+        closing_qty = db.query(func.coalesce(func.sum(ReagentStock.quantity), 0)).filter(
+            ReagentStock.item_id == it.id
+        ).scalar() or 0
+        # 本月入库：当月到货接收细项合计
+        received_qty = db.query(func.coalesce(func.sum(ReceivingItem.quantity), 0)).join(
+            Receiving, ReceivingItem.receiving_id == Receiving.id
+        ).filter(
+            ReceivingItem.item_id == it.id,
+            Receiving.receipt_date >= month_start,
+            Receiving.receipt_date < month_end,
+        ).scalar() or 0
+        # 期初库存：上月消耗记录的期末库存
         prev = db.query(ReagentConsumption).filter(
             ReagentConsumption.item_id == it.id,
         ).order_by(ReagentConsumption.year_month.desc()).first()
         opening = prev.closing_balance if prev else 0
-        # 本月入库量（从 receiving 计算）
-        # 简化版：暂取 stock quantity 之和
-        consumption = opening + closing - closing  # placeholder
-        # 实际计算 month_received
-        month_start = date(int(year_month[:4]), int(year_month[5:7]), 1)
-        if month_start.month == 12:
-            month_end = date(month_start.year + 1, 1, 1)
-        else:
-            month_end = date(month_start.year, month_start.month + 1, 1)
-        total_received_qty = db.query(ReagentStock).filter(
-            ReagentStock.item_id == it.id,
-        ).with_entities(ReagentStock.quantity).all()
-        closing_qty = sum(r[0] for r in total_received_qty)
-        consumption = opening - closing_qty  # 暂简算
+        consumption = opening + received_qty - closing_qty
         if consumption < 0:
             consumption = 0
-        # upsert
+
         existing = db.query(ReagentConsumption).filter(
             ReagentConsumption.item_id == it.id,
             ReagentConsumption.year_month == year_month,
         ).first()
         if existing:
             existing.opening_balance = opening
+            existing.total_received = received_qty
             existing.closing_balance = closing_qty
-            existing.total_received = total_received_qty
             existing.consumption = consumption
             existing.calculated_at = datetime.utcnow()
-        else:
+            updated += 1
+        elif opening or received_qty or closing_qty:
+            # 仅当有数据时落库，避免大量空行
             db.add(ReagentConsumption(
                 item_id=it.id, year_month=year_month,
-                opening_balance=opening, total_received=0,
+                opening_balance=opening, total_received=received_qty,
                 closing_balance=closing_qty, consumption=consumption,
             ))
             added += 1
     db.commit()
-    return {"added": added, "year_month": year_month}
+    return {"added": added, "updated": updated, "year_month": year_month}
 
 
 # =============================================================================

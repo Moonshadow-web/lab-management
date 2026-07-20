@@ -144,8 +144,18 @@ async function onDelete(row) {
   await deleteReagentOrder(row.id); ElMessage.success('已删除'); refresh()
 }
 function onExport(row) {
-  // 导出设备科订购表
-  ElMessage.success('导出功能正在实现')
+  // 导出设备科订购表（含材料编码）
+  exportOrderForm(row.id).then((blob) => {
+    const url = window.URL.createObjectURL(new Blob([blob]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `设备科订购表_${row.order_no}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('已导出订购表')
+  }).catch(() => ElMessage.error('导出失败'))
 }
 onMounted(refresh)
 </script>

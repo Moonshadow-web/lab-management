@@ -157,7 +157,7 @@ async function onUpload() {
   if (!uploadFile.value) { ElMessage.warning('请选择文件'); return }
   uploading.value = true
   try {
-    const fd = new FormData(); fd.append('_file', uploadFile.value)
+    const fd = new FormData(); fd.append('file', uploadFile.value)
     const r = await importReagentFromExcel(fd)
     ElMessage.success(`导入完成：新增 ${r.imported} 条，跳过 ${r.skipped} 条`)
     importVisible.value = false; refresh()
