@@ -12,7 +12,7 @@
         <el-option v-for="i in instruments" :key="i.id" :label="i.name" :value="i.id" />
       </el-select>
       <div style="flex:1" />
-      <el-button type="primary" :icon="Plus" @click="openPlanCreate" v-if="canWrite">新建计划</el-button>
+      <el-button type="primary" :icon="Plus" @click="openPlanCreate" v-if="canCreate">新建计划</el-button>
     </div>
 
       <el-alert v-if="!plans.length" type="info" :closable="false" show-icon
@@ -86,10 +86,10 @@
       </el-table-column>
       <el-table-column label="操作" min-width="280" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="openEntry(row)">录入</el-button>
+          <el-button size="small" @click="openEntry(row)" v-if="canCreate">录入</el-button>
           <el-button size="small" type="warning" @click="openReport(row)">报告管理</el-button>
-          <el-button size="small" @click="openPlanEdit(row)" v-if="canWrite">编辑</el-button>
-          <el-button size="small" type="danger" @click="onDeletePlan(row)" v-if="canWrite">删除</el-button>
+          <el-button size="small" @click="openPlanEdit(row)" v-if="canEdit">编辑</el-button>
+          <el-button size="small" type="danger" @click="onDeletePlan(row)" v-if="canEdit">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -161,7 +161,7 @@
         <el-alert type="info" :closable="false" show-icon style="margin-bottom:10px"
           :title="`${entryPlan.year}年${entryPlan.half === 1 ? '上半年' : '下半年'} ｜ 仪器：${instrumentName(entryPlan.instrument_id)} ｜ 参比实验室：${entryPlan.reference_lab || '—'}`" />
         <div style="margin-bottom:10px">
-          <el-button size="small" type="primary" :icon="Plus" @click="addItemRow" v-if="canWrite">添加项目</el-button>
+          <el-button size="small" type="primary" :icon="Plus" @click="addItemRow" v-if="canCreate">添加项目</el-button>
           <span class="tip">每个项目测 5 个水平。可比较系统=参比实验室，比较系统1=本实验室平台1，比较系统2=本实验室平台2（若有2个平台）。偏倚/符合自动计算。</span>
         </div>
         <!-- 逐项目分组展示 -->
@@ -186,7 +186,7 @@
                 <el-option label="定性" value="定性" />
               </el-select>
             </div>
-            <el-button size="small" type="danger" :icon="Delete" circle @click="entryRows.splice(idx, 1)" v-if="canWrite" />
+            <el-button size="small" type="danger" :icon="Delete" circle @click="entryRows.splice(idx, 1)" v-if="canCreate" />
           </div>
           <el-table :data="item.levels" border size="small">
             <el-table-column label="水平" width="50" fixed>
@@ -291,7 +291,7 @@
       </div>
       <template #footer>
         <el-button @click="entryVisible = false">关闭</el-button>
-        <el-button type="primary" @click="saveEntry" :loading="saving" v-if="canWrite">保存结果</el-button>
+        <el-button type="primary" @click="saveEntry" :loading="saving" v-if="canCreate">保存结果</el-button>
       </template>
     </el-dialog>
 
@@ -313,13 +313,13 @@
 
         <div class="rep-toolbar">
           <el-button :icon="View" @click="doPreview" :loading="previewing">预览</el-button>
-          <el-button type="success" :icon="Document" @click="doGenerate" :loading="generating" v-if="canWrite">生成报告</el-button>
+          <el-button type="success" :icon="Document" @click="doGenerate" :loading="generating" v-if="canEdit">生成报告</el-button>
           <el-button :icon="Download" @click="doDownload" :disabled="!reportPlan || !reportPlan.report_filename">下载</el-button>
           <el-button :icon="Printer" @click="doPrint" :disabled="!previewHtml">打印</el-button>
-          <el-upload :show-file-list="false" :auto-upload="true" :http-request="doUpload" v-if="canWrite">
+          <el-upload :show-file-list="false" :auto-upload="true" :http-request="doUpload" v-if="canCreate">
             <el-button :icon="Upload">上传存档</el-button>
           </el-upload>
-          <el-button type="danger" :icon="Delete" @click="doDeleteReport" :disabled="!reportPlan || !reportPlan.report_filename" v-if="canWrite">删除报告</el-button>
+          <el-button type="danger" :icon="Delete" @click="doDeleteReport" :disabled="!reportPlan || !reportPlan.report_filename" v-if="canEdit">删除报告</el-button>
         </div>
         <div class="rep-preview" v-html="previewHtml" v-loading="previewing" />
       </div>
@@ -338,13 +338,16 @@ import {
   uploadInterlabReport, deleteInterlabReport,
 } from '../../api/interlab'
 import { useAuthStore } from '../../store/auth'
+import { usePermissionStore } from '../../store/permission'
 import UserSelect from '../../components/UserSelect.vue'
 
 const auth = useAuthStore()
-const canWrite = computed(() => {
-  const roles = auth.user?.roles || auth.user?.role || ''
-  return String(roles).includes('admin') || String(roles).includes('qc_manager')
-})
+const perm = usePermissionStore()
+// 新建/录入/上传 → interlab-create（admin/qc_manager/technical_support）
+// 编辑/删除/生成报告 → interlab-edit（admin/qc_manager）
+// 职工(member/staff) 仅可查看已生成报告，不能录入或改动。
+const canCreate = computed(() => perm.canWrite(auth.myRoles, 'interlab-create'))
+const canEdit = computed(() => perm.canWrite(auth.myRoles, 'interlab-edit'))
 
 const instruments = ref([])
 const plans = ref([])
