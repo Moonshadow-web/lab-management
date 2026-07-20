@@ -38,6 +38,7 @@ COPY data/eqa_reports /app/backup/eqa_reports
 # 卷已挂载后再创建（见下方启动脚本）。
 ENV DATA_DIR=/app/data
 ENV UPLOAD_ROOT=/app/data/uploads
+ENV DATABASE_URL=mysql+pymysql://labapp:Jzz6827556@10.0.1.18:3306/cloud1-0gjhamv53ff2298d
 ENV SECRET_KEY=923fc5168b97f6cde072ae078aac3db8ce4cbef562ecb623523a8e34bd9bc78b
 
 # 启动脚本：首次运行时从备份恢复数据到持久卷
