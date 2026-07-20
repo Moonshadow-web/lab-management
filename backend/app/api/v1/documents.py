@@ -207,7 +207,6 @@ def list_documents(
     # 作废状态排到最后，其余按编号自然序（作废在末、同状态下仍按编号从小到大）
     query = query.order_by(
         case((Document.status == "作废", 1), else_=0),
-        func.doc_number_sort(Document.doc_number),
         Document.doc_number,
     )
     return paginate(query, page, page_size)

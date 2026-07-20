@@ -51,7 +51,7 @@ def qc_instruments(
     rows = (
         db.query(Instrument)
         .filter(Instrument.qc_instrument == True)  # noqa: E712
-        .order_by(_func.doc_number_sort(Instrument.dept_no), Instrument.dept_no)
+        .order_by(Instrument.dept_no)
         .all()
     )
     return [

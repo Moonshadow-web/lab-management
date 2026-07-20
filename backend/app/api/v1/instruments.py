@@ -40,7 +40,7 @@ from ...services.notification_service import (
 # 排序：日常管理人(空值排最后) → 科室编号自然升序
 _instrument_order = [
     case((or_(Instrument.daily_manager.is_(None), Instrument.daily_manager == ""), 1), else_=0),
-    func.doc_number_sort(Instrument.dept_no),
+    # doc_number_sort 仅在 SQLite 存在，MySQL 用原生排序
     Instrument.dept_no,
 ]
 router = make_router(
