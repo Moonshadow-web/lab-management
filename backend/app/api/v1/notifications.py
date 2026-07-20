@@ -94,6 +94,30 @@ def mark_all_read(db: Session = Depends(get_db), user: User = Depends(get_curren
     return {"ok": True}
 
 
+@router.post("/{nid}/unread")
+def mark_unread(nid: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """将某条提醒对「当前用户」重新标记为未读（删除该用户的已读记录）。"""
+    n = db.get(Notification, nid)
+    if not n:
+        raise HTTPException(status_code=404, detail="未找到提醒")
+    row = db.query(NotificationRead).filter(
+        NotificationRead.user_id == user.id,
+        NotificationRead.notification_id == nid,
+    ).first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return {"ok": True}
+
+
+@router.post("/unread-all")
+def mark_all_unread(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """将当前用户的所有已读记录清除（即全部恢复为未读）。"""
+    db.query(NotificationRead).filter(NotificationRead.user_id == user.id).delete()
+    db.commit()
+    return {"ok": True}
+
+
 @router.post("/send")
 def send_notifications_by_email(
     db: Session = Depends(get_db),

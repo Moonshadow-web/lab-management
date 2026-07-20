@@ -54,7 +54,12 @@
 
     <AppCard title="提醒事项" class="mt">
       <template #header-extra>
-        <el-button v-if="notices.length" size="small" @click="onReadAll">全部已读</el-button>
+        <el-radio-group v-model="showAll" size="small" @change="loadNotices">
+          <el-radio-button :label="false">仅未读</el-radio-button>
+          <el-radio-button :label="true">全部</el-radio-button>
+        </el-radio-group>
+        <el-button v-if="!showAll && notices.length" size="small" type="primary" plain @click="onReadAll">全部已读</el-button>
+        <el-button v-if="showAll && hasRead" size="small" @click="onUnreadAll">全部标为未读</el-button>
       </template>
       <el-empty v-if="!notices.length" description="暂无提醒" />
       <el-table v-else :data="notices" style="width: 100%">
@@ -66,10 +71,13 @@
           </template>
         </el-table-column>
         <el-table-column prop="due_date" label="到期日" width="130" />
-        <el-table-column label="操作" width="100" align="center">
+        <el-table-column label="操作" width="150" align="center">
           <template #default="{ row }">
             <el-button v-if="!row.is_read" link type="primary" @click="onRead(row)">标记已读</el-button>
-            <el-tag v-else type="success" size="small">已读</el-tag>
+            <template v-else>
+              <el-tag type="success" size="small">已读</el-tag>
+              <el-button link type="warning" size="small" @click="onUnread(row)">标记未读</el-button>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -78,7 +86,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import AppCard from '../components/AppCard.vue'
@@ -86,7 +94,7 @@ import { getDashboardStats } from '../api/dashboard'
 import { listTestItems } from '../api/testItems'
 import { listInstruments } from '../api/instruments'
 import { listDocuments } from '../api/documents'
-import { listNotifications, markRead, markAllRead } from '../api/notifications'
+import { listNotifications, markRead, markAllRead, markUnread, markAllUnread } from '../api/notifications'
 import { listQC } from '../api/qc'
 import { listReagents } from '../api/reagents'
 import { listTraining } from '../api/training'
@@ -99,6 +107,8 @@ const stats = ref({
   qc: '-', reagents: '-', training: '-', verification: '-', nc: '-',
 })
 const notices = ref([])
+const showAll = ref(false)  // false=仅未读（默认隐藏已读），true=显示全部
+const hasRead = computed(() => notices.value.some(n => n.is_read))
 
 function levelType(level) {
   if (level === 'danger') return 'danger'
@@ -152,7 +162,7 @@ async function loadStats() {
 
 async function loadNotices() {
   try {
-    const res = await listNotifications({ page: 1, page_size: 50 })
+    const res = await listNotifications({ page: 1, page_size: 50, unread_only: !showAll.value })
     notices.value = res.items || []
   } catch (e) {
     notices.value = []
@@ -161,12 +171,24 @@ async function loadNotices() {
 
 async function onRead(row) {
   await markRead(row.id)
-  row.is_read = true
+  // 默认「仅未读」视图下，已读后该项应隐藏，重新拉取列表
+  await loadNotices()
+  loadStats()
+}
+async function onUnread(row) {
+  await markUnread(row.id)
+  await loadNotices()
   loadStats()
 }
 async function onReadAll() {
   await markAllRead()
   ElMessage.success('已全部标记已读')
+  loadNotices()
+  loadStats()
+}
+async function onUnreadAll() {
+  await markAllUnread()
+  ElMessage.success('已全部恢复为未读')
   loadNotices()
   loadStats()
 }
