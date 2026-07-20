@@ -22,7 +22,7 @@ from . import (
     module_permissions,
 
     qc_summaries,
-    # reagent_management,  # 暂注：MySQL FK 缺失导致 mapper 失败
+    reagent_management,
     reagents,
     test_items,
     training,
@@ -45,7 +45,7 @@ api_router.include_router(qc_summaries.router)
 api_router.include_router(eqa.router)
 api_router.include_router(eqa_associations.router)
 api_router.include_router(reagents.router)
-# api_router.include_router(reagent_management.router)  # 暂注
+api_router.include_router(reagent_management.router)
 api_router.include_router(training.router)
 api_router.include_router(verification.router)
 api_router.include_router(nonconformity.router)
