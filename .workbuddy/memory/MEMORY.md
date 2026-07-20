@@ -1,7 +1,7 @@
 # 项目长期记忆
 
 ## 项目基线
-- 生化免疫专业组速查工具；栈 FastAPI+SQLAlchemy2.0+SQLite / Vue3+Vite+Element Plus+Pinia；8 模块。
+- 生化免疫专业组速查工具；栈 FastAPI+SQLAlchemy2.0 / Vue3+Vite+Element Plus+Pinia；8 模块；数据库已切 CloudBase TDSQL-C MySQL（见下方 #数据库与持久化，勿按 SQLite 思路排查）。
 - 管理员 金子铮(id=2)，线上密码 Jzz6827556；18 科室初始 123456 首登改密。
 
 ## 部署与数据
@@ -69,6 +69,7 @@
 - 迁移方式：本地 pymysql 连接外网（临时打开）→ SQLAlchemy create_all 建表 → pymysql 逐行插数据 → 关闭外网 → deploy 切 MySQL DATABASE_URL。
 - 数据备份：`online_backup.json`（391KB，38 条 QC 摘要 + 每日值），API dump → MySQL 恢复验证通过。
 - **不再需要 CFS 持久卷**，cloudbaserc.json volumes 已清空，服务端「存储挂载」已关闭。
+- **验证基线（重要）**：任何 schema/查询改动须面向 MySQL 验证，勿用 SQLite 内存库代替。main.py 启动逻辑里残留的 `PRAGMA`/`sqlite3` 自愈代码均被 `try/except` 包裹（MySQL 下报错即跳过，不中断启动）；`Base.metadata.create_all` 对 MySQL 执行即自动建缺失表。部署后 `/_diag/build` 标记切换即证明 MySQL 建表+启动成功。
 
 ## CFS 挂载冲突（平台级，非代码问题）
 - **根因**：TCB CloudRun side-dns-cache 边车容器的 lifecycle hook 在宿主上执行 `/mount_cfs.sh`，挂载目标 `/mnt/cfs/10-0-1-2` 被本地磁盘 `/dev/vdb` 抢先挂载。

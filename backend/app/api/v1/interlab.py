@@ -312,6 +312,9 @@ def generate_report(pid: int, db: Session = Depends(get_db), user: User = Depend
     inst_name = svc_disp(inst) if inst else ""
     p.report_path = f"interlab_reports/{safe}"
     p.report_filename = f"室间比对_{p.year}_{half}_{inst_name}.docx"
+    # 生成报告即视为比对工作已完成（必做项目表据此自动显示「已完成」并顺延下次周期）。
+    # 仍可在「编辑计划」里手动改回 draft（进行中）。
+    p.status = "done"
     p.updated_at = datetime.utcnow()
     db.commit()
     return _ser_plan(p)

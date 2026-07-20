@@ -132,6 +132,15 @@
             <el-option label="不可接受" value="不可接受" />
           </el-select>
         </el-form-item>
+        <el-form-item label="状态">
+          <el-radio-group v-model="planForm.status">
+            <el-radio value="draft">进行中（未完）</el-radio>
+            <el-radio value="done">已完成</el-radio>
+          </el-radio-group>
+          <div style="font-size:12px;color:#888;line-height:1.4;margin-top:2px">
+            生成报告会自动置「已完成」；手动切回「进行中」后可重新录入/编辑。
+          </div>
+        </el-form-item>
         <el-form-item label="结果分析">
           <el-input v-model="planForm.summary" type="textarea" :rows="2"
             @input="summaryTouched = true" />
@@ -353,6 +362,7 @@ const summaryTouched = ref(false)
 const planForm = reactive({
   year: new Date().getFullYear(), half: 1, instrument_id: null, reference_lab: '',
   compared_instrument2: '', compared_at: '', operator: '', reviewer: '', conclusion: '', summary: '', handle_plan: '',
+  status: 'draft',
 })
 
 // 结果分析默认句（用户未改过时，随参比实验室联动）
@@ -534,6 +544,7 @@ function openPlanCreate() {
   Object.assign(planForm, {
     year: new Date().getFullYear(), half: 1, instrument_id: null, reference_lab: '',
     compared_instrument2: '', compared_at: '', operator: '', reviewer: '', conclusion: '', summary: '', handle_plan: '',
+    status: 'draft',
   })
   // 新建：结果分析填入默认句，标记未手动编辑（让 watch 随参比实验室联动）
   summaryTouched.value = false
@@ -547,6 +558,7 @@ function openPlanEdit(row) {
     compared_instrument2: row.compared_instrument2 || '',
     compared_at: row.compared_at, operator: row.operator, reviewer: row.reviewer,
     conclusion: row.conclusion, summary: row.summary, handle_plan: row.handle_plan,
+    status: row.status || 'draft',
   })
   // 编辑：已存在 summary，标记为已手动编辑，避免 watch 覆盖
   summaryTouched.value = true
