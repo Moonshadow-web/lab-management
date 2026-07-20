@@ -1,16 +1,16 @@
 <template>
   <div class="cmp-page">
     <div class="toolbar">
-      <el-button :icon="EditPen" @click="openGroupEdit" :disabled="!selectedGroup">编辑分组</el-button>
-      <el-button type="danger" :icon="Delete" @click="onDeleteGroup" :disabled="!selectedGroup">删除分组</el-button>
-      <el-button type="primary" :icon="Plus" @click="openGroupCreate">新建分组</el-button>
+      <el-button :icon="EditPen" @click="openGroupEdit" :disabled="!selectedGroup" v-if="canWrite">编辑分组</el-button>
+      <el-button type="danger" :icon="Delete" @click="onDeleteGroup" :disabled="!selectedGroup" v-if="canWrite">删除分组</el-button>
+      <el-button type="primary" :icon="Plus" @click="openGroupCreate" v-if="canWrite">新建分组</el-button>
       <el-select v-model="selectedGroupId" filterable placeholder="选择比对分组" style="width:300px"
         @change="onGroupChange">
         <el-option v-for="g in groups" :key="g.id" :label="`${g.name}（${g.form_code}）`" :value="g.id" />
       </el-select>
       <el-tag type="info" v-if="selectedGroup">类型：{{ selectedGroup.category }}｜水平：{{ selectedGroup.levels }}｜项目：{{ selectedGroup.items.length }}</el-tag>
       <div style="flex:1" />
-      <el-button type="success" :icon="Plus" @click="openPlanCreate" :disabled="!selectedGroup">新建计划</el-button>
+      <el-button type="success" :icon="Plus" @click="openPlanCreate" :disabled="!selectedGroup" v-if="canWrite">新建计划</el-button>
     </div>
 
     <el-alert v-if="!selectedGroup" type="info" :closable="false" show-icon
@@ -65,15 +65,15 @@
           <el-badge v-if="row.attachment_count" :value="row.attachment_count" :max="99" type="primary">
             <el-button size="small" @click="openAttachments(row)">附件</el-button>
           </el-badge>
-          <el-button v-else size="small" plain @click="openAttachments(row)">+上传</el-button>
+          <el-button v-else size="small" plain @click="openAttachments(row)" v-if="canWrite">+上传</el-button>
         </template>
       </el-table-column>
       <el-table-column label="操作" min-width="260" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="openEntry(row)">录入</el-button>
+          <el-button size="small" @click="openEntry(row)" v-if="canWrite">录入</el-button>
           <el-button size="small" type="warning" @click="openReport(row)">报告管理</el-button>
-          <el-button size="small" @click="openPlanEdit(row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="onDeletePlan(row)">删除</el-button>
+          <el-button size="small" @click="openPlanEdit(row)" v-if="canWrite">编辑</el-button>
+          <el-button size="small" type="danger" @click="onDeletePlan(row)" v-if="canWrite">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -98,11 +98,18 @@ import { Plus, EditPen, Delete } from '@element-plus/icons-vue'
 import {
   listGroups, deleteGroup, listPlans, deletePlan, updatePlan, instrumentOptions,
 } from '../../api/comparison'
+import { useAuthStore } from '../../store/auth'
+import { usePermissionStore } from '../../store/permission'
 import GroupDialog from './GroupDialog.vue'
 import PlanDialog from './PlanDialog.vue'
 import ResultEntry from './ResultEntry.vue'
 import ReportPanel from './ReportPanel.vue'
 import AttachmentsDialog from './AttachmentsDialog.vue'
+
+const auth = useAuthStore()
+const perm = usePermissionStore()
+const canWrite = computed(() => perm.canWrite(auth.userRoles, 'comparison'))
+const canEdit = computed(() => perm.canWrite(auth.userRoles, 'comparison-edit'))
 
 const groups = ref([])
 const instruments = ref([])
