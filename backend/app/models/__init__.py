@@ -21,10 +21,11 @@ from .qc_target import QCTargetBatch, QCTargetResult
 from .qc_material import QcMaterial
 from .refresh_token import RefreshToken
 from .quality_requirement import QualityRequirement  # 修复 models 导入，但 __init__ 里没加 import
-from .reagent_management import (
-    ReagentItem, ReagentStock, InventoryCheck, InventoryCheckItem,
-    ReagentOrder, ReagentOrderItem, Receiving, ReceivingItem, ReagentConsumption,
-)
+# reagent_management 暂注：MySQL 表缺少 FK 导致 mapper 失败，阻塞所有模块
+# from .reagent_management import (
+#     ReagentItem, ReagentStock, InventoryCheck, InventoryCheckItem,
+#     ReagentOrder, ReagentOrderItem, Receiving, ReceivingItem, ReagentConsumption,
+# )
 from .module_permission import ModulePermission, DEFAULT_MODULE_PERMISSIONS, ALL_MODULES, ALL_ROLES
 
 __all__ = [
@@ -65,8 +66,8 @@ __all__ = [
     "RefreshToken",
     "QualityRequirement",
     "ModulePermission",
-    # 试剂管理
-    "ReagentItem", "ReagentStock", "InventoryCheck", "InventoryCheckItem",
-    "ReagentOrder", "ReagentOrderItem", "Receiving", "ReceivingItem",
-    "ReagentConsumption",
+    # 试剂管理 — 暂注（MySQL FK 问题）
+    # "ReagentItem", "ReagentStock", "InventoryCheck", "InventoryCheckItem",
+    # "ReagentOrder", "ReagentOrderItem", "Receiving", "ReceivingItem",
+    # "ReagentConsumption",
 ]
