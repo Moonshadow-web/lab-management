@@ -1,8 +1,15 @@
 <template>
   <div class="page">
     <el-tabs v-model="activeTab">
+      <el-tab-pane
+        v-for="tab in visibleTabs"
+        :key="tab.name"
+        :label="tab.label"
+        :name="tab.name"
+        :lazy="tab.name !== 'summary' && tab.name !== 'chart'"
+      >
       <!-- ============ 月结 ============ -->
-      <el-tab-pane label="室内质控月结" name="summary" v-if="auth.canAccessMenu('qc-monthly')">
+      <template v-if="activeTab === 'summary'">
         <div class="toolbar">
           <el-date-picker
             v-model="monthValue"
@@ -141,10 +148,10 @@
             </el-button>
           </div>
         </div>
-      </el-tab-pane>
+      </template>
 
       <!-- ============ LJ 质控图 ============ -->
-      <el-tab-pane label="LJ 质控图" name="chart" v-if="auth.canAccessMenu('qc-monthly')">
+      <template v-if="activeTab === 'chart'">
         <div class="toolbar">
           <el-date-picker
             v-model="chartMonth"
@@ -213,10 +220,10 @@
             <div ref="chartRef" class="chart-box"></div>
           </div>
         </div>
-      </el-tab-pane>
+      </template>
 
       <!-- ============ 室间质评 ============ -->
-      <el-tab-pane label="室间质评" name="eqa" v-if="auth.canAccessMenu('eqa')">
+      <template v-if="activeTab === 'eqa'">
         <div class="toolbar">
           <el-date-picker
             v-model="eqaYear"
@@ -597,16 +604,17 @@
             <el-button type="primary" :loading="resultSaving" @click="saveResult">保存</el-button>
           </template>
         </el-dialog>
-      </el-tab-pane>
-      <el-tab-pane label="仪器间比对" name="cmp" lazy v-if="auth.canAccessMenu('comparison')">
+      </template>
+      <template v-if="activeTab === 'cmp'">
         <Comparison />
-      </el-tab-pane>
-      <el-tab-pane label="室间比对" name="interlab" lazy v-if="auth.canAccessMenu('interlab')">
+      </template>
+      <template v-if="activeTab === 'interlab'">
         <InterlabComparison />
-      </el-tab-pane>
-      <el-tab-pane label="质控品换批号累靶" name="lot" lazy v-if="auth.canAccessMenu('qc-target')">
+      </template>
+      <template v-if="activeTab === 'lot'">
         <TargetValueBoard />
-      </el-tab-pane>
+      </template>
+    </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -647,21 +655,21 @@ let chartInstance = null
 
 // 按权限收口可见页签：technical_support 仅见其被授权的页签
 const visibleTabs = computed(() => {
-  const map = {
-    summary: 'qc-monthly',
-    chart: 'qc-monthly',
-    eqa: 'eqa',
-    cmp: 'comparison',
-    interlab: 'interlab',
-    lot: 'qc-target',
-  }
-  return Object.keys(map).filter((t) => auth.canAccessMenu(map[t]))
+  const tabs = [
+    { name: 'summary', label: '室内质控月结', key: 'qc-monthly' },
+    { name: 'chart', label: 'LJ 质控图', key: 'qc-monthly' },
+    { name: 'eqa', label: '室间质评', key: 'eqa' },
+    { name: 'cmp', label: '仪器间比对', key: 'comparison' },
+    { name: 'interlab', label: '室间比对', key: 'interlab' },
+    { name: 'lot', label: '质控品换批号累靶', key: 'qc-target' },
+  ]
+  return tabs.filter((t) => auth.canAccessMenu(t.key))
 })
 // 当前选中页签不可见时，自动切到第一个可见页签（如 technical_support 默认落在"仪器间比对"）
 watch(
   visibleTabs,
   (v) => {
-    if (v.length && !v.includes(activeTab.value)) activeTab.value = v[0]
+    if (v.length && !v.some((t) => t.name === activeTab.value)) activeTab.value = v[0].name
   },
   { immediate: true },
 )
