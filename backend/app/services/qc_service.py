@@ -285,19 +285,21 @@ def evaluate_westgard(values: list[float], mean: float, sd: float) -> dict[int, 
     n = len(values)
     if n == 0 or sd <= 0:
         return ooc
+    # 浮点容差：判定「超过」阈值时使用，避免恰好等于阈值（如相邻差恰好 = 4sd）被误判为失控。
+    eps = 1e-9 * (abs(mean) + abs(sd) + 1)
     # 1-3s
     for i, v in enumerate(values):
-        if v > mean + 3 * sd or v < mean - 3 * sd:
+        if v > mean + 3 * sd + eps or v < mean - 3 * sd - eps:
             ooc[i] = _join(ooc.get(i, ""), "1-3s")
     # 2-2s
     for i in range(n - 1):
         a, b = values[i], values[i + 1]
-        if (a > mean + 2 * sd and b > mean + 2 * sd) or (a < mean - 2 * sd and b < mean - 2 * sd):
+        if (a > mean + 2 * sd + eps and b > mean + 2 * sd + eps) or (a < mean - 2 * sd - eps and b < mean - 2 * sd - eps):
             ooc[i] = _join(ooc.get(i, ""), "2-2s")
             ooc[i + 1] = _join(ooc.get(i + 1, ""), "2-2s")
     # R-4s
     for i in range(n - 1):
-        if abs(values[i] - values[i + 1]) > 4 * sd:
+        if abs(values[i] - values[i + 1]) > 4 * sd + eps:
             ooc[i] = _join(ooc.get(i, ""), "R-4s")
             ooc[i + 1] = _join(ooc.get(i + 1, ""), "R-4s")
     # 4-1s 已禁用
@@ -311,11 +313,17 @@ def evaluate_westgard(values: list[float], mean: float, sd: float) -> dict[int, 
 
 
 def aggregate(values: list[float], target_mean: float, target_sd: float):
-    """由每日测值聚合月结统计；target_mean/target_sd 用于 Westgard 判定。"""
+    """由每日测值聚合月结统计；target_mean/target_sd 用于 Westgard 判定。
+
+    返回的 mean/sd/cv 为**剔除失控点后**的「在控统计量」（用户要求：导入核算须去除失控点）。
+    原始全量统计量另存 all_mean/all_sd/all_cv 供追溯。Westgard 判定仍基于靶值（或缺失时本批全量），
+    不受剔除影响。
+    """
     n = len(values)
     if n == 0:
         return {
             "mean": 0.0, "sd": 0.0, "cv": 0.0, "n": 0,
+            "all_mean": 0.0, "all_sd": 0.0, "all_cv": 0.0,
             "out_of_control_count": 0, "in_control_rate": 0.0,
             "ooc": {},
         }
@@ -331,8 +339,18 @@ def aggregate(values: list[float], target_mean: float, target_sd: float):
     ooc = evaluate_westgard(values, eff_mean, eff_sd)
     ooc_count = len(ooc)
     in_control_rate = (n - ooc_count) / n if n else 0.0
+    # 剔除失控点后在控统计量（用户要求：均值/SD/CV 去除失控点重算）
+    in_control = [v for i, v in enumerate(values) if i not in ooc]
+    if in_control:
+        ic_mean = sum(in_control) / len(in_control)
+        ic_sd = statistics.stdev(in_control) if len(in_control) > 1 else 0.0
+        ic_cv = (ic_sd / ic_mean * 100) if ic_mean else 0.0
+    else:
+        # 全部失控时退化为全量，避免无值
+        ic_mean, ic_sd, ic_cv = mean, sd, cv
     return {
-        "mean": mean, "sd": sd, "cv": cv, "n": n,
+        "mean": ic_mean, "sd": ic_sd, "cv": ic_cv, "n": n,
+        "all_mean": mean, "all_sd": sd, "all_cv": cv,
         "out_of_control_count": ooc_count, "in_control_rate": in_control_rate,
         "ooc": ooc,
     }
