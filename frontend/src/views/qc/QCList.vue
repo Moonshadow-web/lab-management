@@ -6,7 +6,6 @@
         :key="tab.name"
         :label="tab.label"
         :name="tab.name"
-        :lazy="tab.name !== 'summary' && tab.name !== 'chart'"
       >
       <!-- ============ 月结 ============ -->
       <template v-if="activeTab === 'summary'">
