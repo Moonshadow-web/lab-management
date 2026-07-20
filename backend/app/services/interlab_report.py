@@ -6,7 +6,8 @@
 
 import json
 import os
-from datetime import datetime
+import calendar
+from datetime import datetime, date
 from pathlib import Path
 
 from docx import Document
@@ -30,6 +31,36 @@ def _parse_float(x):
         return float(str(x).strip())
     except Exception:
         return None
+
+
+def _parse_date_str(s):
+    """解析日期字符串，支持 ISO 日期及常见分隔符。"""
+    if not s:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(str(s).strip(), fmt).date()
+        except Exception:
+            pass
+    return None
+
+
+def _add_months(d: date, months: int) -> date:
+    """给 date 增加指定月数，月末自动处理（1.31 + 1月 → 2.28/29）。"""
+    total = d.month - 1 + months
+    new_year = d.year + total // 12
+    new_month = total % 12 + 1
+    last_day = calendar.monthrange(new_year, new_month)[1]
+    new_day = min(d.day, last_day)
+    return date(new_year, new_month, new_day)
+
+
+def _half_year_end(year: int, half: int) -> date:
+    return date(year, 6, 30) if half == 1 else date(year, 12, 31)
+
+
+def _fmt_before(d: date) -> str:
+    return f"{d.year}年{d.month}月{d.day}日之前"
 
 
 def _compute_bias(our, ref, te, mode):
@@ -222,15 +253,15 @@ def mandatory_projects(db):
         if last_plan:
             last_status = last_plan.status or "draft"
             last_label = f"{last_plan.year}年{'上半年' if last_plan.half == 1 else '下半年'}"
-            if last_status == "done":
-                # 下次：half+1 跨年处理
-                if last_plan.half == 1:
-                    next_label = f"{last_plan.year}年下半年"
-                else:
-                    next_label = f"{last_plan.year + 1}年上半年"
-                progress = {"last_plan": last_label, "last_status": "done", "next_due": next_label}
-            else:
-                progress = {"last_plan": last_label, "last_status": "in_progress", "next_due": last_label}
+            # 下次应做：以上次比对日期 + 6 个月；无比对日期时以该半年度最后一天为基准
+            base_date = _parse_date_str(last_plan.compared_at) or _half_year_end(last_plan.year, last_plan.half)
+            next_due_date = _add_months(base_date, 6)
+            next_due_label = _fmt_before(next_due_date)
+            progress = {
+                "last_plan": last_label,
+                "last_status": "done" if last_status == "done" else "in_progress",
+                "next_due": next_due_label,
+            }
         else:
             progress = {"last_plan": "", "last_status": "never", "next_due": "请尽快安排"}
 
