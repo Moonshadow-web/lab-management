@@ -371,7 +371,7 @@ const planForm = reactive({
 // 结果分析默认句（用户未改过时，随参比实验室联动）
 function defaultSummary(refLab) {
   const lab = (refLab || '').trim() || '参比实验室'
-  return `使用5例样本与${lab}实验室进行室间比对， 一致性可接受。`
+  return `使用5例样本与${lab}进行室间比对，一致性可接受。`
 }
 // 监听参比实验室：用户未手动编辑时，自动更新结果分析默认句
 watch(() => planForm.reference_lab, (v) => {
