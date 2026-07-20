@@ -155,17 +155,50 @@ def candidate_projects(db, instrument_id: int):
 
 
 def mandatory_projects(db):
-    """指导用：返回所有「无室间质评、需做室间比对」的必做项目及所属仪器。"""
+    """指导用：返回所有「无室间质评、需做室间比对」的必做项目及所属仪器。
+
+    过滤逻辑：
+    - has_eqa 改用 eqa_associations 的计算结果（_compute_associations），
+      避免依赖 test_items.has_eqa 这个陈旧缓存字段。
+    - has_interlab 仍用 test_items 字段（无变动）。
+
+    进度：
+    - last_plan：该项目最近一次被哪个 plan 覆盖（按 year/half/instrument 维度）。
+    - last_status：最近一次 plan 的状态（done=已完成，其它=进行中/草稿）。
+    - next_due：根据「每半年一次」规则推断下一次应做时间。
+    """
+    from ..api.v1.eqa_associations import _compute_associations
     fam_lut = _family_name_to_ids(db)
     inst_lut = {i.id: i for i in db.query(Instrument).all()}
+
+    # 计算 EQA 关联（用实际 plan 数据）
+    assoc = _compute_associations(db)
+    has_eqa_map = {a.id: a.has_eqa for a in assoc}
+
+    # 找每个 test_item 最近一次 plan（按名称匹配 InterlabItem.item）
+    from ..models.interlab import InterlabPlan, InterlabItem
+    # 一次性拿全部 items + plans
+    plan_map = {p.id: p for p in db.query(InterlabPlan).all()}
+    # item_name -> 最新 plan（按 year desc, half desc, plan.id desc）
+    latest_plan_by_name: dict[str, InterlabPlan] = {}
+    for it in db.query(InterlabItem).all():
+        p = plan_map.get(it.plan_id)
+        if not p:
+            continue
+        prev = latest_plan_by_name.get(it.item)
+        if (not prev or
+            (p.year, p.half, p.id) > (prev.year, prev.half, prev.id)):
+            latest_plan_by_name[it.item] = p
+
     out = []
     for ti in db.query(TestItem).all():
-        he = getattr(ti, "has_eqa", None)
-        if he is not None and int(he) == 1:
+        # 用实时计算的 has_eqa（不再用 ti.has_eqa 缓存）
+        if has_eqa_map.get(ti.id):
             continue
         hi = getattr(ti, "has_interlab", None)
         if hi is not None and int(hi) != 1:
             continue
+
         run_ids = set()
         for tok in _split_tokens(ti.instrument_group):
             run_ids |= fam_lut.get(tok, set())
@@ -180,12 +213,34 @@ def mandatory_projects(db):
                 continue
             nm = (inst.model or inst.name or "").strip() or f"仪器{iid}"
             insts.append({"id": iid, "name": nm})
+        if not insts:
+            # 没有活跃仪器上跑的，不作为必做项
+            continue
+
+        # 找最近一次 plan（按 test_item.name 匹配）
+        last_plan = latest_plan_by_name.get((ti.name or "").strip())
+        if last_plan:
+            last_status = last_plan.status or "draft"
+            last_label = f"{last_plan.year}年{'上半年' if last_plan.half == 1 else '下半年'}"
+            if last_status == "done":
+                # 下次：half+1 跨年处理
+                if last_plan.half == 1:
+                    next_label = f"{last_plan.year}年下半年"
+                else:
+                    next_label = f"{last_plan.year + 1}年上半年"
+                progress = {"last_plan": last_label, "last_status": "done", "next_due": next_label}
+            else:
+                progress = {"last_plan": last_label, "last_status": "in_progress", "next_due": last_label}
+        else:
+            progress = {"last_plan": "", "last_status": "never", "next_due": "请尽快安排"}
+
         out.append({
             "id": ti.id,
             "code": (ti.code or "").strip(),
             "name": (ti.name or "").strip(),
             "unit": (ti.unit or "").strip(),
             "instruments": insts,
+            **progress,
         })
     return out
 

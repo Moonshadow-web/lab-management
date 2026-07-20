@@ -24,16 +24,36 @@
         <span class="guide-sub">—— 以下项目系统已按仪器档案自动归集，新建计划时会自动带出</span>
       </template>
       <el-table :data="mandatory" border size="small" max-height="260">
-        <el-table-column prop="name" label="检验项目" min-width="220">
+        <el-table-column prop="name" label="检验项目" min-width="200">
           <template #default="{ row }">
             <el-tag type="danger" size="small" effect="dark" style="margin-right:6px">必做</el-tag>{{ row.name }}
           </template>
         </el-table-column>
-        <el-table-column prop="unit" label="单位" width="90" />
-        <el-table-column label="所属仪器" min-width="220">
+        <el-table-column prop="unit" label="单位" width="80" />
+        <el-table-column label="所属仪器" min-width="200">
           <template #default="{ row }">
             <el-tag v-for="ins in (row.instruments||[])" :key="ins.id" size="small" style="margin-right:4px">{{ ins.name }}</el-tag>
             <span v-if="!row.instruments || !row.instruments.length" class="no">未关联仪器</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上次比对" width="120">
+          <template #default="{ row }">
+            <span v-if="!row.last_plan" class="no">无</span>
+            <span v-else>{{ row.last_plan }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.last_status === 'done'" type="success" size="small">已完成</el-tag>
+            <el-tag v-else-if="row.last_status === 'in_progress'" type="warning" size="small">进行中</el-tag>
+            <el-tag v-else type="info" size="small">未做</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="下次应做" width="130">
+          <template #default="{ row }">
+            <span v-if="row.last_status === 'done'" style="color:#16a34a">✓ {{ row.next_due }}</span>
+            <span v-else-if="row.last_status === 'in_progress'" style="color:#d97706">{{ row.next_due }}</span>
+            <span v-else style="color:#dc2626;font-weight:600">{{ row.next_due }}</span>
           </template>
         </el-table-column>
       </el-table>
