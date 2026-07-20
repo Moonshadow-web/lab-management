@@ -103,8 +103,9 @@ export const useAuthStore = defineStore('auth', {
       if (this.isAdmin) return true
       // 优先读后端拉的最新配置；尚未加载或找不到时用 fallback
       let required
+      let permStore
       try {
-        const permStore = usePermissionStore()
+        permStore = usePermissionStore()
         required = permStore.moduleRoles[module]
       } catch (_) { /* store 未挂载时退化 */ }
       if (!required) required = FALLBACK_MODULE_WRITE_ROLES[module]
