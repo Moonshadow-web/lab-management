@@ -126,6 +126,47 @@ def diag_build():
     return {"build": _BUILD_MARK, "has_self_heal": True}
 
 
+@router.get("/copy-from-sqlite")
+def diag_copy_from_sqlite():
+    """把容器内 /app/data/app.db (SQLite) 的数据搬到 MySQL。
+    用于调试：cloudbaserc.json 的 env 未生效、容器内仍在用 SQLite 时。
+    用完即删。
+    """
+    if not os.path.exists(_DB_PATH):
+        return {"error": "no sqlite at /app/data/app.db"}
+    import sqlite3 as _sq
+    src = _sq.connect(_DB_PATH)
+    src.row_factory = _sq.Row
+    from ...core.database import engine
+    from sqlalchemy import text as _t
+    report = {}
+    with engine.begin() as dst:
+        inspector = inspect(engine)
+        for table in inspector.get_table_names():
+            try:
+                rows = src.execute(f"SELECT * FROM `{table}`").fetchall()
+            except Exception as e:
+                report[table] = f"read_err: {e}"
+                continue
+            if not rows:
+                report[table] = "0 rows"
+                continue
+            cols = [c["name"] for c in inspector.get_columns(table)]
+            col_q = ", ".join(f"`{c}`" for c in cols)
+            ph = ", ".join(":" + c for c in cols)
+            n = 0
+            for row in rows:
+                vals = {c: row[c] for c in cols}
+                try:
+                    dst.execute(_t(f"INSERT INTO `{table}` ({col_q}) VALUES ({ph})"), vals)
+                    n += 1
+                except Exception:
+                    pass
+            report[table] = f"+{n}/{len(rows)}"
+    src.close()
+    return {"ok": True, "report": report}
+
+
 @router.get("/db")
 def diag_db():
     """下载当前数据库文件（免鉴权，仅管理员使用）。"""
