@@ -6,9 +6,10 @@
 
 ## 部署与数据
 - 部署：`printf 'Y\n' | tcb cloudrun deploy -e cloud1-0gjhamv53ff2298d -s lab-management --force`；构建源=origin/main（本地 commit 须先 push）；灰度 5-10min。
-- 线上 DB 唯一源；本地 data/app.db 是种子/兜底库（gitignored，但 .dockerignore 不排除 → 进镜像备份）。
-- 就绪验证 URL 返回 200。
-- **CDN 418 排查**：公网 `lab-management.tcloudbaseapp.com` 返回 418 "X-Cache-Lookup: Return Directly" = CDN 不转发到后端。绕过用 TCB 内部 host `lab-management-282724-9-1408547492.sh.run.tcloudbase.com`（从 `tcb logs search` 取）。容器 "normal" 但 CDN 缓存/规则异常时只能等 TCB 平台处理。
+- **数据库已切 MySQL**（见下方 #数据库与持久化），不再依赖本地 SQLite 文件。`data/app.db` 仅作 Docker 镜像种子兜底（首次 MySQL 为空时回退）。
+- 就绪验证：`curl /api/v1/_diag/build` 返回 200。
+- **CDN 418**：公网 `lab-management.tcloudbaseapp.com` 418 = CDN 不转发。绕过用内网 host `lab-management-282724-9-1408547492.sh.run.tcloudbase.com`。通常 CFS 挂载问题解决后自愈。
+- **请勿反复 deploy**：每次 deploy 触发新 pod 创建；在 CFS 问题时期可能反复卡死。确认服务 normal 后再操作。
 
 ## 登录/权限/前端约定
 - RBAC roles 逗号分隔；admin 通杀；会话 30min access+7d refresh，401 静默 refresh；禁用 Promise.all+静默 catch。
@@ -60,11 +61,27 @@
 - 后端 documents.py preview 对 xlsx/xls media_type=None→部署环境回退 text/plain；前端 onPreview 原仅 docx(mammoth)/pdf 有渲染，xlsx/xls 走 previewBlob→window.open 当文本→乱码。
 - 修复：前端用 exceljs(已装 ^4.4.0) 增加 xlsx/xls 分支转 HTML 表格（与 docx 一致），按文件头 PK→exceljs、OLE→提示下载、其余→gbk 文本；后端补 xlsx/xls 正确 media_type。
 
-## Docker/CFS 硬约束
-- 持久卷 mountPath=/app/data；构建期 /app/data 必须空，子目录运行时建；.dockerignore 排除 backend/data/；改后须 push+deploy。
+## 数据库与持久化（2026-07-20 全面变更）
+- **已放弃 SQLite+CFS**，全面改用 **CloudBase TDSQL-C MySQL**（cynosdbmysql）。
+- MySQL 实例：`cynosdbmysql-ins-102awksb`，内网 10.0.1.18:3306，数据库 `cloud1-0gjhamv53ff2298d`。
+- 账号：`labapp`（密码同 admin；外网访问按需开关，平时关闭只用内网）。
+- app 连接：cloudbaserc.json 中 `DATABASE_URL=mysql+pymysql://labapp:PASS@10.0.1.18:3306/cloud1-...`。
+- 迁移方式：本地 pymysql 连接外网（临时打开）→ SQLAlchemy create_all 建表 → pymysql 逐行插数据 → 关闭外网 → deploy 切 MySQL DATABASE_URL。
+- 数据备份：`online_backup.json`（391KB，38 条 QC 摘要 + 每日值），API dump → MySQL 恢复验证通过。
+- **不再需要 CFS 持久卷**，cloudbaserc.json volumes 已清空，服务端「存储挂载」已关闭。
 
-## 上线必做（CFS 恢复后）
-- 部署积压提交→清 AU5800(id=5) 重复月小结（走 API 删）→重生成 CZ-012 月结报告。
+## CFS 挂载冲突（平台级，非代码问题）
+- **根因**：TCB CloudRun side-dns-cache 边车容器的 lifecycle hook 在宿主上执行 `/mount_cfs.sh`，挂载目标 `/mnt/cfs/10-0-1-2` 被本地磁盘 `/dev/vdb` 抢先挂载。
+- **症状**：每次 deploy 新版本 pod 起不来（mount source mismatch, exit 15），公网 418；旧 pod 不受影响（内部 host 正常）。
+- **工程师修复**：清宿主机 stale 挂载（非代码修复）；控制台「服务配置→存储挂载」关闭后永久不再需要 CFS。
+- **工单沟通要点**：明确是 platform-level、不是 app volumes 配置；附上 DST_PATH + Pod 名 + exit 15 日志即可加速排查。
+
+## 7/19-20 部署连环故障与修复
+1. **upload 500**：`_lookup_qr_goal` 中 `name.contains(col)` AttributeError。11736ee → Py 侧过滤 + try-except。
+2. **models/__init__.py 缺 import**：`__all__` 有 QualityRequirement 但没有 `from .quality_requirement import ...`。19d5bbe。
+3. **Pydantic v2 `_file` 字段**：reagent_management.py `_file: UploadFile` 不兼容。c73e2f5 → 改为 `file`。
+4. **SQLAlchemy mapper InvalidRequestError**：reagent_management.py 多张表的 FK 列只有 `Integer` 没有 `ForeignKey`。dbdae85 → 补全 6 处 FK。
+5. **容器 DB 丢失**：无 CFS 时每次 deploy 覆盖种子库。切 MySQL 从根本上解决。
 
 ## 质量要求模块 (2026-07-19)
 - 三源同表 quality_requirements，source 字段分：wst403-2024/bj-hr-2025/nccl-2026。
