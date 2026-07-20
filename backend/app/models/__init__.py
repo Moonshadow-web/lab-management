@@ -7,7 +7,7 @@ from .instrument import CalibrationRecord, Instrument
 from .instrument_archive import InstrumentArchive
 from .instrument_family import InstrumentFamily, InstrumentFamilyMember
 from .nonconformity import Nonconformity
-from .notification import Notification
+from .notification import Notification, NotificationRead
 from .qc import QCRecord, QCMonthlySummary, QCDailyValue, QCMonthlyReport
 from .eqa import EqaPlan, EqaSummary
 from .reagent import Reagent
@@ -39,6 +39,7 @@ __all__ = [
     "InstrumentFamilyMember",
     "CalibrationRecord",
     "Notification",
+    "NotificationRead",
     "AuditLog",
     "FileChangeLog",
     "QCRecord",

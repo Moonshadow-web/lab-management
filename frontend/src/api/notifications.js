@@ -9,9 +9,6 @@ export function markRead(nid) {
 export function markAllRead() {
   return request.post('/api/v1/notifications/read-all')
 }
-export function sendNotificationEmails() {
-  return request.post('/api/v1/notifications/send')
-}
 export function testEmail(to) {
   return request.post('/api/v1/notifications/test-email', to ? { to } : {})
 }

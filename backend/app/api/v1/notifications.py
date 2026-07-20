@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from ...core.config import SYSTEM_NAME
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
-from ...models.notification import Notification
+from ...models.notification import Notification, NotificationRead
 from ...models.user import User
 from ...services.email_service import send_email, send_notifications_email
 from ...services.notification_service import get_email_recipients
@@ -20,12 +20,42 @@ def list_notifications(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    query = db.query(Notification)
+    # 当前用户已读通知 id 子查询（按用户维度，互不影响）
+    read_subq = db.query(NotificationRead.notification_id).filter(
+        NotificationRead.user_id == user.id
+    ).subquery()
+
+    query = db.query(Notification).outerjoin(
+        read_subq, Notification.id == read_subq.c.notification_id
+    )
     if unread_only:
-        query = query.filter(Notification.is_read == False)  # noqa: E712
-    query = query.order_by(Notification.is_read.asc(), Notification.level.desc(), Notification.id.desc())
+        # 未读 = 该用户在 notification_reads 中无对应记录
+        query = query.filter(read_subq.c.notification_id.is_(None))
+    # 未读在前、已读在后；同级按等级、ID 倒序
+    query = query.order_by(
+        read_subq.c.notification_id.is_(None).desc(),
+        Notification.level.desc(),
+        Notification.id.desc(),
+    )
     total = query.count()
-    items = query.offset((page - 1) * page_size).limit(page_size).all()
+    rows = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    read_ids = {
+        rid for (rid,) in db.query(NotificationRead.notification_id)
+        .filter(NotificationRead.user_id == user.id).all()
+    }
+    items = [{
+        "id": n.id,
+        "module": n.module,
+        "ref_type": n.ref_type,
+        "ref_id": n.ref_id,
+        "title": n.title,
+        "message": n.message,
+        "due_date": n.due_date,
+        "level": n.level,
+        "is_read": n.id in read_ids,  # 按当前用户维度判定
+        "created_at": n.created_at.isoformat() if n.created_at else None,
+    } for n in rows]
     pages = (total + page_size - 1) // page_size if page_size else 0
     return {"items": items, "total": total, "page": page, "pages": pages, "page_size": page_size}
 
@@ -35,16 +65,31 @@ def mark_read(nid: int, db: Session = Depends(get_db), user: User = Depends(get_
     n = db.get(Notification, nid)
     if not n:
         raise HTTPException(status_code=404, detail="未找到提醒")
-    n.is_read = True
-    db.commit()
+    # 仅记录「当前用户已读」，不影响其他账号
+    exists = db.query(NotificationRead).filter(
+        NotificationRead.user_id == user.id,
+        NotificationRead.notification_id == nid,
+    ).first()
+    if not exists:
+        db.add(NotificationRead(user_id=user.id, notification_id=nid))
+        db.commit()
     return {"ok": True}
 
 
 @router.post("/read-all")
 def mark_all_read(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    db.query(Notification).filter(Notification.is_read == False).update(  # noqa: E712
-        {"is_read": True}, synchronize_session=False
+    # 取该用户尚未标记已读的通知，逐条写入 notification_reads
+    already = db.query(NotificationRead.notification_id).filter(
+        NotificationRead.user_id == user.id
+    ).subquery()
+    pending = (
+        db.query(Notification.id)
+        .outerjoin(already, Notification.id == already.c.notification_id)
+        .filter(already.c.notification_id.is_(None))
+        .all()
     )
+    for (nid,) in pending:
+        db.add(NotificationRead(user_id=user.id, notification_id=nid))
     db.commit()
     return {"ok": True}
 
@@ -66,9 +111,14 @@ def send_notifications_by_email(
             "recipients": 0,
             "detail": "无邮件接收人（需给用户配置邮箱、role 为 admin/leader 且开启通知）",
         }
+    # 发「当前管理员（admin）未读」的通知，与列表判定一致
+    read_subq = db.query(NotificationRead.notification_id).filter(
+        NotificationRead.user_id == admin.id
+    ).subquery()
     pending = (
         db.query(Notification)
-        .filter(Notification.is_read == False)  # noqa: E712
+        .outerjoin(read_subq, Notification.id == read_subq.c.notification_id)
+        .filter(read_subq.c.notification_id.is_(None))
         .order_by(Notification.level.desc(), Notification.id.desc())
         .all()
     )
