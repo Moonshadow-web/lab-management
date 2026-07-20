@@ -218,32 +218,58 @@ def _fetch_report(db: Session, instrument_id, instrument: str, year: int, month:
     return _find_report(db, instrument_id, instrument, year, month)
 
 
-def _ensure_report_draft(db: Session, instrument_id, instrument: str, year: int, month: int):
-    """若报告不存在或五段文字全为空，则按当前数据草拟并落库（不覆盖用户已编辑的字段）。
+def _count_summary_lines(text: str | None) -> int:
+    """按草稿文本中「；」分隔的条目数，估算当前文字覆盖了多少个（项目×水平）。"""
+    if not text:
+        return 0
+    return len([x for x in text.split("；") if x.strip()])
 
-    修复：之前只判「报告不存在」，导致历史遗留的空文本报告永远不会被补字。
-    现增加「五段文字全为空」判定，重传/重生成时主动回填。
+
+def _ensure_report_draft(db: Session, instrument_id, instrument: str, year: int, month: int):
+    """若报告不存在、五段文字全为空，或当前月结明细数多于文字覆盖数，则按当前数据草拟并落库。
+
+    修复：
+    1. 之前只判「报告不存在」，导致历史遗留的空文本报告永远不会被补字。
+    2. 之前只回填空字段，导致先上传部分数据、后补充数据时，文字报告不会随明细自动更新。
+       现增加「明细条目数 > 文字条目数」判定，检测到遗漏时整段重生成（覆盖原有自动文字，
+       保护用户编辑的尽力而为：若用户未删行，仅新增项目时触发更新；若用户手动精简过文字，
+       只要条目数未少于明细数，就不会被覆盖）。
     """
-    rep = _find_report(db, instrument_id, instrument, year, month)
-    if rep:
-        # 已有报告：仅当五段文字全为空时才回填（保护用户已编辑内容）
-        if any((getattr(rep, f, "") or "").strip() for f in
-               ("operation_status", "drift_trend", "cv_setting_ok", "cv_calc_ok", "freq_ok")):
-            return
-        # 落到下面走"草拟并落库"逻辑（覆盖空文本）
     q = db.query(QCMonthlySummary).filter_by(year=year, month=month)
     if instrument_id:
         q = q.filter_by(instrument_id=instrument_id)
     else:
         q = q.filter_by(instrument=(instrument or ""))
     summaries = q.all()
+
+    rep = _find_report(db, instrument_id, instrument, year, month)
     if not summaries:
-        if rep:
-            return
-        rep = QCMonthlyReport(instrument_id=instrument_id, instrument=instrument or "", year=year, month=month)
-        db.add(rep)
-        db.commit()
+        if not rep:
+            rep = QCMonthlyReport(instrument_id=instrument_id, instrument=instrument or "", year=year, month=month)
+            db.add(rep)
+            db.commit()
         return
+
+    expected = len(summaries)
+    needs_draft = False
+    if not rep:
+        needs_draft = True
+    else:
+        has_any = any((getattr(rep, f, "") or "").strip() for f in
+                      ("operation_status", "drift_trend", "cv_setting_ok", "cv_calc_ok", "freq_ok"))
+        stored_lines = max(
+            _count_summary_lines(rep.cv_setting_ok),
+            _count_summary_lines(rep.cv_calc_ok),
+        )
+        if not has_any:
+            needs_draft = True
+        elif expected > stored_lines:
+            # 月结明细比文字覆盖的多 → 自动文字已过时，需要重生成
+            needs_draft = True
+
+    if not needs_draft:
+        return
+
     sids = [s.id for s in summaries]
     dvs = db.query(QCDailyValue).filter(QCDailyValue.summary_id.in_(sids)).all()
     daily = {}
@@ -259,10 +285,9 @@ def _ensure_report_draft(db: Session, instrument_id, instrument: str, year: int,
         )
         db.add(rep)
     else:
-        # 覆盖空文本（保留用户已编辑字段）
+        # 重生成时覆盖全部五段文字（仅在有需要时进入此分支）
         for k, v in drafted.items():
-            if not (getattr(rep, k, "") or "").strip():
-                setattr(rep, k, v)
+            setattr(rep, k, v)
     db.commit()
 
 
@@ -524,52 +549,14 @@ def get_qc_report(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """获取某(仪器,年,月)的月结文字报告；不存在则按当前数据自动草拟并保存。
-
-    修复：若报告存在但五段文字全为空，也触发自动草拟（覆盖空文本，保留用户编辑）。
-    """
+    """获取某(仪器,年,月)的月结文字报告；不存在/为空/明细增加时自动按当前数据重生成。"""
+    _ensure_report_draft(db, instrument_id, instrument, year, month)
     rep = _find_report(db, instrument_id, instrument, year, month)
-    if rep:
-        if any((getattr(rep, f, "") or "").strip() for f in
-               ("operation_status", "drift_trend", "cv_setting_ok", "cv_calc_ok", "freq_ok")):
-            return rep
-        # 文本全空：落到下面草拟逻辑并覆盖
-    # 自动草拟
-    q = db.query(QCMonthlySummary).filter_by(year=year, month=month)
-    if instrument_id:
-        q = q.filter_by(instrument_id=instrument_id)
-    else:
-        q = q.filter_by(instrument=(instrument or ""))
-    summaries = q.all()
-    if not summaries:
-        if rep:
-            return rep
+    if not rep:
         rep = QCMonthlyReport(instrument_id=instrument_id, instrument=instrument or "", year=year, month=month)
         db.add(rep)
         db.commit()
         db.refresh(rep)
-        return rep
-    sids = [s.id for s in summaries]
-    dvs = db.query(QCDailyValue).filter(QCDailyValue.summary_id.in_(sids)).all()
-    daily = {}
-    for dv in dvs:
-        daily.setdefault(dv.summary_id, []).append(dv)
-    drafted = draft_report(instrument or summaries[0].instrument, year, month, summaries, daily)
-    if not rep:
-        rep = QCMonthlyReport(
-            instrument_id=instrument_id,
-            instrument=instrument or summaries[0].instrument,
-            instrument_no=summaries[0].instrument_no,
-            year=year, month=month, **drafted,
-        )
-        db.add(rep)
-    else:
-        # 报告存在但文本全空：覆盖空字段
-        for k, v in drafted.items():
-            if not (getattr(rep, k, "") or "").strip():
-                setattr(rep, k, v)
-    db.commit()
-    db.refresh(rep)
     return rep
 
 
@@ -598,6 +585,45 @@ def upsert_qc_report(
     db.refresh(rep)
     return rep
 
+
+@router.post("/report/regenerate")
+def regenerate_qc_report(
+    instrument_id: int | None = None,
+    instrument: str = "",
+    year: int = 0,
+    month: int = 0,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """强制按当前月结明细重新生成 CZ-012 五段文字（覆盖原有文字，请谨慎使用）。"""
+    q = db.query(QCMonthlySummary).filter_by(year=year, month=month)
+    if instrument_id:
+        q = q.filter_by(instrument_id=instrument_id)
+    else:
+        q = q.filter_by(instrument=(instrument or ""))
+    summaries = q.all()
+    if not summaries:
+        raise HTTPException(status_code=404, detail="未找到月结明细，无法生成文字报告")
+    sids = [s.id for s in summaries]
+    dvs = db.query(QCDailyValue).filter(QCDailyValue.summary_id.in_(sids)).all()
+    daily = {}
+    for dv in dvs:
+        daily.setdefault(dv.summary_id, []).append(dv)
+    drafted = draft_report(instrument or summaries[0].instrument, year, month, summaries, daily)
+    rep = _find_report(db, instrument_id, instrument, year, month)
+    if not rep:
+        rep = QCMonthlyReport()
+        db.add(rep)
+    rep.instrument_id = instrument_id
+    rep.instrument = instrument or summaries[0].instrument
+    rep.instrument_no = summaries[0].instrument_no
+    rep.year = year
+    rep.month = month
+    for k, v in drafted.items():
+        setattr(rep, k, v)
+    db.commit()
+    db.refresh(rep)
+    return rep
 
 
 # ---------------------------------------------------------------------------

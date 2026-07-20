@@ -57,6 +57,11 @@ export function getQCReport(instrumentId, year, month) {
 export function upsertQCReport(data) {
   return request.put('/api/v1/qc-summaries/report', data)
 }
+export function regenerateQCReport(instrumentId, year, month) {
+  const params = { year, month }
+  if (instrumentId) params.instrument_id = instrumentId
+  return request.post('/api/v1/qc-summaries/report/regenerate', null, { params })
+}
 export function exportQCSummary(year, month, instrumentId) {
   const params = { year, month }
   if (instrumentId) params.instrument_id = instrumentId

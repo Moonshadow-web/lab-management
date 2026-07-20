@@ -133,6 +133,9 @@
             <el-button type="primary" size="small" :loading="reportMap[g.key]._saving" @click="saveReport(g)">
               保存总结文字
             </el-button>
+            <el-button type="warning" size="small" plain :loading="reportMap[g.key]._regening" @click="regenerateReport(g)">
+              重新生成文字
+            </el-button>
             <el-button type="success" size="small" :loading="reportMap[g.key]._docxing" @click="downloadDocx(g)">
               下载 Word (A4 横向)
             </el-button>
@@ -615,7 +618,7 @@ import ExcelJS from 'exceljs'
 import * as echarts from 'echarts'
 import {
   listQCSummaries, uploadQCSummary, getQCDaily, updateQCSummary, deleteQCSummary,
-  getQCReport, upsertQCReport, exportQCReportDocx, getQCProjectDaily,
+  getQCReport, upsertQCReport, regenerateQCReport, exportQCReportDocx, getQCProjectDaily,
 } from '../../api/qc'
 import { getQCInstruments } from '../../api/qc'
 import {
@@ -1218,6 +1221,29 @@ async function saveReport(g) {
     ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message))
   } finally {
     rep._saving = false
+  }
+}
+async function regenerateReport(g) {
+  const rep = reportMap[g.key]
+  if (!rep) return
+  try {
+    await ElMessageBox.confirm(
+      '重新生成将根据当前月结明细覆盖五段文字。若你曾手动编辑过文字，确定要覆盖吗？',
+      '提示',
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  rep._regening = true
+  try {
+    const { year, month } = parseMonth()
+    const fresh = await regenerateQCReport(g.rows[0].instrument_id || null, year, month)
+    reportMap[g.key] = { ...(fresh || {}), _regening: false }
+    ElMessage.success('文字报告已重新生成')
+  } catch (e) {
+    ElMessage.error('重新生成失败：' + (e.response?.data?.detail || e.message))
+    rep._regening = false
   }
 }
 
