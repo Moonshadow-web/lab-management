@@ -61,6 +61,13 @@ def build_docx(out_path, summaries, report, instrument_name, instrument_no, year
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _run_font(p.add_run(sub), 10.5)
 
+    # 表单信息行：表格编号 / 科室 / 生效日期（与 CZ-012 表单一致）
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    _run_font(p.add_run(
+        "表格编号：BG-SM-CZ-012    民航总医院检验科生化免疫组       生效日期：2026.08.01"
+    ), 10.5)
+
     # 数据表格
     ncol = len(CZ012_HEADERS)
     t = doc.add_table(rows=1, cols=ncol)
@@ -118,13 +125,13 @@ def build_docx(out_path, summaries, report, instrument_name, instrument_no, year
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     _run_font(p.add_run(""), 11)
 
-    # 审批人 + 年月日
+    # 审批人 + 年月日（右下角落款，年月日向右缩进，左侧留空便于手填年份）
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     p.paragraph_format.space_before = Pt(8)
     _run_font(p.add_run("审批人："), 11)
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     _run_font(p.add_run("年    月    日"), 11)
 
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)

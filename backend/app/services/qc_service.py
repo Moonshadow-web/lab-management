@@ -421,27 +421,37 @@ def draft_report(instrument: str, year: int, month: int, summaries: list, daily_
             drift_lines.append(f"{p['name']}({p['level']})：{'、'.join(tags)}")
     drift_trend = ("；".join(drift_lines) + "。") if drift_lines else "各项目未见明显漂移或趋势性改变，质控稳定。"
 
-    # 三、各项目CV%设置是否达标（靶值CV% vs 质量目标）
-    cv_set_lines = []
-    for p in projects:
-        if p["goal"] is None:
-            cv_set_lines.append(f"{p['name']}({p['level']})：无质量目标，无法判定")
-        elif p["target_cv"] <= p["goal"]:
-            cv_set_lines.append(f"{p['name']}({p['level']})：设置CV% {p['target_cv']:.2f}% ≤ 允许 {p['goal']:.2f}%，达标")
-        else:
-            cv_set_lines.append(f"{p['name']}({p['level']})：设置CV% {p['target_cv']:.2f}% > 允许 {p['goal']:.2f}%，不达标")
-    cv_setting_ok = ("；".join(cv_set_lines) + "。") if cv_set_lines else "无项目数据。"
+    # 三、四：CV% 达标判定 —— 汇总式：只列不合格项，后接「其余项目均已达标」
+    def _fmt_cv_section(projects, kind):
+        """kind='set' 用设置CV%；kind='calc' 用计算CV%。
 
-    # 四、各项目计算CV%是否达标
-    cv_calc_lines = []
-    for p in projects:
-        if p["goal"] is None:
-            cv_calc_lines.append(f"{p['name']}({p['level']})：无质量目标，无法判定")
-        elif p["cv"] <= p["goal"]:
-            cv_calc_lines.append(f"{p['name']}({p['level']})：计算CV% {p['cv']:.2f}% ≤ 允许 {p['goal']:.2f}%，达标")
-        else:
-            cv_calc_lines.append(f"{p['name']}({p['level']})：计算CV% {p['cv']:.2f}% > 允许 {p['goal']:.2f}%，不达标")
-    cv_calc_ok = ("；".join(cv_calc_lines) + "。") if cv_calc_lines else "无项目数据。"
+        返回汇总文字：列出不达标（及无质量目标无法判定）项，其余合并为「其余项目均已达标」。
+        """
+        bad = []      # 不达标项
+        unknown = []  # 无质量目标，无法判定
+        good = 0
+        for p in projects:
+            val = p["target_cv"] if kind == "set" else p["cv"]
+            if p["goal"] is None:
+                unknown.append(f"{p['name']}({p['level']})：无质量目标，无法判定")
+                continue
+            if val > p["goal"]:
+                word = "设置" if kind == "set" else "计算"
+                bad.append(f"{p['name']}({p['level']}) {word}CV% {val:.2f}% > 允许 {p['goal']:.2f}%，不达标")
+            else:
+                good += 1
+        if bad or unknown:
+            parts = list(bad) + unknown
+            text = "；".join(parts)
+            text += "；其余项目均已达标。" if good > 0 else "。"
+            return text
+        # 无不合格项
+        if kind == "set":
+            return "各项目CV%设置均达标。"
+        return "各项目计算CV%均达标。"
+
+    cv_setting_ok = _fmt_cv_section(projects, "set") if projects else "无项目数据。"
+    cv_calc_ok = _fmt_cv_section(projects, "calc") if projects else "无项目数据。"
 
     # 五、各项目质控频次是否达标（不由系统自动判定，留空模板「是」供人工手录）
     freq_ok = "是"
