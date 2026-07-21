@@ -13,6 +13,8 @@
 
 ## 登录/权限/前端约定
 - RBAC roles 逗号分隔；admin 通杀；会话 30min access+7d refresh，401 静默 refresh；禁用 Promise.all+静默 catch。
+- **前端空白排查铁律**：先要用户贴 F12 Console 报错，再动手；不要臆测缓存/CDN/灰度。本沙箱 Playwright 访问线上 host 会被网络层「风险提醒」拦截页劫持（curl 同 URL 正常），故沙箱浏览器验证不可信。
+- **权限 store 易错点**：`auth.canWrite/canDelete/canAccessMenu` 内若用 `usePermissionStore()`，声明必须提到函数作用域（`let permStore`），勿在 `try{}` 内用 `const` 声明后于块外引用（会 `ReferenceError: permStore is not defined` 炸白整个组件）。2026-07-21 因此 bug 导致 QC 月结/累靶整片空白。
 
 ## EQA
 - 路由 /api/v1/eqa-plans；编号 年4+轮1+序1。北京临检机构 01110025/4731；肝炎/感染B/C 填 P/N+S/CO，快检仅 P/N。

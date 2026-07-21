@@ -55,3 +55,21 @@ export function uploadInterlabReport(planId, file) {
 export function deleteInterlabReport(planId) {
   return request.delete(`/api/v1/interlab/plans/${planId}/report`)
 }
+
+// 原始报告附件：列表 / 上传(多文件) / 预览 / 下载 / 删除
+export function listInterlabAttachments(planId) {
+  return request.get(`/api/v1/interlab/plans/${planId}/attachments`)
+}
+export function uploadInterlabAttachments(planId, files) {
+  const fd = new FormData()
+  for (const f of files) fd.append('files', f)
+  return request.post(`/api/v1/interlab/plans/${planId}/attachments`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+export function interlabAttachmentUrl(id, inline = true) {
+  return `/api/v1/interlab/attachments/${id}${inline ? '?inline=true' : '?inline=false'}`
+}
+export function deleteInterlabAttachment(id) {
+  return request.delete(`/api/v1/interlab/attachments/${id}`)
+}

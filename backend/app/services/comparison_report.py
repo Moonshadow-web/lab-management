@@ -41,17 +41,16 @@ def _load_json(s, default):
 
 
 def disp_name(inst: Instrument) -> str:
-    """人可识别的仪器显示名：优先规格型号(model)，其次名称。
+    """人可识别的仪器显示名：名称 + 规格型号(model)，便于报告中辨识具体仪器。
 
-    仪器档案里 name 多为通用名（如"全自动生化分析仪"），model 才是可识别的
-    具体型号（如"贝克曼AU5821 A"、"TOP700A"）。比对模块统一用 model 展示。
+    如"全自动生化分析仪（贝克曼AU5821 A）"。仅当其中之一缺失时退化为另一项。
     """
     if not inst:
         return ""
     model = (inst.model or "").strip()
     name = (inst.name or "").strip()
-    if model and len(model) <= 40:
-        return model
+    if name and model:
+        return f"{name}（{model}）"
     return name or model or f"仪器{inst.id}"
 
 
@@ -98,6 +97,38 @@ def _compute_bias(ref, val, te, mode):
     return round(bias, 2), accepted
 
 
+def _to_pn(raw):
+    """定性结果 → 阴/阳性(P/N)。兼容两种存储格式：
+    - 旧数据直接存 'P'/'N' 字符串；
+    - 新数据存 S/CO 比值（数值字符串），>1 判为 P，否则 N。
+    无法判定（空/非数值且非 P/N）返回 None。
+    """
+    if raw is None:
+        return None
+    if raw in ("P", "N"):
+        return raw
+    try:
+        f = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if f != f:  # NaN
+        return None
+    return "P" if f > 1 else "N"
+
+
+def _qual_cell_display(v):
+    """定性报告单元格展示：数值显示「值（P/N）」，纯 P/N 直接显示，空显示「-」。"""
+    if v is None:
+        return "-"
+    s = str(v).strip()
+    if s == "":
+        return "-"
+    if s in ("P", "N"):
+        return s
+    pn = _to_pn(s)
+    return f"{s}（{pn}）" if pn else s
+
+
 # ---------------------------------------------------------------------------
 # 计算
 # ---------------------------------------------------------------------------
@@ -139,8 +170,10 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
                 res = rj.get(str(ins["id"])) or []
                 agreement = None
                 if res and ref_res and len(res) == len(ref_res):
-                    valid = sum(1 for a in res if a in ("P", "N"))
-                    matches = sum(1 for a, b in zip(res, ref_res) if a == b and a in ("P", "N"))
+                    # 兼容「P/N 字符串」与「S/CO 数值」两种存储：统一经 _to_pn 推导阴/阳性
+                    valid = sum(1 for a in res if _to_pn(a) is not None)
+                    matches = sum(1 for a, b in zip(res, ref_res)
+                                  if _to_pn(a) is not None and _to_pn(a) == _to_pn(b))
                     agreement = round(matches / valid * 100, 1) if valid else None
                 insts[ins["id"]] = {"name": ins["name"], "results": res, "agreement": agreement, "masked": False}
             matrix.append({"item": it["name"], "insts": insts})
@@ -347,7 +380,7 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
                     html.append('<td class="mask">/</td><td class="mask">/</td>')
                     continue
                 cell = c.get("results") or []
-                samples = " ".join(cell) if isinstance(cell, list) and cell else "-"
+                samples = " ".join(_qual_cell_display(v) for v in cell) if isinstance(cell, list) and cell else "-"
                 agr = c.get("agreement")
                 agr_s = f"{agr}%" if agr is not None else "-"
                 html.append(f"<td>{samples}</td><td>{agr_s}</td>")
@@ -670,7 +703,7 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
                     _fill(cells[1 + i * 2], "/"); _fill(cells[2 + i * 2], "/")
                     continue
                 res = c.get("results") or []
-                samples = " ".join(res) if isinstance(res, list) and res else "-"
+                samples = " ".join(_qual_cell_display(v) for v in res) if isinstance(res, list) and res else "-"
                 agr = c.get("agreement")
                 agr_s = f"{agr}%" if agr is not None else "-"
                 if agr is not None and agr < 80:
@@ -948,6 +981,9 @@ def _resolve_te(it: dict, level: int = None, ref_value: str = None):
     ex = _GROUP_TO_EXCEL.get(name)
     if ex and ex.upper() in TE_LOOKUP:
         return TE_LOOKUP[ex.upper()][0]
+    cg = _coag_te_for(it.get("name", ""))
+    if cg and str(cg[0]).strip() not in ("", "0", "0.0"):
+        return cg[0]
     return te or "0"
 
 
@@ -1214,6 +1250,39 @@ COAG_ITEM = _items_quant([
     ("TT", 10, "relative"), ("PT", 8, "relative"), ("FDP", 7, "relative"), ("FIB", 10, "relative"),
 ])
 
+# 凝血项目 同义名/中文名 → COAG_ITEM 标准代码。用于「自动生成项目」与「计算TE」时，
+# 即使 test_items 里用的是中文名（如"D-二聚体(D-Dimer)"、"活化部分凝血活酶时间"）也能命中推荐允许偏倚。
+_COAG_SYN = {
+    "dd": "D-D", "ddimer": "D-D", "d二聚体": "D-D", "二聚体": "D-D",
+    "aptt": "APTT", "活化部分凝血活酶时间": "APTT", "部分凝血活酶时间": "APTT",
+    "atiii": "AT-III", "抗凝血酶iii": "AT-III", "抗凝血酶ⅲ": "AT-III", "抗凝血酶": "AT-III",
+    "tt": "TT", "凝血酶时间": "TT",
+    "pt": "PT", "凝血酶原时间": "PT", "inr": "PT",
+    "fdp": "FDP", "纤维蛋白原降解产物": "FDP", "纤维蛋白降解产物": "FDP", "纤维蛋白原降": "FDP",
+    "fib": "FIB", "纤维蛋白原": "FIB",
+}
+
+
+def _coag_te_for(name):
+    """按项目名/异名命中凝血 COAG_ITEM，返回 (te, mode) 或 None。"""
+    if not name:
+        return None
+    n = _norm_token(name)
+    if not n:
+        return None
+    if n in _COAG_SYN:
+        key = _COAG_SYN[n]
+        it = next((x for x in COAG_ITEM if _norm_token(x["name"]) == _norm_token(key)), None)
+        if it:
+            return it["te"], it["mode"]
+    for syn, key in _COAG_SYN.items():
+        if syn and (syn in n or n in syn):
+            it = next((x for x in COAG_ITEM if _norm_token(x["name"]) == _norm_token(key)), None)
+            if it:
+                return it["te"], it["mode"]
+    return None
+
+
 PREG_ITEM = _items_quant([
     # 之前全部填 25 偏高，按 WS/T 403-2024 校准（β-HCG 标准未单列，沿用 10%）：
     ("HCG",   10, "relative"),   # β-HCG 标准未列
@@ -1344,9 +1413,13 @@ def resolve_common_items(db, instrument_ids, category="定量", min_count=2):
         if key in seen_names:
             continue
         seen_names.add(key)
-        # 默认 TE/mode 优先级：现有报告里已用过的 > TE_LOOKUP
+        # 默认 TE/mode 优先级：现有报告里已用过的 > TE_LOOKUP > 凝血同义命中(COAG_ITEM)
         prior = used_default.get(key) or {}
         te_lk, mode_lk = TE_LOOKUP.get(key, ("", "relative"))
+        if not te_lk:
+            cg = _coag_te_for(code) or _coag_te_for(label)
+            if cg:
+                te_lk, mode_lk = cg
         te = prior.get("te") or te_lk or "0"
         mode = prior.get("mode") or mode_lk or "relative"
         items_out.append({

@@ -297,8 +297,12 @@ def evaluate_westgard(values: list[float], mean: float, sd: float) -> dict[int, 
         if (a > mean + 2 * sd + eps and b > mean + 2 * sd + eps) or (a < mean - 2 * sd - eps and b < mean - 2 * sd - eps):
             ooc[i] = _join(ooc.get(i, ""), "2-2s")
             ooc[i + 1] = _join(ooc.get(i + 1, ""), "2-2s")
-    # R-4s
+    # R-4s：失控点本身不参与相邻判定（避免已判失控的点级联误判其前后点也 R-4s）。
+    # 即：仅当两个相邻点都尚未被 1-3s / 2-2s / 10-x 等规则判为失控时，才用二者差值判 R-4s。
+    base_ooc = set(ooc.keys())
     for i in range(n - 1):
+        if i in base_ooc or i + 1 in base_ooc:
+            continue
         if abs(values[i] - values[i + 1]) > 4 * sd + eps:
             ooc[i] = _join(ooc.get(i, ""), "R-4s")
             ooc[i + 1] = _join(ooc.get(i + 1, ""), "R-4s")
@@ -310,6 +314,38 @@ def evaluate_westgard(values: list[float], mean: float, sd: float) -> dict[int, 
             for j in range(i, i + 10):
                 ooc[j] = _join(ooc.get(j, ""), "10-x")
     return ooc
+
+
+def _robust_stats(values: list[float]):
+    """靶值缺失时估计均值/SD：用中位数 + MAD（对极端值稳健）迭代剔除外点，避免失控点抬高 SD 而漏判。
+
+    返回的 (mean, sd) 用于 Westgard 判定；被剔除的极端点在 aggregate 中进一步从统计量中排除。
+    """
+    vals = list(values)
+    for _ in range(4):
+        if len(vals) < 3:
+            break
+        med = statistics.median(vals)
+        mad = statistics.median([abs(v - med) for v in vals]) or 0.0
+        if mad <= 0:
+            # 无离散度时无法稳健估计，退回普通均值/SD
+            m = sum(vals) / len(vals)
+            s = statistics.stdev(vals) if len(vals) > 1 else 0.0
+            return m, s
+        rsd = 1.4826 * mad  # MAD → 近似正态 SD
+        if rsd <= 0:
+            break
+        thr = 3.5 * rsd
+        outs = [v for v in vals if abs(v - med) > thr]
+        if not outs:
+            break
+        extreme = max(outs, key=lambda v: abs(v - med))
+        vals = [v for v in vals if abs(v - extreme) > 1e-12]
+        if len(vals) < 3:
+            break
+    if len(vals) < 2:
+        return sum(values) / len(values), (statistics.stdev(values) if len(values) > 1 else 0.0)
+    return sum(vals) / len(vals), statistics.stdev(vals)
 
 
 def aggregate(values: list[float], target_mean: float, target_sd: float):
@@ -330,12 +366,12 @@ def aggregate(values: list[float], target_mean: float, target_sd: float):
     mean = sum(values) / n
     sd = statistics.stdev(values) if n > 1 else 0.0
     cv = (sd / mean * 100) if mean else 0.0
-    # Westgard 判定：优先用靶值（target_mean/target_sd）；若缺失则退化为本批实测
-    # 均值/标准差，保证未提供靶值的导入数据也能真实判定失控（不影响已带靶值的数据）。
+    # Westgard 判定：优先用靶值（target_mean/target_sd）；若缺失则退化为「迭代剔除极端点」后估计的
+    # 均值/标准差，避免失控点抬高 SD 而漏判（不影响已带靶值的数据）。
     if target_mean and target_sd:
         eff_mean, eff_sd = target_mean, target_sd
     else:
-        eff_mean, eff_sd = mean, sd
+        eff_mean, eff_sd = _robust_stats(values)
     ooc = evaluate_westgard(values, eff_mean, eff_sd)
     ooc_count = len(ooc)
     in_control_rate = (n - ooc_count) / n if n else 0.0

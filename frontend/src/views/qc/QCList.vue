@@ -1164,7 +1164,7 @@ async function loadSummary() {
     loadingSummary.value = false
   }
 }
-watch(activeTab, (t) => { if (t === 'summary' && !summaryRows.value.length && monthValue.value) loadSummary() })
+watch(activeTab, (t) => { if (t === 'summary' && !summaryRows.value.length && (monthValue.value || uploadInstrumentId.value)) loadSummary() })
 onMounted(loadInstruments)
 
 function triggerCsv() { csvInput.value?.click() }

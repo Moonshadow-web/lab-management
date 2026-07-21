@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from ...core.config import DATA_DIR
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
-from ...models.interlab import InterlabPlan, InterlabItem, InterlabLevel
+from ...models.interlab import InterlabPlan, InterlabItem, InterlabLevel, InterlabAttachment
 from ...models.instrument import Instrument
 from ...models.user import User
 from ...schemas.interlab import (
@@ -27,6 +27,30 @@ router = APIRouter(prefix="/interlab", tags=["interlab"])
 REPORT_DIR = DATA_DIR / "interlab_reports"
 os.makedirs(REPORT_DIR, exist_ok=True)
 svc.REPORT_DIR = REPORT_DIR
+
+ATTACH_DIR = DATA_DIR / "interlab_attachments"
+os.makedirs(ATTACH_DIR, exist_ok=True)
+
+
+def _classify_ext(ext: str) -> str:
+    e = (ext or "").lower().lstrip(".")
+    if e in ("jpg", "jpeg", "png", "gif", "bmp", "webp"):
+        return "image"
+    if e == "pdf":
+        return "pdf"
+    if e in ("doc", "docx"):
+        return "doc"
+    return "other"
+
+
+def _ser_attachment(a: InterlabAttachment):
+    return {
+        "id": a.id, "plan_id": a.plan_id, "file_type": a.file_type,
+        "original_name": a.original_name, "stored_name": a.stored_name,
+        "size_bytes": a.size_bytes,
+        "uploaded_by": a.uploaded_by,
+        "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
+    }
 
 # 权限分层：
 #   CREATE = 新建计划 + 在新计划上录入结果（technical_support 也可做）
@@ -90,10 +114,14 @@ def mandatory_list(db: Session = Depends(get_db), user: User = Depends(get_curre
 
 
 def svc_disp(inst: Instrument) -> str:
+    """报告/比对中的仪器显示名：名称 + 规格型号(model)，便于辨识具体仪器。
+
+    如"全自动生化分析仪（贝克曼AU5821 A）"。仅当其中之一缺失时退化为另一项。
+    """
     model = (inst.model or "").strip()
     name = (inst.name or "").strip()
-    if model and len(model) <= 40:
-        return model
+    if name and model:
+        return f"{name}（{model}）"
     return name or model or f"仪器{inst.id}"
 
 
@@ -362,3 +390,91 @@ def delete_report(pid: int, db: Session = Depends(get_db), user: User = Depends(
     p.updated_at = datetime.utcnow()
     db.commit()
     return _ser_plan(p)
+
+
+# ---------------------------------------------------------------------------
+# 原始报告附件（存档 / 预览 / 下载 / 打印 / 删除）
+# ---------------------------------------------------------------------------
+@router.get("/plans/{pid}/attachments")
+def list_interlab_attachments(pid: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    p = db.get(InterlabPlan, pid)
+    if not p:
+        raise HTTPException(404, "未找到计划")
+    items = db.query(InterlabAttachment).filter_by(plan_id=pid).order_by(InterlabAttachment.id.desc()).all()
+    return {"items": [_ser_attachment(a) for a in items], "total": len(items)}
+
+
+@router.post("/plans/{pid}/attachments", status_code=201)
+async def upload_interlab_attachments(
+    pid: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), user: User = Depends(CREATE),
+):
+    """一次性上传 1~N 个原始报告文件（同一计划）。"""
+    p = db.get(InterlabPlan, pid)
+    if not p:
+        raise HTTPException(404, "未找到计划")
+    out = []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        ext = os.path.splitext(f.filename)[1] or ""
+        safe = f"plan_{pid}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{len(out)}{ext}"
+        full = ATTACH_DIR / safe
+        content = await f.read()
+        with open(full, "wb") as fp:
+            fp.write(content)
+        a = InterlabAttachment(
+            plan_id=pid,
+            file_type=_classify_ext(ext),
+            original_name=f.filename,
+            stored_name=safe,
+            rel_path=f"interlab_attachments/{safe}",
+            size_bytes=len(content),
+            uploaded_by=user.username,
+        )
+        db.add(a)
+        out.append(a)
+    db.commit()
+    for a in out:
+        db.refresh(a)
+    return {"items": [_ser_attachment(a) for a in out], "total": len(out)}
+
+
+@router.get("/attachments/{aid}")
+def get_interlab_attachment(aid: int, inline: bool = True, db: Session = Depends(get_db),
+                            user: User = Depends(get_current_user)):
+    """inline=True（默认）→ 预览；inline=False → 下载。"""
+    a = db.get(InterlabAttachment, aid)
+    if not a:
+        raise HTTPException(404, "附件不存在")
+    full = DATA_DIR / a.rel_path
+    if not full.exists():
+        raise HTTPException(404, "文件已丢失")
+    media = "application/octet-stream"
+    if a.file_type == "image":
+        ext = os.path.splitext(a.stored_name)[1].lstrip(".").lower() or "jpeg"
+        media = f"image/{ext}"
+        if media == "image/jpg":
+            media = "image/jpeg"
+    elif a.file_type == "pdf":
+        media = "application/pdf"
+    disp = "inline" if inline else "attachment"
+    return FileResponse(
+        str(full), media_type=media, filename=a.original_name,
+        headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'},
+    )
+
+
+@router.delete("/attachments/{aid}")
+def delete_interlab_attachment(aid: int, db: Session = Depends(get_db), user: User = Depends(CREATE)):
+    a = db.get(InterlabAttachment, aid)
+    if not a:
+        raise HTTPException(404, "附件不存在")
+    try:
+        full = DATA_DIR / a.rel_path
+        if full.exists():
+            full.unlink()
+    except Exception:
+        pass
+    db.delete(a)
+    db.commit()
+    return {"ok": True}

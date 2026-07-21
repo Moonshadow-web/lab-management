@@ -332,9 +332,21 @@ def get_results(pid: int, db: Session = Depends(get_db), user: User = Depends(ge
     qual = []
     for r in db.query(ComparisonQualResult).filter_by(plan_id=pid).all():
         qual.append({"item": r.item, "results": json.loads(r.results_json) if r.results_json else {}})
+    # 解析各项目「推荐允许偏倚」：组里若为空（如凝血项目中文名未匹配 TE_LOOKUP），
+    # 用凝血同义字典补默认 TE，使结果录入界面能显示推荐偏倚。
+    items_out = []
+    for it in (json.loads(g.items) if g.items else []):
+        it = dict(it)
+        _te = str(it.get("te", "")).strip()
+        if _te in ("", "0", "0.0"):
+            cg = svc._coag_te_for(it.get("name", ""))
+            if cg and str(cg[0]).strip() not in ("", "0", "0.0"):
+                it["te"] = cg[0]
+                it["mode"] = cg[1]
+        items_out.append(it)
     return {
         "category": g.category,
-        "items": json.loads(g.items) if g.items else [],
+        "items": items_out,
         "levels": g.levels,
         "instruments": instruments,
         "global_ref_id": g.reference_instrument_id,

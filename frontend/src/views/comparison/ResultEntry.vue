@@ -6,7 +6,7 @@
       <el-alert v-if="category === '定量'" type="info" :closable="false" show-icon
         title="录入靶机（参照仪器）与各比对仪器的检测值，偏倚%与是否允许自动计算。" style="margin-bottom:8px" />
       <el-alert v-else type="info" :closable="false" show-icon
-        title="逐台仪器录入5例样本阴/阳性（P/N），符合率自动计算（以靶机为基准）。" style="margin-bottom:8px" />
+        title="逐台仪器录入5例样本的 S/CO 比值，系统自动判读 P/N（>1 为 P，否则为 N），符合率自动计算（以靶机为基准）。" style="margin-bottom:8px" />
       <el-alert v-if="plan?.only_uncompared" type="warning" :closable="false" show-icon
         title="本计划为同半年补录：仅列出本期尚未比对的项目，已做项目不显示。" style="margin-bottom:8px" />
 
@@ -93,15 +93,15 @@
                 <template #default="{ row }">
                   <div v-if="!isApplicable(row.item, ins.id)" class="masked" title="该项目不在此仪器上开展">/</div>
                   <template v-else>
-                    <div style="display:flex;gap:3px;flex-wrap:wrap">
-                      <el-select v-for="k in 5" :key="k" v-model="row.results[ins.id][k - 1]" size="small"
-                        style="width:58px" @change="onEdit">
-                        <el-option label="P" value="P" />
-                        <el-option label="N" value="N" />
-                      </el-select>
-                    </div>
-                    <div style="font-size:11px" :class="agreementOf(row, ins).ok === false ? 'no' : (agreementOf(row, ins).ok ? 'yes' : '')">
-                      符合率 {{ agreementOf(row, ins).val == null ? '-' : agreementOf(row, ins).val + '%' }}
+                    <div style="display:flex;flex-direction:column;gap:3px">
+                      <div style="display:flex;gap:3px;flex-wrap:wrap">
+                        <el-input v-for="k in 5" :key="k" v-model="row.results[ins.id][k - 1]" size="small"
+                          style="width:58px" placeholder="S/CO" @input="onEdit" />
+                      </div>
+                      <div style="font-size:10px;color:#888">判读：{{ qualPN(row, ins) }}</div>
+                      <div style="font-size:11px" :class="agreementOf(row, ins).ok === false ? 'no' : (agreementOf(row, ins).ok ? 'yes' : '')">
+                        符合率 {{ agreementOf(row, ins).val == null ? '-' : agreementOf(row, ins).val + '%' }}
+                      </div>
                     </div>
                   </template>
                 </template>
@@ -222,16 +222,30 @@ function biasOf(row, ins) {
   if (b === null) return { bias: null, ok: null }
   return { bias: Math.round(b * 100) / 100, ok: Math.abs(b) <= tf + 1e-9 }
 }
+function _pnOf(x) {
+  // 兼容旧数据直接存 'P'/'N' 与新数据存 S/CO 数值：>1 判 P，否则 N
+  if (x === 'P' || x === 'N') return x
+  const f = parseFloat(x)
+  if (isNaN(f)) return null
+  return f > 1 ? 'P' : 'N'
+}
 function agreementOf(row, ins) {
   const ref = allInstruments.value.find((i) => i.is_reference)
   const r = ref ? row.results[ref.id] : null
   const v = row.results[ins.id]
   if (!r || !v || r.length !== v.length) return { val: null, ok: null }
-  const valid = v.filter((x) => x === 'P' || x === 'N').length
-  const matches = v.filter((x, i) => x === r[i] && (x === 'P' || x === 'N')).length
+  const rp = r.map(_pnOf)
+  const vp = v.map(_pnOf)
+  const valid = vp.filter((x) => x !== null).length
   if (!valid) return { val: null, ok: null }
+  const matches = vp.filter((x, i) => x !== null && x === rp[i]).length
   const pct = Math.round((matches / valid) * 1000) / 10
   return { val: pct, ok: pct >= 80 }
+}
+function qualPN(row, ins) {
+  const arr = row.results[ins.id] || []
+  const s = arr.map(_pnOf).filter((x) => x).join(' ')
+  return s || '—'
 }
 function fmt(x) { return x == null ? '-' : x }
 

@@ -46,14 +46,19 @@ def qc_instruments(
     user: User = Depends(get_current_user),
 ):
     """月结下拉专用：仅返回室内质控受控仪器（instruments.qc_instrument=True），
-    按科室编号自然序返回 {id, name, dept_no, model}。"""
-    from sqlalchemy import func as _func
+    按科室编号自然序返回 {id, name, dept_no, model}。
+
+    兜底：若没有任何仪器被标记为质控受控（如白名单 ID 与实际数据不一致、或重新灌库后
+    未打标），则回退返回全部仪器，避免月结下拉为空导致「上传 LIS 数据」按钮被永久禁用、
+    且无法按仪器筛选月结。"""
     rows = (
         db.query(Instrument)
         .filter(Instrument.qc_instrument == True)  # noqa: E712
         .order_by(Instrument.dept_no)
         .all()
     )
+    if not rows:
+        rows = db.query(Instrument).order_by(Instrument.dept_no).all()
     return [
         {"id": r.id, "name": r.name, "dept_no": r.dept_no, "model": r.model}
         for r in rows
@@ -663,6 +668,16 @@ def export_qc_report_docx(
 
     inst_name = summaries[0].instrument or ""
     inst_no = summaries[0].instrument_no or ""
+    # 仪器名称含型号（便于报告中辨识具体仪器）
+    if instrument_id:
+        inst = db.get(Instrument, instrument_id)
+        if inst:
+            _n = (inst.name or "").strip()
+            _m = (inst.model or "").strip()
+            if _n and _m:
+                inst_name = f"{_n}（{_m}）"
+            else:
+                inst_name = _n or _m or inst_name
     rep = _find_report(db, instrument_id, instrument, year, month)
     if rep is None:
         # 报告尚未保存时，按当前数据临时草拟一份（不持久化）供导出，避免 build_docx 接收 None

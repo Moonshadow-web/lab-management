@@ -39,6 +39,12 @@
         <div v-else-if="previewLoading" class="preview-empty">加载中…</div>
         <div v-else class="preview-empty">点击「刷新」加载预览</div>
       </div>
+
+      <!-- 原始报告存档（多文件上传 / 预览 / 下载 / 打印 / 删除） -->
+      <div style="margin-top:16px">
+        <el-divider content-position="left">原始报告存档</el-divider>
+        <AttachmentList :plan-id="plan.id" module="comparison" :can-write="canEdit" />
+      </div>
     </div>
     <template #footer>
       <el-button @click="$emit('close')">关闭</el-button>
@@ -47,11 +53,18 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   previewReport, generateReport, downloadReport, uploadReport, deleteReport,
 } from '../../api/comparison'
+import AttachmentList from '../../components/AttachmentList.vue'
+import { useAuthStore } from '../../store/auth'
+import { usePermissionStore } from '../../store/permission'
+
+const auth = useAuthStore()
+const perm = usePermissionStore()
+const canEdit = computed(() => perm.canWrite(auth.myRoles, 'comparison-edit'))
 
 const props = defineProps({
   visible: Boolean,

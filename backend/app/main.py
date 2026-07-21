@@ -224,6 +224,7 @@ def _migrate_schema():
         23,                   # 爱康 URANUS
         26,                   # Stago CompactMax
         75,                   # 安图 A6200
+        601,                  # 表面抗原等质控常用仪器（用户实测用）
     ]
     try:
         with SessionLocal() as db:

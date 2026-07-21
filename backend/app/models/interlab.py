@@ -81,3 +81,23 @@ class InterlabLevel(Base):
     ref2_mean: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class InterlabAttachment(Base):
+    """室间比对原始报告附件：手工上传的扫描件/图片/PDF/Word 等，沉淀在计划下便于审核/复盘预览。
+
+    与仪器间比对的 ComparisonAttachment 同源设计，但独立建表（plan_id 关联 interlab_plans），
+    避免跨表外键约束。报告本身的 docx 不归这里。
+    """
+
+    __tablename__ = "interlab_attachments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("interlab_plans.id", ondelete="CASCADE"), index=True)
+    file_type: Mapped[str] = mapped_column(String(20), default="other")  # image / pdf / doc / other
+    original_name: Mapped[str] = mapped_column(String(300), default="")  # 用户上传时的文件名
+    stored_name: Mapped[str] = mapped_column(String(300), default="")  # 实际存储文件名（避免冲突）
+    rel_path: Mapped[str] = mapped_column(String(500), default="")  # 相对 DATA_DIR 的路径
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    uploaded_by: Mapped[str] = mapped_column(String(100), default="")
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

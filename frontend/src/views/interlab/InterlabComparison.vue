@@ -322,6 +322,9 @@
           <el-button type="danger" :icon="Delete" @click="doDeleteReport" :disabled="!reportPlan || !reportPlan.report_filename" v-if="canEdit">删除报告</el-button>
         </div>
         <div class="rep-preview" v-html="previewHtml" v-loading="previewing" />
+
+        <el-divider content-position="left">原始报告存档</el-divider>
+        <AttachmentList :plan-id="reportPlan.id" module="interlab" :can-write="canCreate" />
       </div>
     </el-dialog>
   </div>
@@ -340,6 +343,7 @@ import {
 import { useAuthStore } from '../../store/auth'
 import { usePermissionStore } from '../../store/permission'
 import UserSelect from '../../components/UserSelect.vue'
+import AttachmentList from '../../components/AttachmentList.vue'
 
 const auth = useAuthStore()
 const perm = usePermissionStore()
@@ -681,8 +685,8 @@ function doPrint() {
 }
 async function doDownload() {
   try {
-    const r = await downloadInterlabReport(reportPlan.value.id)
-    const blob = new Blob([r.data])
+    // request 拦截器已返回 response.data（即 Blob 本身），无需再取 .data
+    const blob = await downloadInterlabReport(reportPlan.value.id)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
