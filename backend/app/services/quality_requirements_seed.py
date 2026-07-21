@@ -18,6 +18,87 @@
 本文件仅作为初始灌库来源；后续修改请走 API（admin 角色）。
 """
 from typing import Any
+import re
+
+
+# ---------------- 安全包含匹配（打通项目库名 ↔ 标准源名） ----------------
+# 直接用 `a in b` 做中文包含匹配太松：单字「钙」会误入「降钙素原/降钙素/骨钙素」，
+# 且「降钙素」前缀会误入「降钙素原」。仅在「多余部分」全为修饰性成分
+# （标本/基质前缀、括号及括号内单位代码、并列分隔符等）时才视为同一项目。
+_SAFE_PREFIXES = (
+    "总", "无机", "血清", "血浆", "全血", "血液", "尿液", "尿", "脑脊液", "空白",
+    "检测", "测定", "定量", "浓度", "标本", "质控品", "质控",
+)
+
+
+def _strip_paren_groups(s: str) -> str:
+    """去掉 ( ) （ ） [ ] 【 】 及其内部内容。"""
+    return re.sub(r"[\(（\[【][^\)）\]】]*[\)）\]】]", "", s)
+
+
+def _is_decoration(rem: str) -> bool:
+    """判断多余部分是否仅由修饰性成分构成。
+
+    允许：标本/基质中文前缀（总/血清/血浆…）、括号及单位代码（拉丁字母/数字/分隔符，
+    如 cp/pct/ct/tsh）。中文部分只能由安全前缀拼接，否则视为不同项目。
+    """
+    rem = _strip_paren_groups(rem)
+    if not rem:
+        return True
+    for seg in re.findall(r"[一-鿿]+|[^一-鿿]+", rem):
+        if re.match(r"^[一-鿿]+$", seg):
+            i, m = 0, len(seg)
+            while i < m:
+                hit = False
+                for tok in _SAFE_PREFIXES:
+                    if seg.startswith(tok, i):
+                        i += len(tok)
+                        hit = True
+                        break
+                if not hit:
+                    return False
+        else:
+            # 非中文段只能是纯字母/数字/分隔符（单位代码）
+            if not re.match(r"^[A-Za-z0-9.\-+/]+$", seg):
+                return False
+    return True
+
+
+def contains_same_item(a: str, b: str) -> bool:
+    """判断 a、b 是否为同一检验项目的不同叫法（安全包含匹配）。
+
+    规则：
+      1) 去除首尾空白后精确相等 → 同一项目；
+      2) 含 / 、 等并列分隔符（且分隔符在括号外）时，按段递归匹配任一子项；
+      3) 单向包含且「非包含部分」仅剩修饰性成分（标本前缀/括号单位码）→ 同一项目；
+      4) 其余包含（如短字「钙」误入「降钙素原」、前缀「降钙素」误入「降钙素原」）
+         → 视为不同项目，不匹配。
+
+    注意：项目库名均为中文，英文代码只在别名中；故不依赖「括号代码相等」，
+    避免 TG(甲状腺球蛋白) 与 TG(甘油三酯) 等缩写碰撞。
+    """
+    if not a or not b:
+        return False
+    a, b = a.strip(), b.strip()
+    if a == b:
+        return True
+    # 仅在括号外出现并列分隔符时才按段拆分（避免单位代码 μg/L 中的 / 被误拆）
+    stripped_b = _strip_paren_groups(b)
+    for sep in ("/", "、", "，", ",", "；", ";"):
+        if sep in stripped_b:
+            for part in b.split(sep):
+                part = part.strip()
+                if part and contains_same_item(a, part):
+                    return True
+    if a in b:
+        i = b.index(a)
+        rem = b[:i] + b[i + len(a):]
+        return _is_decoration(rem)
+    if b in a:
+        i = a.index(b)
+        rem = a[:i] + a[i + len(b):]
+        return _is_decoration(rem)
+    return False
 
 
 # ---------------- WS/T 403—2024 ----------------
@@ -523,6 +604,7 @@ NCCL_ITEMS: list[dict[str, Any]] = [
     {"item_name": "维生素D", "tea": "靶值 ±25%", "remark": "卫健委EQA计划靶值(用户核对补充)"},
     {"item_name": "骨钙素", "tea": "靶值 ±30%", "remark": "卫健委EQA计划靶值(用户核对补充)"},
     {"item_name": "降钙素", "tea": "靶值 ±30%", "remark": "卫健委EQA计划靶值(用户核对补充)"},
+    {"item_name": "血清降钙素原(PCT)", "tea": "靶值 ±30%或±0.03μg/L（取大值）", "remark": "卫健委EQA计划靶值(用户核对补充)"},
     {"item_name": "总Ⅰ型胶原氨基端延长肽", "tea": "靶值 ±30%", "remark": "卫健委EQA计划靶值(用户核对补充)"},
     {"item_name": "β-胶原特殊序列", "tea": "靶值 ±30%", "remark": "卫健委EQA计划靶值(用户核对补充)"},
     {"item_name": "非结合型雌三醇", "tea": "靶值 ±30%", "remark": "卫健委EQA计划靶值(用户核对补充)"},

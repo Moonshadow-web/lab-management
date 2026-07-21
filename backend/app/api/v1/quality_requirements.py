@@ -125,6 +125,8 @@ def matrix_view(
         qr_norm_maps[src] = {_norm(k): v for k, v in qr_maps[src].items()}
 
     # 模糊匹配辅助：item_name 不完全一致时按包含关系兜底；并应用同义词和归一化匹配
+    from ...services.quality_requirements_seed import contains_same_item
+
     def _find_best(src: str, name: str) -> QualityRequirement | None:
         candidates = [name] + _SYNONYMS.get(name, [])
         # 1) 候选精确匹配
@@ -132,10 +134,10 @@ def matrix_view(
             m = qr_maps[src].get(cand)
             if m:
                 return m
-        # 2) 候选与标准名互相包含
+        # 2) 候选与标准名互相包含（安全包含：仅修饰性差异视为同一项目）
         for cand in candidates:
             for k, v in qr_maps[src].items():
-                if cand in k or k in cand:
+                if contains_same_item(cand, k):
                     return v
         # 3) 归一化精确匹配（补体C3 ↔ 补体 C3；C肽 ↔ C-肽；免疫球蛋白G ↔ 免疫球蛋白 G 等）
         n_name = _norm(name)
@@ -148,11 +150,11 @@ def matrix_view(
             hit = qr_norm_maps[src].get(n_cand)
             if hit:
                 return hit
-        # 5) 归一化包含匹配
+        # 5) 归一化包含匹配（安全包含）
         for cand in candidates:
             n_cand = _norm(cand)
             for nk, v in qr_norm_maps[src].items():
-                if n_cand in nk or nk in n_cand:
+                if contains_same_item(n_cand, nk):
                     return v
         return None
 

@@ -133,28 +133,22 @@ def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
 
     def _all(name: str) -> list:
         """查询指定名称的所有 quality_requirements 记录。"""
+        from .quality_requirements_seed import contains_same_item
         # 精确匹配
         rows = db.query(QualityRequirement).filter(
             QualityRequirement.item_name == name
         ).all()
-        # 子串匹配（含 name 或被 name 含）
+        # 安全包含匹配（双向），避免「钙」误入「降钙素原」等短字/前缀误匹配
         if not rows:
-            rows = db.query(QualityRequirement).filter(
-                QualityRequirement.item_name.contains(name)
-            ).all()
-        if not rows:
-            # 反向匹配：name 中包含某 item_name（用 Python 过滤，因 SQL 侧无法参数化列值）
             all_qr = db.query(QualityRequirement).all()
-            rows = [r for r in all_qr if r.item_name and r.item_name in name]
-        # 再试别名中的每个词
+            rows = [r for r in all_qr if r.item_name and contains_same_item(name, r.item_name)]
+        # 再试别名中的每个词（同样用安全包含）
         if not rows:
             for a in (aliases or "").replace("，", ",").split(","):
                 a = a.strip()
                 if not a:
                     continue
-                rows = db.query(QualityRequirement).filter(
-                    QualityRequirement.item_name.contains(a)
-                ).all()
+                rows = [r for r in all_qr if r.item_name and contains_same_item(a, r.item_name)]
                 if rows:
                     break
         return rows or []
