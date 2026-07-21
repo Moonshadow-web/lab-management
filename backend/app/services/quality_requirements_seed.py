@@ -61,6 +61,10 @@ def _is_decoration(rem: str) -> bool:
             # 非中文段只能是纯字母/数字/分隔符（单位代码）
             if not re.match(r"^[A-Za-z0-9.\-+/]+$", seg):
                 return False
+            # 纯数字后缀（如「免疫球蛋白G4」误匹配「免疫球蛋白G」的 "4"）视为不同项目，
+            # 不能当作修饰性成分——子类数字与单位代码字母须区分。
+            if not re.search(r"[A-Za-z]", seg):
+                return False
     return True
 
 
@@ -240,6 +244,7 @@ BJHR_ITEMS: list[dict[str, Any]] = [
     {"category": "35", "item_name": "直接胆红素(D-Bil)","cv": "8.0%", "tea": "±20%", "unit": "μmol/L"},
     {"category": "36", "item_name": "铁(Fe)",            "cv": "6.5%", "tea": "±15%", "unit": "μmol/L"},
     {"category": "37", "item_name": "总铁结合力(TIBC)",  "cv": "6.7%", "tea": "±20%", "unit": "μmol/L"},
+    {"category": "37", "item_name": "不饱和铁结合力(UIBC)", "cv": "6.7%", "tea": "±20%", "unit": "μmol/L"},
     {"category": "38", "item_name": "镁(Mg)",            "cv": "5.5%", "tea": "±15%", "unit": "mmol/L"},
     {"category": "39", "item_name": "γ-谷氨酰基转移酶(GGT)", "cv": "3.5%", "tea": "±11%", "unit": "U/L"},
     {"category": "40", "item_name": "α-羟丁酸脱氢酶(α-HBDH)", "cv": "7.5%", "tea": "±30%", "unit": "U/L"},
@@ -287,6 +292,8 @@ BJHR_ITEMS: list[dict[str, Any]] = [
     {"category": "75", "item_name": "微量总蛋白(尿液)",  "cv": "14.7%", "tea": "±44%", "unit": "mg/L"},
     {"category": "76", "item_name": "淀粉酶(尿液)",      "cv": "10.0%", "tea": "±30%", "unit": "U/L"},
     {"category": "77", "item_name": "微量白蛋白(尿液)",  "cv": "10.0%", "tea": "±30%", "unit": "mg/L"},
+    {"category": "77", "item_name": "尿微量白蛋白",  "cv": "10.0%", "tea": "±30%", "unit": ""},
+    {"category": "77", "item_name": "尿转铁蛋白",    "cv": "8.3%",  "tea": "±25%", "unit": ""},
     # 脑脊液
     {"category": "78", "item_name": "微量总蛋白(脑脊液)","cv": "3.3%",  "tea": "±10%或±0.1g/L(取大者)", "unit": "g/L"},
     {"category": "79", "item_name": "微量白蛋白(脑脊液)","cv": "3.3%",  "tea": "±10%或±0.1g/L(取大者)", "unit": "g/L"},
@@ -304,6 +311,7 @@ BJHR_ITEMS: list[dict[str, Any]] = [
     {"category": "90", "item_name": "游离甲状腺素(FT4)",   "cv": "7.0%", "tea": "±25%", "unit": "pmol/L"},
     {"category": "91", "item_name": "促甲状腺素(TSH)",     "cv": "7.0%", "tea": "±25%", "unit": "mIU/L"},
     {"category": "92", "item_name": "皮质醇(Cor)",         "cv": "7.0%", "tea": "±25%", "unit": "nmol/L"},
+    {"category": "92", "item_name": "游离皮质醇（尿液）",   "cv": "7.0%", "tea": "±25%", "unit": "nmol/L"},
     {"category": "93", "item_name": "卵泡刺激素(FSH)",     "cv": "7.0%", "tea": "±25%", "unit": "IU/L"},
     {"category": "94", "item_name": "黄体生成素(LH)",      "cv": "7.0%", "tea": "±25%", "unit": "IU/L"},
     {"category": "95", "item_name": "孕酮(P)",             "cv": "7.0%", "tea": "±25%", "unit": "nmol/L"},
