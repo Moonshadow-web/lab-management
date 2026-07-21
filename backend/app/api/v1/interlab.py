@@ -146,13 +146,17 @@ def list_plans(year: int = None, half: int = None, instrument_id: int = None,
     items = q.order_by(InterlabPlan.year.desc(), InterlabPlan.half.desc(), InterlabPlan.id.desc()).all()
     # 一次性查出附件数量
     counts = {}
+    attachment_error = None
     if items:
         pids = [p.id for p in items]
-        rows = db.query(InterlabAttachment.plan_id, db.func.count(InterlabAttachment.id)).filter(
-            InterlabAttachment.plan_id.in_(pids)
-        ).group_by(InterlabAttachment.plan_id).all()
-        counts = {pid: c for pid, c in rows}
-    return {"items": [{**_ser_plan(p), "attachment_count": counts.get(p.id, 0)} for p in items], "total": len(items)}
+        try:
+            rows = db.query(InterlabAttachment.plan_id, db.func.count(InterlabAttachment.id)).filter(
+                InterlabAttachment.plan_id.in_(pids)
+            ).group_by(InterlabAttachment.plan_id).all()
+            counts = {pid: c for pid, c in rows}
+        except Exception as e:
+            attachment_error = f"{type(e).__name__}: {e}"
+    return {"items": [{**_ser_plan(p), "attachment_count": counts.get(p.id, 0)} for p in items], "total": len(items), "attachment_error": attachment_error}
 
 
 @router.get("/plans/{pid}", response_model=InterlabPlanRead)
