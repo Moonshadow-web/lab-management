@@ -29,6 +29,7 @@ const routes = [
       { path: 'reagent/orders', name: 'reagent-orders', component: () => import('../views/reagent/ReagentOrders.vue'), meta: { title: '订购管理', moduleKey: 'reagents' } },
       { path: 'reagent/receivings', name: 'reagent-receivings', component: () => import('../views/reagent/ReagentReceivings.vue'), meta: { title: '到货接收', moduleKey: 'reagents' } },
       { path: 'reagent/consumption', name: 'reagent-consumption', component: () => import('../views/reagent/ReagentConsumption.vue'), meta: { title: '月消耗', moduleKey: 'reagents' } },
+      { path: 'reagent/associations', name: 'reagent-associations', component: () => import('../views/reagent/ReagentAssociations.vue'), meta: { title: '项目与仪器关联', moduleKey: 'reagents' } },
       { path: 'training', name: 'training', component: () => import('../views/training/TrainingList.vue'), meta: { title: '继教培训', moduleKey: 'training' } },
       { path: 'verification', name: 'verification', component: () => import('../views/verification/VerificationList.vue'), meta: { title: '性能验证', moduleKey: 'verification' } },
       { path: 'iso15189', name: 'iso15189', component: () => import('../views/iso15189/NonconformityList.vue'), meta: { title: '15189专项', moduleKey: 'iso15189' } },

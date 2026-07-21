@@ -87,6 +87,7 @@ const menus = computed(() => {
       { path: '/reagent/orders', title: '订购管理' },
       { path: '/reagent/receivings', title: '到货接收' },
       { path: '/reagent/consumption', title: '月消耗' },
+      { path: '/reagent/associations', title: '项目与仪器关联' },
     ] },
     { path: '/training', title: '继教培训', icon: 'Reading', moduleKey: 'training' },
     { path: '/verification', title: '性能验证', icon: 'DataAnalysis', moduleKey: 'verification' },

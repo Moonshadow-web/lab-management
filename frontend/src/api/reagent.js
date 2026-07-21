@@ -95,3 +95,26 @@ export function listReagentConsumption(params) {
 export function calculateConsumption(yearMonth) {
   return request.post(`/api/v1/reagent/consumption/_calculate?year_month=${yearMonth}`)
 }
+
+// ── 项目↔试剂 / 仪器↔耗材 关联 ──
+export function listTestItemReagents(params) {
+  return request.get('/api/v1/reagent/associations/test-items', { params })
+}
+export function createTestItemReagent(data) {
+  return request.post('/api/v1/reagent/associations/test-items', data)
+}
+export function deleteTestItemReagent(id) {
+  return request.delete(`/api/v1/reagent/associations/test-items/${id}`)
+}
+export function listInstrumentReagents(params) {
+  return request.get('/api/v1/reagent/associations/instruments', { params })
+}
+export function createInstrumentReagent(data) {
+  return request.post('/api/v1/reagent/associations/instruments', data)
+}
+export function deleteInstrumentReagent(id) {
+  return request.delete(`/api/v1/reagent/associations/instruments/${id}`)
+}
+export function autoMatchAssociations(reset = false) {
+  return request.post(`/api/v1/reagent/associations/_auto-match?reset=${reset}`)
+}
