@@ -523,7 +523,8 @@ NCCL_ITEMS: list[dict[str, Any]] = [
     {"category": "NCCL-C-13", "item_name": "尿素(尿液)","tea": "靶值 ±20%"},
     {"category": "NCCL-C-13", "item_name": "尿酸(尿液)","tea": "靶值 ±20%"},
     {"category": "NCCL-C-13", "item_name": "肌酐(尿液)","tea": "靶值 ±20%"},
-    {"category": "NCCL-C-13", "item_name": "总蛋白(尿液)","tea": "靶值 ±30%"},
+    # 卫健委 EQA 登记名为「总蛋白」+标本类型(尿液)；对应项目库 TestItem「微量总蛋白（尿液）」，改名以精确命中
+    {"category": "NCCL-C-13", "item_name": "微量总蛋白（尿液）","tea": "靶值 ±30%"},
     {"category": "NCCL-C-13", "item_name": "淀粉酶(尿液)","tea": "靶值 ±30%"},
     {"category": "NCCL-C-13", "item_name": "微量白蛋白(尿液)","tea": "靶值 ±30%"},
     # NCCL-C-14 半胱氨酸蛋白酶抑制剂 C
@@ -555,7 +556,8 @@ NCCL_ITEMS: list[dict[str, Any]] = [
     {"category": "NCCL-C-25", "item_name": "血清淀粉样蛋白 A（SAA）","tea": "靶值 ±25%"},
     # NCCL-C-28 脑脊液
     {"category": "NCCL-C-28", "item_name": "白蛋白(脑脊液)","tea": "靶值 ±10% 或 ±0.04g/L(取大值)"},
-    {"category": "NCCL-C-28", "item_name": "总蛋白(脑脊液)","tea": "靶值 ±10% 或 ±0.04g/L(取大值)"},
+    # 卫健委 EQA 登记名为「总蛋白」+标本类型(脑脊液)；对应项目库 TestItem「微量总蛋白（脑脊液）」，改名以精确命中
+    {"category": "NCCL-C-28", "item_name": "微量总蛋白（脑脊液）","tea": "靶值 ±10% 或 ±0.04g/L(取大值)"},
     {"category": "NCCL-C-28", "item_name": "氯化物(脑脊液)","tea": "靶值 ±5%"},
     {"category": "NCCL-C-28", "item_name": "葡萄糖(脑脊液)","tea": "靶值 ±10% 或 ±0.1mmol/L(取大值)"},
     {"category": "NCCL-C-28", "item_name": "乳酸脱氢酶(脑脊液)","tea": "靶值 ±20%"},
