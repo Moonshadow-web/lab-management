@@ -693,6 +693,22 @@ def _norm_match(s: str) -> str:
     return s.strip().lower()
 
 
+def _alnum_tokens(s: str) -> list:
+    """从仪器名/型号或耗材名中提取「纯 ASCII 型号代码」片段。
+
+    直接按正则提取所有 ASCII 字母/数字连续段（忽略中文与任何括号/标点），
+    只保留「长度 >= 2 且至少含一个字母」的片段（如 au5822 / dxi800c /
+    top700a / e601 / acl / top / au / bm60）。
+
+    - 要求含字母：排除纯数字片段（300 / 600 / 618 …），否则仪器型号里的数字
+      会误命中耗材名中的货号（如 03005712190 含 300），造成错误关联。
+    - 品牌中文前缀（贝克曼/罗氏…）天然被排除；即便型号被全角括号包裹
+      （如「反应杯（DxI800）」）也能正确析出 `dxi800`。
+    """
+    return [t.lower() for t in _re.findall(r"[A-Za-z0-9]+", str(s or ""))
+            if len(t) >= 2 and any(c.isalpha() for c in t)]
+
+
 @router.post("/associations/_auto-match", response_model=dict)
 def auto_match_associations(
     reset: bool = Query(False, description="true 时先清空已有自动匹配记录再重新生成"),
@@ -742,26 +758,41 @@ def auto_match_associations(
             tir_unmatched.append({"reagent_id": r.id, "name": r.name, "type": r.type})
 
     insts = db.query(Instrument).all()
-    inst_norms = [
-        (ins.id, _norm_match(ins.name) + _norm_match(getattr(ins, "model", None) or ""))
-        for ins in insts
-    ]
+    # 预计算每个仪器的：全名归一化 / ASCII 型号代码列表 / 中文名归一化
+    inst_idx = []
+    for ins in insts:
+        full = _norm_match((ins.name or "") + " " + (getattr(ins, "model", None) or ""))
+        alnum = _alnum_tokens((ins.name or "") + " " + (getattr(ins, "model", None) or ""))
+        cn_name = _norm_match(ins.name or "")
+        inst_idx.append((ins.id, full, alnum, cn_name))
+
     ir_added, ir_unmatched = 0, []
     for r in reagents:
         if r.type != "耗材":
             continue
         rn = _norm_match(r.name)
-        best, best_score = None, 0
-        for iid, inorm in inst_norms:
-            if not inorm:
-                continue
-            score = len(inorm) if inorm in rn else (len(rn) if (rn and rn in inorm) else 0)
-            if score > best_score:
-                best_score, best = score, iid
-        if best and best_score >= 3:
-            if not db.query(InstrumentReagent).filter_by(instrument_id=best, reagent_item_id=r.id).first():
-                db.add(InstrumentReagent(instrument_id=best, reagent_item_id=r.id, role="耗材", auto_matched=True))
-                ir_added += 1
+        r_alnum = _alnum_tokens(r.name)
+        matched_iids = []
+        for iid, full, alnum, cn_name in inst_idx:
+            score = 0
+            # 1) 仪器型号代码出现在耗材名中（强信号：耗材明确写了该型号）
+            for t in alnum:
+                if len(t) >= 3 and t in rn:
+                    score = max(score, len(t))
+            # 2) 耗材型号代码出现在仪器全名中（耗材带的型号代码命中仪器）
+            for t in r_alnum:
+                if len(t) >= 2 and t in full:
+                    score = max(score, len(t))
+            # 3) 仪器中文名称出现在耗材名中（如「糖化血红蛋白分析仪」）
+            if len(cn_name) >= 4 and cn_name in rn:
+                score = max(score, len(cn_name))
+            if score >= 3:
+                matched_iids.append(iid)
+        if matched_iids:
+            for iid in matched_iids:
+                if not db.query(InstrumentReagent).filter_by(instrument_id=iid, reagent_item_id=r.id).first():
+                    db.add(InstrumentReagent(instrument_id=iid, reagent_item_id=r.id, role="耗材", auto_matched=True))
+                    ir_added += 1
         else:
             ir_unmatched.append({"reagent_id": r.id, "name": r.name})
 
