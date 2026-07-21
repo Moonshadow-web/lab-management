@@ -1172,11 +1172,13 @@ function triggerCsv() {
     ElMessage.warning('请先在上方「质控仪器」下拉中选好仪器，再上传该仪器的 LIS 数据')
     return
   }
-  if (!csvInput.value) {
+  // 模板 ref 位于 el-tab-pane 的 v-for 内，Vue 会把它绑定成数组（即使只渲染一个元素）
+  const input = Array.isArray(csvInput.value) ? csvInput.value[0] : csvInput.value
+  if (!input || typeof input.click !== 'function') {
     ElMessage.error('上传组件未就绪，请刷新页面后重试')
     return
   }
-  csvInput.value.click()
+  input.click()
 }
 async function onCsvChange(e) {
   const file = e.target.files?.[0]
