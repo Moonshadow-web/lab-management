@@ -10,6 +10,8 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.schema import CreateColumn
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -26,12 +28,48 @@ from .services.comparison_report import ensure_comparison_defaults
 logger = logging.getLogger("reminder")
 
 
+def _ensure_missing_columns():
+    """MySQL/任意 dialect 补列：create_all 只建缺失表、不补已存在表的新列。
+
+    用 inspector 比对模型定义与线上表结构，凡模型有而表缺的列，
+    执行 ALTER TABLE ADD COLUMN（仅 ADD，绝不 DROP）。幂等：已存在的列跳过，
+    每次启动调用，不破坏数据。覆盖所有表，避免「加了模型字段却忘了迁列」导致的 500。
+    """
+    try:
+        inspector = sa_inspect(engine)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("inspect 失败，跳过自动补列: %s", e)
+        return
+    for table in Base.metadata.tables.values():
+        try:
+            if not inspector.has_table(table.name):
+                continue
+            existing = {c["name"] for c in inspector.get_columns(table.name)}
+        except Exception:  # noqa: BLE001
+            continue
+        for col in table.columns:
+            if col.name in existing:
+                continue
+            try:
+                ddl = str(CreateColumn(col).compile(dialect=engine.dialect))
+                with engine.begin() as conn:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE `{table.name}` ADD COLUMN {ddl}"
+                    )
+                logger.info("自动补列 %s.%s (%s)", table.name, col.name, ddl)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("自动补列失败(忽略) %s.%s: %s", table.name, col.name, e)
+
+
 def _migrate_schema():
     """为已存在的表补齐新增列（create_all 不会 ALTER 旧表）。
 
     部署时若 data/app.db 已存在旧表结构，这里补加缺失列，避免
     OperationalError: no such column。新增表由 create_all 负责创建。
     """
+    # 通用补列（MySQL/SQLite 均适用）：先按模型补齐所有缺失列，
+    # 再执行下方 SQLite 专属的 PRAGMA 补列与数据回填（MySQL 下 PRAGMA 会被跳过）。
+    _ensure_missing_columns()
     alters = {
         "qc_monthly_summaries": {
             "instrument_id": "INTEGER",
