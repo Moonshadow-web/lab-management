@@ -169,7 +169,8 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
                     continue
                 res = rj.get(str(ins["id"])) or []
                 agreement = None
-                if res and ref_res and len(res) == len(ref_res):
+                # 符合率仅对非参照仪器计算（参照仪器自己跟自己比无意义）
+                if ins["id"] != ref_id and res and ref_res and len(res) == len(ref_res):
                     # 兼容「P/N 字符串」与「S/CO 数值」两种存储：统一经 _to_pn 推导阴/阳性
                     valid = sum(1 for a in res if _to_pn(a) is not None)
                     matches = sum(1 for a, b in zip(res, ref_res)
@@ -383,9 +384,9 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
             html.append(f'<tr><td style="text-align:left">{ins["name"]}</td>'
                         f'<td>{method}</td><td>{mf}</td><td>{lot}</td></tr>')
         html.append('</tbody></table>')
-        # 比对结果（检验项目 × 检测系统）
+        # 比对结果（检验项目 × 检测系统 × 5 个样本，每样本一行）
         html.append("<h2>比对结果</h2>")
-        html.append('<table><thead><tr><th class="item">检验项目</th>')
+        html.append('<table><thead><tr><th class="item">检验项目</th><th>样本编号</th>')
         for ins in data["instruments"]:
             tag = "（参照）" if ins["is_reference"] else ""
             m = (data.get("qual_meta") or {}).get(str(ins["id"])) or {}
@@ -395,25 +396,52 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
                 if m.get("reagent_lot"):
                     hint += f' / {m.get("reagent_lot")}'
                 hint += '</div>'
-            html.append(f'<th>{ins["name"]}{tag}{hint}</th><th>符合率</th>')
+            html.append(f'<th>{ins["name"]}{tag}{hint}</th>')
+            if not ins["is_reference"]:
+                html.append('<th>符合率</th>')
         html.append("</tr></thead><tbody>")
         for row in data["matrix"]:
-            html.append(f'<tr><td class="item">{row["item"]}</td>')
+            item_name = row["item"]
+            insts = row["insts"]
+            sample_lens = [len(c.get("results") or []) for c in insts.values() if not c.get("masked")]
+            n_samples = max(sample_lens) if sample_lens else 0
+            # 每个样本一行
+            for sample_idx in range(n_samples):
+                html.append(f'<tr><td class="item">{item_name}</td><td>{sample_idx + 1}</td>')
+                for ins in data["instruments"]:
+                    c = insts.get(ins["id"], {})
+                    if c.get("masked"):
+                        html.append('<td class="mask">/</td>')
+                        if not ins["is_reference"]:
+                            html.append('<td class="mask">/</td>')
+                        continue
+                    res = c.get("results") or []
+                    val = _qual_cell_display(res[sample_idx]) if sample_idx < len(res) else "-"
+                    html.append(f'<td>{val}</td>')
+                    if not ins["is_reference"]:
+                        html.append('<td></td>')  # 样本行符合率留空，仅在底部汇总行显示
+                html.append("</tr>")
+            # 每个项目底部汇总：符合率
+            html.append(f'<tr style="background:#f7f9fc"><td class="item">{item_name}</td><td>符合率</td>')
             for ins in data["instruments"]:
-                c = row["insts"].get(ins["id"], {})
+                c = insts.get(ins["id"], {})
                 if c.get("masked"):
-                    html.append('<td class="mask">/</td><td class="mask">/</td>')
+                    html.append('<td class="mask">/</td>')
+                    if not ins["is_reference"]:
+                        html.append('<td class="mask">/</td>')
                     continue
-                cell = c.get("results") or []
-                samples = " ".join(_qual_cell_display(v) for v in cell) if isinstance(cell, list) and cell else "-"
-                agr = c.get("agreement")
-                agr_s = f"{agr}%" if agr is not None else "-"
-                html.append(f"<td>{samples}</td><td>{agr_s}</td>")
+                if ins["is_reference"]:
+                    html.append('<td>—</td>')
+                else:
+                    html.append('<td>—</td>')
+                    agr = c.get("agreement")
+                    agr_s = f"{agr}%" if agr is not None else "-"
+                    html.append(f'<td>{agr_s}</td>')
             html.append("</tr>")
         html.append("</tbody></table>")
         _qual_vals = [i["agreement"] for row in data["matrix"] for i in row["insts"].values()
-                      if not i.get("masked")]
-        _qual_ok = _qual_vals and all(a is not None and a >= 80 for a in _qual_vals)
+                      if not i.get("masked") and i.get("agreement") is not None]
+        _qual_ok = _qual_vals and all(a >= 80 for a in _qual_vals)
         html.append(f'<p>总结：使用5例样本进行室内比对，结果阴阳符合率见上表，结果一致性{"可接受" if _qual_ok else "待评估"}。</p>')
     else:
         inst_name_map = {i["id"]: i["name"] for i in data["instruments"]}
@@ -727,15 +755,17 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
             _fill(mr[3], (str(m.get("reagent_lot") or "").strip()) or "—")
 
         insts = data["instruments"]
-        cols = 1 + len(insts) * 2
+        cols = 2 + len(insts) + sum(0 if ins["is_reference"] else 1 for ins in insts)
         t = doc.add_table(rows=1, cols=cols)
         t.style = "Table Grid"
         t.alignment = WD_TABLE_ALIGNMENT.CENTER
         hdr = t.rows[0].cells
         _fill(hdr[0], "检验项目", bold=True, align="left")
-        for i, ins in enumerate(insts):
+        _fill(hdr[1], "样本编号", bold=True)
+        ci = 2
+        for ins in insts:
             m = (data.get("qual_meta") or {}).get(str(ins["id"])) or {}
-            hc = hdr[1 + i * 2]
+            hc = hdr[ci]
             hc.text = ""
             p1 = hc.paragraphs[0]
             tag = "（参照）" if ins["is_reference"] else ""
@@ -748,24 +778,64 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
                 p2 = hc.add_paragraph()
                 r2 = p2.add_run(sub)
                 _set_cell_font(r2, size=9)
-            _fill(hdr[2 + i * 2], "符合率", bold=True)
+            ci += 1
+            if not ins["is_reference"]:
+                _fill(hdr[ci], "符合率", bold=True)
+                ci += 1
         all_ok = True
         for row in data["matrix"]:
+            item_name = row["item"]
+            insts_data = row["insts"]
+            sample_lens = [len(c.get("results") or []) for c in insts_data.values() if not c.get("masked")]
+            n_samples = max(sample_lens) if sample_lens else 0
+            # 每个样本一行
+            for sample_idx in range(n_samples):
+                cells = t.add_row().cells
+                _fill(cells[0], item_name, align="left")
+                _fill(cells[1], str(sample_idx + 1))
+                ci = 2
+                for ins in insts:
+                    c = insts_data.get(ins["id"], {})
+                    if c.get("masked"):
+                        _fill(cells[ci], "/")
+                        ci += 1
+                        if not ins["is_reference"]:
+                            _fill(cells[ci], "/")
+                            ci += 1
+                        continue
+                    res = c.get("results") or []
+                    val = _qual_cell_display(res[sample_idx]) if sample_idx < len(res) else "-"
+                    _fill(cells[ci], val)
+                    ci += 1
+                    if not ins["is_reference"]:
+                        _fill(cells[ci], "")  # 样本行符合率留空
+                        ci += 1
+            # 每个项目底部汇总：符合率
             cells = t.add_row().cells
-            _fill(cells[0], row["item"], align="left")
-            for i, ins in enumerate(insts):
-                c = row["insts"].get(ins["id"], {})
+            _fill(cells[0], item_name, align="left")
+            _fill(cells[1], "符合率")
+            ci = 2
+            for ins in insts:
+                c = insts_data.get(ins["id"], {})
                 if c.get("masked"):
-                    _fill(cells[1 + i * 2], "/"); _fill(cells[2 + i * 2], "/")
+                    _fill(cells[ci], "/")
+                    ci += 1
+                    if not ins["is_reference"]:
+                        _fill(cells[ci], "/")
+                        ci += 1
                     continue
-                res = c.get("results") or []
-                samples = " ".join(_qual_cell_display(v) for v in res) if isinstance(res, list) and res else "-"
-                agr = c.get("agreement")
-                agr_s = f"{agr}%" if agr is not None else "-"
-                if agr is not None and agr < 80:
-                    all_ok = False
-                _fill(cells[1 + i * 2], samples)
-                _fill(cells[2 + i * 2], agr_s)
+                if ins["is_reference"]:
+                    _fill(cells[ci], "—")
+                    ci += 1
+                else:
+                    _fill(cells[ci], "—")
+                    ci += 1
+                    agr = c.get("agreement")
+                    agr_s = f"{agr}%" if agr is not None else "-"
+                    if agr is not None and agr < 80:
+                        all_ok = False
+                    _fill(cells[ci], agr_s)
+                    ci += 1
         p = doc.add_paragraph()
         _run_font(p.add_run(
             f"总结：使用5例样本进行室内比对，结果阴阳符合率见上表，结果一致性{'可接受' if all_ok else '需关注'}。"), 11)

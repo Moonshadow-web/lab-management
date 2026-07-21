@@ -6,7 +6,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ...core.config import DATA_DIR
@@ -146,17 +146,13 @@ def list_plans(year: int = None, half: int = None, instrument_id: int = None,
     items = q.order_by(InterlabPlan.year.desc(), InterlabPlan.half.desc(), InterlabPlan.id.desc()).all()
     # 一次性查出附件数量
     counts = {}
-    attachment_error = None
     if items:
         pids = [p.id for p in items]
-        try:
-            rows = db.query(InterlabAttachment.plan_id, db.func.count(InterlabAttachment.id)).filter(
-                InterlabAttachment.plan_id.in_(pids)
-            ).group_by(InterlabAttachment.plan_id).all()
-            counts = {pid: c for pid, c in rows}
-        except Exception as e:
-            attachment_error = f"{type(e).__name__}: {e}"
-    return {"items": [{**_ser_plan(p), "attachment_count": counts.get(p.id, 0)} for p in items], "total": len(items), "attachment_error": attachment_error}
+        rows = db.query(InterlabAttachment.plan_id, func.count(InterlabAttachment.id)).filter(
+            InterlabAttachment.plan_id.in_(pids)
+        ).group_by(InterlabAttachment.plan_id).all()
+        counts = {pid: c for pid, c in rows}
+    return {"items": [{**_ser_plan(p), "attachment_count": counts.get(p.id, 0)} for p in items], "total": len(items)}
 
 
 @router.get("/plans/{pid}", response_model=InterlabPlanRead)
