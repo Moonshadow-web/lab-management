@@ -55,10 +55,11 @@ def list_reagent_items(
     if category:
         base = base.filter(ReagentItem.category == category)
     total = base.count()
-    items = base.order_by(ReagentItem.type, ReagentItem.category, ReagentItem.id).offset(
+    rows = base.order_by(ReagentItem.type, ReagentItem.category, ReagentItem.id).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
-    return {"total": total, "page": page, "page_size": page_size, "items": items}
+    return {"total": total, "page": page, "page_size": page_size,
+            "items": [ReagentItemRead.model_validate(r) for r in rows]}
 
 
 @router.get("/items/{item_id}", response_model=ReagentItemRead)
@@ -140,8 +141,9 @@ def list_stock(
             ReagentStock.quantity < ReagentItem.min_stock,
         )
     total = base.count()
-    items = base.order_by(ReagentStock.item_id).offset((page - 1) * page_size).limit(page_size).all()
-    return {"total": total, "page": page, "page_size": page_size, "items": items}
+    rows = base.order_by(ReagentStock.item_id).offset((page - 1) * page_size).limit(page_size).all()
+    return {"total": total, "page": page, "page_size": page_size,
+            "items": [ReagentStockRead.model_validate(r) for r in rows]}
 
 
 # =============================================================================
@@ -156,10 +158,11 @@ def list_inventory_checks(
     _=Depends(get_current_user),
 ):
     total = db.query(InventoryCheck).count()
-    items = db.query(InventoryCheck).order_by(InventoryCheck.check_date.desc()).offset(
+    rows = db.query(InventoryCheck).order_by(InventoryCheck.check_date.desc()).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
-    return {"total": total, "page": page, "page_size": page_size, "items": items}
+    return {"total": total, "page": page, "page_size": page_size,
+            "items": [InventoryCheckRead.model_validate(r) for r in rows]}
 
 
 @router.get("/inventory-checks/{check_id}", response_model=InventoryCheckRead)
@@ -219,10 +222,11 @@ def list_orders(
     _=Depends(get_current_user),
 ):
     total = db.query(ReagentOrder).count()
-    items = db.query(ReagentOrder).order_by(ReagentOrder.order_date.desc()).offset(
+    rows = db.query(ReagentOrder).order_by(ReagentOrder.order_date.desc()).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
-    return {"total": total, "page": page, "page_size": page_size, "items": items}
+    return {"total": total, "page": page, "page_size": page_size,
+            "items": [ReagentOrderRead.model_validate(r) for r in rows]}
 
 
 @router.get("/orders/{order_id}", response_model=ReagentOrderRead)
@@ -358,10 +362,11 @@ def list_receivings(
     _=Depends(get_current_user),
 ):
     total = db.query(Receiving).count()
-    items = db.query(Receiving).order_by(Receiving.receipt_date.desc()).offset(
+    rows = db.query(Receiving).order_by(Receiving.receipt_date.desc()).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
-    return {"total": total, "page": page, "page_size": page_size, "items": items}
+    return {"total": total, "page": page, "page_size": page_size,
+            "items": [ReceivingRead.model_validate(r) for r in rows]}
 
 
 @router.get("/receivings/{receiving_id}", response_model=ReceivingRead)
@@ -423,10 +428,11 @@ def list_consumption(
     if year_month:
         base = base.filter(ReagentConsumption.year_month == year_month)
     total = base.count()
-    items = base.order_by(ReagentConsumption.year_month.desc(), ReagentConsumption.item_id).offset(
+    rows = base.order_by(ReagentConsumption.year_month.desc(), ReagentConsumption.item_id).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
-    return {"total": total, "page": page, "page_size": page_size, "items": items}
+    return {"total": total, "page": page, "page_size": page_size,
+            "items": [ReagentConsumptionRead.model_validate(r) for r in rows]}
 
 
 @router.post("/consumption/_calculate")
