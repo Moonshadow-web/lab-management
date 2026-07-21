@@ -619,10 +619,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import ExcelJS from 'exceljs'
-import * as echarts from 'echarts'
 import {
   listQCSummaries, uploadQCSummary, getQCDaily, updateQCSummary, deleteQCSummary,
   getQCReport, upsertQCReport, regenerateQCReport, exportQCReportDocx, getQCProjectDaily,
@@ -636,9 +634,10 @@ import {
   getEqaSummaryByCategory, generateEqaSummary, eqaSummaryDocUrl, mergeEqaReports,
 } from '../../api/eqa'
 import { useAuthStore } from '../../store/auth'
-import Comparison from '../comparison/Comparison.vue'
-import InterlabComparison from '../interlab/InterlabComparison.vue'
-import TargetValueBoard from './TargetValueBoard.vue'
+// 子功能按需懒加载：避免「质控管理」一打开就下载全部重组件（含 echarts/exceljs 等大依赖），显著减小首屏 chunk
+const Comparison = defineAsyncComponent(() => import('../comparison/Comparison.vue'))
+const InterlabComparison = defineAsyncComponent(() => import('../interlab/InterlabComparison.vue'))
+const TargetValueBoard = defineAsyncComponent(() => import('./TargetValueBoard.vue'))
 
 const activeTab = ref('summary')
 const auth = useAuthStore()
@@ -1043,7 +1042,7 @@ function renderChart(rows) {
     })
   }
 
-  chartInstance = echarts.init(chartRef.value)
+  // chartInstance 的初始化（echarts.init）移到下方「动态加载 echarts 之后」执行
   // 计算标题副标题（仅显示靶值/SD，不含范围）
   const subtitleLines = []
   for (const lv of levels) {
@@ -1126,7 +1125,12 @@ function renderChart(rows) {
       silent: true,
     })
   }
-  chartInstance.setOption(option)
+  // 动态按需加载 echarts（仅 LJ 质控图用到），避免首屏加载大体积依赖
+  import('echarts').then((echarts) => {
+    if (!chartRef.value) return
+    chartInstance = echarts.init(chartRef.value)
+    chartInstance.setOption(option)
+  })
 }
 
 onUnmounted(() => {
@@ -1938,6 +1942,8 @@ function printResult() {
 async function exportExcel() {
   try {
     exporting.value = true
+    // 动态按需加载 exceljs（938KB），仅导出 Excel 时才加载，不占首屏
+    const ExcelJS = (await import('exceljs')).default
     applyGrid()
     const plan = resultPlan.value || {}
     const items = gridItems.value
