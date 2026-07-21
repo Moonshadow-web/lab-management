@@ -144,7 +144,15 @@ def list_plans(year: int = None, half: int = None, instrument_id: int = None,
     if instrument_id is not None:
         q = q.filter_by(instrument_id=instrument_id)
     items = q.order_by(InterlabPlan.year.desc(), InterlabPlan.half.desc(), InterlabPlan.id.desc()).all()
-    return {"items": [_ser_plan(p) for p in items], "total": len(items)}
+    # 一次性查出附件数量
+    counts = {}
+    if items:
+        pids = [p.id for p in items]
+        rows = db.query(InterlabAttachment.plan_id, db.func.count(InterlabAttachment.id)).filter(
+            InterlabAttachment.plan_id.in_(pids)
+        ).group_by(InterlabAttachment.plan_id).all()
+        counts = {pid: c for pid, c in rows}
+    return {"items": [{**_ser_plan(p), "attachment_count": counts.get(p.id, 0)} for p in items], "total": len(items)}
 
 
 @router.get("/plans/{pid}", response_model=InterlabPlanRead)

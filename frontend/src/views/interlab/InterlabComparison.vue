@@ -84,6 +84,14 @@
           <span v-else class="no">未生成</span>
         </template>
       </el-table-column>
+      <el-table-column label="原始结果" width="110" align="center">
+        <template #default="{ row }">
+          <el-badge v-if="row.attachment_count" :value="row.attachment_count" :max="99" type="primary">
+            <el-button size="small" @click="openAttachments(row)">附件</el-button>
+          </el-badge>
+          <el-button v-else size="small" plain @click="openAttachments(row)" v-if="canCreate">+上传</el-button>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" min-width="280" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openEntry(row)" v-if="canCreate">录入</el-button>
@@ -327,6 +335,11 @@
         <AttachmentList :plan-id="reportPlan.id" module="interlab" :can-write="canCreate" />
       </div>
     </el-dialog>
+
+    <!-- 原始结果附件管理 -->
+    <el-dialog v-model="attachVisible" :title="`原始结果 · ${activePlan?.year || ''} 半年${activePlan?.half === 2 ? '下' : '上'}半年`" width="900px" top="3vh">
+      <AttachmentList v-if="activePlan" :plan-id="activePlan.id" module="interlab" :can-write="canCreate" />
+    </el-dialog>
   </div>
 </template>
 
@@ -392,6 +405,9 @@ const reportPlan = ref(null)
 const previewHtml = ref('')
 const previewing = ref(false)
 const generating = ref(false)
+
+const attachVisible = ref(false)
+const activePlan = ref(null)
 
 const instrumentName = (id) => {
   const i = instruments.value.find((x) => x.id === id)
@@ -650,6 +666,10 @@ function openReport(row) {
   previewHtml.value = ''
   reportVisible.value = true
   if (row.report_filename) doPreview()
+}
+function openAttachments(row) {
+  activePlan.value = row
+  attachVisible.value = true
 }
 async function doPreview() {
   previewing.value = true
