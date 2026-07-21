@@ -476,6 +476,8 @@ NCCL_ITEMS: list[dict[str, Any]] = [
     {"category": "NCCL-C-07", "item_name": "总T4","tea": "靶值 ±20%"},
     {"category": "NCCL-C-07", "item_name": "TSH","tea": "靶值 ±20%"},
     {"category": "NCCL-C-07", "item_name": "皮质醇","tea": "靶值 ±20%"},
+    # 游离皮质醇（尿液）卫健委 EQA 靶值同血清皮质醇
+    {"category": "NCCL-C-07", "item_name": "游离皮质醇（尿液）","tea": "靶值 ±20%"},
     {"category": "NCCL-C-07", "item_name": "雌二醇","tea": "靶值 ±25%"},
     {"category": "NCCL-C-07", "item_name": "FSH","tea": "靶值 ±25%"},
     {"category": "NCCL-C-07", "item_name": "LH","tea": "靶值 ±25%"},
@@ -513,19 +515,20 @@ NCCL_ITEMS: list[dict[str, Any]] = [
     {"category": "NCCL-C-12", "item_name": "BNP","tea": "靶值 ±30%"},
     {"category": "NCCL-C-12", "item_name": "NT-proBNP","tea": "靶值 ±30%"},
     # NCCL-C-13 尿液定量生化
-    {"category": "NCCL-C-13", "item_name": "钾(尿液)","tea": "靶值 ±20%"},
-    {"category": "NCCL-C-13", "item_name": "钠(尿液)","tea": "靶值 ±20%"},
-    {"category": "NCCL-C-13", "item_name": "氯(尿液)","tea": "靶值 ±20%"},
-    {"category": "NCCL-C-13", "item_name": "钙(尿液)","tea": "靶值 ±20%"},
-    {"category": "NCCL-C-13", "item_name": "镁(尿液)","tea": "靶值 ±25%"},
-    {"category": "NCCL-C-13", "item_name": "磷(尿液)","tea": "靶值 ±20%"},
-    {"category": "NCCL-C-13", "item_name": "葡萄糖(尿液)","tea": "靶值 ±20%"},
-    {"category": "NCCL-C-13", "item_name": "尿素(尿液)","tea": "靶值 ±20%"},
-    {"category": "NCCL-C-13", "item_name": "尿酸(尿液)","tea": "靶值 ±20%"},
-    {"category": "NCCL-C-13", "item_name": "肌酐(尿液)","tea": "靶值 ±20%"},
+    # 以下 NCCL-C-13 尿液行 tea 已按线上真实分项值校正（原种子文件统一值±20%等为漂移，DB 存真实值）
+    {"category": "NCCL-C-13", "item_name": "钾(尿液)","tea": "靶值 ±6%"},
+    {"category": "NCCL-C-13", "item_name": "钠(尿液)","tea": "靶值 ±4%"},
+    {"category": "NCCL-C-13", "item_name": "氯(尿液)","tea": "靶值 ±4%"},
+    {"category": "NCCL-C-13", "item_name": "钙(尿液)","tea": "靶值 ±5%"},
+    {"category": "NCCL-C-13", "item_name": "镁(尿液)","tea": "靶值 ±15%"},
+    {"category": "NCCL-C-13", "item_name": "磷(尿液)","tea": "靶值 ±10%"},
+    {"category": "NCCL-C-13", "item_name": "葡萄糖(尿液)","tea": "靶值 ±7%"},
+    {"category": "NCCL-C-13", "item_name": "尿素(尿液)","tea": "靶值 ±8%"},
+    {"category": "NCCL-C-13", "item_name": "尿酸(尿液)","tea": "靶值 ±12%"},
+    {"category": "NCCL-C-13", "item_name": "肌酐(尿液)","tea": "靶值 ±12%"},
     # 卫健委 EQA 登记名为「总蛋白」+标本类型(尿液)；对应项目库 TestItem「微量总蛋白（尿液）」，改名以精确命中
     {"category": "NCCL-C-13", "item_name": "微量总蛋白（尿液）","tea": "靶值 ±30%"},
-    {"category": "NCCL-C-13", "item_name": "淀粉酶(尿液)","tea": "靶值 ±30%"},
+    {"category": "NCCL-C-13", "item_name": "淀粉酶(尿液)","tea": "靶值 ±15%"},
     {"category": "NCCL-C-13", "item_name": "微量白蛋白(尿液)","tea": "靶值 ±30%"},
     # NCCL-C-14 半胱氨酸蛋白酶抑制剂 C
     {"category": "NCCL-C-14", "item_name": "半胱氨酸蛋白酶抑制剂 C","tea": "靶值 ±20%"},
@@ -558,13 +561,12 @@ NCCL_ITEMS: list[dict[str, Any]] = [
     {"category": "NCCL-C-28", "item_name": "白蛋白(脑脊液)","tea": "靶值 ±10% 或 ±0.04g/L(取大值)"},
     # 卫健委 EQA 登记名为「总蛋白」+标本类型(脑脊液)；对应项目库 TestItem「微量总蛋白（脑脊液）」，改名以精确命中
     {"category": "NCCL-C-28", "item_name": "微量总蛋白（脑脊液）","tea": "靶值 ±10% 或 ±0.04g/L(取大值)"},
-    {"category": "NCCL-C-28", "item_name": "氯化物(脑脊液)","tea": "靶值 ±5%"},
-    {"category": "NCCL-C-28", "item_name": "葡萄糖(脑脊液)","tea": "靶值 ±10% 或 ±0.1mmol/L(取大值)"},
-    {"category": "NCCL-C-28", "item_name": "乳酸脱氢酶(脑脊液)","tea": "靶值 ±20%"},
-    {"category": "NCCL-C-28", "item_name": "IgA(脑脊液)","tea": "靶值 ±25%"},
-    {"category": "NCCL-C-28", "item_name": "IgG(脑脊液)","tea": "靶值 ±25%"},
-    {"category": "NCCL-C-28", "item_name": "IgM(脑脊液)","tea": "靶值 ±25%"},
-    {"category": "NCCL-C-28", "item_name": "乳酸(脑脊液)","tea": "靶值 ±20% 或 ±0.1mmol/L(取大值)"},
+    # 卫健委 EQA 登记名为「白蛋白」+标本类型(脑脊液)；对应项目库 TestItem「微量白蛋白（脑脊液）」
+    {"category": "NCCL-C-28", "item_name": "微量白蛋白（脑脊液）","tea": "靶值 ±10% 或 ±0.04g/L(取大值)"},
+    # 以下行 tea 已按线上真实分项值校正（原统一值/孤儿命名为漂移）
+    {"category": "NCCL-C-28", "item_name": "氯化物(脑脊液)","tea": "靶值 ±4%"},
+    {"category": "NCCL-C-28", "item_name": "葡萄糖(脑脊液)","tea": "靶值 ±7%"},
+    {"category": "NCCL-C-28", "item_name": "乳酸脱氢酶(脑脊液)","tea": "靶值 ±11%"},
     # NCCL-C-29 全血五元素
     {"category": "NCCL-C-29", "item_name": "铜(全血)","tea": "靶值 ±25%"},
     {"category": "NCCL-C-29", "item_name": "锌(全血)","tea": "靶值 ±25%"},
