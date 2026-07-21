@@ -84,6 +84,30 @@
 
           <!-- 定性 -->
           <template v-else>
+            <el-alert type="warning" :closable="false" show-icon
+              title="请先填写各检测系统的「方法 / 试剂厂家 / 试剂批号」（BG-SM-CZ-021 要求），再录入下方样本结果。" style="margin-bottom:8px" />
+            <el-table :data="allInstruments" size="small" border style="margin-bottom:12px">
+              <el-table-column label="检测系统" min-width="180">
+                <template #default="{ row }">
+                  {{ row.name }}{{ row.is_reference ? '（靶机）' : '' }}
+                </template>
+              </el-table-column>
+              <el-table-column label="方法" min-width="160">
+                <template #default="{ row }">
+                  <el-input v-model="qualMeta[row.id].method" size="small" placeholder="如 化学发光法" @input="onEdit" />
+                </template>
+              </el-table-column>
+              <el-table-column label="试剂厂家" min-width="160">
+                <template #default="{ row }">
+                  <el-input v-model="qualMeta[row.id].reagent_manufacturer" size="small" placeholder="如 罗氏" @input="onEdit" />
+                </template>
+              </el-table-column>
+              <el-table-column label="试剂批号" min-width="160">
+                <template #default="{ row }">
+                  <el-input v-model="qualMeta[row.id].reagent_lot" size="small" placeholder="试剂批号" @input="onEdit" />
+                </template>
+              </el-table-column>
+            </el-table>
             <el-table :data="qualDisplay" size="small" border max-height="460">
               <el-table-column prop="item" label="项目" min-width="140" fixed />
               <el-table-column v-for="ins in allInstruments" :key="ins.id">
@@ -143,6 +167,7 @@ const allInstruments = ref([])
 const itemMeta = ref({}) // name -> {te, mode}
 const quantRows = ref([]) // {item, level, reference_value, values:{id:val}}
 const qualRows = ref([]) // {item, results:{id:[5]}}
+const qualMeta = ref({}) // {instrument_id: {method, reagent_manufacturer, reagent_lot}} 检测系统信息（BG-SM-CZ-021）
 const currentLevel = ref(1)
 const dirty = ref(false)
 
@@ -267,6 +292,17 @@ async function load() {
     itemMeta.value = {}
     data.items.forEach((i) => { itemMeta.value[i.name] = i })
     allItemNames.value = data.items.map((i) => i.name)
+    // 定性检测系统信息（方法/试剂厂家/试剂批号，BG-SM-CZ-021 要求）
+    const qm = {}
+    allInstruments.value.forEach((ins) => {
+      const m = (data.qual_meta && data.qual_meta[String(ins.id)]) || {}
+      qm[ins.id] = {
+        method: m.method || '',
+        reagent_manufacturer: m.reagent_manufacturer || '',
+        reagent_lot: m.reagent_lot || '',
+      }
+    })
+    qualMeta.value = qm
     currentLevel.value = 1
     // 已录入结果的项目（用于"已完成"标记）
     const done = new Set()
@@ -364,6 +400,16 @@ async function onSave() {
         })
         return { item: r.item, results }
       }),
+      qual_meta: Object.fromEntries(
+        allInstruments.value.map((ins) => {
+          const v = qualMeta.value[ins.id] || {}
+          return [String(ins.id), {
+            method: v.method || '',
+            reagent_manufacturer: v.reagent_manufacturer || '',
+            reagent_lot: v.reagent_lot || '',
+          }]
+        })
+      ),
     }
     await saveResults(props.plan.id, payload)
     ElMessage.success('结果已保存')

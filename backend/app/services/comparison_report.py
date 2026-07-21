@@ -183,6 +183,7 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
             "compared": compared,
             "matrix": matrix,
             "ref_id": ref_id,
+            "qual_meta": _load_json(getattr(plan, "qual_meta_json", "{}") or "{}", {}),
         }
 
     # 定量
@@ -312,6 +313,8 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
       .rep .no { color:#c0392b; font-weight:700; }
       .rep .yes { color:#27ae60; font-weight:700; }
       .rep .mask { background:#f0f0f0; color:#aaa; }
+      .rep table.meta { width:auto; max-width:100%; margin-top:4px; }
+      .rep table.meta th { background:#1a365d; color:#fff; }
       .rep .foot { margin-top:18px; font-size:13px; }
       .rep .summary-ok { color:#27ae60; }
     </style>"""
@@ -322,7 +325,7 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
     html = [f'<div class="rep">{css}'
             f'<h1>{kind}室内比对报告（{group.name}）</h1>'
             f'<div class="sub" style="text-align:center;font-size:13px">民航总医院检验科　　生化免疫组　　比对日期：{plan.compared_at or ""}</div>'
-            f'<div class="sub">表格编号 BG-SM-CZ-022（封面）　　{form_code}（数据页）　　民航总医院检验科生化免疫组　　生效日期：{year}.01.01</div>']
+            f'<div class="sub">表格编号 {form_code}（封面/数据页）　　民航总医院检验科生化免疫组　　生效日期：{year}.01.01</div>']
 
     # 第一页（022 封面）：比对方案 / 结果分析 / 处理方案
     ref = next((i for i in data["instruments"] if i["is_reference"]), None)
@@ -366,11 +369,33 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
     html.append('<hr style="margin:18px 0"><h2>数据页：{title}（{form_code}）</h2>'.format(title=title, form_code=form_code))
 
     if data["category"] == "定性":
+        # 检测系统信息表（BG-SM-CZ-021 要求：每台检测系统的方法/试剂厂家/试剂批号）
+        html.append('<h2>检测系统信息</h2>')
+        html.append('<table class="meta"><thead><tr>'
+                    '<th style="text-align:left">检测系统</th>'
+                    '<th>方法</th><th>试剂厂家</th><th>试剂批号</th>'
+                    '</tr></thead><tbody>')
+        for ins in data["instruments"]:
+            m = (data.get("qual_meta") or {}).get(str(ins["id"])) or {}
+            method = (str(m.get("method") or "").strip()) or "—"
+            mf = (str(m.get("reagent_manufacturer") or "").strip()) or "—"
+            lot = (str(m.get("reagent_lot") or "").strip()) or "—"
+            html.append(f'<tr><td style="text-align:left">{ins["name"]}</td>'
+                        f'<td>{method}</td><td>{mf}</td><td>{lot}</td></tr>')
+        html.append('</tbody></table>')
+        # 比对结果（检验项目 × 检测系统）
         html.append("<h2>比对结果</h2>")
         html.append('<table><thead><tr><th class="item">检验项目</th>')
         for ins in data["instruments"]:
             tag = "（参照）" if ins["is_reference"] else ""
-            html.append(f'<th>{ins["name"]}{tag}</th><th>符合率</th>')
+            m = (data.get("qual_meta") or {}).get(str(ins["id"])) or {}
+            hint = ""
+            if m.get("method"):
+                hint = f'<div style="font-weight:400;font-size:10px;color:#666">{m.get("method")}'
+                if m.get("reagent_lot"):
+                    hint += f' / {m.get("reagent_lot")}'
+                hint += '</div>'
+            html.append(f'<th>{ins["name"]}{tag}{hint}</th><th>符合率</th>')
         html.append("</tr></thead><tbody>")
         for row in data["matrix"]:
             html.append(f'<tr><td class="item">{row["item"]}</td>')
@@ -683,15 +708,46 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
     _data_page_header(doc, group, plan)
 
     if data["category"] == "定性":
+        # 检测系统信息表（BG-SM-CZ-021 要求：每台检测系统的方法/试剂厂家/试剂批号）
+        _heading(doc, "检测系统信息", size=12)
+        mt = doc.add_table(rows=1, cols=4)
+        mt.style = "Table Grid"
+        mt.alignment = WD_TABLE_ALIGNMENT.CENTER
+        mh = mt.rows[0].cells
+        _fill(mh[0], "检测系统", bold=True, align="left")
+        _fill(mh[1], "方法", bold=True)
+        _fill(mh[2], "试剂厂家", bold=True)
+        _fill(mh[3], "试剂批号", bold=True)
+        for ins in data["instruments"]:
+            m = (data.get("qual_meta") or {}).get(str(ins["id"])) or {}
+            mr = mt.add_row().cells
+            _fill(mr[0], ins["name"], align="left")
+            _fill(mr[1], (str(m.get("method") or "").strip()) or "—")
+            _fill(mr[2], (str(m.get("reagent_manufacturer") or "").strip()) or "—")
+            _fill(mr[3], (str(m.get("reagent_lot") or "").strip()) or "—")
+
         insts = data["instruments"]
         cols = 1 + len(insts) * 2
         t = doc.add_table(rows=1, cols=cols)
         t.style = "Table Grid"
         t.alignment = WD_TABLE_ALIGNMENT.CENTER
         hdr = t.rows[0].cells
-        _fill(hdr[0], "检验项目", bold=True)
+        _fill(hdr[0], "检验项目", bold=True, align="left")
         for i, ins in enumerate(insts):
-            _fill(hdr[1 + i * 2], f'{ins["name"]}（参照）' if ins["is_reference"] else ins["name"], bold=True)
+            m = (data.get("qual_meta") or {}).get(str(ins["id"])) or {}
+            hc = hdr[1 + i * 2]
+            hc.text = ""
+            p1 = hc.paragraphs[0]
+            tag = "（参照）" if ins["is_reference"] else ""
+            r1 = p1.add_run(f'{ins["name"]}{tag}')
+            _set_cell_font(r1, bold=True)
+            if m.get("method"):
+                sub = str(m.get("method"))
+                if m.get("reagent_lot"):
+                    sub += f' / {m.get("reagent_lot")}'
+                p2 = hc.add_paragraph()
+                r2 = p2.add_run(sub)
+                _set_cell_font(r2, size=9)
             _fill(hdr[2 + i * 2], "符合率", bold=True)
         all_ok = True
         for row in data["matrix"]:

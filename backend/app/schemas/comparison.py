@@ -140,6 +140,7 @@ class QualResultRow(BaseModel):
 class ComparisonResultsPayload(BaseModel):
     quant: list[QuantResultRow] = []
     qual: list[QualResultRow] = []
+    qual_meta: dict[str, dict] = {}  # 仪器id(字符串) -> {method, reagent_manufacturer, reagent_lot}
 
 
 # ---------------------------------------------------------------------------

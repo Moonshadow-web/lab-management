@@ -59,6 +59,7 @@ class ComparisonPlan(Base):
     handle_plan: Mapped[str] = mapped_column(Text, default="")  # 处理方案（如不合格）
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft / done
     only_uncompared: Mapped[bool] = mapped_column(Boolean, default=False)  # 仅纳入本期未比对项目（同分组同半年补录）
+    qual_meta_json: Mapped[str] = mapped_column(Text, default="{}")  # 定性比对：每台检测系统的方法/试剂厂家/试剂批号 {instrument_id(字符串): {method, reagent_manufacturer, reagent_lot}}
     report_path: Mapped[str] = mapped_column(String(500), default="")  # 报告相对路径
     report_filename: Mapped[str] = mapped_column(String(300), default="")  # 报告原始文件名
     created_by: Mapped[str] = mapped_column(String(100), default="")

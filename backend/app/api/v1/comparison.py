@@ -351,6 +351,7 @@ def get_results(pid: int, db: Session = Depends(get_db), user: User = Depends(ge
         "instruments": instruments,
         "global_ref_id": g.reference_instrument_id,
         "quant": quant, "qual": qual,
+        "qual_meta": json.loads(getattr(p, "qual_meta_json", "{}") or "{}"),
     }
 
 
@@ -392,6 +393,10 @@ def save_results(
     # 草稿状态可用 CREATE 权限；已完成报告的计划必须 EDIT 权限（只 qc_manager）
     p = _ensure_can_edit_results(db, pid, user)
     _apply_results(db, pid, body.quant, body.qual)
+    if body.qual_meta:
+        # 规范化键为字符串，避免 int 键序列化后前端对不上
+        norm = {str(k): v for k, v in body.qual_meta.items()}
+        p.qual_meta_json = json.dumps(norm, ensure_ascii=False)
     db.commit()
     return {"ok": True}
 
@@ -472,7 +477,7 @@ def generate_report(pid: int, db: Session = Depends(get_db), user: User = Depend
     if p.report_path:
         _safe_remove(p.report_path)
     p.report_path = f"comparison_reports/{safe}"
-    p.report_filename = f"BG-SM-CZ-022_{g.form_code}_{p.year}_半年{p.half}.docx"
+    p.report_filename = f"{g.form_code}_{p.year}_半年{p.half}.docx"
     p.updated_at = datetime.utcnow()
     db.commit()
     return _ser_plan(p)
