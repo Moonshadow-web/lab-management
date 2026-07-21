@@ -17,13 +17,19 @@ from ...core.security import get_current_user, require_roles
 from ...models.reagent_management import (
     ReagentItem, ReagentStock, InventoryCheck, InventoryCheckItem,
     ReagentOrder, ReagentOrderItem, Receiving, ReceivingItem, ReagentConsumption,
+    TestItemReagent, InstrumentReagent,
+    detect_reagent_type, derive_library,
 )
+from ...models.test_item import TestItem
+from ...models.instrument import Instrument
 from ...models.user import User
 from ...schemas.reagent_management import (
     ReagentItemCreate, ReagentItemUpdate, ReagentItemRead,
     ReagentStockRead, InventoryCheckCreate, InventoryCheckRead,
     ReagentOrderCreate, ReagentOrderRead, ReceivingCreate, ReceivingRead,
     ReagentConsumptionRead, ImportResult,
+    TestItemReagentCreate, TestItemReagentRead,
+    InstrumentReagentCreate, InstrumentReagentRead,
 )
 
 router = APIRouter(prefix="/reagent", tags=["reagent-management"])
@@ -38,6 +44,7 @@ def list_reagent_items(
     q: str = Query("", description="搜索（名称/品牌/材料编码）"),
     type: Optional[str] = Query(None, description="类型筛选"),
     category: Optional[str] = Query(None, description="类别筛选"),
+    library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -54,6 +61,8 @@ def list_reagent_items(
         base = base.filter(ReagentItem.type == type)
     if category:
         base = base.filter(ReagentItem.category == category)
+    if library:
+        base = base.filter(ReagentItem.library == library)
     total = base.count()
     rows = base.order_by(ReagentItem.type, ReagentItem.category, ReagentItem.id).offset(
         (page - 1) * page_size
@@ -541,9 +550,13 @@ def import_reagent_from_excel(
         if col in headers:
             col_map["type"] = headers.index(col)
             break
-    for col in ["category", "类别", "专业"]:
+    for col in ["category", "类别", "专业", "专业组"]:
         if col in headers:
             col_map["category"] = headers.index(col)
+            break
+    for col in ["library", "责任库", "库"]:
+        if col in headers:
+            col_map["library"] = headers.index(col)
             break
     for col in ["brand", "品牌", "生产厂家", "厂家"]:
         if col in headers:
@@ -573,6 +586,10 @@ def import_reagent_from_excel(
         if col in headers:
             col_map["unit_price"] = headers.index(col)
             break
+    for col in ["remark", "备注", "说明"]:
+        if col in headers:
+            col_map["remark"] = headers.index(col)
+            break
 
     imported = 0
     skipped = 0
@@ -582,11 +599,17 @@ def import_reagent_from_excel(
             if not name:
                 skipped += 1
                 continue
-            # 去重检查
-            existing = db.query(ReagentItem).filter(ReagentItem.name == name).first()
+            # 主去重键：材料编码优先，回退名称
+            code = str(row[col_map["material_code"]]).strip() if "material_code" in col_map else ""
+            existing = None
+            if code:
+                existing = db.query(ReagentItem).filter(ReagentItem.material_code == code).first()
+            if existing is None:
+                existing = db.query(ReagentItem).filter(ReagentItem.name == name).first()
             if existing:
                 # 已存在：用本次导入信息补全/覆盖目录字段
-                for key in ("material_code", "spec", "brand", "unit", "category", "unit_price", "manufacturer", "supplier"):
+                for key in ("material_code", "spec", "brand", "unit", "category", "library",
+                            "type", "unit_price", "manufacturer", "supplier", "remark"):
                     if key not in col_map:
                         continue
                     v = row[col_map[key]]
@@ -597,6 +620,15 @@ def import_reagent_from_excel(
                             setattr(existing, key, Decimal(str(v)))
                         except Exception:
                             pass
+                    elif key == "category":
+                        val = str(v).strip()
+                        setattr(existing, key, val)
+                        if "library" not in col_map:
+                            setattr(existing, "library", derive_library(val))
+                    elif key == "library":
+                        setattr(existing, key, str(v).strip())
+                    elif key == "type":
+                        setattr(existing, key, str(v).strip())
                     else:
                         setattr(existing, key, str(v).strip())
                 skipped += 1
@@ -604,20 +636,28 @@ def import_reagent_from_excel(
             item = ReagentItem(name=name)
             if "type" in col_map:
                 item.type = str(row[col_map["type"]] or "试剂").strip()
+            else:
+                item.type = detect_reagent_type(name)  # 按名称自动识别
             if "category" in col_map:
                 item.category = str(row[col_map["category"]] or "").strip()
+            if "library" in col_map:
+                item.library = str(row[col_map["library"]] or "").strip()
+            elif item.category:
+                item.library = derive_library(item.category)  # 由专业组推导责任库
             if "brand" in col_map:
                 item.brand = str(row[col_map["brand"]] or "").strip()
             if "spec" in col_map:
                 item.spec = str(row[col_map["spec"]] or "").strip()
             if "material_code" in col_map:
-                item.material_code = str(row[col_map["material_code"]] or "").strip()
+                item.material_code = code
             if "unit" in col_map:
                 item.unit = str(row[col_map["unit"]] or "").strip()
             if "manufacturer" in col_map:
                 item.manufacturer = str(row[col_map["manufacturer"]] or "").strip()
             if "supplier" in col_map:
                 item.supplier = str(row[col_map["supplier"]] or "").strip()
+            if "remark" in col_map:
+                item.remark = str(row[col_map["remark"]] or "").strip()
             if "unit_price" in col_map:
                 v = row[col_map["unit_price"]]
                 if v is not None and str(v).strip() != "":
@@ -635,3 +675,248 @@ def import_reagent_from_excel(
     result.imported = imported
     result.skipped = skipped
     return result
+
+
+# =============================================================================
+# 8. 项目 ↔ 试剂 / 仪器 ↔ 耗材 关联管理
+# =============================================================================
+
+import re as _re
+
+
+def _norm_match(s: str) -> str:
+    """归一化用于模糊匹配：去前缀编码、去括号、去试剂盒/质控/校准等后缀、去 R1/R2、只留字母数字与中文。"""
+    s = str(s or "")
+    s = _re.sub(r"^[\d]+(/|\s)*", "", s)            # 去前缀编码 20003050 / 11706799001/
+    s = _re.sub(r"[（(].*?[)）]", "", s)             # 去括号及内容
+    s = _re.sub(r"(测定试剂盒|检测试剂盒|试剂盒|测定试剂|检测试剂|测定卡|检测卡|质控品|质控物|控制品|校准品|校准物|定标液)", "", s)
+    s = _re.sub(r"[Rr][1-9]", "", s)                 # 去 R1/R2
+    s = _re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]", "", s)  # 仅留字母数字与中文
+    return s.strip().lower()
+
+
+@router.post("/associations/_auto-match", response_model=dict)
+def auto_match_associations(
+    reset: bool = Query(False, description="true 时先清空已有自动匹配记录再重新生成"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "lab_technician")),
+):
+    """根据名称模糊匹配，自动生成 项目↔试剂 与 耗材↔仪器 关联。
+
+    - 试剂/校准品/质控品：名称 vs 项目 name/aliases 模糊匹配，role 取试剂类型(试剂/校准品/质控品)。
+    - 耗材：名称 vs 仪器 name/model 关键词匹配，role=耗材。
+    返回新增条数与无法自动匹配（需人工审核）的清单。
+    """
+    if reset:
+        db.query(TestItemReagent).delete()
+        db.query(InstrumentReagent).delete()
+
+    tests = db.query(TestItem).all()
+    test_norms = [
+        (t.id, _norm_match(t.name),
+         [_norm_match(a) for a in str(t.aliases or "").split(",") if a.strip()])
+        for t in tests
+    ]
+    reagents = db.query(ReagentItem).all()
+
+    tir_added, tir_unmatched = 0, []
+    for r in reagents:
+        if r.type == "耗材":
+            continue
+        rn = _norm_match(r.name)
+        best, best_score = None, 0
+        for tid, tn, tals in test_norms:
+            for cand in ([tn] + tals):
+                if not cand:
+                    continue
+                score = len(cand) if cand in rn else (len(rn) if (rn and rn in cand) else 0)
+                if score > best_score:
+                    best_score, best = score, tid
+        if best and best_score >= 2:
+            if not db.query(TestItemReagent).filter_by(test_item_id=best, reagent_item_id=r.id).first():
+                db.add(TestItemReagent(
+                    test_item_id=best, reagent_item_id=r.id,
+                    role=r.type if r.type in ("校准品", "质控品") else "试剂",
+                    auto_matched=True,
+                ))
+                tir_added += 1
+        else:
+            tir_unmatched.append({"reagent_id": r.id, "name": r.name, "type": r.type})
+
+    insts = db.query(Instrument).all()
+    inst_norms = [
+        (ins.id, _norm_match(ins.name) + _norm_match(getattr(ins, "model", None) or ""))
+        for ins in insts
+    ]
+    ir_added, ir_unmatched = 0, []
+    for r in reagents:
+        if r.type != "耗材":
+            continue
+        rn = _norm_match(r.name)
+        best, best_score = None, 0
+        for iid, inorm in inst_norms:
+            if not inorm:
+                continue
+            score = len(inorm) if inorm in rn else (len(rn) if (rn and rn in inorm) else 0)
+            if score > best_score:
+                best_score, best = score, iid
+        if best and best_score >= 3:
+            if not db.query(InstrumentReagent).filter_by(instrument_id=best, reagent_item_id=r.id).first():
+                db.add(InstrumentReagent(instrument_id=best, reagent_item_id=r.id, role="耗材", auto_matched=True))
+                ir_added += 1
+        else:
+            ir_unmatched.append({"reagent_id": r.id, "name": r.name})
+
+    db.commit()
+    return {
+        "test_item_reagents_added": tir_added,
+        "instrument_reagents_added": ir_added,
+        "test_item_unmatched": tir_unmatched,
+        "instrument_unmatched": ir_unmatched,
+    }
+
+
+def _enrich_test_item_reagents(rows):
+    out = []
+    for r in rows:
+        ti = r.test_item
+        ri = r.reagent_item
+        out.append({
+            "id": r.id, "test_item_id": r.test_item_id, "reagent_item_id": r.reagent_item_id,
+            "role": r.role, "auto_matched": r.auto_matched, "remark": r.remark,
+            "test_item_name": ti.name if ti else "",
+            "reagent_name": ri.name if ri else "", "reagent_type": ri.type if ri else "",
+            "reagent_library": ri.library if ri else "",
+        })
+    return out
+
+
+def _enrich_instrument_reagents(rows):
+    out = []
+    for r in rows:
+        ins = r.instrument
+        ri = r.reagent_item
+        out.append({
+            "id": r.id, "instrument_id": r.instrument_id, "reagent_item_id": r.reagent_item_id,
+            "role": r.role, "auto_matched": r.auto_matched, "remark": r.remark,
+            "instrument_name": ins.name if ins else "",
+            "reagent_name": ri.name if ri else "", "reagent_type": ri.type if ri else "",
+            "reagent_library": ri.library if ri else "",
+        })
+    return out
+
+
+@router.get("/associations/test-items", response_model=dict)
+def list_test_item_reagents(
+    test_item_id: Optional[int] = Query(None),
+    reagent_id: Optional[int] = Query(None),
+    auto_only: Optional[bool] = Query(None),
+    q: str = Query("", description="搜索项目名/试剂名"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    base = db.query(TestItemReagent)
+    if test_item_id:
+        base = base.filter(TestItemReagent.test_item_id == test_item_id)
+    if reagent_id:
+        base = base.filter(TestItemReagent.reagent_item_id == reagent_id)
+    if auto_only is not None:
+        base = base.filter(TestItemReagent.auto_matched == auto_only)
+    if q.strip():
+        kw = f"%{q.strip()}%"
+        base = base.join(ReagentItem, ReagentItem.id == TestItemReagent.reagent_item_id).filter(
+            or_(TestItemReagent.test_item_id.in_(
+                [t.id for t in db.query(TestItem).filter(TestItem.name.like(kw)).all()]),
+                ReagentItem.name.like(kw))
+        )
+    total = base.count()
+    rows = base.order_by(TestItemReagent.id).offset((page - 1) * page_size).limit(page_size).all()
+    return {"total": total, "page": page, "page_size": page_size,
+            "items": _enrich_test_item_reagents(rows)}
+
+
+@router.post("/associations/test-items", response_model=TestItemReagentRead)
+def create_test_item_reagent(
+    data: TestItemReagentCreate, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "lab_technician")),
+):
+    if db.query(TestItemReagent).filter_by(test_item_id=data.test_item_id, reagent_item_id=data.reagent_item_id).first():
+        raise HTTPException(409, "该关联已存在")
+    obj = TestItemReagent(**data.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/associations/test-items/{rel_id}")
+def delete_test_item_reagent(
+    rel_id: int, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "lab_technician")),
+):
+    obj = db.query(TestItemReagent).get(rel_id)
+    if not obj:
+        raise HTTPException(404, "关联未找到")
+    db.delete(obj)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/associations/instruments", response_model=dict)
+def list_instrument_reagents(
+    instrument_id: Optional[int] = Query(None),
+    reagent_id: Optional[int] = Query(None),
+    auto_only: Optional[bool] = Query(None),
+    q: str = Query("", description="搜索仪器名/试剂名"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    base = db.query(InstrumentReagent)
+    if instrument_id:
+        base = base.filter(InstrumentReagent.instrument_id == instrument_id)
+    if reagent_id:
+        base = base.filter(InstrumentReagent.reagent_item_id == reagent_id)
+    if auto_only is not None:
+        base = base.filter(InstrumentReagent.auto_matched == auto_only)
+    if q.strip():
+        kw = f"%{q.strip()}%"
+        base = base.join(ReagentItem, ReagentItem.id == InstrumentReagent.reagent_item_id).filter(
+            or_(InstrumentReagent.instrument_id.in_(
+                [i.id for i in db.query(Instrument).filter(Instrument.name.like(kw)).all()]),
+                ReagentItem.name.like(kw))
+        )
+    total = base.count()
+    rows = base.order_by(InstrumentReagent.id).offset((page - 1) * page_size).limit(page_size).all()
+    return {"total": total, "page": page, "page_size": page_size,
+            "items": _enrich_instrument_reagents(rows)}
+
+
+@router.post("/associations/instruments", response_model=InstrumentReagentRead)
+def create_instrument_reagent(
+    data: InstrumentReagentCreate, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "lab_technician")),
+):
+    if db.query(InstrumentReagent).filter_by(instrument_id=data.instrument_id, reagent_item_id=data.reagent_item_id).first():
+        raise HTTPException(409, "该关联已存在")
+    obj = InstrumentReagent(**data.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/associations/instruments/{rel_id}")
+def delete_instrument_reagent(
+    rel_id: int, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "lab_technician")),
+):
+    obj = db.query(InstrumentReagent).get(rel_id)
+    if not obj:
+        raise HTTPException(404, "关联未找到")
+    db.delete(obj)
+    db.commit()
+    return {"ok": True}

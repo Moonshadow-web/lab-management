@@ -24,6 +24,7 @@ from .quality_requirement import QualityRequirement
 from .reagent_management import (
     ReagentItem, ReagentStock, InventoryCheck, InventoryCheckItem,
     ReagentOrder, ReagentOrderItem, Receiving, ReceivingItem, ReagentConsumption,
+    TestItemReagent, InstrumentReagent,
 )
 from .module_permission import ModulePermission, DEFAULT_MODULE_PERMISSIONS, ALL_MODULES, ALL_ROLES
 
@@ -69,5 +70,5 @@ __all__ = [
     "ModulePermission",
     "ReagentItem", "ReagentStock", "InventoryCheck", "InventoryCheckItem",
     "ReagentOrder", "ReagentOrderItem", "Receiving", "ReceivingItem",
-    "ReagentConsumption",
+    "ReagentConsumption", "TestItemReagent", "InstrumentReagent",
 ]

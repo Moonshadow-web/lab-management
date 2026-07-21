@@ -406,6 +406,23 @@ async def _background_init():
                 if not db.query(_QM).filter(_QM.name == _pn).first():
                     db.add(_QM(name=_pn, items_json="[]"))
             db.commit()
+            # 试剂目录：按 category 回填 library（生化/凝血→生化凝血，免疫→免疫），幂等
+            try:
+                from .models.reagent_management import derive_library
+                _needs = db.query(ReagentItem).filter(
+                    (ReagentItem.library.is_(None)) | (ReagentItem.library == "")
+                ).all()
+                _n = 0
+                for _it in _needs:
+                    _lib = derive_library(_it.category)
+                    if _lib:
+                        _it.library = _lib
+                        _n += 1
+                if _n:
+                    db.commit()
+                    logger.info("回填试剂责任库 library %d 条", _n)
+            except Exception as e:  # noqa: BLE001
+                logger.error("回填 reagent.library 失败(忽略): %s", e)
             # 升级兼容：已有接收人若未配置订阅分类，默认订阅全部现有规则
             from .models.reminder import NotifyRecipient as _NR, ReminderRule as _RR
             _cats = [r.category for r in db.query(_RR).all() if r.category]

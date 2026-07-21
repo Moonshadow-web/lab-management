@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 class ReagentItemBase(BaseModel):
     type: str = "试剂"
     category: str = ""
+    library: str = ""
     name: str
     brand: str = ""
     spec: str = ""
@@ -31,6 +32,7 @@ class ReagentItemCreate(ReagentItemBase):
 class ReagentItemUpdate(BaseModel):
     type: Optional[str] = None
     category: Optional[str] = None
+    library: Optional[str] = None
     name: Optional[str] = None
     brand: Optional[str] = None
     spec: Optional[str] = None
@@ -48,6 +50,46 @@ class ReagentItemRead(ReagentItemBase):
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── 项目 ↔ 试剂 关联 ──
+class TestItemReagentBase(BaseModel):
+    test_item_id: int
+    reagent_item_id: int
+    role: str = "试剂"
+    auto_matched: bool = True
+    remark: str = ""
+
+
+class TestItemReagentCreate(TestItemReagentBase):
+    pass
+
+
+class TestItemReagentRead(TestItemReagentBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+# ── 仪器 ↔ 试剂/耗材 关联 ──
+class InstrumentReagentBase(BaseModel):
+    instrument_id: int
+    reagent_item_id: int
+    role: str = "耗材"
+    auto_matched: bool = True
+    remark: str = ""
+
+
+class InstrumentReagentCreate(InstrumentReagentBase):
+    pass
+
+
+class InstrumentReagentRead(InstrumentReagentBase):
+    id: int
 
     class Config:
         from_attributes = True
