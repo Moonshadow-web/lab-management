@@ -1263,23 +1263,40 @@ _COAG_SYN = {
 }
 
 
+def _coag_norm(s):
+    """凝血项目专用归一化：保留中文字符 + 数字/字母，去除空格、横线、括号、下划线等。"""
+    if not s:
+        return ""
+    t = str(s).replace("（", "(").replace("）", ")").replace(" ", "").replace("_", "").replace("-", "").lower()
+    return _re.sub(r"[^a-z0-9\u4e00-\u9fff]", "", t)
+
+
+def _coag_item(code):
+    it = next((x for x in COAG_ITEM if _coag_norm(x["name"]) == _coag_norm(code)), None)
+    return (it["te"], it["mode"]) if it else None
+
+
 def _coag_te_for(name):
-    """按项目名/异名命中凝血 COAG_ITEM，返回 (te, mode) 或 None。"""
+    """按项目名/异名命中凝血 COAG_ITEM，返回 (te, mode) 或 None。
+
+    兼容中文全名、缩写、英文代码及带括号的混合名（如"凝血酶原时间(PT)"）。
+    """
     if not name:
         return None
-    n = _norm_token(name)
+    n = _coag_norm(name)
     if not n:
         return None
-    if n in _COAG_SYN:
-        key = _COAG_SYN[n]
-        it = next((x for x in COAG_ITEM if _norm_token(x["name"]) == _norm_token(key)), None)
-        if it:
-            return it["te"], it["mode"]
-    for syn, key in _COAG_SYN.items():
-        if syn and (syn in n or n in syn):
-            it = next((x for x in COAG_ITEM if _norm_token(x["name"]) == _norm_token(key)), None)
-            if it:
-                return it["te"], it["mode"]
+    # 1) 完全匹配（归一化后）
+    for raw, code in _COAG_SYN.items():
+        if _coag_norm(raw) == n:
+            return _coag_item(code)
+    # 2) 子串互含：关键字被包含于 name，或 name 被包含于关键字
+    for raw, code in _COAG_SYN.items():
+        kn = _coag_norm(raw)
+        if not kn:
+            continue
+        if kn in n or n in kn:
+            return _coag_item(code)
     return None
 
 

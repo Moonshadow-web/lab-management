@@ -262,7 +262,7 @@ def _migrate_schema():
         23,                   # 爱康 URANUS
         26,                   # Stago CompactMax
         75,                   # 安图 A6200
-        601,                  # 表面抗原等质控常用仪器（用户实测用）
+        # 注：用户常称的"601"即罗氏 e601（id=14），已在上方列出，不要重复写不存在的 id 601
     ]
     try:
         with SessionLocal() as db:
