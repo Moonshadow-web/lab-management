@@ -35,6 +35,7 @@ class ReagentItem(Base):
     unit: Mapped[str] = mapped_column(String(20), default="")
     manufacturer: Mapped[str] = mapped_column(String(100), default="")
     supplier: Mapped[str] = mapped_column(String(100), default="")
+    unit_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)  # 目录参考单价
     min_stock: Mapped[int] = mapped_column(Integer, default=0)  # 最低库存预警量
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     remark: Mapped[str] = mapped_column(Text, default="")

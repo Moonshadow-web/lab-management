@@ -18,6 +18,7 @@ class ReagentItemBase(BaseModel):
     unit: str = ""
     manufacturer: str = ""
     supplier: str = ""
+    unit_price: Optional[Decimal] = None
     min_stock: int = 0
     is_active: bool = True
     remark: str = ""
@@ -37,6 +38,7 @@ class ReagentItemUpdate(BaseModel):
     unit: Optional[str] = None
     manufacturer: Optional[str] = None
     supplier: Optional[str] = None
+    unit_price: Optional[Decimal] = None
     min_stock: Optional[int] = None
     is_active: Optional[bool] = None
     remark: Optional[str] = None

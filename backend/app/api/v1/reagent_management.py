@@ -1,6 +1,7 @@
 """试剂管理：试剂目录/库存/盘库/订购/接收/月消耗 API"""
 
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Optional
 
 from io import BytesIO
@@ -524,7 +525,7 @@ def import_reagent_from_excel(
     headers = [str(h or "").strip() for h in rows[0]]
     # 尝试推断列映射
     col_map = {}
-    for col in ["name", "试剂名称", "名称", "名称(试剂名称)", "试剂名"]:
+    for col in ["name", "试剂名称", "材料名称", "名称", "名称(试剂名称)", "试剂名"]:
         if col in headers:
             col_map["name"] = headers.index(col)
             break
@@ -542,7 +543,7 @@ def import_reagent_from_excel(
         if col in headers:
             col_map["brand"] = headers.index(col)
             break
-    for col in ["spec", "规格", "包装规格"]:
+    for col in ["spec", "规格", "规格型号", "包装规格"]:
         if col in headers:
             col_map["spec"] = headers.index(col)
             break
@@ -562,6 +563,10 @@ def import_reagent_from_excel(
         if col in headers:
             col_map["supplier"] = headers.index(col)
             break
+    for col in ["unit_price", "单价", "价格", "参考单价"]:
+        if col in headers:
+            col_map["unit_price"] = headers.index(col)
+            break
 
     imported = 0
     skipped = 0
@@ -574,11 +579,20 @@ def import_reagent_from_excel(
             # 去重检查
             existing = db.query(ReagentItem).filter(ReagentItem.name == name).first()
             if existing:
-                # 更新材料编码等
-                if "material_code" in col_map:
-                    mc = str(row[col_map["material_code"]] or "").strip()
-                    if mc:
-                        existing.material_code = mc
+                # 已存在：用本次导入信息补全/覆盖目录字段
+                for key in ("material_code", "spec", "brand", "unit", "category", "unit_price", "manufacturer", "supplier"):
+                    if key not in col_map:
+                        continue
+                    v = row[col_map[key]]
+                    if v is None or str(v).strip() == "":
+                        continue
+                    if key == "unit_price":
+                        try:
+                            setattr(existing, key, Decimal(str(v)))
+                        except Exception:
+                            pass
+                    else:
+                        setattr(existing, key, str(v).strip())
                 skipped += 1
                 continue
             item = ReagentItem(name=name)
@@ -598,6 +612,13 @@ def import_reagent_from_excel(
                 item.manufacturer = str(row[col_map["manufacturer"]] or "").strip()
             if "supplier" in col_map:
                 item.supplier = str(row[col_map["supplier"]] or "").strip()
+            if "unit_price" in col_map:
+                v = row[col_map["unit_price"]]
+                if v is not None and str(v).strip() != "":
+                    try:
+                        item.unit_price = Decimal(str(v))
+                    except Exception:
+                        pass
             db.add(item)
             imported += 1
         except Exception as e:
