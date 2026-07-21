@@ -32,7 +32,7 @@
               :value="opt.id"
             />
           </el-select>
-          <el-button v-if="auth.canWrite('qc')" type="primary" :disabled="!uploadInstrumentId" @click="triggerCsv">上传该仪器 LIS 数据(CSV/XLSX)</el-button>
+          <el-button v-if="auth.canWrite('qc')" type="primary" @click="triggerCsv">上传该仪器 LIS 数据(CSV/XLSX)</el-button>
           <input ref="csvInput" type="file" accept=".csv,.xlsx,.xls" hidden @change="onCsvChange" />
           <span class="hint">
             月结按所选仪器分块；上传前先在下拉中选好受控仪器（绑定仪器台账），系统按每日测值跑 Westgard 判失控并自动草拟文字小结。
@@ -1167,7 +1167,17 @@ async function loadSummary() {
 watch(activeTab, (t) => { if (t === 'summary' && !summaryRows.value.length && monthValue.value && uploadInstrumentId.value) loadSummary() })
 onMounted(loadInstruments)
 
-function triggerCsv() { csvInput.value?.click() }
+function triggerCsv() {
+  if (!uploadInstrumentId.value) {
+    ElMessage.warning('请先在上方「质控仪器」下拉中选好仪器，再上传该仪器的 LIS 数据')
+    return
+  }
+  if (!csvInput.value) {
+    ElMessage.error('上传组件未就绪，请刷新页面后重试')
+    return
+  }
+  csvInput.value.click()
+}
 async function onCsvChange(e) {
   const file = e.target.files?.[0]
   if (!file) return
