@@ -107,7 +107,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "attachment-img-compress-maxpacket-2026-07-23"
+_BUILD_MARK = "conn-event-maxpacket-2026-07-23"
 
 
 def get_build_mark() -> str:
@@ -124,6 +124,24 @@ router = APIRouter(prefix="/_diag", tags=["diag"])
 def diag_build():
     """返回构建标记，确认当前服役容器版本（免鉴权，仅探针）。"""
     return {"build": _BUILD_MARK, "has_self_heal": True}
+
+
+@router.get("/max_allowed_packet")
+def diag_max_allowed_packet():
+    """临时诊断：读取 MySQL 全局 max_allowed_packet，验证连接级兜底是否生效。验证后移除。"""
+    from ...core.database import SessionLocal
+    from sqlalchemy import text as _t
+
+    try:
+        s = SessionLocal()
+        try:
+            row = s.execute(_t("SHOW GLOBAL VARIABLES LIKE 'max_allowed_packet'")).fetchone()
+            val = int(row[1]) if row else None
+        finally:
+            s.close()
+    except Exception as e:  # noqa: BLE001
+        val = f"error: {e}"
+    return {"max_allowed_packet": val}
 
 
 @router.get("/copy-from-sqlite")
