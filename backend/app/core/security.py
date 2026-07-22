@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -17,7 +17,7 @@ from .database import get_db
 from ..models.user import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 def hash_password(password: str) -> str:
@@ -56,14 +56,35 @@ def decode_token(token: str, expected_type: str | None = None) -> dict:
     return payload
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def _token_from_request(request: Request, token: str | None) -> str | None:
+    """优先 Authorization 头，其次 URL query token，最后 cookie access_token。"""
+    if token:
+        return token
+    if request:
+        t = request.query_params.get("token")
+        if t:
+            return t
+        t = request.cookies.get("access_token")
+        if t:
+            return t
+    return None
+
+
+def get_current_user(
+    request: Request,
+    token: str | None = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="无效或过期的凭证",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    t = _token_from_request(request, token)
+    if not t:
+        raise credentials_exception
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(t, SECRET_KEY, algorithms=[ALGORITHM])
         uid = int(payload.get("sub"))
     except (JWTError, ValueError, TypeError):
         raise credentials_exception

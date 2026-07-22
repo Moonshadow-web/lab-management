@@ -68,7 +68,8 @@ export function uploadInterlabAttachments(planId, files) {
   })
 }
 export function interlabAttachmentUrl(id, inline = true) {
-  return `/api/v1/interlab/attachments/${id}${inline ? '?inline=true' : '?inline=false'}`
+  const token = localStorage.getItem('token')
+  return `/api/v1/interlab/attachments/${id}${inline ? '?inline=true' : '?inline=false'}${token ? '&token=' + encodeURIComponent(token) : ''}`
 }
 export function deleteInterlabAttachment(id) {
   return request.delete(`/api/v1/interlab/attachments/${id}`)

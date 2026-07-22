@@ -107,7 +107,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "qr-urine-csf-drift-fix-2026-07-22"
+_BUILD_MARK = "attachment-auth-token-2026-07-22"
 
 
 def get_build_mark() -> str:

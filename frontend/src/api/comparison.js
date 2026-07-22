@@ -87,7 +87,8 @@ export function uploadAttachments(planId, files) {
   })
 }
 export function attachmentUrl(id, inline = true) {
-  return `/api/v1/comparison/attachments/${id}${inline ? '?inline=true' : '?inline=false'}`
+  const token = localStorage.getItem('token')
+  return `/api/v1/comparison/attachments/${id}${inline ? '?inline=true' : '?inline=false'}${token ? '&token=' + encodeURIComponent(token) : ''}`
 }
 export function deleteAttachment(id) {
   return request.delete(`/api/v1/comparison/attachments/${id}`)
