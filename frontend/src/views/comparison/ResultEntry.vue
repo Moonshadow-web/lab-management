@@ -85,30 +85,35 @@
           <!-- 定性 -->
           <template v-else>
             <el-alert type="warning" :closable="false" show-icon
-              title="请先填写各检测系统的「方法 / 试剂厂家 / 试剂批号」（BG-SM-CZ-021 要求），再录入下方样本结果。" style="margin-bottom:8px" />
-            <el-table :data="allInstruments" size="small" border style="margin-bottom:12px">
-              <el-table-column label="检测系统" min-width="180">
-                <template #default="{ row }">
-                  {{ row.name }}{{ row.is_reference ? '（靶机）' : '' }}
-                </template>
-              </el-table-column>
-              <el-table-column label="方法" min-width="160">
-                <template #default="{ row }">
-                  <el-input v-model="qualMeta[row.id].method" size="small" placeholder="如 化学发光法" @input="onEdit" />
-                </template>
-              </el-table-column>
-              <el-table-column label="试剂厂家" min-width="160">
-                <template #default="{ row }">
-                  <el-input v-model="qualMeta[row.id].reagent_manufacturer" size="small" placeholder="如 罗氏" @input="onEdit" />
-                </template>
-              </el-table-column>
-              <el-table-column label="试剂批号" min-width="160">
-                <template #default="{ row }">
-                  <el-input v-model="qualMeta[row.id].reagent_lot" size="small" placeholder="试剂批号" @input="onEdit" />
-                </template>
-              </el-table-column>
-            </el-table>
-            <el-table :data="qualDisplay" size="small" border max-height="460">
+              title="请按每个项目分别填写各检测系统的「方法 / 试剂厂家 / 试剂批号」（BG-SM-CZ-021 要求，不同项目批号可能不同），再录入下方样本结果。" style="margin-bottom:8px" />
+            <el-scrollbar max-height="300px" style="border:1px solid #ebeef5;border-radius:6px;padding:8px;margin-bottom:12px">
+              <div v-for="it in qualDisplay" :key="it.item" class="qual-meta-block" style="margin-bottom:12px">
+                <div class="qual-meta-title" style="font-weight:700;margin-bottom:4px;color:#1a365d">{{ it.item }}</div>
+                <el-table :data="allInstruments" size="small" border>
+                  <el-table-column label="检测系统" min-width="170">
+                    <template #default="{ row }">
+                      {{ row.name }}{{ row.is_reference ? '（靶机）' : '' }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="方法" min-width="150">
+                    <template #default="{ row }">
+                      <el-input v-model="qualMeta[it.item][String(row.id)].method" size="small" placeholder="如 化学发光法" @input="onEdit" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="试剂厂家" min-width="150">
+                    <template #default="{ row }">
+                      <el-input v-model="qualMeta[it.item][String(row.id)].reagent_manufacturer" size="small" placeholder="如 罗氏" @input="onEdit" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="试剂批号" min-width="150">
+                    <template #default="{ row }">
+                      <el-input v-model="qualMeta[it.item][String(row.id)].reagent_lot" size="small" placeholder="试剂批号" @input="onEdit" />
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </el-scrollbar>
+            <el-table :data="qualDisplay" size="small" border max-height="420">
               <el-table-column prop="item" label="项目" min-width="140" fixed />
               <el-table-column v-for="ins in allInstruments" :key="ins.id">
                 <template #header>
@@ -167,7 +172,7 @@ const allInstruments = ref([])
 const itemMeta = ref({}) // name -> {te, mode}
 const quantRows = ref([]) // {item, level, reference_value, values:{id:val}}
 const qualRows = ref([]) // {item, results:{id:[5]}}
-const qualMeta = ref({}) // {instrument_id: {method, reagent_manufacturer, reagent_lot}} 检测系统信息（BG-SM-CZ-021）
+const qualMeta = ref({}) // {项目名: {instrument_id(字符串): {method, reagent_manufacturer, reagent_lot}}} 检测系统信息（BG-SM-CZ-021，按项目分别录入）
 const currentLevel = ref(1)
 const dirty = ref(false)
 
@@ -292,15 +297,19 @@ async function load() {
     itemMeta.value = {}
     data.items.forEach((i) => { itemMeta.value[i.name] = i })
     allItemNames.value = data.items.map((i) => i.name)
-    // 定性检测系统信息（方法/试剂厂家/试剂批号，BG-SM-CZ-021 要求）
+    // 定性检测系统信息（方法/试剂厂家/试剂批号，BG-SM-CZ-021 要求）：按项目 × 仪器 维度
     const qm = {}
-    allInstruments.value.forEach((ins) => {
-      const m = (data.qual_meta && data.qual_meta[String(ins.id)]) || {}
-      qm[ins.id] = {
-        method: m.method || '',
-        reagent_manufacturer: m.reagent_manufacturer || '',
-        reagent_lot: m.reagent_lot || '',
-      }
+    allItemNames.value.forEach((name) => {
+      qm[name] = {}
+      allInstruments.value.forEach((ins) => {
+        const itemM = (data.qual_meta && data.qual_meta[name]) || {}
+        const m = itemM[String(ins.id)] || {}
+        qm[name][String(ins.id)] = {
+          method: m.method || '',
+          reagent_manufacturer: m.reagent_manufacturer || '',
+          reagent_lot: m.reagent_lot || '',
+        }
+      })
     })
     qualMeta.value = qm
     currentLevel.value = 1
@@ -401,13 +410,18 @@ async function onSave() {
         return { item: r.item, results }
       }),
       qual_meta: Object.fromEntries(
-        allInstruments.value.map((ins) => {
-          const v = qualMeta.value[ins.id] || {}
-          return [String(ins.id), {
-            method: v.method || '',
-            reagent_manufacturer: v.reagent_manufacturer || '',
-            reagent_lot: v.reagent_lot || '',
-          }]
+        allItemNames.value.map((name) => {
+          const perItem = qualMeta.value[name] || {}
+          const insts = {}
+          allInstruments.value.forEach((ins) => {
+            const v = perItem[String(ins.id)] || {}
+            insts[String(ins.id)] = {
+              method: v.method || '',
+              reagent_manufacturer: v.reagent_manufacturer || '',
+              reagent_lot: v.reagent_lot || '',
+            }
+          })
+          return [name, insts]
         })
       ),
     }

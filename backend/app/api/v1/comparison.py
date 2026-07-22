@@ -351,7 +351,7 @@ def get_results(pid: int, db: Session = Depends(get_db), user: User = Depends(ge
         "instruments": instruments,
         "global_ref_id": g.reference_instrument_id,
         "quant": quant, "qual": qual,
-        "qual_meta": json.loads(getattr(p, "qual_meta_json", "{}") or "{}"),
+        "qual_meta": svc._normalize_qual_meta(json.loads(getattr(p, "qual_meta_json", "{}") or "{}"), items_out),
     }
 
 
@@ -394,8 +394,13 @@ def save_results(
     p = _ensure_can_edit_results(db, pid, user)
     _apply_results(db, pid, body.quant, body.qual)
     if body.qual_meta:
-        # 规范化键为字符串，避免 int 键序列化后前端对不上
-        norm = {str(k): v for k, v in body.qual_meta.items()}
+        # 规范化键为字符串（含嵌套仪器id），避免 int 键序列化后前端对不上
+        norm = {}
+        for k, v in body.qual_meta.items():
+            if isinstance(v, dict):
+                norm[str(k)] = {str(kk): vv for kk, vv in v.items()}
+            else:
+                norm[str(k)] = v
         p.qual_meta_json = json.dumps(norm, ensure_ascii=False)
     db.commit()
     return {"ok": True}

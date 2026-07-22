@@ -40,6 +40,35 @@ def _load_json(s, default):
         return default
 
 
+def _normalize_qual_meta(raw, items):
+    """定性检测系统信息：新结构 {项目名: {仪器id(字符串): {method, reagent_manufacturer, reagent_lot}}}。
+
+    旧结构 {仪器id(字符串): {method, ...}}（单仪器维度，所有项目共享同值）→ 复制到每个项目，
+    使前端/报告统一按 per-item per-instrument 处理（旧数据首次渲染即自动迁移，不影响既有报告）。
+
+    判断依据：任一顶层值若直接含 method/reagent_manufacturer/reagent_lot 键，即为旧结构（扁平）；
+    否则视为新结构（值本身是「仪器id→信息」的子字典）原样返回。
+    """
+    if not raw:
+        return {}
+    is_legacy = False
+    for v in raw.values():
+        if isinstance(v, dict) and (
+            "method" in v or "reagent_manufacturer" in v or "reagent_lot" in v
+        ):
+            is_legacy = True
+            break
+    if not is_legacy:
+        return raw
+    out = {}
+    for it in (items or []):
+        name = it.get("name") if isinstance(it, dict) else it
+        if not name:
+            continue
+        out[name] = {str(k): v for k, v in raw.items()}
+    return out
+
+
 def disp_name(inst: Instrument) -> str:
     """人可识别的仪器显示名：名称 + 规格型号(model)，便于报告中辨识具体仪器。
 
@@ -184,7 +213,8 @@ def compute_data(db, group: ComparisonGroup, plan: ComparisonPlan):
             "compared": compared,
             "matrix": matrix,
             "ref_id": ref_id,
-            "qual_meta": _load_json(getattr(plan, "qual_meta_json", "{}") or "{}", {}),
+            "qual_meta": _normalize_qual_meta(
+                _load_json(getattr(plan, "qual_meta_json", "{}") or "{}", {}), items),
         }
 
     # 定量
@@ -370,50 +400,56 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
     html.append('<hr style="margin:18px 0"><h2>数据页：{title}（{form_code}）</h2>'.format(title=title, form_code=form_code))
 
     if data["category"] == "定性":
-        # 检测系统信息表（BG-SM-CZ-021 要求：每台检测系统的方法/试剂厂家/试剂批号）
-        html.append('<h2>检测系统信息</h2>')
-        html.append('<table class="meta"><thead><tr>'
-                    '<th style="text-align:left">检测系统</th>'
-                    '<th>方法</th><th>试剂厂家</th><th>试剂批号</th>'
-                    '</tr></thead><tbody>')
-        for ins in data["instruments"]:
-            m = (data.get("qual_meta") or {}).get(str(ins["id"])) or {}
-            method = (str(m.get("method") or "").strip()) or "—"
-            mf = (str(m.get("reagent_manufacturer") or "").strip()) or "—"
-            lot = (str(m.get("reagent_lot") or "").strip()) or "—"
-            html.append(f'<tr><td style="text-align:left">{ins["name"]}</td>'
-                        f'<td>{method}</td><td>{mf}</td><td>{lot}</td></tr>')
-        html.append('</tbody></table>')
-        # 比对结果（检验项目 × 检测系统 × 5 个样本，每样本一行）
-        html.append("<h2>比对结果</h2>")
-        html.append('<table><thead><tr><th class="item">检验项目</th><th>样本编号</th>')
-        for ins in data["instruments"]:
-            tag = "（参照）" if ins["is_reference"] else ""
-            m = (data.get("qual_meta") or {}).get(str(ins["id"])) or {}
-            hint = ""
-            if m.get("method"):
-                hint = f'<div style="font-weight:400;font-size:10px;color:#666">{m.get("method")}'
-                if m.get("reagent_lot"):
-                    hint += f' / {m.get("reagent_lot")}'
-                hint += '</div>'
-            html.append(f'<th>{ins["name"]}{tag}{hint}</th>')
-            if not ins["is_reference"]:
-                html.append('<th>符合率</th>')
-        html.append("</tr></thead><tbody>")
+        qual_meta = data.get("qual_meta") or {}
         for row in data["matrix"]:
             item_name = row["item"]
             insts = row["insts"]
+            item_meta = qual_meta.get(item_name, {}) or {}
+            # 该项目的检测系统信息（方法/试剂厂家/试剂批号，BG-SM-CZ-021 要求。
+            # 试剂批号按项目分别录入，故每个项目单独一张信息表）
+            html.append(f'<h2>检测系统信息 — {item_name}</h2>')
+            html.append('<table class="meta"><thead><tr>'
+                        '<th style="text-align:left">检测系统</th>'
+                        '<th>方法</th><th>试剂厂家</th><th>试剂批号</th>'
+                        '</tr></thead><tbody>')
+            for ins in data["instruments"]:
+                c = insts.get(ins["id"], {})
+                if c.get("masked"):
+                    continue
+                m = item_meta.get(str(ins["id"])) or {}
+                method = (str(m.get("method") or "").strip()) or "—"
+                mf = (str(m.get("reagent_manufacturer") or "").strip()) or "—"
+                lot = (str(m.get("reagent_lot") or "").strip()) or "—"
+                html.append(f'<tr><td style="text-align:left">{ins["name"]}</td>'
+                            f'<td>{method}</td><td>{mf}</td><td>{lot}</td></tr>')
+            html.append('</tbody></table>')
+            # 该项目的比对结果（检测系统 × 5 个样本，每样本一行）
+            html.append(f"<h2>比对结果 — {item_name}</h2>")
+            html.append('<table><thead><tr><th>样本编号</th>')
+            for ins in data["instruments"]:
+                c = insts.get(ins["id"], {})
+                if c.get("masked"):
+                    continue
+                tag = "（参照）" if ins["is_reference"] else ""
+                m = item_meta.get(str(ins["id"])) or {}
+                hint = ""
+                if m.get("method"):
+                    hint = f'<div style="font-weight:400;font-size:10px;color:#666">{m.get("method")}'
+                    if m.get("reagent_lot"):
+                        hint += f' / {m.get("reagent_lot")}'
+                    hint += '</div>'
+                html.append(f'<th>{ins["name"]}{tag}{hint}</th>')
+                if not ins["is_reference"]:
+                    html.append('<th>符合率</th>')
+            html.append("</tr></thead><tbody>")
             sample_lens = [len(c.get("results") or []) for c in insts.values() if not c.get("masked")]
             n_samples = max(sample_lens) if sample_lens else 0
             # 每个样本一行
             for sample_idx in range(n_samples):
-                html.append(f'<tr><td class="item">{item_name}</td><td>{sample_idx + 1}</td>')
+                html.append(f'<tr><td>{sample_idx + 1}</td>')
                 for ins in data["instruments"]:
                     c = insts.get(ins["id"], {})
                     if c.get("masked"):
-                        html.append('<td class="mask">/</td>')
-                        if not ins["is_reference"]:
-                            html.append('<td class="mask">/</td>')
                         continue
                     res = c.get("results") or []
                     val = _qual_cell_display(res[sample_idx]) if sample_idx < len(res) else "-"
@@ -422,13 +458,10 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
                         html.append('<td></td>')  # 样本行符合率留空，仅在底部汇总行显示
                 html.append("</tr>")
             # 每个项目底部汇总：符合率
-            html.append(f'<tr style="background:#f7f9fc"><td class="item">{item_name}</td><td>符合率</td>')
+            html.append(f'<tr style="background:#f7f9fc"><td>符合率</td>')
             for ins in data["instruments"]:
                 c = insts.get(ins["id"], {})
                 if c.get("masked"):
-                    html.append('<td class="mask">/</td>')
-                    if not ins["is_reference"]:
-                        html.append('<td class="mask">/</td>')
                     continue
                 if ins["is_reference"]:
                     html.append('<td>—</td>')
@@ -438,7 +471,7 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
                     agr_s = f"{agr}%" if agr is not None else "-"
                     html.append(f'<td>{agr_s}</td>')
             html.append("</tr>")
-        html.append("</tbody></table>")
+            html.append("</tbody></table>")
         _qual_vals = [i["agreement"] for row in data["matrix"] for i in row["insts"].values()
                       if not i.get("masked") and i.get("agreement") is not None]
         _qual_ok = _qual_vals and all(a >= 80 for a in _qual_vals)
@@ -736,73 +769,73 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
     _data_page_header(doc, group, plan)
 
     if data["category"] == "定性":
-        # 检测系统信息表（BG-SM-CZ-021 要求：每台检测系统的方法/试剂厂家/试剂批号）
-        _heading(doc, "检测系统信息", size=12)
-        mt = doc.add_table(rows=1, cols=4)
-        mt.style = "Table Grid"
-        mt.alignment = WD_TABLE_ALIGNMENT.CENTER
-        mh = mt.rows[0].cells
-        _fill(mh[0], "检测系统", bold=True, align="left")
-        _fill(mh[1], "方法", bold=True)
-        _fill(mh[2], "试剂厂家", bold=True)
-        _fill(mh[3], "试剂批号", bold=True)
-        for ins in data["instruments"]:
-            m = (data.get("qual_meta") or {}).get(str(ins["id"])) or {}
-            mr = mt.add_row().cells
-            _fill(mr[0], ins["name"], align="left")
-            _fill(mr[1], (str(m.get("method") or "").strip()) or "—")
-            _fill(mr[2], (str(m.get("reagent_manufacturer") or "").strip()) or "—")
-            _fill(mr[3], (str(m.get("reagent_lot") or "").strip()) or "—")
-
-        insts = data["instruments"]
-        cols = 2 + len(insts) + sum(0 if ins["is_reference"] else 1 for ins in insts)
-        t = doc.add_table(rows=1, cols=cols)
-        t.style = "Table Grid"
-        t.alignment = WD_TABLE_ALIGNMENT.CENTER
-        hdr = t.rows[0].cells
-        _fill(hdr[0], "检验项目", bold=True, align="left")
-        _fill(hdr[1], "样本编号", bold=True)
-        ci = 2
-        for ins in insts:
-            m = (data.get("qual_meta") or {}).get(str(ins["id"])) or {}
-            hc = hdr[ci]
-            hc.text = ""
-            p1 = hc.paragraphs[0]
-            tag = "（参照）" if ins["is_reference"] else ""
-            r1 = p1.add_run(f'{ins["name"]}{tag}')
-            _set_cell_font(r1, bold=True)
-            if m.get("method"):
-                sub = str(m.get("method"))
-                if m.get("reagent_lot"):
-                    sub += f' / {m.get("reagent_lot")}'
-                p2 = hc.add_paragraph()
-                r2 = p2.add_run(sub)
-                _set_cell_font(r2, size=9)
-            ci += 1
-            if not ins["is_reference"]:
-                _fill(hdr[ci], "符合率", bold=True)
-                ci += 1
+        qual_meta = data.get("qual_meta") or {}
         all_ok = True
         for row in data["matrix"]:
             item_name = row["item"]
             insts_data = row["insts"]
+            item_meta = qual_meta.get(item_name, {}) or {}
+            # 该项目的检测系统信息（方法/试剂厂家/试剂批号，BG-SM-CZ-021 要求。
+            # 试剂批号按项目分别录入，故每个项目单独一张信息表）
+            _heading(doc, f"检测系统信息 — {item_name}", size=12)
+            mt = doc.add_table(rows=1, cols=4)
+            mt.style = "Table Grid"
+            mt.alignment = WD_TABLE_ALIGNMENT.CENTER
+            mh = mt.rows[0].cells
+            _fill(mh[0], "检测系统", bold=True, align="left")
+            _fill(mh[1], "方法", bold=True)
+            _fill(mh[2], "试剂厂家", bold=True)
+            _fill(mh[3], "试剂批号", bold=True)
+            for ins in data["instruments"]:
+                c = insts_data.get(ins["id"], {})
+                if c.get("masked"):
+                    continue
+                m = item_meta.get(str(ins["id"])) or {}
+                mr = mt.add_row().cells
+                _fill(mr[0], ins["name"], align="left")
+                _fill(mr[1], (str(m.get("method") or "").strip()) or "—")
+                _fill(mr[2], (str(m.get("reagent_manufacturer") or "").strip()) or "—")
+                _fill(mr[3], (str(m.get("reagent_lot") or "").strip()) or "—")
+
+            # 该项目的比对结果
+            _heading(doc, f"比对结果 — {item_name}", size=12)
+            insts = [ins for ins in data["instruments"]
+                     if not insts_data.get(ins["id"], {}).get("masked")]
+            cols = 1 + len(insts) + sum(0 if ins["is_reference"] else 1 for ins in insts)
+            t = doc.add_table(rows=1, cols=cols)
+            t.style = "Table Grid"
+            t.alignment = WD_TABLE_ALIGNMENT.CENTER
+            hdr = t.rows[0].cells
+            _fill(hdr[0], "样本编号", bold=True)
+            ci = 1
+            for ins in insts:
+                m = item_meta.get(str(ins["id"])) or {}
+                hc = hdr[ci]
+                hc.text = ""
+                p1 = hc.paragraphs[0]
+                tag = "（参照）" if ins["is_reference"] else ""
+                r1 = p1.add_run(f'{ins["name"]}{tag}')
+                _run_font(r1, bold=True)
+                if m.get("method"):
+                    sub = str(m.get("method"))
+                    if m.get("reagent_lot"):
+                        sub += f' / {m.get("reagent_lot")}'
+                    p2 = hc.add_paragraph()
+                    r2 = p2.add_run(sub)
+                    _run_font(r2, size=9)
+                ci += 1
+                if not ins["is_reference"]:
+                    _fill(hdr[ci], "符合率", bold=True)
+                    ci += 1
             sample_lens = [len(c.get("results") or []) for c in insts_data.values() if not c.get("masked")]
             n_samples = max(sample_lens) if sample_lens else 0
             # 每个样本一行
             for sample_idx in range(n_samples):
                 cells = t.add_row().cells
-                _fill(cells[0], item_name, align="left")
-                _fill(cells[1], str(sample_idx + 1))
-                ci = 2
+                _fill(cells[0], str(sample_idx + 1))
+                ci = 1
                 for ins in insts:
                     c = insts_data.get(ins["id"], {})
-                    if c.get("masked"):
-                        _fill(cells[ci], "/")
-                        ci += 1
-                        if not ins["is_reference"]:
-                            _fill(cells[ci], "/")
-                            ci += 1
-                        continue
                     res = c.get("results") or []
                     val = _qual_cell_display(res[sample_idx]) if sample_idx < len(res) else "-"
                     _fill(cells[ci], val)
@@ -812,18 +845,10 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
                         ci += 1
             # 每个项目底部汇总：符合率
             cells = t.add_row().cells
-            _fill(cells[0], item_name, align="left")
-            _fill(cells[1], "符合率")
-            ci = 2
+            _fill(cells[0], "符合率")
+            ci = 1
             for ins in insts:
                 c = insts_data.get(ins["id"], {})
-                if c.get("masked"):
-                    _fill(cells[ci], "/")
-                    ci += 1
-                    if not ins["is_reference"]:
-                        _fill(cells[ci], "/")
-                        ci += 1
-                    continue
                 if ins["is_reference"]:
                     _fill(cells[ci], "—")
                     ci += 1

@@ -140,7 +140,10 @@ class QualResultRow(BaseModel):
 class ComparisonResultsPayload(BaseModel):
     quant: list[QuantResultRow] = []
     qual: list[QualResultRow] = []
-    qual_meta: dict[str, dict] = {}  # 仪器id(字符串) -> {method, reagent_manufacturer, reagent_lot}
+    # 检测系统信息（方法/试剂厂家/试剂批号，BG-SM-CZ-021 要求）。
+    # 新结构：项目名 -> 仪器id(字符串) -> {method, reagent_manufacturer, reagent_lot}
+    # 兼容旧结构（单仪器维度）：仪器id(字符串) -> {...}，加载时按项目复制。
+    qual_meta: dict[str, dict] = {}
 
 
 # ---------------------------------------------------------------------------
