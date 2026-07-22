@@ -835,6 +835,7 @@ def _enrich_instrument_reagents(rows):
             "id": r.id, "instrument_id": r.instrument_id, "reagent_item_id": r.reagent_item_id,
             "role": r.role, "auto_matched": r.auto_matched, "remark": r.remark,
             "instrument_name": ins.name if ins else "",
+            "instrument_model": ins.model if ins else "",
             "reagent_name": ri.name if ri else "", "reagent_type": ri.type if ri else "",
             "reagent_library": ri.library if ri else "",
         })

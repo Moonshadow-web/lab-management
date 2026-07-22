@@ -66,7 +66,11 @@
         </div>
         <el-table v-loading="instLoading" :data="instItems" border stripe height="calc(100vh - 340px)" empty-text="暂无关联">
           <el-table-column type="index" width="50" label="#" />
-          <el-table-column prop="instrument_name" label="仪器" min-width="200" show-overflow-tooltip />
+          <el-table-column label="仪器" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span>{{ row.instrument_name }}<template v-if="row.instrument_model">（{{ row.instrument_model }}）</template></span>
+            </template>
+          </el-table-column>
           <el-table-column prop="reagent_name" label="耗材" min-width="220" show-overflow-tooltip />
           <el-table-column prop="reagent_type" label="类型" width="100" />
           <el-table-column prop="role" label="关联角色" width="110" />
@@ -185,17 +189,35 @@ const instForm = reactive({ instrument_id: null, reagent_item_id: null, role: '�
 
 async function loadOptions() {
   try {
-    const [ti, ri, ins] = await Promise.all([
+    const [ti, ins] = await Promise.all([
       listTestItems({ page: 1, page_size: 300 }),
-      listReagentItems({ page: 1, page_size: 500 }),
       listInstruments({ page: 1, page_size: 100 }),
     ])
     testItemOptions.value = (ti.items || []).map(t => ({ value: t.id, label: t.name }))
-    reagentOptionsAll.value = (ri.items || []).map(r => ({ value: r.id, label: `${r.name}（${r.type}）`, type: r.type }))
-    instrumentOptions.value = (ins.items || []).map(i => ({ value: i.id, label: i.name }))
+    instrumentOptions.value = (ins.items || []).map(i => ({
+      value: i.id,
+      label: i.model ? `${i.name}（${i.model}）` : i.name,
+    }))
+    // 试剂可能超过单页上限(200)，分页拉全
+    const all = []
+    let page = 1
+    while (page <= 20) {
+      const r = await listReagentItems({ page, page_size: 200 })
+      all.push(...(r.items || []))
+      if (!r.items || r.items.length < 200) break
+      page++
+    }
+    reagentOptionsAll.value = all.map(r => ({ value: r.id, label: `${r.name}（${r.type}）`, type: r.type }))
   } catch (e) {
-    ElMessage.error('加载下拉数据失败：' + (e?.response?.data?.detail || e.message))
+    ElMessage.error('加载下拉数据失败：' + errText(e))
   }
+}
+
+function errText(e) {
+  const d = e?.response?.data?.detail
+  if (d == null) return e?.message || '未知错误'
+  if (typeof d === 'string') return d
+  try { return JSON.stringify(d) } catch { return String(d) }
 }
 
 async function loadProj() {
@@ -207,7 +229,7 @@ async function loadProj() {
     const r = await listTestItemReagents(params)
     projItems.value = r.items; projTotal.value = r.total
   } catch (e) {
-    ElMessage.error('加载失败：' + (e?.response?.data?.detail || e.message))
+    ElMessage.error('加载失败：' + errText(e))
   } finally { projLoading.value = false }
 }
 
@@ -219,7 +241,7 @@ async function loadInst() {
     const r = await listInstrumentReagents(params)
     instItems.value = r.items; instTotal.value = r.total
   } catch (e) {
-    ElMessage.error('加载失败：' + (e?.response?.data?.detail || e.message))
+    ElMessage.error('加载失败：' + errText(e))
   } finally { instLoading.value = false }
 }
 
@@ -239,7 +261,7 @@ async function onAutoMatch() {
     ElMessage.success(msg)
     loadProj(); loadInst()
   } catch (e) {
-    ElMessage.error('自动匹配失败：' + (e?.response?.data?.detail || e.message))
+    ElMessage.error('自动匹配失败：' + errText(e))
   } finally { matching.value = false }
 }
 
@@ -274,7 +296,7 @@ async function onProjSubmit() {
     }
     ElMessage.success('已保存'); projAddVisible.value = false; loadProj()
   } catch (e) {
-    ElMessage.error('保存失败：' + (e?.response?.data?.detail || e.message))
+    ElMessage.error('保存失败：' + errText(e))
   } finally { submitting.value = false }
 }
 async function onInstSubmit() {
@@ -288,7 +310,7 @@ async function onInstSubmit() {
     }
     ElMessage.success('已保存'); instAddVisible.value = false; loadInst()
   } catch (e) {
-    ElMessage.error('保存失败：' + (e?.response?.data?.detail || e.message))
+    ElMessage.error('保存失败：' + errText(e))
   } finally { submitting.value = false }
 }
 async function onDeleteProj(row) {
@@ -296,7 +318,8 @@ async function onDeleteProj(row) {
   await deleteTestItemReagent(row.id); ElMessage.success('已删除'); loadProj()
 }
 async function onDeleteInst(row) {
-  await ElMessageBox.confirm(`确认删除「${row.instrument_name} ↔ ${row.reagent_name}」？`, '提示', { type: 'warning' })
+  const ins = row.instrument_model ? `${row.instrument_name}（${row.instrument_model}）` : row.instrument_name
+  await ElMessageBox.confirm(`确认删除「${ins} ↔ ${row.reagent_name}」？`, '提示', { type: 'warning' })
   await deleteInstrumentReagent(row.id); ElMessage.success('已删除'); loadInst()
 }
 

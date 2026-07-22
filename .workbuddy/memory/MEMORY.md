@@ -2,7 +2,7 @@
 
 ## 项目基线
 - 生化免疫专业组速查工具；栈 FastAPI+SQLAlchemy2.0 / Vue3+Vite+Element Plus+Pinia；8 模块；数据库已切 CloudBase TDSQL-C MySQL（见下方 #数据库与持久化，勿按 SQLite 思路排查）。
-- 管理员 金子铮(id=2)，线上密码 Jzz6827556；18 科室初始 123456 首登改密。
+- 管理员 金子铮(id=2)，**登录用户名 jinzizheng**，线上密码 Jzz6827556；18 科室初始 123456 首登改密。
 
 ## 部署与数据
 - 部署：`printf 'Y\n' | tcb cloudrun deploy -e cloud1-0gjhamv53ff2298d -s lab-management --force`；构建源=origin/main（本地 commit 须先 push）；灰度 5-10min。
@@ -15,6 +15,7 @@
 - RBAC roles 逗号分隔；admin 通杀；会话 30min access+7d refresh，401 静默 refresh；禁用 Promise.all+静默 catch。
 - **前端空白排查铁律**：先要用户贴 F12 Console 报错，再动手；不要臆测缓存/CDN/灰度。本沙箱 Playwright 访问线上 host 会被网络层「风险提醒」拦截页劫持（curl 同 URL 正常），故沙箱浏览器验证不可信。
 - **权限 store 易错点**：`auth.canWrite/canDelete/canAccessMenu` 内若用 `usePermissionStore()`，声明必须提到函数作用域（`let permStore`），勿在 `try{}` 内用 `const` 声明后于块外引用（会 `ReferenceError: permStore is not defined` 炸白整个组件）。2026-07-21 因此 bug 导致 QC 月结/累靶整片空白。
+- **仪器显示铁律（用户硬性要求 2026-07-22）**：**任何展示仪器的地方（下拉、表格、关联、报表、比对等）必须同时显示「名称 + 型号」**，仅显示名称会被误认。型号来源于 Instrument.model；前端展示格式统一 `名称(model)`，空型号时仅显示名称。涉及仪器选择/展示的组件改版时默认可加，勿省略型号。
 
 ## EQA
 - 路由 /api/v1/eqa-plans；编号 年4+轮1+序1。北京临检机构 01110025/4731；肝炎/感染B/C 填 P/N+S/CO，快检仅 P/N。
