@@ -713,7 +713,7 @@ def _alnum_tokens(s: str) -> list:
 def auto_match_associations(
     reset: bool = Query(False, description="true 时先清空已有自动匹配记录再重新生成"),
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     """根据名称模糊匹配，自动生成 项目↔试剂 与 耗材↔仪器 关联。
 
@@ -869,7 +869,7 @@ def list_test_item_reagents(
 @router.post("/associations/test-items", response_model=TestItemReagentRead)
 def create_test_item_reagent(
     data: TestItemReagentCreate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     if db.query(TestItemReagent).filter_by(test_item_id=data.test_item_id, reagent_item_id=data.reagent_item_id).first():
         raise HTTPException(409, "该关联已存在")
@@ -883,7 +883,7 @@ def create_test_item_reagent(
 @router.delete("/associations/test-items/{rel_id}")
 def delete_test_item_reagent(
     rel_id: int, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     obj = db.query(TestItemReagent).get(rel_id)
     if not obj:
@@ -927,7 +927,7 @@ def list_instrument_reagents(
 @router.post("/associations/instruments", response_model=InstrumentReagentRead)
 def create_instrument_reagent(
     data: InstrumentReagentCreate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     if db.query(InstrumentReagent).filter_by(instrument_id=data.instrument_id, reagent_item_id=data.reagent_item_id).first():
         raise HTTPException(409, "该关联已存在")
@@ -941,7 +941,7 @@ def create_instrument_reagent(
 @router.delete("/associations/instruments/{rel_id}")
 def delete_instrument_reagent(
     rel_id: int, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     obj = db.query(InstrumentReagent).get(rel_id)
     if not obj:
