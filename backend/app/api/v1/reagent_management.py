@@ -693,6 +693,12 @@ def _norm_match(s: str) -> str:
     return s.strip().lower()
 
 
+# 过于通用的「抗体类别代号」：单独出现时无法区分具体项目，若作为匹配键会让
+# 「免疫球蛋白G」被所有含 "igg" 的试剂盒（单纯疱疹/肝炎/风疹…）误命中。
+# 仅当试剂名包含项目的「具体全称」（如「免疫球蛋白g」）时才允许匹配。
+GENERIC_CLASS_TOKENS = {"igg", "igm", "iga", "ige", "ig"}
+
+
 def _alnum_tokens(s: str) -> list:
     """从仪器名/型号或耗材名中提取「纯 ASCII 型号代码」片段。
 
@@ -741,7 +747,7 @@ def auto_match_associations(
         best, best_score = None, 0
         for tid, tn, tals in test_norms:
             for cand in ([tn] + tals):
-                if not cand:
+                if not cand or cand in GENERIC_CLASS_TOKENS:
                     continue
                 score = len(cand) if cand in rn else (len(rn) if (rn and rn in cand) else 0)
                 if score > best_score:
