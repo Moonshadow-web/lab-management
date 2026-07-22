@@ -537,6 +537,25 @@ def _self_heal_db():
         logger.error("self-heal db error (non-fatal): %s", e)
 
 
+def _raise_max_allowed_packet():
+    """尝试调大 MySQL 全局单包上限，避免大附件(>~4MB)写入 BLOB 时触发 500。
+
+    附件字节直接存 LONGBLOB，但单条 INSERT 仍受服务端 max_allowed_packet 限制
+    （CloudBase TDSQL-C 默认约 4MB）。后端与 MySQL 同 VPC 可达，启动时尝试
+    SET GLOBAL 调大到 128MB，并 dispose 连接池使新连接读取新值。
+    若账号无 SUPER 权限或托管实例重置该参数，仅告警、不影响启动；
+    彻底解决需在 TDSQL-C 控制台将 max_allowed_packet 设为 134217728(128M)。
+    """
+    try:
+        with engine.raw_connection() as conn:
+            cur = conn.connection.cursor()
+            cur.execute("SET GLOBAL max_allowed_packet = 134217728")
+        engine.dispose()  # 强制连接池重建，新连接读取新的全局包大小
+        logger.info("max_allowed_packet 已调大至 128MB（连接池已重建）")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("调大 max_allowed_packet 失败(可忽略，建议在 TDSQL-C 控制台设置): %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 同步、轻量初始化：先启动自愈修库（CFS 偶发损坏会让新容器健康检查失败、
@@ -550,6 +569,10 @@ async def lifespan(app: FastAPI):
         _migrate_schema()
     except Exception as e:  # noqa: BLE001
         logger.error("init error (create_all/migrate): %s", e)
+    try:
+        _raise_max_allowed_packet()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("raise max_allowed_packet error (non-fatal): %s", e)
     # 重活放后台：关联打标 / 种子 / 刷新通知 / 提醒，避免启动过慢导致探针超时
     asyncio.create_task(_background_init())
     asyncio.create_task(_reminder_scheduler())

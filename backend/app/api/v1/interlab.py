@@ -15,7 +15,8 @@ from ...core.security import get_current_user, require_roles
 from ...models.interlab import InterlabPlan, InterlabItem, InterlabLevel, InterlabAttachment
 from ...models.instrument import Instrument
 from ...models.user import User
-from ...schemas.interlab import (
+from ...services.attachment_compress import optimize_image_bytes
+from ...schemas.interlab import(
     InterlabPlanCreate, InterlabPlanUpdate, InterlabPlanRead,
     InterlabResultsPayload, InterlabResultsRead,
     InterlabProject, InterlabItemRow,
@@ -427,9 +428,12 @@ async def upload_interlab_attachments(
         ext = os.path.splitext(f.filename)[1] or ""
         safe = f"plan_{pid}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{len(out)}{ext}"
         content = await f.read()
+        ft = _classify_ext(ext)
+        if ft == "image":
+            content = optimize_image_bytes(content, ext)
         a = InterlabAttachment(
             plan_id=pid,
-            file_type=_classify_ext(ext),
+            file_type=ft,
             original_name=f.filename,
             stored_name=safe,
             rel_path="",
@@ -439,7 +443,18 @@ async def upload_interlab_attachments(
         )
         db.add(a)
         out.append(a)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:  # noqa: BLE001  捕获 max_allowed_packet 等，给友好提示
+        db.rollback()
+        msg = str(e)
+        if "max_allowed_packet" in msg or "packet bigger" in msg:
+            raise HTTPException(
+                413,
+                "文件过大：超过数据库单包大小限制(max_allowed_packet)。请压缩后再上传，"
+                "或在 TDSQL-C 控制台将 max_allowed_packet 调大。",
+            )
+        raise
     for a in out:
         db.refresh(a)
     return {"items": [_ser_attachment(a) for a in out], "total": len(out)}
