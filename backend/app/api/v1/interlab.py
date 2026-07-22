@@ -452,7 +452,7 @@ async def upload_interlab_attachments(
             raise HTTPException(
                 413,
                 "文件过大：超过数据库单包大小限制(max_allowed_packet)。请压缩后再上传，"
-                "或在 TDSQL-C 控制台将 max_allowed_packet 调大。",
+                "系统会自动调大数据库单包上限，如仍失败请联系管理员。",
             )
         raise
     for a in out:

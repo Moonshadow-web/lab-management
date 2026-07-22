@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import event, inspect as sa_inspect
 from sqlalchemy.schema import CreateColumn
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -26,6 +26,21 @@ from .services.reminder_engine import ensure_reminder_defaults, run_reminders
 from .services.comparison_report import ensure_comparison_defaults
 
 logger = logging.getLogger("reminder")
+
+# 连接级兜底：每次新建 MySQL 连接时把 max_allowed_packet 调大到 128MB。
+# 背景：本集群为 CloudBase 代管（集群名 cloudbase__SAmOhXfvyj），TDSQL-C 控制台入口
+# 被平台锁定、CloudBase 控制台也不暴露该内核参数，无法在控制台改 → 只能靠代码侧保证。
+# 即使 TDSQL-C 实例重启、连接池断开重建，新连接也会自动 SET GLOBAL 自愈。
+@event.listens_for(engine, "connect")
+def _on_connect_raise_max_allowed_packet(dbapi_conn, conn_record):
+    try:
+        cur = dbapi_conn.cursor()
+        try:
+            cur.execute("SET GLOBAL max_allowed_packet = 134217728")
+        finally:
+            cur.close()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _ensure_missing_columns():
@@ -538,13 +553,16 @@ def _self_heal_db():
 
 
 def _raise_max_allowed_packet():
-    """尝试调大 MySQL 全局单包上限，避免大附件(>~4MB)写入 BLOB 时触发 500。
+    """启动时调大 MySQL 全局单包上限，避免大附件(>~4MB)写入 BLOB 时触发 500。
 
     附件字节直接存 LONGBLOB，但单条 INSERT 仍受服务端 max_allowed_packet 限制
     （CloudBase TDSQL-C 默认约 4MB）。后端与 MySQL 同 VPC 可达，启动时尝试
-    SET GLOBAL 调大到 128MB，并 dispose 连接池使新连接读取新值。
-    若账号无 SUPER 权限或托管实例重置该参数，仅告警、不影响启动；
-    彻底解决需在 TDSQL-C 控制台将 max_allowed_packet 设为 134217728(128M)。
+    SET GLOBAL 调大到 128MB，并 dispose 连接池使新连接立刻读取新值。
+    注意：本集群是 CloudBase 代管，TDSQL-C 控制台入口被锁定、CloudBase 控制台也不
+    暴露该内核参数，控制台路线不可行；真正的持久兜底见模块顶层
+    _on_connect_raise_max_allowed_packet：每次新建连接自动 SET GLOBAL，
+    即使实例重启 / 连接池重建也会自愈。此处再 SET 一次仅作快速生效 + 日志可观测。
+    若账号无权限仅告警、不影响启动。
     """
     try:
         with engine.raw_connection() as conn:
