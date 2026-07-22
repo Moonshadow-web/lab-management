@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -426,16 +426,14 @@ async def upload_interlab_attachments(
             continue
         ext = os.path.splitext(f.filename)[1] or ""
         safe = f"plan_{pid}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{len(out)}{ext}"
-        full = ATTACH_DIR / safe
         content = await f.read()
-        with open(full, "wb") as fp:
-            fp.write(content)
         a = InterlabAttachment(
             plan_id=pid,
             file_type=_classify_ext(ext),
             original_name=f.filename,
             stored_name=safe,
-            rel_path=f"interlab_attachments/{safe}",
+            rel_path="",
+            data=content,
             size_bytes=len(content),
             uploaded_by=user.username,
         )
@@ -454,8 +452,7 @@ def get_interlab_attachment(aid: int, inline: bool = True, db: Session = Depends
     a = db.get(InterlabAttachment, aid)
     if not a:
         raise HTTPException(404, "附件不存在")
-    full = DATA_DIR / a.rel_path
-    if not full.exists():
+    if not a.data:
         raise HTTPException(404, "文件已丢失")
     media = "application/octet-stream"
     if a.file_type == "image":
@@ -466,8 +463,8 @@ def get_interlab_attachment(aid: int, inline: bool = True, db: Session = Depends
     elif a.file_type == "pdf":
         media = "application/pdf"
     disp = "inline" if inline else "attachment"
-    return FileResponse(
-        str(full), media_type=media, filename=a.original_name,
+    return Response(
+        a.data, media_type=media,
         headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'},
     )
 
@@ -477,12 +474,6 @@ def delete_interlab_attachment(aid: int, db: Session = Depends(get_db), user: Us
     a = db.get(InterlabAttachment, aid)
     if not a:
         raise HTTPException(404, "附件不存在")
-    try:
-        full = DATA_DIR / a.rel_path
-        if full.exists():
-            full.unlink()
-    except Exception:
-        pass
     db.delete(a)
     db.commit()
     return {"ok": True}

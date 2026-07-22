@@ -12,7 +12,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.database import Base
@@ -97,7 +97,8 @@ class InterlabAttachment(Base):
     file_type: Mapped[str] = mapped_column(String(20), default="other")  # image / pdf / doc / other
     original_name: Mapped[str] = mapped_column(String(300), default="")  # 用户上传时的文件名
     stored_name: Mapped[str] = mapped_column(String(300), default="")  # 实际存储文件名（避免冲突）
-    rel_path: Mapped[str] = mapped_column(String(500), default="")  # 相对 DATA_DIR 的路径
+    rel_path: Mapped[str] = mapped_column(String(500), default="")  # 相对 DATA_DIR 的路径（兼容旧记录，新记录留空）
+    data: Mapped[bytes | None] = mapped_column(LargeBinary(16 * 1024 * 1024), nullable=True)  # 文件字节（持久化于 MySQL LONGBLOB，避免容器重建丢文件）
     size_bytes: Mapped[int] = mapped_column(Integer, default=0)
     uploaded_by: Mapped[str] = mapped_column(String(100), default="")
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
