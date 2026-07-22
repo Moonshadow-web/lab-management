@@ -39,6 +39,9 @@
       </el-table-column>
     </el-table>
     <div v-else class="att-empty">暂无原始报告存档</div>
+
+    <!-- 内嵌预览（支持 图片/PDF/Word/Excel，与文档模块一致） -->
+    <AttachmentPreview v-model:visible="previewVisible" :file="previewing" :get-url="apiUrl" @download="onDownload" />
   </div>
 </template>
 
@@ -52,6 +55,7 @@ import {
 import {
   listInterlabAttachments, uploadInterlabAttachments, interlabAttachmentUrl, deleteInterlabAttachment,
 } from '../api/interlab'
+import AttachmentPreview from './AttachmentPreview.vue'
 
 const props = defineProps({
   // 计划/比对 id
@@ -66,6 +70,8 @@ const props = defineProps({
 
 const items = ref([])
 const uploading = ref(false)
+const previewVisible = ref(false)
+const previewing = ref(null)
 
 const api = computed(() => {
   if (props.module === 'interlab') {
@@ -111,7 +117,11 @@ async function onUpload(option) {
 }
 
 function onPreview(row) {
-  window.open(api.value.url(row.id, true), '_blank')
+  previewing.value = row
+  previewVisible.value = true
+}
+function apiUrl(id, inline) {
+  return api.value.url(id, inline)
 }
 
 function onDownload(row) {

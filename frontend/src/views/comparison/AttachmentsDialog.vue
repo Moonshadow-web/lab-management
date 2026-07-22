@@ -39,26 +39,16 @@
       </div>
     </template>
 
-    <!-- 内嵌预览 -->
-    <el-dialog v-model="previewVisible" :title="previewing?.original_name || '预览'" width="90%" top="2vh" append-to-body>
-      <div v-if="previewing" class="preview-wrap">
-        <img v-if="previewing.file_type === 'image'" :src="attachmentUrl(previewing.id, true)" :alt="previewing.original_name" />
-        <iframe v-else-if="previewing.file_type === 'pdf'" :src="attachmentUrl(previewing.id, true)" style="width:100%;height:75vh;border:0" />
-        <div v-else class="other-preview">
-          <el-icon :size="64"><Document /></el-icon>
-          <p>该类型文件无法在浏览器内直接预览，请点击下载查看。</p>
-          <el-button type="primary" @click="onDownload(previewing)">下载 {{ previewing.original_name }}</el-button>
-        </div>
-      </div>
-    </el-dialog>
+    <!-- 内嵌预览（支持 图片/PDF/Word/Excel，与文档模块一致） -->
+    <AttachmentPreview v-model:visible="previewVisible" :file="previewing" :get-url="attachmentUrl" @download="onDownload" />
   </el-dialog>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Document } from '@element-plus/icons-vue'
 import { listAttachments, uploadAttachments, attachmentUrl, deleteAttachment } from '../../api/comparison'
+import AttachmentPreview from '../../components/AttachmentPreview.vue'
 
 const props = defineProps({
   visible: Boolean,
