@@ -43,20 +43,32 @@ def list_sources(_: User = Depends(get_current_user)):
 
 @router.post("/_meta/seed", dependencies=[Depends(require_roles("admin"))])
 def seed_defaults(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """幂等灌库：已存在的 (source, item_name) 不会重复追加；缺则新增。"""
+    """幂等灌库：已存在的 (source, item_name) 不重复追加；缺则新增。
+    已存在行做「空字段回填」——仅当库内该字段为空、且种子值非空时才写入，
+    既不重复插入，也不覆盖人工已填值（如本次给定性标志物补 cv=10%）。"""
     seed_rows = all_seed()
     existing = {(r.source, r.item_name): r for r in db.query(QualityRequirement).all()}
     added = updated = skipped = 0
     for row in seed_rows:
         key = (row["source"], row["item_name"])
         if key in existing:
-            # 已存在则不更新，避免覆盖人工修改；只统计
-            skipped += 1
+            r = existing[key]
+            changed = False
+            for f in ("category", "item_code", "cv", "bias", "tea", "unit"):
+                sv = (row.get(f) or "").strip()
+                cur = (getattr(r, f) or "").strip()
+                if sv and not cur:
+                    setattr(r, f, sv)
+                    changed = True
+            if changed:
+                updated += 1
+            else:
+                skipped += 1
             continue
         db.add(QualityRequirement(**row))
         added += 1
     db.commit()
-    return {"added": added, "skipped": skipped, "total_seed": len(seed_rows), "by": user.username}
+    return {"added": added, "updated": updated, "skipped": skipped, "total_seed": len(seed_rows), "by": user.username}
 
 
 # ── 三个标准源的 source 常量，与 QUALITY_SOURCES 顺序一致 ──

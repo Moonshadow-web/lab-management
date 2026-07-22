@@ -367,7 +367,7 @@ def upload_qc_summary(
         daily_meta.setdefault(key, []).append((d.strftime("%Y-%m-%d"), v, op, vreason, vdeal))
         if key not in meta:
             ti_name = (get("test_item") or "").strip()
-            matched = find_test_item_by_name(db, ti_name) if ti_name else None
+            matched = find_test_item_by_name(db, ti_name, instrument=inst) if ti_name else None
             file_unit = (get("unit") or "").strip()
             unit = file_unit or (matched.unit if matched else "")
             meta[key] = {

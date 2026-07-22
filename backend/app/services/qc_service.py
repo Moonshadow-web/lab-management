@@ -61,44 +61,57 @@ def _alias_words(aliases: str) -> set[str]:
     return words
 
 
-def find_test_item_by_name(db: Session, name: str) -> TestItem | None:
-    """按项目名或别名匹配 test_items 表；返回最相似的一条或 None。"""
+def find_test_item_by_name(db: Session, name: str, instrument: str = "") -> TestItem | None:
+    """按项目名或别名匹配 test_items 表；返回最相似的一条或 None。
+
+    若提供 instrument，则优先在该仪器（含 instrument_group）名下做过的项目中匹配，
+    以利用「仪器档案的检验项目」来对应质控项目——同名项目跨仪器时定位更精准，
+    取到的规范名/别名也更贴近该仪器实际使用的项目叫法。
+    """
     if not name:
         return None
     norm = _norm(name)
+    inst_norm = _norm(instrument or "")
     rows = db.query(TestItem).all()
-    # 1. 精确匹配 name
-    for r in rows:
-        if _norm(r.name) == norm:
-            return r
-    # 2. 子串互含（name 或 name 的分词）
-    for r in rows:
-        rnorm = _norm(r.name)
-        if norm in rnorm or rnorm in norm:
-            return r
-        # 拆 test_item 自身，看是否命中 name
-        for w in re.split(r"[\s+]", name.strip()):
-            wn = _norm(w)
-            if wn and (wn in rnorm or rnorm in wn):
-                return r
-    # 3. aliases 精确/子串匹配；同时拆分 alias 中的空格
-    for r in rows:
-        words = _alias_words(r.aliases or "")
-        for w in words:
-            if w == norm or w == name or norm == _norm(w):
-                return r
-        for w in words:
-            if norm in w or w in norm:
-                return r
-        # 再用 test_item 的分词反向匹配 alias 中的每个词
+
+    def _matches(r: TestItem) -> bool:
+        rn = _norm(r.name)
+        if rn == norm:
+            return True
+        if norm in rn or rn in norm:
+            return True
+        for w in _alias_words(r.aliases or ""):
+            if w == norm or norm in w or w in norm:
+                return True
         for seg in re.split(r"[\s+]", name.strip()):
             sn = _norm(seg)
-            if not sn:
-                continue
-            for w in words:
-                if sn in w or w in sn:
+            if sn and (sn in rn or rn in sn):
+                return True
+        return False
+
+    # 优先：本仪器（含 instrument_group）名下的项目
+    if inst_norm:
+        for r in rows:
+            ri = _norm(r.instrument or "")
+            rg = _norm(r.instrument_group or "")
+            if (ri and (ri == inst_norm or inst_norm in ri or ri in inst_norm)) or \
+               (rg and (rg == inst_norm or inst_norm in rg or rg in inst_norm)):
+                if _matches(r):
                     return r
+    # 兜底：全局匹配（与原逻辑一致）
+    for r in rows:
+        if _matches(r):
+            return r
     return None
+
+
+def _paren_code(name: str) -> str:
+    """提取名称中括号里的代码，如「乙肝病毒表面抗原(HBsAg)」→「HBsAG」。
+    用于按仪器档案检验项目的别名/代码去对应质量目标条目。"""
+    if not name:
+        return ""
+    m = re.search(r"\(([^()]+)\)", name)
+    return m.group(1).strip().upper() if m else ""
 
 
 def _extract_first_pct(s: str) -> float | None:
@@ -134,13 +147,11 @@ def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
     def _all(name: str) -> list:
         """查询指定名称的所有 quality_requirements 记录。"""
         from .quality_requirements_seed import contains_same_item
+        all_qr = db.query(QualityRequirement).all()
         # 精确匹配
-        rows = db.query(QualityRequirement).filter(
-            QualityRequirement.item_name == name
-        ).all()
+        rows = [r for r in all_qr if r.item_name == name]
         # 安全包含匹配（双向），避免「钙」误入「降钙素原」等短字/前缀误匹配
         if not rows:
-            all_qr = db.query(QualityRequirement).all()
             rows = [r for r in all_qr if r.item_name and contains_same_item(name, r.item_name)]
         # 再试别名中的每个词（同样用安全包含）
         if not rows:
@@ -150,6 +161,19 @@ def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
                     continue
                 rows = [r for r in all_qr if r.item_name and contains_same_item(a, r.item_name)]
                 if rows:
+                    break
+        # 用「仪器档案检验项目」的别名/代码匹配质量目标条目的括号代码（如 HBsAg / HCV / HIV）。
+        # 即按本仪器实际做过的项目去对应质控项目；定性标志物（如 HBsAg）原先仅存定性 tea，
+        # 其规范名带括号代码，用此路径即可命中（前提：条目已补 cv）。
+        if not rows:
+            ti_codes = {(name or "").strip().upper()}
+            for w in _alias_words(aliases or ""):
+                if w:
+                    ti_codes.add(w.upper())
+            for r in all_qr:
+                rc = _paren_code(r.item_name)
+                if rc and rc in ti_codes:
+                    rows.append(r)
                     break
         return rows or []
 
