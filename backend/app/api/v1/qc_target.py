@@ -275,6 +275,56 @@ def list_results(batch_id: int, db: Session = Depends(get_db), user: User = Depe
     return {"rows": [_ser_result(r) for r in rows], "stats": _build_stats(db, batch)}
 
 
+@router.post("/recalc", response_model=None)
+def recalc_all(db: Session = Depends(get_db), user: User = Depends(require_roles("admin", "qc_manager"))):
+    """批量重算所有录入型批号的结果状态/SI（修复历史因 manual_atomic 跳过判定导致的累计中）。
+
+    仅重算 status='累计中' 且非人工确认、非失控标记的记录；按 analyte 逐条累积 active
+    序列（is_out 不计入、manual 计入）复刻 add_result 的判定逻辑。
+    """
+    from statistics import mean as _mean
+    batches = db.query(QCTargetBatch).filter(QCTargetBatch.mode == "entry").all()
+    updated = 0
+    for batch in batches:
+        results = db.query(QCTargetResult).filter(QCTargetResult.batch_id == batch.id).order_by(QCTargetResult.id).all()
+        by_analyte = {}
+        for r in results:
+            by_analyte.setdefault(r.analyte, []).append(r)
+        for analyte, rows in by_analyte.items():
+            active = []
+            for r in rows:
+                if r.manual or r.is_out:
+                    # 用户已手动处理的记录：保持原状态；manual 值计入 active，is_out 不计入
+                    if r.manual:
+                        active.append(r.value)
+                    continue
+                if r.status == "累计中":
+                    new_vals = active + [r.value]
+                    if batch.method == "immediate":
+                        info = svc.classify_immediate(new_vals)
+                        r.status = info["status"]
+                        r.si_upper = info.get("si_upper") or 0.0
+                        r.si_lower = info.get("si_lower") or 0.0
+                        r.is_out = (info["status"] == "失控")
+                        updated += 1
+                    else:
+                        if batch.established:
+                            tgt = {}
+                            try:
+                                tgt = json.loads(batch.targets_json or "{}").get(analyte, {})
+                            except Exception:
+                                tgt = {}
+                            tm = tgt.get("mean", _mean(new_vals) if new_vals else 0.0)
+                            ts = tgt.get("sd", 0.0)
+                            r.status = svc.classify_conventional(r.value, tm, ts)
+                            r.is_out = (r.status == "失控")
+                            updated += 1
+                        # 未确立的常规法：本就累计中，保持
+                active.append(r.value)
+    db.commit()
+    return {"updated": updated}
+
+
 @router.delete("/{batch_id}/results/{rid}", response_model=None)
 def delete_result(batch_id: int, rid: int, request: Request, db: Session = Depends(get_db), user: User = Depends(WRITE)):
     row = db.get(QCTargetResult, rid)
