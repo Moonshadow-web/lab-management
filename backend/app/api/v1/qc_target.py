@@ -138,14 +138,6 @@ def _active_values(db, batch_id, analyte):
     return [r.value for r in rows]
 
 
-def _has_manual(db, batch_id, analyte):
-    """该分析物是否有任何人工确认的记录。"""
-    return db.query(QCTargetResult).filter(
-        QCTargetResult.batch_id == batch_id, QCTargetResult.analyte == analyte,
-        QCTargetResult.manual == True
-    ).first() is not None
-
-
 def _build_stats(db, batch):
     """返回 per-analyte 统计 + 批次级状态。"""
     results = db.query(QCTargetResult).filter(QCTargetResult.batch_id == batch.id).all()
@@ -157,8 +149,11 @@ def _build_stats(db, batch):
     for a in analytes:
         vals = _active_values(db, batch.id, a)
         per[a] = svc.compute_analyte(vals, batch.method, batch.established)
-        # 人工确认覆盖自动判定
-        if _has_manual(db, batch.id, a):
+        # 仅当最新一条记录为人工确认时，才以人工状态展示
+        latest = db.query(QCTargetResult).filter(
+            QCTargetResult.batch_id == batch.id, QCTargetResult.analyte == a
+        ).order_by(QCTargetResult.id.desc()).first()
+        if latest and latest.manual:
             per[a]["status"] = "在控(人工)"
             per[a]["manual"] = True
     # 批次级状态
@@ -222,16 +217,10 @@ def add_result(
     active = _active_values(db, batch_id, analyte)
     new_vals = active + [payload.value]
 
-    manual_atomic = _has_manual(db, batch_id, analyte)
-
     si_up = si_lo = None
     status = "累计中"
     is_out = False
-    if manual_atomic:
-        # 已有手工确认记录 → 跳过自动判定，新值直接纳入
-        status = "累计中"
-        si_up = si_lo = None
-    elif batch.method == "immediate":
+    if batch.method == "immediate":
         info = svc.classify_immediate(new_vals)
         status = info["status"]
         si_up = info.get("si_upper")
