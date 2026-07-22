@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
-from ...core.security import get_current_user
+from ...core.security import get_current_user, require_roles
 from ...core.storage import storage
 from ...models.qc import QCMonthlySummary, QCDailyValue, QCMonthlyReport
 from ...models.instrument import Instrument
@@ -482,6 +482,34 @@ def upload_qc_summary(
         "groups": len(groups),
         "items": items,
     }
+
+
+@router.post("/_backfill_goals", dependencies=[Depends(require_roles("admin", "qc_manager"))])
+def backfill_quality_goals(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """回填已存月结行的质量目标。
+
+    质量目标在 LIS 上传时由 lookup_quality_goal 算好并冻结进 qc_monthly_summaries.quality_goal。
+    当质量目标表（QualityRequirement）扩容/修复匹配逻辑后，历史月结行仍为旧值（空或旧值）。
+    本接口按「项目名 + 别名」重新查表回填，仅更新当前为空的行，避免覆盖人工/既有非空值。
+
+    返回 {updated, total, samples}（samples 列出本次被回填的 {test_item, instrument, goal} 便于核对）。
+    """
+    rows = db.query(QCMonthlySummary).all()
+    updated = 0
+    samples = []
+    for s in rows:
+        if (s.quality_goal or "").strip():
+            continue  # 已有值，跳过
+        matched = find_test_item_by_name(db, s.test_item, instrument=s.instrument) if s.test_item else None
+        aliases = matched.aliases if matched else ""
+        goal = lookup_quality_goal(s.test_item, aliases, db)
+        if goal and goal != (s.quality_goal or ""):
+            s.quality_goal = goal
+            updated += 1
+            if len(samples) < 30:
+                samples.append({"test_item": s.test_item, "instrument": s.instrument, "goal": goal})
+    db.commit()
+    return {"updated": updated, "total": len(rows), "samples": samples}
 
 
 @router.get("/daily/project")

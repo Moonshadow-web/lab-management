@@ -172,7 +172,17 @@ def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
                     ti_codes.add(w.upper())
             for r in all_qr:
                 rc = _paren_code(r.item_name)
-                if rc and rc in ti_codes:
+                if not rc:
+                    continue
+                # 精确匹配括号代码（如 HBsAg）；并兼容「qHBsAg ⊃ HBsAG」「HCVAb ⊃ HCV」
+                # 这类别名写法/大小写差异（LIS 简称经 find_test_item_by_name 命中定量项时别名不含 HBsAg）
+                hit = rc in ti_codes
+                if not hit:
+                    for w in ti_codes:
+                        if rc in w or w in rc:
+                            hit = True
+                            break
+                if hit:
                     rows.append(r)
                     break
         return rows or []
