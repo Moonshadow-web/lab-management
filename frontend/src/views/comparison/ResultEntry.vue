@@ -6,7 +6,7 @@
       <el-alert v-if="category === '定量'" type="info" :closable="false" show-icon
         title="录入靶机（参照仪器）与各比对仪器的检测值，偏倚%与是否允许自动计算。" style="margin-bottom:8px" />
       <el-alert v-else type="info" :closable="false" show-icon
-        title="逐台仪器录入5例样本的 S/CO 比值，系统自动判读 P/N（>1 为 P，否则为 N），符合率自动计算（以靶机为基准）。" style="margin-bottom:8px" />
+        title="逐台仪器录入5例样本的 S/CO 比值，系统自动判读 P/N（>1 为 P，否则为 N），符合率以靶机为基准自动计算。各项目的「方法 / 试剂厂家 / 试剂批号」需分别填写（BG-SM-CZ-021，不同项目批号可不同）。" style="margin-bottom:8px" />
       <el-alert v-if="plan?.only_uncompared" type="warning" :closable="false" show-icon
         title="本计划为同半年补录：仅列出本期尚未比对的项目，已做项目不显示。" style="margin-bottom:8px" />
 
@@ -84,58 +84,63 @@
 
           <!-- 定性 -->
           <template v-else>
-            <el-alert type="warning" :closable="false" show-icon
-              title="请按每个项目分别填写各检测系统的「方法 / 试剂厂家 / 试剂批号」（BG-SM-CZ-021 要求，不同项目批号可能不同），再录入下方样本结果。" style="margin-bottom:8px" />
-            <el-scrollbar max-height="300px" style="border:1px solid #ebeef5;border-radius:6px;padding:8px;margin-bottom:12px">
-              <div v-for="it in qualDisplay" :key="it.item" class="qual-meta-block" style="margin-bottom:12px">
-                <div class="qual-meta-title" style="font-weight:700;margin-bottom:4px;color:#1a365d">{{ it.item }}</div>
-                <el-table :data="allInstruments" size="small" border>
-                  <el-table-column label="检测系统" min-width="170">
-                    <template #default="{ row }">
-                      {{ row.name }}{{ row.is_reference ? '（靶机）' : '' }}
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="方法" min-width="150">
-                    <template #default="{ row }">
-                      <el-input v-model="qualMeta[it.item][String(row.id)].method" size="small" placeholder="如 化学发光法" @input="onEdit" />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="试剂厂家" min-width="150">
-                    <template #default="{ row }">
-                      <el-input v-model="qualMeta[it.item][String(row.id)].reagent_manufacturer" size="small" placeholder="如 罗氏" @input="onEdit" />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="试剂批号" min-width="150">
-                    <template #default="{ row }">
-                      <el-input v-model="qualMeta[it.item][String(row.id)].reagent_lot" size="small" placeholder="试剂批号" @input="onEdit" />
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </div>
-            </el-scrollbar>
-            <el-table :data="qualDisplay" size="small" border max-height="420">
-              <el-table-column prop="item" label="项目" min-width="140" fixed />
-              <el-table-column v-for="ins in allInstruments" :key="ins.id">
-                <template #header>
-                  <span>{{ ins.name }}{{ ins.is_reference ? '（靶机）' : '' }}</span>
-                </template>
-                <template #default="{ row }">
-                  <div v-if="!isApplicable(row.item, ins.id)" class="masked" title="该项目不在此仪器上开展">/</div>
-                  <template v-else>
-                    <div style="display:flex;flex-direction:column;gap:3px">
-                      <div style="display:flex;gap:3px;flex-wrap:wrap">
-                        <el-input v-for="k in 5" :key="k" v-model="row.results[ins.id][k - 1]" size="small"
-                          style="width:58px" placeholder="S/CO" @input="onEdit" />
-                      </div>
-                      <div style="font-size:10px;color:#888">判读：{{ qualPN(row, ins) }}</div>
-                      <div style="font-size:11px" :class="agreementOf(row, ins).ok === false ? 'no' : (agreementOf(row, ins).ok ? 'yes' : '')">
-                        符合率 {{ agreementOf(row, ins).val == null ? '-' : agreementOf(row, ins).val + '%' }}
-                      </div>
+            <el-scrollbar max-height="560px" style="padding-right:4px">
+              <el-collapse v-model="activeQual">
+                <el-collapse-item v-for="it in qualDisplay" :key="it.item" :name="it.item">
+                  <template #title>
+                    <div class="q-card-title">
+                      <span class="q-dot">{{ isDone(it.item) ? '✓' : '○' }}</span>
+                      <span class="q-name">{{ it.item }}</span>
+                      <span class="q-sub">{{ metaInstruments(it.item).length }} 个检测系统</span>
                     </div>
                   </template>
-                </template>
-              </el-table-column>
-            </el-table>
+                  <div class="q-card-body">
+                    <div class="q-section-label">检测系统信息（BG-SM-CZ-021：方法 / 试剂厂家 / 试剂批号，不同项目批号可不同）</div>
+                    <el-table :data="metaInstruments(it.item)" size="small" border class="q-meta">
+                      <el-table-column label="检测系统" min-width="150">
+                        <template #default="{ row }">
+                          <span :class="{ 'q-ref': row.is_reference }">{{ row.name }}{{ row.is_reference ? '（靶机）' : '' }}</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="方法" min-width="130">
+                        <template #default="{ row }">
+                          <el-input v-model="qualMeta[it.item][String(row.id)].method" size="small" placeholder="如 化学发光法" @input="onEdit" />
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="试剂厂家" min-width="130">
+                        <template #default="{ row }">
+                          <el-input v-model="qualMeta[it.item][String(row.id)].reagent_manufacturer" size="small" placeholder="如 罗氏" @input="onEdit" />
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="试剂批号" min-width="140">
+                        <template #default="{ row }">
+                          <el-input v-model="qualMeta[it.item][String(row.id)].reagent_lot" size="small" placeholder="试剂批号" @input="onEdit" />
+                        </template>
+                      </el-table-column>
+                    </el-table>
+
+                    <div class="q-section-label" style="margin-top:12px">样本结果（5 例 S/CO，&gt;1 判 P，否则判 N；符合率以靶机为基准）</div>
+                    <div class="q-results">
+                      <div v-for="ins in metaInstruments(it.item)" :key="ins.id" class="q-res-row">
+                        <div class="q-res-head">
+                          <span class="q-res-name" :class="{ 'q-ref': ins.is_reference }">{{ ins.name }}{{ ins.is_reference ? '（靶机 / 基准）' : '' }}</span>
+                          <span class="q-pn">判读：{{ qualPN(it, ins) }}</span>
+                          <span class="q-agree" :class="agreementOf(it, ins).ok === false ? 'no' : (agreementOf(it, ins).ok ? 'yes' : '')">
+                            {{ agreementOf(it, ins).val == null ? '符合率 —' : '符合率 ' + agreementOf(it, ins).val + '%' }}
+                          </span>
+                        </div>
+                        <div class="q-res-inputs">
+                          <div v-for="k in 5" :key="k" class="q-cell">
+                            <span class="q-cell-idx">例{{ k }}</span>
+                            <el-input v-model="it.results[ins.id][k - 1]" size="small" placeholder="S/CO" @input="onEdit" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </el-collapse-item>
+              </el-collapse>
+            </el-scrollbar>
           </template>
         </div>
       </div>
@@ -179,6 +184,7 @@ const dirty = ref(false)
 // 便捷性增强
 const showOnlyUnfinished = ref(false)
 const focusItem = ref(null)
+const activeQual = ref([])   // 定性折叠面板展开项
 const savedItems = ref(new Set())   // 本计划已录入结果的项目名
 const allItemNames = ref([])        // 分组全量项目名
 const scopeItems = ref(null)        // plan.only_uncompared 时=本期未比对项目名；否则 null(全量)
@@ -277,6 +283,11 @@ function qualPN(row, ins) {
   const s = arr.map(_pnOf).filter((x) => x).join(' ')
   return s || '—'
 }
+// 定性卡片内只展示本项目适用的检测系统（避免对不适用仪器铺一排空表，界面更干净）
+function metaInstruments(item) {
+  const appl = allInstruments.value.filter((i) => isApplicable(item, i.id))
+  return appl.length ? appl : allInstruments.value
+}
 function fmt(x) { return x == null ? '-' : x }
 
 // 对话框以 v-if 挂载，挂载时 props.visible 已为 true；用 immediate 确保挂载即加载，
@@ -285,6 +296,10 @@ watch(() => props.visible, async (v) => {
   if (!v || !props.plan) return
   await load()
 }, { immediate: true })
+// 聚焦项目变化时，折叠面板跟随定位
+watch(focusItem, (v) => {
+  activeQual.value = v ? [v] : (qualDisplay.value[0] ? [qualDisplay.value[0].item] : [])
+})
 async function load() {
   loading.value = true
   focusItem.value = null
@@ -332,6 +347,9 @@ async function load() {
       scopeItems.value = null
     }
     showOnlyUnfinished.value = !!props.plan.only_uncompared
+    activeQual.value = focusItem.value
+      ? [focusItem.value]
+      : (qualDisplay.value[0] ? [qualDisplay.value[0].item] : [])
     // 定量：补齐 项目×水平
     const qmap = {}
     data.quant.forEach((r) => { qmap[`${r.item}__${r.level}`] = r })
@@ -457,4 +475,29 @@ async function onSave() {
 .nav-item.done { color: #27ae60; }
 .nav-dot { width: 16px; text-align: center; }
 .nav-name { flex: 1; }
+
+/* —— 定性仪器间比对：按项目折叠卡片 —— */
+.q-card-title { display: flex; align-items: center; gap: 8px; width: 100%; }
+.q-dot { width: 18px; text-align: center; color: #27ae60; font-weight: 700; }
+.q-name { font-weight: 700; color: #1a365d; }
+.q-sub { color: #999; font-size: 12px; margin-left: auto; }
+.q-card-body { padding: 4px 4px 10px; }
+.q-section-label {
+  font-size: 12px; font-weight: 700; color: #555; margin: 6px 0 6px;
+  padding-left: 8px; border-left: 3px solid #409eff;
+}
+.q-meta { margin-bottom: 4px; }
+.q-ref { color: #409eff; font-weight: 600; }
+.q-results { display: flex; flex-direction: column; gap: 8px; }
+.q-res-row {
+  border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 10px;
+  background: #fafbfc;
+}
+.q-res-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.q-res-name { font-weight: 600; font-size: 13px; }
+.q-pn { font-size: 11px; color: #888; }
+.q-agree { font-size: 12px; margin-left: auto; }
+.q-res-inputs { display: flex; gap: 10px; flex-wrap: wrap; }
+.q-cell { display: flex; flex-direction: column; gap: 2px; width: 92px; }
+.q-cell-idx { font-size: 10px; color: #aaa; text-align: center; }
 </style>

@@ -357,7 +357,7 @@ BJHR_ITEMS: list[dict[str, Any]] = [
     {"category": "133","item_name": "转铁蛋白(TRF)",       "cv": "8.3%", "tea": "±25%", "unit": "g/L"},
     {"category": "134","item_name": "前白蛋白(PA)",        "cv": "7.5%", "tea": "±25%", "unit": "mg/L"},
     # 感染
-    {"category": "135","item_name": "乙肝病毒表面抗原(HBsAg)",  "cv": "10%", "tea": "与预期结果一致"},
+    {"category": "135","item_name": "乙肝病毒表面抗原(HBsAg)",  "cv": "", "tea": "与预期结果一致"},
     {"category": "136","item_name": "乙肝病毒表面抗体(HBsAb)",  "cv": "10%", "tea": "与预期结果一致"},
     {"category": "137","item_name": "乙肝病毒核心抗体(HBcAb)",  "cv": "10%", "tea": "与预期结果一致"},
     {"category": "138","item_name": "乙肝病毒e抗原(HBeAg)",     "cv": "10%", "tea": "与预期结果一致"},
