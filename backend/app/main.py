@@ -27,16 +27,21 @@ from .services.comparison_report import ensure_comparison_defaults
 
 logger = logging.getLogger("reminder")
 
-# 连接级兜底：每次新建 MySQL 连接时把 max_allowed_packet 调大到 128MB。
+# 连接级兜底：仅在 MySQL 全局 max_allowed_packet 低于 128MB 时才调大。
 # 背景：本集群为 CloudBase 代管（集群名 cloudbase__SAmOhXfvyj），TDSQL-C 控制台入口
-# 被平台锁定、CloudBase 控制台也不暴露该内核参数，无法在控制台改 → 只能靠代码侧保证。
-# 即使 TDSQL-C 实例重启、连接池断开重建，新连接也会自动 SET GLOBAL 自愈。
+# 被平台锁定、CloudBase 控制台也不暴露该内核参数，无法在控制台改。
+# 实测线上全局常为 1GB（平台/客服已调大或代管默认），故此处用「条件式」：
+# 不降级（保持平台已设的大值），仅当实例被重置到 <128MB 时由新连接自动 SET GLOBAL 自愈。
 @event.listens_for(engine, "connect")
 def _on_connect_raise_max_allowed_packet(dbapi_conn, conn_record):
     try:
         cur = dbapi_conn.cursor()
         try:
-            cur.execute("SET GLOBAL max_allowed_packet = 134217728")
+            cur.execute("SHOW GLOBAL VARIABLES LIKE 'max_allowed_packet'")
+            row = cur.fetchone()
+            cur.fetchall()  # 消费剩余结果，避免连接污染
+            if row and int(row[1]) < 134217728:
+                cur.execute("SET GLOBAL max_allowed_packet = 134217728")
         finally:
             cur.close()
     except Exception:  # noqa: BLE001
@@ -567,11 +572,15 @@ def _raise_max_allowed_packet():
     try:
         with engine.raw_connection() as conn:
             cur = conn.connection.cursor()
-            cur.execute("SET GLOBAL max_allowed_packet = 134217728")
+            cur.execute("SHOW GLOBAL VARIABLES LIKE 'max_allowed_packet'")
+            row = cur.fetchone()
+            cur.fetchall()  # 消费剩余结果，避免连接污染
+            if row and int(row[1]) < 134217728:
+                cur.execute("SET GLOBAL max_allowed_packet = 134217728")
         engine.dispose()  # 强制连接池重建，新连接读取新的全局包大小
-        logger.info("max_allowed_packet 已调大至 128MB（连接池已重建）")
+        logger.info("max_allowed_packet 兜底就绪（低于128MB时自动调大，不降级现有更大值）")
     except Exception as e:  # noqa: BLE001
-        logger.warning("调大 max_allowed_packet 失败(可忽略，建议在 TDSQL-C 控制台设置): %s", e)
+        logger.warning("max_allowed_packet 兜底设置失败(可忽略): %s", e)
 
 
 @asynccontextmanager
