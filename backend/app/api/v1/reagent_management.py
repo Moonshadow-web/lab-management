@@ -28,8 +28,8 @@ from ...schemas.reagent_management import (
     ReagentStockRead, InventoryCheckCreate, InventoryCheckRead,
     ReagentOrderCreate, ReagentOrderRead, ReceivingCreate, ReceivingRead,
     ReagentConsumptionRead, ImportResult,
-    TestItemReagentCreate, TestItemReagentRead,
-    InstrumentReagentCreate, InstrumentReagentRead,
+    TestItemReagentCreate, TestItemReagentUpdate, TestItemReagentRead,
+    InstrumentReagentCreate, InstrumentReagentUpdate, InstrumentReagentRead,
 )
 
 router = APIRouter(prefix="/reagent", tags=["reagent-management"])
@@ -893,6 +893,31 @@ def delete_test_item_reagent(
     return {"ok": True}
 
 
+@router.put("/associations/test-items/{rel_id}", response_model=TestItemReagentRead)
+def update_test_item_reagent(
+    rel_id: int, data: TestItemReagentUpdate, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
+):
+    obj = db.query(TestItemReagent).get(rel_id)
+    if not obj:
+        raise HTTPException(404, "关联未找到")
+    updates = data.model_dump(exclude_unset=True)
+    if "test_item_id" in updates or "reagent_item_id" in updates:
+        tid = updates.get("test_item_id", obj.test_item_id)
+        rid = updates.get("reagent_item_id", obj.reagent_item_id)
+        if db.query(TestItemReagent).filter(
+            TestItemReagent.test_item_id == tid,
+            TestItemReagent.reagent_item_id == rid,
+            TestItemReagent.id != rel_id,
+        ).first():
+            raise HTTPException(409, "该关联已存在")
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
 @router.get("/associations/instruments", response_model=dict)
 def list_instrument_reagents(
     instrument_id: Optional[int] = Query(None),
@@ -949,3 +974,28 @@ def delete_instrument_reagent(
     db.delete(obj)
     db.commit()
     return {"ok": True}
+
+
+@router.put("/associations/instruments/{rel_id}", response_model=InstrumentReagentRead)
+def update_instrument_reagent(
+    rel_id: int, data: InstrumentReagentUpdate, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
+):
+    obj = db.query(InstrumentReagent).get(rel_id)
+    if not obj:
+        raise HTTPException(404, "关联未找到")
+    updates = data.model_dump(exclude_unset=True)
+    if "instrument_id" in updates or "reagent_item_id" in updates:
+        iid = updates.get("instrument_id", obj.instrument_id)
+        rid = updates.get("reagent_item_id", obj.reagent_item_id)
+        if db.query(InstrumentReagent).filter(
+            InstrumentReagent.instrument_id == iid,
+            InstrumentReagent.reagent_item_id == rid,
+            InstrumentReagent.id != rel_id,
+        ).first():
+            raise HTTPException(409, "该关联已存在")
+    for k, v in updates.items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj

@@ -44,8 +44,9 @@
               <el-tag :type="row.auto_matched ? 'warning' : 'success'" size="small">{{ row.auto_matched ? '自动' : '人工' }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right" v-if="canWrite">
+          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
             <template #default="{ row }">
+              <el-button size="small" link @click="openProjEdit(row)">编辑</el-button>
               <el-button size="small" link type="danger" @click="onDeleteProj(row)">删除</el-button>
             </template>
           </el-table-column>
@@ -74,8 +75,9 @@
               <el-tag :type="row.auto_matched ? 'warning' : 'success'" size="small">{{ row.auto_matched ? '自动' : '人工' }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right" v-if="canWrite">
+          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
             <template #default="{ row }">
+              <el-button size="small" link @click="openInstEdit(row)">编辑</el-button>
               <el-button size="small" link type="danger" @click="onDeleteInst(row)">删除</el-button>
             </template>
           </el-table-column>
@@ -86,8 +88,8 @@
       </el-tab-pane>
     </el-tabs>
 
-    <!-- 新增 项目-试剂 关联 -->
-    <el-dialog v-model="projAddVisible" title="新增 项目-试剂 关联" width="560px">
+    <!-- 新增/编辑 项目-试剂 关联 -->
+    <el-dialog v-model="projAddVisible" :title="projEditingId ? '编辑 项目-试剂 关联' : '新增 项目-试剂 关联'" width="560px">
       <el-form label-width="90px" size="small">
         <el-form-item label="检验项目" required>
           <el-select v-model="projForm.test_item_id" filterable placeholder="选择项目" style="width:100%">
@@ -113,8 +115,8 @@
       </template>
     </el-dialog>
 
-    <!-- 新增 仪器-耗材 关联 -->
-    <el-dialog v-model="instAddVisible" title="新增 仪器-耗材 关联" width="560px">
+    <!-- 新增/编辑 仪器-耗材 关联 -->
+    <el-dialog v-model="instAddVisible" :title="instEditingId ? '编辑 仪器-耗材 关联' : '新增 仪器-耗材 关联'" width="560px">
       <el-form label-width="90px" size="small">
         <el-form-item label="仪器" required>
           <el-select v-model="instForm.instrument_id" filterable placeholder="选择仪器" style="width:100%">
@@ -140,8 +142,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, MagicStick } from '@element-plus/icons-vue'
 import {
-  listTestItemReagents, createTestItemReagent, deleteTestItemReagent,
-  listInstrumentReagents, createInstrumentReagent, deleteInstrumentReagent,
+  listTestItemReagents, createTestItemReagent, updateTestItemReagent, deleteTestItemReagent,
+  listInstrumentReagents, createInstrumentReagent, updateInstrumentReagent, deleteInstrumentReagent,
   autoMatchAssociations,
 } from '../../api/reagent'
 import { listTestItems } from '../../api/testItems'
@@ -177,6 +179,7 @@ const instLoading = ref(false), instQ = ref('')
 const matching = ref(false)
 const submitting = ref(false)
 const projAddVisible = ref(false), instAddVisible = ref(false)
+const projEditingId = ref(null), instEditingId = ref(null)
 const projForm = reactive({ test_item_id: null, reagent_item_id: null, role: '试剂' })
 const instForm = reactive({ instrument_id: null, reagent_item_id: null, role: '耗材' })
 
@@ -241,19 +244,35 @@ async function onAutoMatch() {
 }
 
 function openProjAdd() {
+  projEditingId.value = null
   Object.assign(projForm, { test_item_id: null, reagent_item_id: null, role: '试剂' })
   projAddVisible.value = true
 }
+function openProjEdit(row) {
+  projEditingId.value = row.id
+  Object.assign(projForm, { test_item_id: row.test_item_id, reagent_item_id: row.reagent_item_id, role: row.role })
+  projAddVisible.value = true
+}
 function openInstAdd() {
+  instEditingId.value = null
   Object.assign(instForm, { instrument_id: null, reagent_item_id: null, role: '耗材' })
+  instAddVisible.value = true
+}
+function openInstEdit(row) {
+  instEditingId.value = row.id
+  Object.assign(instForm, { instrument_id: row.instrument_id, reagent_item_id: row.reagent_item_id, role: row.role })
   instAddVisible.value = true
 }
 async function onProjSubmit() {
   if (!projForm.test_item_id || !projForm.reagent_item_id) { ElMessage.warning('请选择项目与试剂'); return }
   submitting.value = true
   try {
-    await createTestItemReagent({ ...projForm, auto_matched: false })
-    ElMessage.success('已新增'); projAddVisible.value = false; loadProj()
+    if (projEditingId.value) {
+      await updateTestItemReagent(projEditingId.value, { ...projForm })
+    } else {
+      await createTestItemReagent({ ...projForm, auto_matched: false })
+    }
+    ElMessage.success('已保存'); projAddVisible.value = false; loadProj()
   } catch (e) {
     ElMessage.error('保存失败：' + (e?.response?.data?.detail || e.message))
   } finally { submitting.value = false }
@@ -262,8 +281,12 @@ async function onInstSubmit() {
   if (!instForm.instrument_id || !instForm.reagent_item_id) { ElMessage.warning('请选择仪器与耗材'); return }
   submitting.value = true
   try {
-    await createInstrumentReagent({ ...instForm, auto_matched: false })
-    ElMessage.success('已新增'); instAddVisible.value = false; loadInst()
+    if (instEditingId.value) {
+      await updateInstrumentReagent(instEditingId.value, { ...instForm })
+    } else {
+      await createInstrumentReagent({ ...instForm, auto_matched: false })
+    }
+    ElMessage.success('已保存'); instAddVisible.value = false; loadInst()
   } catch (e) {
     ElMessage.error('保存失败：' + (e?.response?.data?.detail || e.message))
   } finally { submitting.value = false }

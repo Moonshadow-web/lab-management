@@ -68,6 +68,14 @@ class TestItemReagentCreate(TestItemReagentBase):
     pass
 
 
+class TestItemReagentUpdate(BaseModel):
+    test_item_id: Optional[int] = None
+    reagent_item_id: Optional[int] = None
+    role: Optional[str] = None
+    auto_matched: Optional[bool] = None
+    remark: Optional[str] = None
+
+
 class TestItemReagentRead(TestItemReagentBase):
     id: int
 
@@ -86,6 +94,14 @@ class InstrumentReagentBase(BaseModel):
 
 class InstrumentReagentCreate(InstrumentReagentBase):
     pass
+
+
+class InstrumentReagentUpdate(BaseModel):
+    instrument_id: Optional[int] = None
+    reagent_item_id: Optional[int] = None
+    role: Optional[str] = None
+    auto_matched: Optional[bool] = None
+    remark: Optional[str] = None
 
 
 class InstrumentReagentRead(InstrumentReagentBase):

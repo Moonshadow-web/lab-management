@@ -103,6 +103,9 @@ export function listTestItemReagents(params) {
 export function createTestItemReagent(data) {
   return request.post('/api/v1/reagent/associations/test-items', data)
 }
+export function updateTestItemReagent(id, data) {
+  return request.put(`/api/v1/reagent/associations/test-items/${id}`, data)
+}
 export function deleteTestItemReagent(id) {
   return request.delete(`/api/v1/reagent/associations/test-items/${id}`)
 }
@@ -111,6 +114,9 @@ export function listInstrumentReagents(params) {
 }
 export function createInstrumentReagent(data) {
   return request.post('/api/v1/reagent/associations/instruments', data)
+}
+export function updateInstrumentReagent(id, data) {
+  return request.put(`/api/v1/reagent/associations/instruments/${id}`, data)
 }
 export function deleteInstrumentReagent(id) {
   return request.delete(`/api/v1/reagent/associations/instruments/${id}`)
