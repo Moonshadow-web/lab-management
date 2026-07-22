@@ -444,6 +444,8 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
             html.append("</tr></thead><tbody>")
             sample_lens = [len(c.get("results") or []) for c in insts.values() if not c.get("masked")]
             n_samples = max(sample_lens) if sample_lens else 0
+            ref_id_for_item = data["ref_id"]
+            ref_res_for_item = insts.get(ref_id_for_item, {}).get("results") or []
             # 每个样本一行
             for sample_idx in range(n_samples):
                 html.append(f'<tr><td>{sample_idx + 1}</td>')
@@ -455,7 +457,15 @@ def build_html(group: ComparisonGroup, plan: ComparisonPlan, data: dict):
                     val = _qual_cell_display(res[sample_idx]) if sample_idx < len(res) else "-"
                     html.append(f'<td>{val}</td>')
                     if not ins["is_reference"]:
-                        html.append('<td></td>')  # 样本行符合率留空，仅在底部汇总行显示
+                        # 逐样本判定：与靶机 P/N 是否一致
+                        ref_pn = _to_pn(ref_res_for_item[sample_idx]) if sample_idx < len(ref_res_for_item) else None
+                        cur_pn = _to_pn(res[sample_idx]) if sample_idx < len(res) else None
+                        if ref_pn is None or cur_pn is None:
+                            html.append('<td>-</td>')
+                        elif ref_pn == cur_pn:
+                            html.append('<td class="yes">符合</td>')
+                        else:
+                            html.append('<td class="no">不符合</td>')
                 html.append("</tr>")
             # 每个项目底部汇总：符合率
             html.append(f'<tr style="background:#f7f9fc"><td>符合率</td>')
@@ -829,6 +839,8 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
                     ci += 1
             sample_lens = [len(c.get("results") or []) for c in insts_data.values() if not c.get("masked")]
             n_samples = max(sample_lens) if sample_lens else 0
+            ref_id_for_item = data["ref_id"]
+            ref_res_for_item = insts_data.get(ref_id_for_item, {}).get("results") or []
             # 每个样本一行
             for sample_idx in range(n_samples):
                 cells = t.add_row().cells
@@ -841,7 +853,15 @@ def build_docx(db, group: ComparisonGroup, plan: ComparisonPlan, data: dict, out
                     _fill(cells[ci], val)
                     ci += 1
                     if not ins["is_reference"]:
-                        _fill(cells[ci], "")  # 样本行符合率留空
+                        # 逐样本判定：与靶机 P/N 是否一致
+                        ref_pn = _to_pn(ref_res_for_item[sample_idx]) if sample_idx < len(ref_res_for_item) else None
+                        cur_pn = _to_pn(res[sample_idx]) if sample_idx < len(res) else None
+                        if ref_pn is None or cur_pn is None:
+                            _fill(cells[ci], "-")
+                        elif ref_pn == cur_pn:
+                            _fill(cells[ci], "符合", color=RGBColor(0x27, 0xae, 0x60), bold=True)
+                        else:
+                            _fill(cells[ci], "不符合", color=RGBColor(0xc0, 0x39, 0x2b), bold=True)
                         ci += 1
             # 每个项目底部汇总：符合率
             cells = t.add_row().cells
