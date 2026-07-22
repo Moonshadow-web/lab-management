@@ -126,24 +126,6 @@ def diag_build():
     return {"build": _BUILD_MARK, "has_self_heal": True}
 
 
-@router.get("/max_allowed_packet")
-def diag_max_allowed_packet():
-    """临时诊断：读取 MySQL 全局 max_allowed_packet，验证连接级兜底是否生效。验证后移除。"""
-    from ...core.database import SessionLocal
-    from sqlalchemy import text as _t
-
-    try:
-        s = SessionLocal()
-        try:
-            row = s.execute(_t("SHOW GLOBAL VARIABLES LIKE 'max_allowed_packet'")).fetchone()
-            val = int(row[1]) if row else None
-        finally:
-            s.close()
-    except Exception as e:  # noqa: BLE001
-        val = f"error: {e}"
-    return {"max_allowed_packet": val}
-
-
 @router.get("/copy-from-sqlite")
 def diag_copy_from_sqlite():
     """把容器内 /app/data/app.db (SQLite) 的数据搬到 MySQL。
