@@ -27,6 +27,32 @@ from ...schemas import (
 )
 from ...services.qc_service import aggregate, lookup_quality_goal, draft_report, find_test_item_by_name
 
+# 单位纠正映射：月结项目名(=LIS 上传的 test_item 原文) -> 正确单位。
+# 用于覆盖 LIS 文件里错误的「单位」列（如定性免疫项目被错填成 IU/mL / ng/L / 空）。
+# 上传时强制采用本映射；并通过 /_backfill_units 回填历史行。
+# 新增/修改项目只需在此增删条目，然后调用 /_backfill_units 并重新部署。
+# 取值依据：用户点名的 4 项按指定 COI；其余按项目库(TestItem)权威单位核对（2026-07-23）。
+QC_UNIT_OVERRIDES = {
+    # 用户明确指定 → COI
+    "表面抗原": "COI",
+    "e-抗体": "COI",
+    "甲肝IgM抗体": "COI",
+    "梅毒特异抗体": "COI",
+    # 按项目库(TestItem)权威单位核对（e-抗原/表面抗体保持原单位，不入此表）
+    "HSV-1 IgM": "AU/mL",
+    "HSV-2 IgM": "AU/mL",
+    "巨细胞病毒IgM": "COI",
+    "巨细胞病毒IgG": "U/mL",
+    "弓型体IgM": "COI",
+    "弓型体IgG": "IU/mL",
+    "戊肝抗体IgM": "S/CO",
+    "戊肝抗体IgG": "S/CO",
+    "风疹IgM": "COI",
+    "风疹IgG": "IU/mL",
+    "I型单纯疱疹IgG": "COI",
+    "II型单纯疱疹IgG": "COI",
+}
+
 router = make_router(
     QCMonthlySummary,
     QCMonthlySummaryRead,
@@ -369,7 +395,7 @@ def upload_qc_summary(
             ti_name = (get("test_item") or "").strip()
             matched = find_test_item_by_name(db, ti_name, instrument=inst) if ti_name else None
             file_unit = (get("unit") or "").strip()
-            unit = file_unit or (matched.unit if matched else "")
+            unit = QC_UNIT_OVERRIDES.get(ti_name, file_unit or (matched.unit if matched else ""))
             meta[key] = {
                 "unit": unit,
                 "target_mean": _to_float(get("target_mean")) or 0.0,
@@ -508,6 +534,36 @@ def backfill_quality_goals(db: Session = Depends(get_db), user: User = Depends(g
             updated += 1
             if len(samples) < 30:
                 samples.append({"test_item": s.test_item, "instrument": s.instrument, "goal": goal})
+    db.commit()
+    return {"updated": updated, "total": len(rows), "samples": samples}
+
+
+@router.post("/_backfill_units", dependencies=[Depends(require_roles("admin", "qc_manager"))])
+def backfill_units(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """按 QC_UNIT_OVERRIDES 回填已存月结行的单位。
+
+    单位在 LIS 上传时由文件「单位」列决定，定性免疫项目常被错填为 IU/mL / ng/L / 空，
+    覆盖 TestItem 里本就正确的 COI。本接口按项目名映射强制纠正历史行（无视原值，直接改成正值）。
+    返回 {updated, total, samples}。
+    """
+    if not QC_UNIT_OVERRIDES:
+        return {"updated": 0, "total": 0, "samples": []}
+    rows = db.query(QCMonthlySummary).all()
+    updated = 0
+    samples = []
+    for s in rows:
+        target = QC_UNIT_OVERRIDES.get((s.test_item or "").strip())
+        if not target:
+            continue
+        if (s.unit or "") != target:
+            old = s.unit
+            s.unit = target
+            updated += 1
+            if len(samples) < 50:
+                samples.append({
+                    "test_item": s.test_item, "instrument": s.instrument,
+                    "lot_no": s.lot_no, "old_unit": old, "new_unit": target,
+                })
     db.commit()
     return {"updated": updated, "total": len(rows), "samples": samples}
 
