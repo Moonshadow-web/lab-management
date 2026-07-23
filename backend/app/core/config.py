@@ -44,3 +44,9 @@ SMTP_PASS = os.getenv("SMTP_PASS", "")
 SMTP_TLS = os.getenv("SMTP_TLS", "true").lower() in ("1", "true", "yes", "y")
 MAIL_FROM = os.getenv("MAIL_FROM", SMTP_USER or "noreply@localhost")
 SYSTEM_NAME = os.getenv("SYSTEM_NAME", "检验科生免组实验室管理系统")
+
+# 微信推送（WxPusher）：配置 appToken 后按人向用户微信发提醒；未配置时降级为本地日志。
+# 注册/登录：wxpusher.zjiecode.com/admin 用微信扫码，无账号自动注册；创建应用拿 appToken。
+# 官方文档：https://wxpusher.zjiecode.com/docs/
+WXPUSHER_ENABLED = os.getenv("WXPUSHER_ENABLED", "false").lower() in ("1", "true", "yes", "y")
+WXPUSHER_APP_TOKEN = os.getenv("WXPUSHER_APP_TOKEN", "")

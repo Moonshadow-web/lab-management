@@ -7,7 +7,7 @@ from ..core.database import Base
 
 
 class NotifyRecipient(Base):
-    """提醒接收人（独立于系统用户，可增删）。支持邮箱与手机号（短信预留）。"""
+    """提醒接收人（独立于系统用户，可增删）。支持邮箱、手机号（短信预留）、微信(WxPusher)。"""
 
     __tablename__ = "notify_recipients"
 
@@ -15,7 +15,8 @@ class NotifyRecipient(Base):
     name: Mapped[str] = mapped_column(String(100), default="")          # 姓名/称谓
     email: Mapped[str] = mapped_column(String(200), default="")         # 接收提醒的邮箱
     phone: Mapped[str] = mapped_column(String(30), default="")          # 手机号（短信预留）
-    channels: Mapped[str] = mapped_column(String(50), default="email")  # 渠道：email / sms / 逗号分隔
+    wx_uid: Mapped[str] = mapped_column(String(60), default="")         # 微信推送(WxPusher)用户UID，按人精准推送用
+    channels: Mapped[str] = mapped_column(String(50), default="email")  # 渠道：email / sms / wxpusher / 逗号分隔
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)        # 是否启用
     rule_categories: Mapped[str] = mapped_column(String(200), default="")  # 订阅的提醒分类(CSV)；空=不接收
     note: Mapped[str] = mapped_column(String(300), default="")

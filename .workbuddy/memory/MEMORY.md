@@ -19,6 +19,7 @@
 ## 业务模块约定
 - EQA：/api/v1/eqa-plans；编号 年4+轮1+序1；北京机构 01110025/4731；肝炎/感染B/C 填 P/N+S/CO，快检仅 P/N。
 - QC仪器：受控21台；替代：停用 AU5822(2)/DXI800C(3)/DXI800D(4)/DXI800急诊(6)/DXI800唐筛(7) → AU5821A(67)/AU5821B(68)/DXI800 1-4(69-72)/DXI800急(73)/唐(74)/AU5800急诊(5)。
+  - **仪器 name 代号式归整（2026-07-23）**：instruments.name 改为科室代号，model 原值保留、显示自动拼「名称（型号）」。映射：AU5821A=AU58-1(67)/AU5821B=AU58-2(68)/AU5800急诊=AU5800(5)；DXI800 1-4=①~④号机(69-72)、急=急诊(73)、唐=唐筛(74)；停用旧机 name 加「（停用）」后缀。家族分组(AU生化仪[5,67,68]、DxI800[69-74])与项目→仪器链接靠 family 名+model 兜底，与 name 无关，改名不影响。回滚备份 scratch_invest/instruments_backup_20260723_065652.json。
 - interlab：过滤 has_eqa=0 AND has_interlab=1；16例外→0，有EQA→0，其余→1；模板 定量019/定性018。
 - comparison：/api/v1/comparison；分组1生化 67/68/5(参比68)，分组2 DXI800 69-74；DXI800 te=15% 不降(IL-6/BNP/cTnI/PCT/sTfR/IFA)，生化 CO2 te=10%；权威 WS/T 403—2024 字典在 services/comparison_report.py(键=系统代码大写)，新TE查字典勿写死；按水平 te_by_level/mode_by_level。
 - qc_target：一批次一靶值；水平1/2/3；conventional/immediate；SI 界值 services/qc_target.py。
@@ -30,7 +31,18 @@
 - 字节存 MySQL BLOB（ComparisonAttachment/InterlabAttachment.data，LONGBLOB 16MB），不落磁盘。
 - 上传图片经 services/attachment_compress.optimize_image_bytes 压缩（长边≤2400px、JPEG q85）；非图片原样；Pillow 缺失降级；超限 413。
 - 预览/下载：get_current_user 支持 URL ?token=/cookie 兜底；前端 AttachmentPreview 内嵌预览。
-- max_allowed_packet：单条 INSERT 受服务端限制（TDSQL-C 默认~4MB，超→上传500）。**该集群是 CloudBase 代管（集群名 cloudbase__SAmOhXfvyj，集群ID cynosdbmysql-l0kufcte），TDSQL-C 控制台入口被平台锁定，CloudBase 控制台也不暴露该内核参数 → 控制台路线走不通**。唯一可靠手段是代码侧：main.py 启动 SET GLOBAL 134217728 + dispose，且注册 SQLAlchemy `connect` 事件**每次新建连接自动 SET GLOBAL 134217728**，实例重启/连接池重建自愈。值须为1024倍数(134217728=128MB符合)。详见 2026-07-23 日志。
+- max_allowed_packet：单条 INSERT 受服务端限制。**实测线上 `SHOW GLOBAL VARIABLES` = 1073741824(1GB)**（非早前假设的4MB；应是平台/客服已调大或代管默认），故当前大文件上传已无 500。该集群 CloudBase 代管（cloudbase__SAmOhXfvyj / cynosdbmysql-l0kufcte），控制台锁定改不了参数。代码侧保留兜底：main.py 启动 + SQLAlchemy `connect` 事件**仅当全局<128MB 时才 SET GLOBAL 134217728**（条件式，不降级、不覆盖平台已设的1GB；仅实例重置到<128MB 时自愈升）。详见 2026-07-23 日志。
+
+## 提醒短信(SMS)（规划中，尚未实现）
+- **关键现实**：CloudBase 内置短信配额**仅用于登录验证码（Auth）**，不能发业务通知；业务通知短信须**单独开通腾讯云短信 SMS 服务**（同主账号 `cloud1-0gjhamv53ff2298d`）。
+- **当前代码基础**：`NotifyRecipient` 已预留 `phone`+`channels`(email/sms) 列但未发短信；`reminder_engine.run_reminders` 只发站内通知+邮件，无 sms 分支；模型无需改表。触发点 `main.py:_reminder_scheduler` 已就绪。
+- **落地规划（用户当前仅要"怎么做"的指引，未让写代码）**：
+  - `config.py` 加 `SMS_ENABLED/SECRET_ID/SECRET_KEY/SDK_APP_ID/SIGN_NAME/TEMPLATE_ID` 读 `os.getenv`。
+  - 新建 `services/sms_service.py`：`send_sms(phone, params)` 用 `tencentcloud-sdk-python-sms`（轻量模块包，非全量），未配置降级日志（与邮件同策略）。
+  - `reminder_engine.py`：新增 `get_sms_recipients`（筛 `channels like '%sms%'` 且 `phone` 非空），在 `run_reminders` 聚合邮件处并行发短信并计入 `ReminderSendLog`。
+  - 前端接收人设置加「短信渠道+手机号」；Cloud Run 环境变量补 SMS 五项。
+  - 短信文案受审核模板约束（变量{1}=条数、{2}=摘要）；引擎已有里程碑去重+7天重发控条数。
+- **用户侧前置（截至 2026-07-22 尚未开通 SMS）**：①确认 SMS 与 CloudBase 同主账号；②企业实名；③申请签名（医院需《医疗机构执业许可证》，签名如"民航总医院"）；④申请通知类模板（含{1}{2}）；⑤拿到 SmsSdkAppId/SecretId/SecretKey/SignName/TemplateId 填环境变量。备选：企微/公众号模板消息免费免签名。
 
 ## 数据库与持久化
 - 已弃 SQLite+CFS，用 CloudBase TDSQL-C MySQL：实例 cynosdbmysql-ins-102awksb，内网 10.0.1.18:3306，库 cloud1-0gjhamv53ff2298d；账号 labapp（外网按需开，平时关）；DATABASE_URL 在 cloudbaserc.json。

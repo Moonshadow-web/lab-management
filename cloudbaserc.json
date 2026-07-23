@@ -25,7 +25,9 @@
             "SMTP_USER": "815268425@qq.com",
             "SMTP_PASS": "ejrgnmwzoigsbfjd",
             "MAIL_FROM": "815268425@qq.com",
-            "DATABASE_URL": "mysql+pymysql://labapp:Jzz6827556@10.0.1.18:3306/cloud1-0gjhamv53ff2298d"
+            "DATABASE_URL": "mysql+pymysql://labapp:Jzz6827556@10.0.1.18:3306/cloud1-0gjhamv53ff2298d",
+            "WXPUSHER_ENABLED": "true",
+            "WXPUSHER_APP_TOKEN": "AT_c4z7ZO7rBn1wup5HYboK0bSQwEJ96Mfp"
           },
           "volumes": []
         }

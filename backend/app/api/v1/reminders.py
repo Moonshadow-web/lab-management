@@ -11,6 +11,7 @@ from ...core.security import get_current_user, require_roles
 from ...models.reminder import NotifyRecipient, ReminderRule, ReminderSendLog
 from ...models.user import User
 from ...services.reminder_engine import ensure_reminder_defaults, run_reminders
+from ...services.wxpusher_service import create_follow_qrcode, resolve_uid_by_extra
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
 
@@ -72,6 +73,34 @@ def delete_recipient(rid: int, db: Session = Depends(get_db), _: User = Depends(
     db.delete(r)
     db.commit()
     return {"ok": True}
+
+
+# ---------------- 微信(WxPusher) 绑定辅助 ----------------
+@router.get("/recipients/{rid}/wx-qrcode")
+def wx_follow_qrcode(rid: int, db: Session = Depends(get_db), _: User = Depends(require_roles("admin"))):
+    """生成带 extra=rid 的关注二维码，接收人扫码关注后即可绑定微信。返回二维码地址。"""
+    r = db.get(NotifyRecipient, rid)
+    if not r:
+        raise HTTPException(status_code=404, detail="接收人不存在")
+    url = create_follow_qrcode(extra=rid, valid_time=1800)
+    if not url:
+        raise HTTPException(status_code=502, detail="生成二维码失败：WxPusher 未配置或调用异常")
+    return {"url": url}
+
+
+@router.post("/recipients/{rid}/wx-sync")
+def wx_sync_uid(rid: int, db: Session = Depends(get_db), _: User = Depends(require_roles("admin"))):
+    """按 extra=rid 在 WxPusher 关注用户中解析并回填该接收人的 wx_uid。"""
+    r = db.get(NotifyRecipient, rid)
+    if not r:
+        raise HTTPException(status_code=404, detail="接收人不存在")
+    uid = resolve_uid_by_extra(extra=rid)
+    if not uid:
+        raise HTTPException(status_code=404, detail="未找到关注记录：请先让该接收人扫码关注二维码后再同步")
+    r.wx_uid = uid
+    r.updated_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True, "wx_uid": uid}
 
 
 # ---------------- 提醒类型 ----------------

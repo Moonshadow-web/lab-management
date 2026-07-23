@@ -19,6 +19,7 @@
             <el-table-column prop="name" label="姓名" width="140" />
             <el-table-column prop="email" label="邮箱" min-width="180" />
             <el-table-column prop="phone" label="手机号" width="130" />
+            <el-table-column prop="wx_uid" label="微信UID" min-width="120" />
             <el-table-column prop="channels" label="渠道" width="100" />
             <el-table-column label="启用" width="80">
               <template #default="{ row }">
@@ -89,8 +90,8 @@
             <el-button :loading="testingMail" @click="onTestMail">发送测试邮件到 815268425@qq.com</el-button>
             <el-button @click="loadLog">刷新记录</el-button>
           </div>
-          <el-alert v-if="runResult" :type="runResult.emails_sent ? 'success' : 'info'" :closable="false"
-            :title="`规则 ${runResult.rules} 条 · 本次发送事项 ${runResult.items_sent} · 成功发信 ${runResult.emails_sent} 人`" />
+          <el-alert v-if="runResult" :type="(runResult.emails_sent || runResult.wx_sent) ? 'success' : 'info'" :closable="false"
+            :title="`规则 ${runResult.rules} 条 · 本次发送事项 ${runResult.items_sent} · 邮件 ${runResult.emails_sent} 人 · 微信 ${runResult.wx_sent || 0} 人`" />
 
           <template v-if="previewList.length">
             <div style="margin: 14px 0 6px; font-weight: 600">预览（将发送以下内容）</div>
@@ -134,9 +135,22 @@
         <el-form-item label="姓名" required><el-input v-model="recipientForm.name" /></el-form-item>
         <el-form-item label="邮箱"><el-input v-model="recipientForm.email" placeholder="接收提醒的邮箱" /></el-form-item>
         <el-form-item label="手机号"><el-input v-model="recipientForm.phone" placeholder="短信预留" /></el-form-item>
+        <el-form-item label="微信UID">
+          <el-input v-model="recipientForm.wx_uid" placeholder="WxPusher 用户UID；留空则点右侧按钮扫码绑定">
+            <template #append>
+              <el-button size="small" :loading="qrLoading" @click="onGenQrcode">生成二维码</el-button>
+            </template>
+          </el-input>
+          <div style="margin-top: 6px">
+            <el-button size="small" @click="onSyncUid" :loading="syncLoading">从扫码关注同步 UID</el-button>
+            <span style="font-size: 12px; color: #999; margin-left: 6px">先「生成二维码」让对方微信扫码关注，再点同步自动写入 UID。</span>
+          </div>
+        </el-form-item>
         <el-form-item label="渠道">
           <el-select v-model="recipientForm.channels" style="width: 100%">
             <el-option label="邮件 email" value="email" />
+            <el-option label="邮件+微信 email,wxpusher" value="email,wxpusher" />
+            <el-option label="微信 wxpusher" value="wxpusher" />
             <el-option label="邮件+短信 email,sms" value="email,sms" />
           </el-select>
         </el-form-item>
@@ -186,6 +200,16 @@
         <el-button type="primary" :loading="submitting" @click="onSubmitRule">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 微信关注二维码 -->
+    <el-dialog v-model="qrVisible" title="微信关注二维码" width="380px">
+      <div style="text-align: center">
+        <img v-if="qrUrl" :src="qrUrl" style="width: 240px; height: 240px" />
+        <p style="font-size: 12px; color: #999; margin-top: 8px">
+          让该接收人用微信扫码关注；关注后回到「编辑发送人」点「从扫码关注同步 UID」即可绑定。
+        </p>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -196,6 +220,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listRecipients, createRecipient, updateRecipient, deleteRecipient,
   listRules, createRule, updateRule, deleteRule, runReminders, listSendLog,
+  getRecipientWxQrcode, syncRecipientWxUid,
 } from '../api/reminders'
 import { testEmail } from '../api/notifications'
 
@@ -220,7 +245,11 @@ function categoryLabel(cat) {
 
 const showRecipient = ref(false)
 const editingRecipient = ref(null)
-const recipientForm = ref({ name: '', email: '', phone: '', channels: 'email', enabled: true, rule_categories: [], note: '' })
+const recipientForm = ref({ name: '', email: '', phone: '', wx_uid: '', channels: 'email', enabled: true, rule_categories: [], note: '' })
+const qrLoading = ref(false)
+const syncLoading = ref(false)
+const qrVisible = ref(false)
+const qrUrl = ref('')
 
 const showRule = ref(false)
 const editingRule = ref(null)
@@ -253,7 +282,7 @@ function onAddRecipient() {
 }
 function onEditRecipient(row) {
   editingRecipient.value = row
-  recipientForm.value = { ...row, rule_categories: (row.rule_categories || '').split(',').filter(Boolean) }
+  recipientForm.value = { ...row, wx_uid: row.wx_uid || '', rule_categories: (row.rule_categories || '').split(',').filter(Boolean) }
   showRecipient.value = true
 }
 async function onSubmitRecipient() {
@@ -284,6 +313,32 @@ async function onDeleteRecipient(row) {
     ElMessage.success('已删除')
     await loadAll()
   } catch (e) { if (e !== 'cancel') ElMessage.error('删除失败') }
+}
+
+// 微信(WxPusher)绑定
+async function onGenQrcode() {
+  const id = editingRecipient.value?.id
+  if (!id) { ElMessage.warning('请先保存接收人再生成二维码'); return }
+  qrLoading.value = true
+  try {
+    const res = await getRecipientWxQrcode(id)
+    qrUrl.value = res.url
+    qrVisible.value = true
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '生成二维码失败')
+  } finally { qrLoading.value = false }
+}
+async function onSyncUid() {
+  const id = editingRecipient.value?.id
+  if (!id) { ElMessage.warning('请先保存接收人再同步'); return }
+  syncLoading.value = true
+  try {
+    const res = await syncRecipientWxUid(id)
+    recipientForm.value.wx_uid = res.wx_uid
+    ElMessage.success('已同步微信 UID：' + res.wx_uid)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '同步失败')
+  } finally { syncLoading.value = false }
 }
 
 // 提醒类型
