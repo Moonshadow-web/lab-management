@@ -24,6 +24,41 @@ from .seed.seed import run_seed
 from .services.notification_service import refresh_calibration_notifications, refresh_eqa_notifications
 from .services.reminder_engine import ensure_reminder_defaults, run_reminders
 from .services.comparison_report import ensure_comparison_defaults
+from .models.scheduling import (
+    SchedulingPost, POST_GROUP_DAY, POST_GROUP_NIGHT, POST_GROUP_SPECIAL,
+)
+
+
+# 生免组标准岗位（表为空时灌入，幂等）。顺序即展示顺序。
+# (name, group, required, only_weekday, required_weekday, order)
+DEFAULT_SCHEDULING_POSTS = [
+    ("门1岗", POST_GROUP_DAY, True, None, None, 1),
+    ("门2岗", POST_GROUP_DAY, True, None, None, 2),
+    ("门诊辅助岗", POST_GROUP_DAY, False, None, None, 3),
+    ("急诊1岗", POST_GROUP_DAY, True, None, None, 4),
+    ("急诊2岗", POST_GROUP_DAY, True, None, None, 5),
+    ("病房岗", POST_GROUP_DAY, True, None, None, 6),
+    ("电泳岗", POST_GROUP_DAY, False, None, 3, 7),     # 周四必有
+    ("凝血岗", POST_GROUP_DAY, True, None, None, 8),
+    ("免1岗", POST_GROUP_DAY, True, None, None, 9),
+    ("免2岗", POST_GROUP_DAY, True, None, None, 10),
+    ("发热白班", POST_GROUP_DAY, True, None, None, 11),
+    ("质谱岗", POST_GROUP_SPECIAL, True, 2, None, 12),  # 仅周三
+    ("生化夜班", POST_GROUP_NIGHT, True, None, None, 13),
+    ("发热夜班", POST_GROUP_NIGHT, True, None, None, 14),
+]
+
+
+def ensure_scheduling_defaults(db):
+    """岗位定义种子：表为空时灌入生免组标准岗位。幂等。"""
+    if db.query(SchedulingPost).first():
+        return
+    for name, group, required, only_weekday, required_weekday, order in DEFAULT_SCHEDULING_POSTS:
+        db.add(SchedulingPost(
+            name=name, group=group, required=required,
+            only_weekday=only_weekday, required_weekday=required_weekday, order=order,
+        ))
+    db.commit()
 
 logger = logging.getLogger("reminder")
 
@@ -396,6 +431,7 @@ async def _background_init():
             refresh_eqa_notifications(db)
             ensure_reminder_defaults(db)
             ensure_comparison_defaults(db)
+            ensure_scheduling_defaults(db)
             # 模块写权限配置：表为空时灌入出厂默认（与旧硬编码值一致）
             from .models.module_permission import ModulePermission, DEFAULT_MODULE_PERMISSIONS
             # 增量补齐：无论表是否为空，都把 DEFAULT_MODULE_PERMISSIONS 中缺失的

@@ -62,6 +62,7 @@ DEFAULT_MODULE_PERMISSIONS = {
     "verification":        ["admin", "specialty_leader"],
     "iso15189":            ["admin", "quality_manager", "qc_manager", "training_manager", "reagent_manager", "it_manager", "specialty_leader"],
     "quality-requirements": ["admin"],
+    "scheduling":          ["admin", "specialty_leader"],
 }
 
 
@@ -85,6 +86,7 @@ ALL_MODULES = [
     ("verification",        "性能验证"),
     ("iso15189",            "15189专项"),
     ("quality-requirements","项目质量要求"),
+    ("scheduling",          "排班管理"),
 ]
 
 

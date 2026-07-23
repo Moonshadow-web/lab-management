@@ -20,6 +20,7 @@ from . import (
     qc_material,
     quality_requirements,
     module_permissions,
+    scheduling,
 
     qc_summaries,
     reagent_management,
@@ -57,6 +58,10 @@ api_router.include_router(qc_target.router)
 api_router.include_router(qc_material.router)
 api_router.include_router(quality_requirements.router)
 api_router.include_router(module_permissions.router)
+api_router.include_router(scheduling.posts_router)
+api_router.include_router(scheduling.plans_router)
+api_router.include_router(scheduling.assignments_router)
+api_router.include_router(scheduling.router)
 
 # 将 test-items 的静态路由 /stats、/export 移到参数路由 /{item_id} 之前，
 # 避免具体路径被通用参数路由吞掉（如 GET /test-items/stats 误命中 /{item_id}）。

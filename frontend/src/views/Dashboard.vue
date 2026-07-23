@@ -52,6 +52,28 @@
       </div>
     </AppCard>
 
+    <AppCard title="今日我的岗位" class="mt">
+      <template #header-extra>
+        <el-button size="small" @click="loadMyShifts">刷新</el-button>
+      </template>
+      <el-empty v-if="!myShifts.length" description="今日无排班记录" :image-size="60" />
+      <div v-else class="my-shifts">
+        <el-tag
+          v-for="m in myShifts"
+          :key="m.post_id"
+          :type="m.group === 'night' ? 'danger' : (m.group === 'special' ? 'warning' : 'primary')"
+          effect="light"
+          class="shift-chip"
+        >
+          {{ m.post_name }}
+          <template v-if="m.is_early"><span class="tag-sub">早班</span></template>
+          <template v-if="m.is_continuous"><span class="tag-sub">连班</span></template>
+          <span v-if="m.status && m.status !== '在岗'" class="tag-sub">{{ m.status }}</span>
+        </el-tag>
+        <el-button class="shift-more" size="small" text type="primary" @click="go('/scheduling')">查看完整排班表</el-button>
+      </div>
+    </AppCard>
+
     <AppCard title="提醒事项" class="mt">
       <template #header-extra>
         <el-radio-group v-model="showAll" size="small" @change="loadNotices">
@@ -100,6 +122,7 @@ import { listReagents } from '../api/reagents'
 import { listTraining } from '../api/training'
 import { listVerification } from '../api/verification'
 import { listNC } from '../api/nonconformity'
+import { getMyToday } from '../api/scheduling'
 
 const router = useRouter()
 const stats = ref({
@@ -107,6 +130,7 @@ const stats = ref({
   qc: '-', reagents: '-', training: '-', verification: '-', nc: '-',
 })
 const notices = ref([])
+const myShifts = ref([])
 const showAll = ref(false)  // false=仅未读（默认隐藏已读），true=显示全部
 const hasRead = computed(() => notices.value.some(n => n.is_read))
 
@@ -169,6 +193,14 @@ async function loadNotices() {
   }
 }
 
+async function loadMyShifts() {
+  try {
+    myShifts.value = await getMyToday()
+  } catch (e) {
+    myShifts.value = []
+  }
+}
+
 async function onRead(row) {
   await markRead(row.id)
   // 默认「仅未读」视图下，已读后该项应隐藏，重新拉取列表
@@ -196,6 +228,7 @@ async function onUnreadAll() {
 onMounted(() => {
   loadStats()
   loadNotices()
+  loadMyShifts()
 })
 </script>
 
@@ -254,5 +287,23 @@ onMounted(() => {
   color: #888;
   font-size: 13px;
   margin-top: 4px;
+}
+.my-shifts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.shift-chip {
+  font-size: 14px;
+  padding: 6px 10px;
+}
+.shift-more {
+  margin-left: 4px;
+}
+.tag-sub {
+  margin-left: 4px;
+  opacity: 0.8;
+  font-size: 12px;
 }
 </style>

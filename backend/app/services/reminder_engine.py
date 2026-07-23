@@ -16,6 +16,7 @@ from ..core.config import SYSTEM_NAME
 from ..models.eqa import EqaPlan
 from ..models.instrument import CalibrationRecord, Instrument
 from ..models.notification import Notification
+from ..models.scheduling import SchedulingAssignment, SchedulingPost
 from ..models.reminder import NotifyRecipient, ReminderRule, ReminderSendLog
 from ..services.email_service import send_email
 from ..services.serverchan_service import send_serverchan
@@ -35,6 +36,16 @@ DEFAULT_RULES = [
     {
         "category": "calibration", "label": "设备校准到期提醒", "ref_kind": "calibration",
         "enabled": True, "lead_days": 30, "escalate_days_left": "14,7",
+        "scope_kind": "all", "scope_values": "",
+    },
+    {
+        "category": "shift_early", "label": "早班提醒", "ref_kind": "shift",
+        "enabled": True, "lead_days": 1, "escalate_days_left": "1",
+        "scope_kind": "all", "scope_values": "",
+    },
+    {
+        "category": "shift_continuous", "label": "连班提醒", "ref_kind": "shift",
+        "enabled": True, "lead_days": 1, "escalate_days_left": "1",
         "scope_kind": "all", "scope_values": "",
     },
 ]
@@ -167,6 +178,30 @@ def _fetch_items(db: Session, rule: ReminderRule, today: date):
             out.append({
                 "ref_id": inst.id, "ref_type": "calibration", "days_left": days_left,
                 "title": f"{inst.name}{model_txt}校准提醒", "message": msg, "due_date": rec.next_due_date,
+            })
+    elif rule.ref_kind == "shift":
+        # 早班/连班提醒：仅提醒「明天」(days_left==1) 的早班/连班，每人每天一次。
+        target_early = rule.category == "shift_early"
+        target_cont = rule.category == "shift_continuous"
+        for a in db.query(SchedulingAssignment).filter(
+            SchedulingAssignment.is_early == target_early,
+            SchedulingAssignment.is_continuous == target_cont,
+            SchedulingAssignment.person != "",
+        ).all():
+            d = _parse_date(a.date)
+            if not d:
+                continue
+            days_left = (d - today).days
+            if days_left > rule.lead_days or days_left < 0:
+                continue  # 只看将来的班（过去的班不提醒）
+            post = db.get(SchedulingPost, a.post_id)
+            post_name = post.name if post else "岗位"
+            kind = "早班" if target_early else "连班"
+            out.append({
+                "ref_id": a.id, "ref_type": rule.category, "days_left": days_left,
+                "title": f"{a.person} 的{post_name}{kind}提醒",
+                "message": f"将于 {a.date} 上岗（{post_name}）",
+                "due_date": a.date,
             })
     return out
 

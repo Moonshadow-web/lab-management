@@ -32,6 +32,7 @@ const routes = [
       { path: 'reagent/associations', name: 'reagent-associations', component: () => import('../views/reagent/ReagentAssociations.vue'), meta: { title: '项目与仪器关联', moduleKey: 'reagents' } },
       { path: 'training', name: 'training', component: () => import('../views/training/TrainingList.vue'), meta: { title: '继教培训', moduleKey: 'training' } },
       { path: 'verification', name: 'verification', component: () => import('../views/verification/VerificationList.vue'), meta: { title: '性能验证', moduleKey: 'verification' } },
+      { path: 'scheduling', name: 'scheduling', component: () => import('../views/scheduling/SchedulingList.vue'), meta: { title: '排班管理', moduleKey: 'scheduling' } },
       { path: 'iso15189', name: 'iso15189', component: () => import('../views/iso15189/NonconformityList.vue'), meta: { title: '15189专项', moduleKey: 'iso15189' } },
       { path: 'audit-logs', name: 'audit-logs', component: () => import('../views/audit/AuditLogList.vue'), meta: { title: '审计日志', adminOnly: true } },
       { path: 'users', name: 'users', component: () => import('../views/users/UserList.vue'), meta: { title: '用户管理', adminOnly: true } },

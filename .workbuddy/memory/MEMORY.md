@@ -48,6 +48,7 @@
 - **隐藏 bug 已修 + 端到端已验证（2026-07-24）**：原 `reminders.py` 的 `RecipientIn/RecipientUpdate` Pydantic 模型**缺 `wx_uid` 字段**，PUT 静默丢弃前端传来的 SendKey → Key 落不了库。修复 commit `a795f89`（build mark `serverchan-wxuid-fix-2026-07-23`，已部署）。用户 SendKey 已写入接收人 id=1（金子铮）、channels=email,serverchan；`wx-test` 返回 code:0 SUCCESS、真实 `run_reminders` 微信 `wx_sent:1` → 通道完全打通。**改接收人 API 务必保留 `wx_uid` 字段。**
 - 既有通道：站内 notifications + 邮件(smtp) + 微信(serverchan)，三路并行、渠道可任意组合。
 - **多人接收操作约定（2026-07-24）**：ServerChan 一人一 Key，不能共用；让同事接收 = 每人各自去 sctapi.ftqq.com 扫码拿 SendKey → 后台「提醒设置→发送人→新增发送人」填姓名+ServerChan Key(wx_uid)+渠道勾 serverchan+订阅分类(rule_categories，空=不收)。分类取值：`eqa_biochem_coag`(生化+凝血质评)/`eqa_immuno`(免疫质评)/`calibration`(设备校准)，多类逗号分隔。后端 `POST /recipients` 已具备，前端有「新增发送人」按钮；也可把名单(姓名+Key+订阅范围)交 AI 批量建。现有接收人若渠道含 serverchan 但 wx_uid 为空则微信发不出，需各自补 Key。
+- **自动调度与方糖配额关系（2026-07-24 核实）**：`main.py` 的 `_reminder_scheduler()` 每天 **08:00 自动跑一次** `run_reminders`（asyncio 常驻任务），每次给每个接收人发 **1 条聚合消息**（所有待办合并进一个 desp）。方糖免费版限制=**每个 SendKey(每人)每天最多 5 条推送**，属发送侧配额天花板、且按 Key 独立计数（多人互不影响）。故自动调度每天仅耗每人 1/5 配额，余量充足；不会"每人收5次"也不会"系统发5次"。注意：手动多次触发 run（如测试）会额外消耗配额；引擎去重(同里程碑7天不重发)保证同事项不重复发。验证期手动多跑已可能耗掉用户当日部分额度，次日0点重置。
 - **已实现（commit 29ee1a9 已部署，build mark `wxpusher-channel-2026-07-23`）**：
   - `NotifyRecipient.wx_uid` 新列（启动 `_ensure_missing_columns` 自动补，幂等，无迁移风险）；`channels` 支持 `wxpusher`（可组合 `email,wxpusher`）。
   - `config.py`：`WXPUSHER_ENABLED`/`WXPUSHER_APP_TOKEN`（读 env）；Cloud Run 环境变量已写入 `cloudbaserc.json`。

@@ -91,6 +91,7 @@ const menus = computed(() => {
     ] },
     { path: '/training', title: '继教培训', icon: 'Reading', moduleKey: 'training' },
     { path: '/verification', title: '性能验证', icon: 'DataAnalysis', moduleKey: 'verification' },
+    { path: '/scheduling', title: '排班管理', icon: 'Calendar', moduleKey: 'scheduling' },
     { path: '/iso15189', title: '15189专项', icon: 'Stamp', moduleKey: 'iso15189' },
   ]
   // 按权限过滤：technical_support 仅显示其被授权的模块；其余角色维持原样（全部可见）

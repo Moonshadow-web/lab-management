@@ -593,3 +593,88 @@ class QualityRequirementRead(QualityRequirementBase):
     id: int
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+# ---------------- Scheduling ----------------
+class SchedulingPostBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    name: str = ""
+    group: str = "day"          # day / night / special
+    required: bool = True
+    only_weekday: int | None = None
+    required_weekday: int | None = None
+    order: int = 0
+    notes: str = ""
+
+
+class SchedulingPostCreate(SchedulingPostBase):
+    pass
+
+
+class SchedulingPostUpdate(SchedulingPostBase):
+    pass
+
+
+class SchedulingPostRead(SchedulingPostBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class SchedulingPlanBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    name: str = ""
+    start_date: str = ""
+    end_date: str = ""
+    notes: str = ""
+
+
+class SchedulingPlanCreate(SchedulingPlanBase):
+    pass
+
+
+class SchedulingPlanUpdate(SchedulingPlanBase):
+    pass
+
+
+class SchedulingPlanRead(SchedulingPlanBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class SchedulingAssignmentBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    plan_id: int = 0
+    date: str = ""
+    weekday: int = 0
+    is_workday: bool = True
+    post_id: int = 0
+    person: str = ""
+    status: str = "在岗"        # 在岗 / 质控 / 开会 / 病假
+    is_early: bool = False
+    is_continuous: bool = False
+    note: str = ""
+
+
+class SchedulingAssignmentCreate(SchedulingAssignmentBase):
+    pass
+
+
+class SchedulingAssignmentUpdate(SchedulingAssignmentBase):
+    pass
+
+
+class SchedulingAssignmentRead(SchedulingAssignmentBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class SchedulingGenerateRequest(BaseModel):
+    """自动生成排班请求。"""
+    plan_id: int
+    people: list[str] | None = None   # 生免组人员名单（full_name）；缺省用全部活跃用户
+    start: str | None = None           # 覆盖计划起止日期（YYYY-MM-DD）
+    end: str | None = None
+
