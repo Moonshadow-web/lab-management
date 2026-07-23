@@ -26,7 +26,19 @@ assert 5 in ooc2 and "R-4s" in ooc2[5], f"index5 应判 R-4s，实际={ooc2.get(
 assert 6 in ooc2 and "R-4s" in ooc2[6], f"index6 应判 R-4s，实际={ooc2.get(6)}"
 print("PASS 用例2：真实相邻 R-4s 仍正确判定")
 
-print("\n=== 用例3：aggregate 须剔除失控点重算 mean/sd/cv（无靶值也要能检出）===")
+print("\n=== 用例3：R-4s 自身判定后不应级联下一点（同一天第二个值不应被牵连）===")
+# 模拟图2场景：中间点与前后两个相邻点差值均 >4sd，但中间点已因前一对 R-4s 失控，
+# 故后一对不应再判 R-4s。
+# mean=0, sd=1：±3sd=[-3,3]，±4sd=[-4,4]；2.5/-2.5 均在 3sd 内，|差值|=5>4sd。
+vals3 = [2.5, -2.5, 2.5]
+ooc3 = evaluate_westgard(vals3, 0.0, 1.0)
+print("失控点:", {i: r for i, r in ooc3.items()})
+assert 0 in ooc3 and "R-4s" in ooc3[0], "index0 应判 R-4s"
+assert 1 in ooc3 and "R-4s" in ooc3[1], "index1 应判 R-4s"
+assert 2 not in ooc3, f"index2 不应被级联判 R-4s，实际={ooc3.get(2)}"
+print("PASS 用例3：R-4s 未级联下一点")
+
+print("\n=== 用例4：aggregate 须剔除失控点重算 mean/sd/cv（无靶值也要能检出）===")
 # 601 HBsAg 水平1 模拟：靶值≈1.0，多数点 0.9~1.1，一个失控点 1.8
 series = [0.98, 1.02, 1.00, 0.97, 1.80, 1.03, 0.99, 1.01, 0.96, 1.02]
 agg = aggregate(series, 0.0, 0.0)  # 无靶值 → 走 _robust_stats
@@ -36,6 +48,6 @@ print(f"全量   mean={agg['all_mean']:.4f} sd={agg['all_sd']:.4f} cv={agg['all_
 assert agg["out_of_control_count"] >= 1, "应检出至少 1 个失控点"
 assert abs(agg["mean"] - 1.0) < 0.05, f"剔除后均值应≈1.0，实际={agg['mean']}"
 assert agg["sd"] < 0.06, f"剔除后 SD 应明显小于全量，实际={agg['sd']}"
-print("PASS 用例3：失控点被检出并剔除重算")
+print("PASS 用例4：失控点被检出并剔除重算")
 
 print("\n全部用例通过 ✅")

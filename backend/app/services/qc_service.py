@@ -326,10 +326,9 @@ def evaluate_westgard(values: list[float], mean: float, sd: float) -> dict[int, 
             ooc[i] = _join(ooc.get(i, ""), "2-2s")
             ooc[i + 1] = _join(ooc.get(i + 1, ""), "2-2s")
     # R-4s：失控点本身不参与相邻判定（避免已判失控的点级联误判其前后点也 R-4s）。
-    # 即：仅当两个相邻点都尚未被 1-3s / 2-2s / 10-x 等规则判为失控时，才用二者差值判 R-4s。
-    base_ooc = set(ooc.keys())
+    # 包括：被 1-3s / 2-2s / 10-x 判失控的点，以及本轮 R-4s 已判失控的点。
     for i in range(n - 1):
-        if i in base_ooc or i + 1 in base_ooc:
+        if i in ooc or i + 1 in ooc:
             continue
         if abs(values[i] - values[i + 1]) > 4 * sd + eps:
             ooc[i] = _join(ooc.get(i, ""), "R-4s")
