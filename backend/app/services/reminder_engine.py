@@ -200,6 +200,32 @@ def _render_html(items):
     )
 
 
+def _render_markdown(items):
+    """微信(ServerChan)内容：Markdown 格式（ServerChan 的 desp 按 Markdown 渲染，
+    若直接塞 HTML 会被当成纯文本显示成『乱码』）。按逾期/即将到期分组，便于手机阅读。"""
+    overdue = [it for it in items if it.get("days_left", 0) < 0]
+    upcoming = [it for it in items if it.get("days_left", 0) >= 0]
+    lines = []
+    if overdue:
+        lines.append(f"## 🔴 已逾期（{len(overdue)} 项，请尽快处理）")
+        for it in overdue:
+            due = f"（截止 {it.get('due_date', '')}）" if it.get("due_date") else ""
+            lines.append(f"- **{it['title']}**{due}")
+            if it.get("message"):
+                lines.append(f"  {it['message']}")
+        lines.append("")
+    if upcoming:
+        lines.append(f"## 🟡 即将到期（{len(upcoming)} 项）")
+        for it in upcoming:
+            due = f"（截止 {it.get('due_date', '')}）" if it.get("due_date") else ""
+            lines.append(f"- **{it['title']}**{due}")
+            if it.get("message"):
+                lines.append(f"  {it['message']}")
+        lines.append("")
+    lines.append("> 此消息由系统自动发送，请勿直接回复。")
+    return "\n".join(lines)
+
+
 def _sync_notifications(db: Session, notif_active, active_keys):
     """upsert 站内提醒（reminder_*），删除不再活跃的记录。
 
@@ -342,12 +368,12 @@ def run_reminders(db: Session, as_of: Optional[date] = None, dry_run: bool = Fal
                 stats["emails_sent"] += 1
                 for rule, it in items:
                     _record_send(db, rule, it, now)
-        # 微信(ServerChan)按人推送
+        # 微信(ServerChan)按人推送（desp 用 Markdown，避免 HTML 被当纯文本显示成乱码）
         for uid, items in sc_deliveries.items():
             subject = f"【{SYSTEM_NAME}】实验室待办提醒（{len(items)} 条）"
             res = send_serverchan(
                 title=subject,
-                desp=_render_html([it for _, it in items]),
+                desp=_render_markdown([it for _, it in items]),
                 sendkey=uid,
             )
             if res.get("sent"):
