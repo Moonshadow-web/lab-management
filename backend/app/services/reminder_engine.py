@@ -18,7 +18,7 @@ from ..models.instrument import CalibrationRecord, Instrument
 from ..models.notification import Notification
 from ..models.reminder import NotifyRecipient, ReminderRule, ReminderSendLog
 from ..services.email_service import send_email
-from ..services.wxpusher_service import send_wxpusher
+from ..services.serverchan_service import send_serverchan
 
 # 默认规则（种子，仅在库为空时写入）
 DEFAULT_RULES = [
@@ -79,14 +79,15 @@ def get_email_recipients(db: Session):
     )
 
 
-def get_wxpusher_recipients(db: Session):
-    """微信(WxPusher)接收人：启用 + 渠道含 wxpusher + 已绑定 wx_uid。"""
+def get_serverchan_recipients(db: Session):
+    """微信(ServerChan)接收人：启用 + 渠道含 serverchan(兼容旧 wxpusher) + 已填 SendKey(wx_uid)。"""
     return (
         db.query(NotifyRecipient)
         .filter(
             NotifyRecipient.enabled == True,  # noqa: E712
             NotifyRecipient.wx_uid != "",
-            NotifyRecipient.channels.like("%wxpusher%"),
+            (NotifyRecipient.channels.like("%serverchan%")
+             | NotifyRecipient.channels.like("%wxpusher%")),
         )
         .all()
     )
@@ -255,9 +256,9 @@ def run_reminders(db: Session, as_of: Optional[date] = None, dry_run: bool = Fal
         pass
     rules = db.query(ReminderRule).filter(ReminderRule.enabled == True).all()  # noqa: E712
     email_recipients = get_email_recipients(db)
-    wx_recipients = get_wxpusher_recipients(db)
+    sc_recipients = get_serverchan_recipients(db)
     deliveries = {}            # email -> [item dict]
-    wx_deliveries = {}         # wx_uid -> [item dict]
+    sc_deliveries = {}         # sendkey(wx_uid) -> [item dict]
     notif_active = []          # (ref_type, ref_id, title, message, due_date, level, module)
     planned = []               # 用于 dry_run 展示
     stats = {"rules": len(rules), "items_sent": 0, "emails_sent": 0, "wx_sent": 0, "skipped_no_recipient": 0}
@@ -308,14 +309,14 @@ def run_reminders(db: Session, as_of: Optional[date] = None, dry_run: bool = Fal
                     stats["skipped_no_recipient"] += 1
                 for rec in matched:
                     deliveries.setdefault(rec.email, []).append((rule, it))
-                wx_matched = [
-                    r for r in wx_recipients
+                sc_matched = [
+                    r for r in sc_recipients
                     if r.wx_uid and rule.category in {
                         c.strip() for c in (r.rule_categories or "").split(",") if c.strip()
                     }
                 ]
-                for rec in wx_matched:
-                    wx_deliveries.setdefault(rec.wx_uid, []).append((rule, it))
+                for rec in sc_matched:
+                    sc_deliveries.setdefault(rec.wx_uid, []).append((rule, it))
                 if not log:
                     log = ReminderSendLog(rule_id=rule.id, ref_type=ref_type, ref_id=ref_id)
                     db.add(log)
@@ -341,13 +342,13 @@ def run_reminders(db: Session, as_of: Optional[date] = None, dry_run: bool = Fal
                 stats["emails_sent"] += 1
                 for rule, it in items:
                     _record_send(db, rule, it, now)
-        # 微信(WxPusher)按人推送
-        for uid, items in wx_deliveries.items():
+        # 微信(ServerChan)按人推送
+        for uid, items in sc_deliveries.items():
             subject = f"【{SYSTEM_NAME}】实验室待办提醒（{len(items)} 条）"
-            res = send_wxpusher(
-                content=_render_html([it for _, it in items]),
-                uids=[uid],
-                summary=subject,
+            res = send_serverchan(
+                title=subject,
+                desp=_render_html([it for _, it in items]),
+                sendkey=uid,
             )
             if res.get("sent"):
                 stats["wx_sent"] += 1

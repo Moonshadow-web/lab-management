@@ -12,11 +12,8 @@ export function updateRecipient(id, data) {
 export function deleteRecipient(id) {
   return request.delete(`/api/v1/reminders/recipients/${id}`)
 }
-export function getRecipientWxQrcode(id) {
-  return request.get(`/api/v1/reminders/recipients/${id}/wx-qrcode`)
-}
-export function syncRecipientWxUid(id) {
-  return request.post(`/api/v1/reminders/recipients/${id}/wx-sync`)
+export function getRecipientWxTest(id) {
+  return request.post(`/api/v1/reminders/recipients/${id}/wx-test`)
 }
 
 export function listRules() {

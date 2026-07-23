@@ -10,8 +10,9 @@ from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
 from ...models.reminder import NotifyRecipient, ReminderRule, ReminderSendLog
 from ...models.user import User
+from ...core.config import SYSTEM_NAME
 from ...services.reminder_engine import ensure_reminder_defaults, run_reminders
-from ...services.wxpusher_service import create_follow_qrcode, resolve_uid_by_extra
+from ...services.serverchan_service import send_serverchan
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
 
@@ -75,32 +76,23 @@ def delete_recipient(rid: int, db: Session = Depends(get_db), _: User = Depends(
     return {"ok": True}
 
 
-# ---------------- 微信(WxPusher) 绑定辅助 ----------------
-@router.get("/recipients/{rid}/wx-qrcode")
-def wx_follow_qrcode(rid: int, db: Session = Depends(get_db), _: User = Depends(require_roles("admin"))):
-    """生成带 extra=rid 的关注二维码，接收人扫码关注后即可绑定微信。返回二维码地址。"""
+# ---------------- 微信(ServerChan) 测试发送 ----------------
+@router.post("/recipients/{rid}/wx-test")
+def wx_test_send(rid: int, db: Session = Depends(get_db), _: User = Depends(require_roles("admin"))):
+    """用该接收人的 wx_uid(=ServerChan SendKey) 发一条测试微信，验证通道是否打通。"""
     r = db.get(NotifyRecipient, rid)
     if not r:
         raise HTTPException(status_code=404, detail="接收人不存在")
-    url = create_follow_qrcode(extra=rid, valid_time=1800)
-    if not url:
-        raise HTTPException(status_code=502, detail="生成二维码失败：WxPusher 未配置或调用异常")
-    return {"url": url}
-
-
-@router.post("/recipients/{rid}/wx-sync")
-def wx_sync_uid(rid: int, db: Session = Depends(get_db), _: User = Depends(require_roles("admin"))):
-    """按 extra=rid 在 WxPusher 关注用户中解析并回填该接收人的 wx_uid。"""
-    r = db.get(NotifyRecipient, rid)
-    if not r:
-        raise HTTPException(status_code=404, detail="接收人不存在")
-    uid = resolve_uid_by_extra(extra=rid)
-    if not uid:
-        raise HTTPException(status_code=404, detail="未找到关注记录：请先让该接收人扫码关注二维码后再同步")
-    r.wx_uid = uid
-    r.updated_at = datetime.utcnow()
-    db.commit()
-    return {"ok": True, "wx_uid": uid}
+    if not r.wx_uid:
+        raise HTTPException(status_code=400, detail="该接收人未填写 ServerChan SendKey（wx_uid 字段）")
+    res = send_serverchan(
+        title=f"【{SYSTEM_NAME}】微信推送测试",
+        desp="这是一条来自生免速查工具的测试消息。若你收到，说明 ServerChan 通道已打通，后续提醒会推送到此微信。",
+        sendkey=r.wx_uid,
+    )
+    if not res.get("sent"):
+        raise HTTPException(status_code=502, detail=f"发送失败：{res.get('error')}")
+    return {"ok": True, "detail": res.get("raw")}
 
 
 # ---------------- 提醒类型 ----------------

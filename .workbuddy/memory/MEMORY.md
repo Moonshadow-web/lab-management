@@ -33,16 +33,24 @@
 - 预览/下载：get_current_user 支持 URL ?token=/cookie 兜底；前端 AttachmentPreview 内嵌预览。
 - max_allowed_packet：单条 INSERT 受服务端限制。**实测线上 `SHOW GLOBAL VARIABLES` = 1073741824(1GB)**（非早前假设的4MB；应是平台/客服已调大或代管默认），故当前大文件上传已无 500。该集群 CloudBase 代管（cloudbase__SAmOhXfvyj / cynosdbmysql-l0kufcte），控制台锁定改不了参数。代码侧保留兜底：main.py 启动 + SQLAlchemy `connect` 事件**仅当全局<128MB 时才 SET GLOBAL 134217728**（条件式，不降级、不覆盖平台已设的1GB；仅实例重置到<128MB 时自愈升）。详见 2026-07-23 日志。
 
-## 提醒短信(SMS)（规划中，尚未实现）
-- **关键现实**：CloudBase 内置短信配额**仅用于登录验证码（Auth）**，不能发业务通知；业务通知短信须**单独开通腾讯云短信 SMS 服务**（同主账号 `cloud1-0gjhamv53ff2298d`）。
-- **当前代码基础**：`NotifyRecipient` 已预留 `phone`+`channels`(email/sms) 列但未发短信；`reminder_engine.run_reminders` 只发站内通知+邮件，无 sms 分支；模型无需改表。触发点 `main.py:_reminder_scheduler` 已就绪。
-- **落地规划（用户当前仅要"怎么做"的指引，未让写代码）**：
-  - `config.py` 加 `SMS_ENABLED/SECRET_ID/SECRET_KEY/SDK_APP_ID/SIGN_NAME/TEMPLATE_ID` 读 `os.getenv`。
-  - 新建 `services/sms_service.py`：`send_sms(phone, params)` 用 `tencentcloud-sdk-python-sms`（轻量模块包，非全量），未配置降级日志（与邮件同策略）。
-  - `reminder_engine.py`：新增 `get_sms_recipients`（筛 `channels like '%sms%'` 且 `phone` 非空），在 `run_reminders` 聚合邮件处并行发短信并计入 `ReminderSendLog`。
-  - 前端接收人设置加「短信渠道+手机号」；Cloud Run 环境变量补 SMS 五项。
-  - 短信文案受审核模板约束（变量{1}=条数、{2}=摘要）；引擎已有里程碑去重+7天重发控条数。
-- **用户侧前置（截至 2026-07-22 尚未开通 SMS）**：①确认 SMS 与 CloudBase 同主账号；②企业实名；③申请签名（医院需《医疗机构执业许可证》，签名如"民航总医院"）；④申请通知类模板（含{1}{2}）；⑤拿到 SmsSdkAppId/SecretId/SecretKey/SignName/TemplateId 填环境变量。备选：企微/公众号模板消息免费免签名。
+## 提醒推送渠道（WxPusher 已失效 → 待切换个人可用微信通道）
+- **⚠️ 通道失效（2026-07-23 晚）**：WxPusher 经微信公众号下发消息的通道被微信封禁，原 WxPusher 按人推送方案不可用。控制台加 `WXPUSHER_*` 环境变量已无意义（加了也发不出去）。
+- **关键约束（2026-07-23 深夜，用户明确）**：用户**是个人开发者，走不了医院的企业微信**。故**企业微信自建应用**与**企业微信群机器人 webhook** 两条路均不可行（二者都要求先有一个企业微信组织/workspace）。候选通道收窄为：
+  1. **方糖 ServerChan（个人微信，推荐）**：个人微信扫码关注方糖公众号绑定 → 拿到 SendKey → 后端 POST 推送。免企业资质、零成本、最贴合个人「按人推送」（收到的是自己的微信）。基于方糖独立公众号（与 WxPusher 不同账号，WxPusher 被封应是账号级，方糖大概率仍可用，但同属公众号推送，不保证永久）。
+  2. **自建企业微信(自己注册个人 workspace)**：用户自己用个人实名注册一个企业微信组织 → 建自建应用 → corpid/secret/agentid + 自己的 userid。官方通道、免费、非公众号、最稳，但注册+配置较繁琐，且需用户愿意用自己的实名建组织。
+  3. **放弃微信，仅邮件+站内通知**：最稳零风险，等以后有企业微信或通道明朗再说。
+- 历史决策：原规划短信→用户放弃短信改微信→先选 WxPusher(已埋代码 commit 29ee1a9, build mark `wxpusher-channel-2026-07-23`，现通道死、代码休眠存档)。详见 2026-07-23.md。
+- 待用户拍板新通道后，把 `services/wxpusher_service.py` 改造成通用微信推送（ServerChan 仅需 SendKey，改动很小：把 wx_uid 复用为 SendKey / 或加 wx_sendkey 列）。
+- **已实现（commit 29ee1a9 已部署，build mark `wxpusher-channel-2026-07-23`）**：
+  - `NotifyRecipient.wx_uid` 新列（启动 `_ensure_missing_columns` 自动补，幂等，无迁移风险）；`channels` 支持 `wxpusher`（可组合 `email,wxpusher`）。
+  - `config.py`：`WXPUSHER_ENABLED`/`WXPUSHER_APP_TOKEN`（读 env）；Cloud Run 环境变量已写入 `cloudbaserc.json`。
+  - 新建 `services/wxpusher_service.py`：`send_wxpusher`(POST /api/send/message, HTML contentType=2)、`resolve_uid_by_extra`(GET /api/fun/wxuser/v2，按 extra=接收人id 命中记录 target 字段)、`create_follow_qrcode`(POST /api/fun/create/qrcode)。未配置降级日志。
+  - `reminder_engine.run_reminders`：新增 `get_wxpusher_recipients`（启用+渠道含wxpusher+wx_uid非空），与邮件并行按人推送，复用 `_render_html`；抽 `_record_send` 共用去重标记；stats 增 `wx_sent`。
+  - `reminders.py`：admin 端点 `GET /recipients/{id}/wx-qrcode`（生成带 extra=id 关注二维码）、`POST /recipients/{id}/wx-sync`（回填 wx_uid）。
+  - 前端 `ReminderSettings.vue`：表格加微信UID列、渠道下拉加 `email,wxpusher`/`wxpusher`、对话框加微信UID输入+「生成二维码」「同步UID」、二维码预览弹窗；`reminders.js` 加两 API 函数；执行结果提示含微信人数。
+- **WxPusher 凭证（用户明确要求记住）**：appToken=`AT_c4z7ZO7rBn1wup5HYboK0bSQwEJ96Mfp`，已写入 `cloudbaserc.json` 环境变量（与原 DATABASE_URL/SMTP 同处置，均落库明文）。注册/登录=wxpusher.zjiecode.com/admin 微信扫码（无账号自动注册）。
+- **接入流程（给用户）**：接收人编辑页 → 渠道选含微信 → 点「生成二维码」让对方微信扫码关注 → 点「同步UID」自动写入 wx_uid → 之后提醒引擎按人推送。引擎里程碑去重+7天重发仍控条数。
+- 既有发送通道：站内 notifications + 邮件(smtp) + 微信(wxpusher)，三路并行、渠道可任意组合。
 
 ## 数据库与持久化
 - 已弃 SQLite+CFS，用 CloudBase TDSQL-C MySQL：实例 cynosdbmysql-ins-102awksb，内网 10.0.1.18:3306，库 cloud1-0gjhamv53ff2298d；账号 labapp（外网按需开，平时关）；DATABASE_URL 在 cloudbaserc.json。

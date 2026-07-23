@@ -45,8 +45,6 @@ SMTP_TLS = os.getenv("SMTP_TLS", "true").lower() in ("1", "true", "yes", "y")
 MAIL_FROM = os.getenv("MAIL_FROM", SMTP_USER or "noreply@localhost")
 SYSTEM_NAME = os.getenv("SYSTEM_NAME", "检验科生免组实验室管理系统")
 
-# 微信推送（WxPusher）：配置 appToken 后按人向用户微信发提醒；未配置时降级为本地日志。
-# 注册/登录：wxpusher.zjiecode.com/admin 用微信扫码，无账号自动注册；创建应用拿 appToken。
-# 官方文档：https://wxpusher.zjiecode.com/docs/
-WXPUSHER_ENABLED = os.getenv("WXPUSHER_ENABLED", "false").lower() in ("1", "true", "yes", "y")
-WXPUSHER_APP_TOKEN = os.getenv("WXPUSHER_APP_TOKEN", "")
+# 微信推送（ServerChan / 方糖）：个人微信免企业资质。SendKey 直接存于接收人记录(wx_uid 字段)，
+# 无需环境变量/控制台配置。用法：登录 sctapi.ftqq.com 用微信扫码关注「方糖」公众号 → 复制 SendKey
+# 填入接收人 → 渠道勾选含 serverchan。官方文档：https://sct.ftqq.com/
