@@ -33,14 +33,19 @@
 - 预览/下载：get_current_user 支持 URL ?token=/cookie 兜底；前端 AttachmentPreview 内嵌预览。
 - max_allowed_packet：单条 INSERT 受服务端限制。**实测线上 `SHOW GLOBAL VARIABLES` = 1073741824(1GB)**（非早前假设的4MB；应是平台/客服已调大或代管默认），故当前大文件上传已无 500。该集群 CloudBase 代管（cloudbase__SAmOhXfvyj / cynosdbmysql-l0kufcte），控制台锁定改不了参数。代码侧保留兜底：main.py 启动 + SQLAlchemy `connect` 事件**仅当全局<128MB 时才 SET GLOBAL 134217728**（条件式，不降级、不覆盖平台已设的1GB；仅实例重置到<128MB 时自愈升）。详见 2026-07-23 日志。
 
-## 提醒推送渠道（WxPusher 已失效 → 待切换个人可用微信通道）
-- **⚠️ 通道失效（2026-07-23 晚）**：WxPusher 经微信公众号下发消息的通道被微信封禁，原 WxPusher 按人推送方案不可用。控制台加 `WXPUSHER_*` 环境变量已无意义（加了也发不出去）。
-- **关键约束（2026-07-23 深夜，用户明确）**：用户**是个人开发者，走不了医院的企业微信**。故**企业微信自建应用**与**企业微信群机器人 webhook** 两条路均不可行（二者都要求先有一个企业微信组织/workspace）。候选通道收窄为：
-  1. **方糖 ServerChan（个人微信，推荐）**：个人微信扫码关注方糖公众号绑定 → 拿到 SendKey → 后端 POST 推送。免企业资质、零成本、最贴合个人「按人推送」（收到的是自己的微信）。基于方糖独立公众号（与 WxPusher 不同账号，WxPusher 被封应是账号级，方糖大概率仍可用，但同属公众号推送，不保证永久）。
-  2. **自建企业微信(自己注册个人 workspace)**：用户自己用个人实名注册一个企业微信组织 → 建自建应用 → corpid/secret/agentid + 自己的 userid。官方通道、免费、非公众号、最稳，但注册+配置较繁琐，且需用户愿意用自己的实名建组织。
-  3. **放弃微信，仅邮件+站内通知**：最稳零风险，等以后有企业微信或通道明朗再说。
-- 历史决策：原规划短信→用户放弃短信改微信→先选 WxPusher(已埋代码 commit 29ee1a9, build mark `wxpusher-channel-2026-07-23`，现通道死、代码休眠存档)。详见 2026-07-23.md。
-- 待用户拍板新通道后，把 `services/wxpusher_service.py` 改造成通用微信推送（ServerChan 仅需 SendKey，改动很小：把 wx_uid 复用为 SendKey / 或加 wx_sendkey 列）。
+## 提醒推送渠道（已切 ServerChan/方糖；WxPusher 已移除）
+- **决策（2026-07-23 深夜）**：WxPusher 公众号推送被微信封禁→通道死；用户为个人、无医院企业微信→企业微信自建应用/群机器人两条路也不行；最终选**方糖 ServerChan**（个人微信免资质，最贴合个人「按人推送」）。
+- **已实现（commit cb5e4d7 已部署，build mark `serverchan-channel-2026-07-23`）**：
+  - 新增 `services/serverchan_service.py`：`send_serverchan(title,desp,sendkey)` POST `https://sctapi.ftqq.com/send/{key}.send`（表单 title/desp，成功 `code==0`，错误 40001=错误的Key），stdlib urllib、无第三方依赖。
+  - `reminder_engine.py`：`get_serverchan_recipients`（渠道含 serverchan，兼容旧 wxpusher）+ `run_reminders` 微信块改调 `send_serverchan(title=subject, desp=html, sendkey=wx_uid)`；stats 仍 `wx_sent`。
+  - `reminders.py`：删除 WxPusher 的 `wx-qrcode`/`wx-sync` 端点，改为 `POST /recipients/{id}/wx-test`（用该接收人 `wx_uid`=SendKey 发测试微信）。
+  - 前端 `ReminderSettings.vue`：ServerChan Key 输入 + 「发送测试」按钮，删二维码弹窗；渠道下拉 `email,serverchan`/`serverchan`。`reminders.js` 改 `getRecipientWxTest`。
+  - `config.py` 删 `WXPUSHER_*`；`cloudbaserc.json` 删 `WXPUSHER_*` envs；`models/reminder.py` 注释 `wx_uid`=ServerChan SendKey、`channels` 含 serverchan。
+- **关键设计（绕开环境变量坑）**：ServerChan **SendKey 直接存接收人记录(wx_uid 字段)**，无需 CloudBase 环境变量/控制台配置，彻底规避之前「env 注入不了运行中 pod」问题。
+- **WxPusher 凭证已弃**：原 appToken `AT_c4z7ZO7rBn1wup5HYboK0bSQwEJ96Mfp` 通道死，`wxpusher_service.py` 已删除。
+- **接入流程（给用户）**：登录 sctapi.ftqq.com 用微信扫码关注「方糖」→ 复制 SendKey → 后台接收人填 ServerChan Key + 渠道勾含 serverchan → 点「发送测试」验证 → 后续质评/校准提醒推微信。
+- **隐藏 bug 已修 + 端到端已验证（2026-07-24）**：原 `reminders.py` 的 `RecipientIn/RecipientUpdate` Pydantic 模型**缺 `wx_uid` 字段**，PUT 静默丢弃前端传来的 SendKey → Key 落不了库。修复 commit `a795f89`（build mark `serverchan-wxuid-fix-2026-07-23`，已部署）。用户 SendKey 已写入接收人 id=1（金子铮）、channels=email,serverchan；`wx-test` 返回 code:0 SUCCESS、真实 `run_reminders` 微信 `wx_sent:1` → 通道完全打通。**改接收人 API 务必保留 `wx_uid` 字段。**
+- 既有通道：站内 notifications + 邮件(smtp) + 微信(serverchan)，三路并行、渠道可任意组合。
 - **已实现（commit 29ee1a9 已部署，build mark `wxpusher-channel-2026-07-23`）**：
   - `NotifyRecipient.wx_uid` 新列（启动 `_ensure_missing_columns` 自动补，幂等，无迁移风险）；`channels` 支持 `wxpusher`（可组合 `email,wxpusher`）。
   - `config.py`：`WXPUSHER_ENABLED`/`WXPUSHER_APP_TOKEN`（读 env）；Cloud Run 环境变量已写入 `cloudbaserc.json`。

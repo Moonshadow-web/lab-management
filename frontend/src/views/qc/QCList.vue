@@ -67,6 +67,9 @@
                         <el-tag v-if="d.row.is_out_of_control" type="danger" size="small">
                           失控 {{ d.row.rule_violated }}
                         </el-tag>
+                        <el-tag v-else-if="d.row.is_warning" type="warning" size="small">
+                          警告 {{ d.row.rule_violated }}
+                        </el-tag>
                         <el-tag v-else type="success" size="small">在控</el-tag>
                       </template>
                     </el-table-column>
@@ -208,6 +211,7 @@
                   <div v-if="row.levels[lv]" class="level-cell">
                     <div class="level-val">{{ fmtNum(row.levels[lv].value) }}</div>
                     <el-tag v-if="row.levels[lv].is_out_of_control" type="danger" size="small">失控 {{ row.levels[lv].rule_violated }}</el-tag>
+                    <el-tag v-else-if="row.levels[lv].is_warning" type="warning" size="small">警告 {{ row.levels[lv].rule_violated }}</el-tag>
                     <el-tag v-else type="success" size="small">在控</el-tag>
                   </div>
                   <span v-else class="text-muted">—</span>

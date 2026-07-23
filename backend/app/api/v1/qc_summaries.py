@@ -25,7 +25,7 @@ from ...schemas import (
     QCMonthlyReportRead,
     QCMonthlyReportUpdate,
 )
-from ...services.qc_service import aggregate, lookup_quality_goal, draft_report, find_test_item_by_name
+from ...services.qc_service import aggregate_project, lookup_quality_goal, draft_report, find_test_item_by_name
 
 # 单位纠正映射：月结项目名(=LIS 上传的 test_item 原文) -> 正确单位。
 # 用于覆盖 LIS 文件里错误的「单位」列（如定性免疫项目被错填成 IU/mL / ng/L / 空）。
@@ -132,9 +132,94 @@ def _build_header_map(headers):
     return mapping
 
 
+def _write_summary_level(
+    db: Session,
+    *,
+    year: int, month: int, test_item: str, lot_no: str, level: str,
+    instrument: str, instrument_id: int | None, instrument_no: str,
+    unit: str, quality_goal: str,
+    target_mean: float, target_sd: float, target_cv: float,
+    agg: dict, dmeta: list,
+) -> tuple[QCMonthlySummary, bool]:
+    """按单水平聚合结果落库（upsert 月结行 + 重建每日测值）。
+
+    dmeta: 与 agg 的 idx 对齐的 [(qc_date, value, operator, violate_reason, violate_deal), ...]
+           （已按日期升序排序，与 aggregate_project 的输入顺序一致）。
+    agg:   aggregate_project 返回的该水平结果（含 ooc / warnings / 统计量）。
+    返回 (summary, is_new)。
+    """
+    n = len(dmeta)
+    existing = (
+        db.query(QCMonthlySummary)
+        .filter_by(year=year, month=month, test_item=test_item, lot_no=lot_no,
+                   level=level, instrument=instrument)
+        .first()
+    )
+    if existing:
+        summ = existing
+        is_new = False
+    else:
+        summ = QCMonthlySummary()
+        db.add(summ)
+        is_new = True
+    summ.year = year
+    summ.month = month
+    summ.test_item = test_item
+    summ.unit = unit
+    summ.lot_no = lot_no
+    summ.level = level
+    summ.instrument = instrument
+    summ.instrument_id = instrument_id
+    summ.instrument_no = instrument_no
+    summ.target_mean = target_mean
+    summ.target_sd = target_sd
+    summ.target_cv = target_cv
+    summ.mean = agg["mean"]
+    summ.sd = agg["sd"]
+    summ.cv = agg["cv"]
+    summ.n = n
+    summ.out_of_control_count = agg["out_of_control_count"]
+    summ.in_control_rate = agg["in_control_rate"]
+    summ.quality_goal = quality_goal
+    db.flush()
+    # 重建每日测值（dmeta 与 agg 索引对齐；ooc 来自 R-4s/单水平，warnings 仅作黄色警告）
+    db.query(QCDailyValue).filter_by(summary_id=summ.id).delete()
+    operators: set[str] = set()
+    ooc_details: list[str] = []
+    for idx, (qc_date, val, op, vreason, vdeal) in enumerate(dmeta):
+        rule = agg["ooc"].get(idx, "")
+        warn = agg["warnings"].get(idx, "")
+        is_ooc = bool(rule)
+        is_warn = bool(warn) and not is_ooc
+        if op:
+            operators.add(op)
+        if is_ooc and (vreason or vdeal):
+            parts = []
+            if vreason:
+                parts.append(f"原因：{vreason}")
+            if vdeal:
+                parts.append(f"处理：{vdeal}")
+            detail = f"{qc_date} {test_item}({level}) 失控「{rule}」"
+            if parts:
+                detail += "；" + "；".join(parts)
+            ooc_details.append(detail)
+        db.add(QCDailyValue(
+            summary_id=summ.id,
+            qc_date=qc_date,
+            value=val,
+            is_out_of_control=is_ooc,
+            is_warning=is_warn,
+            rule_violated=(rule if is_ooc else (warn if is_warn else "")),
+            operator=(op or ""),
+            violate_reason=(vreason or "") if is_ooc else "",
+            violate_deal=(vdeal or "") if is_ooc else "",
+        ))
+    summ.operator = "、".join(sorted(operators))
+    summ.handling_note = "\n".join(ooc_details)
+    return summ, is_new
+
+
 def _to_float(s):
-    if s is None:
-        return None
     try:
         return float(str(s).replace(",", "").strip())
     except (ValueError, TypeError):
@@ -405,92 +490,66 @@ def upload_qc_summary(
             }
         block_keys.add((instrument_id if sel_inst else None, inst, d.year, d.month))
 
-    created = 0
-    updated = 0
-    items = []
+    # 按「项目(仪器,年,月,项目,批号)」归组：跨水平 R-4s 需要同一项目多个水平同批计算
+    projects: dict[tuple, list] = {}
     for key, values in groups.items():
         year, month, test_item, lot_no, level, instrument = key
         m = meta[key]
-        tm = m["target_mean"]
-        ts = m["target_sd"]
-        agg = aggregate(values, tm, ts)
-        if not tm and not ts:
-            # 未提供靶值：用本批实测均值/标准差回填，保证报表可读
-            tm = agg["mean"]
-            ts = agg["sd"]
-        target_cv = (ts / tm * 100) if tm else 0.0
-        quality_goal = lookup_quality_goal(test_item, m.get("test_item_aliases", ""), db)
-        existing = (
-            db.query(QCMonthlySummary)
-            .filter_by(year=year, month=month, test_item=test_item, lot_no=lot_no, level=level, instrument=instrument)
-            .first()
-        )
-        if existing:
-            summ = existing
-            updated += 1
-        else:
-            summ = QCMonthlySummary()
-            db.add(summ)
-            created += 1
-        summ.year = year
-        summ.month = month
-        summ.test_item = test_item
-        summ.unit = m["unit"]
-        summ.lot_no = lot_no
-        summ.level = level
-        summ.instrument = instrument
-        summ.instrument_id = instrument_id if sel_inst else None
-        summ.instrument_no = m["instrument_no"]
-        summ.target_mean = tm
-        summ.target_sd = ts
-        summ.target_cv = target_cv
-        summ.mean = agg["mean"]
-        summ.sd = agg["sd"]
-        summ.cv = agg["cv"]
-        summ.n = agg["n"]
-        summ.out_of_control_count = agg["out_of_control_count"]
-        summ.in_control_rate = agg["in_control_rate"]
-        summ.quality_goal = quality_goal
-        db.flush()
-        # 重写每日测值（daily_meta[key] 与 values 同序，索引对齐 ooc）
-        db.query(QCDailyValue).filter_by(summary_id=summ.id).delete()
-        operators = set()
-        ooc_details = []
-        for idx, (qc_date, val, op, vreason, vdeal) in enumerate(daily_meta[key]):
-            rule = agg["ooc"].get(idx, "")
-            if op:
-                operators.add(op)
-            if rule:
-                parts = []
-                if vreason:
-                    parts.append(f"原因：{vreason}")
-                if vdeal:
-                    parts.append(f"处理：{vdeal}")
-                detail = f"{qc_date} {test_item}({level}) 失控「{rule}」"
-                if parts:
-                    detail += "；" + "；".join(parts)
-                ooc_details.append(detail)
-            db.add(
-                QCDailyValue(
-                    summary_id=summ.id,
-                    qc_date=qc_date,
-                    value=val,
-                    is_out_of_control=bool(rule),
-                    rule_violated=rule,
-                    operator=(op or ""),
-                    violate_reason=(vreason or "") if rule else "",
-                    violate_deal=(vdeal or "") if rule else "",
-                )
-            )
-        summ.operator = "、".join(sorted(operators))
-        summ.handling_note = "\n".join(ooc_details)
-        items.append({
-            "id": summ.id, "year": year, "month": month, "test_item": test_item,
-            "lot_no": lot_no, "level": level, "instrument": instrument,
-            "instrument_id": summ.instrument_id, "instrument_no": summ.instrument_no,
-            "n": agg["n"], "out_of_control_count": agg["out_of_control_count"],
-            "in_control_rate": round(agg["in_control_rate"], 4),
+        proj_key = (instrument_id if sel_inst else None, instrument, year, month, test_item, lot_no)
+        # 按日期升序排序（稳定），保证 Westgard 时序与 R-4s 跨水平时间线正确
+        paired = sorted(zip(values, daily_meta[key]), key=lambda t: t[1][0])
+        svalues = [p[0] for p in paired]
+        sdates = [p[1][0] for p in paired]
+        sdmeta = [p[1] for p in paired]
+        projects.setdefault(proj_key, []).append({
+            "level": level,
+            "values": svalues,
+            "dates": sdates,
+            "daily_meta": sdmeta,
+            "target_mean": m["target_mean"],
+            "target_sd": m["target_sd"],
+            "unit": m["unit"],
+            "instrument_no": m["instrument_no"],
+            "test_item_aliases": m.get("test_item_aliases", ""),
         })
+
+    created = 0
+    updated = 0
+    items = []
+    for proj_key, levels in projects.items():
+        inst_id_p, instrument_p, year, month, test_item, lot_no = proj_key
+        aggr = aggregate_project(levels)
+        for spec in levels:
+            level = spec["level"]
+            agg = aggr[level]
+            tm = spec["target_mean"]
+            ts = spec["target_sd"]
+            if not tm and not ts:
+                # 未提供靶值：用本批实测均值/标准差回填，保证报表可读
+                tm = agg["mean"]
+                ts = agg["sd"]
+            target_cv = (ts / tm * 100) if tm else 0.0
+            quality_goal = lookup_quality_goal(test_item, spec.get("test_item_aliases", ""), db)
+            summ, is_new = _write_summary_level(
+                db,
+                year=year, month=month, test_item=test_item, lot_no=lot_no,
+                level=level, instrument=instrument_p, instrument_id=inst_id_p,
+                instrument_no=spec["instrument_no"], unit=spec["unit"],
+                quality_goal=quality_goal,
+                target_mean=tm, target_sd=ts, target_cv=target_cv,
+                agg=agg, dmeta=spec["daily_meta"],
+            )
+            if is_new:
+                created += 1
+            else:
+                updated += 1
+            items.append({
+                "id": summ.id, "year": year, "month": month, "test_item": test_item,
+                "lot_no": lot_no, "level": level, "instrument": instrument_p,
+                "instrument_id": summ.instrument_id, "instrument_no": summ.instrument_no,
+                "n": summ.n, "out_of_control_count": summ.out_of_control_count,
+                "in_control_rate": round(summ.in_control_rate, 4),
+            })
 
     db.commit()
     write_audit(db, user, "import", "qc_monthly_summaries", 0,
@@ -579,62 +638,69 @@ def recalc_summaries(db: Session = Depends(get_db), user: User = Depends(get_cur
     summaries = db.query(QCMonthlySummary).all()
     updated = 0
     samples = []
+    # 按「项目(仪器,年,月,项目,批号)」归组：跨水平 R-4s 需同一项目多水平同批计算
+    projects: dict[tuple, list] = {}
     for s in summaries:
-        dvs = db.query(QCDailyValue).filter_by(summary_id=s.id).order_by(QCDailyValue.qc_date).all()
-        if not dvs:
+        proj_key = (s.instrument_id, s.instrument, s.year, s.month, s.test_item, s.lot_no)
+        projects.setdefault(proj_key, []).append(s)
+    for proj_key, s_list in projects.items():
+        inst_id_p, instrument_p, year, month, test_item, lot_no = proj_key
+        levels = []
+        level_to_summary = {}
+        for s in s_list:
+            dvs = db.query(QCDailyValue).filter_by(summary_id=s.id).order_by(QCDailyValue.qc_date).all()
+            if not dvs:
+                continue
+            values = [float(v.value) for v in dvs]
+            dates = [v.qc_date for v in dvs]
+            dmeta = [
+                (v.qc_date, v.value, (v.operator or ""), (v.violate_reason or ""), (v.violate_deal or ""))
+                for v in dvs
+            ]
+            levels.append({
+                "level": s.level, "values": values, "dates": dates,
+                "daily_meta": dmeta,
+                "target_mean": s.target_mean or 0.0,
+                "target_sd": s.target_sd or 0.0,
+                "unit": s.unit, "instrument_no": s.instrument_no,
+                "test_item_aliases": "",
+            })
+            level_to_summary[s.level] = s
+        if not levels:
             continue
-        values = [float(v.value) for v in dvs]
-        tm = s.target_mean or 0.0
-        ts = s.target_sd or 0.0
-        agg = aggregate(values, tm, ts)
-        changed = (
-            abs((s.mean or 0) - agg["mean"]) > 1e-9
-            or abs((s.sd or 0) - agg["sd"]) > 1e-9
-            or abs((s.cv or 0) - agg["cv"]) > 1e-9
-            or s.out_of_control_count != agg["out_of_control_count"]
-        )
-        s.mean = agg["mean"]
-        s.sd = agg["sd"]
-        s.cv = agg["cv"]
-        s.n = agg["n"]
-        s.out_of_control_count = agg["out_of_control_count"]
-        s.in_control_rate = agg["in_control_rate"]
-        # 重写每日测值：保留原始值与元数据，按新 ooc 更新失控标记
-        db.query(QCDailyValue).filter_by(summary_id=s.id).delete()
-        ooc_details = []
-        operators = set()
-        for idx, v in enumerate(dvs):
-            rule = agg["ooc"].get(idx, "")
-            op = (v.operator or "").strip()
-            if op:
-                operators.add(op)
-            if rule and (v.violate_reason or v.violate_deal):
-                parts = []
-                if v.violate_reason:
-                    parts.append(f"原因：{v.violate_reason}")
-                if v.violate_deal:
-                    parts.append(f"处理：{v.violate_deal}")
-                ooc_details.append(f"{v.qc_date} {s.test_item}({s.level}) 失控「{rule}」" + ("；" + "；".join(parts) if parts else ""))
-            db.add(QCDailyValue(
-                summary_id=s.id,
-                qc_date=v.qc_date,
-                value=v.value,
-                is_out_of_control=bool(rule),
-                rule_violated=rule,
-                operator=op,
-                violate_reason=(v.violate_reason or "") if rule else "",
-                violate_deal=(v.violate_deal or "") if rule else "",
-            ))
-        s.operator = "、".join(sorted(operators))
-        s.handling_note = "\n".join(ooc_details)
-        if changed or agg["ooc"]:
-            updated += 1
-            if len(samples) < 20:
-                samples.append({
-                    "id": s.id, "test_item": s.test_item, "instrument": s.instrument,
-                    "level": s.level, "lot_no": s.lot_no,
-                    "ooc_count": agg["out_of_control_count"],
-                })
+        aggr = aggregate_project(levels)
+        for spec in levels:
+            s = level_to_summary[spec["level"]]
+            agg = aggr[spec["level"]]
+            tm = spec["target_mean"]
+            ts = spec["target_sd"]
+            if not tm and not ts:
+                tm = agg["mean"]
+                ts = agg["sd"]
+            target_cv = (ts / tm * 100) if tm else 0.0
+            # 保留既有 quality_goal（重算仅改判定/统计量，不改质量目标；改目标用 /_backfill_goals）
+            quality_goal = s.quality_goal or ""
+            before_mean, before_sd, before_cv, before_ooc = s.mean, s.sd, s.cv, s.out_of_control_count
+            summ, _ = _write_summary_level(
+                db,
+                year=year, month=month, test_item=test_item, lot_no=lot_no,
+                level=spec["level"], instrument=instrument_p, instrument_id=inst_id_p,
+                instrument_no=spec["instrument_no"], unit=spec["unit"],
+                quality_goal=quality_goal,
+                target_mean=tm, target_sd=ts, target_cv=target_cv,
+                agg=agg, dmeta=spec["daily_meta"],
+            )
+            if (summ.out_of_control_count != before_ooc
+                    or abs((summ.mean or 0) - (before_mean or 0)) > 1e-9
+                    or abs((summ.sd or 0) - (before_sd or 0)) > 1e-9
+                    or abs((summ.cv or 0) - (before_cv or 0)) > 1e-9):
+                updated += 1
+                if len(samples) < 20:
+                    samples.append({
+                        "id": summ.id, "test_item": test_item, "instrument": instrument_p,
+                        "level": spec["level"], "lot_no": lot_no,
+                        "ooc_count": summ.out_of_control_count,
+                    })
     db.commit()
     return {"updated": updated, "total": len(summaries), "samples": samples}
 

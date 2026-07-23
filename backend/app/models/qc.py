@@ -78,7 +78,8 @@ class QCDailyValue(Base):
     qc_date: Mapped[str] = mapped_column(String(30), default="")  # 质控日期
     value: Mapped[float] = mapped_column(Float, default=0.0)  # 测定值
     is_out_of_control: Mapped[bool] = mapped_column(default=False)  # 是否失控
-    rule_violated: Mapped[str] = mapped_column(String(50), default="")  # 触发规则
+    is_warning: Mapped[bool] = mapped_column(default=False)  # 是否警告（如 1-2s / R-4s 前点，不计入失控）
+    rule_violated: Mapped[str] = mapped_column(String(50), default="")  # 触发规则（失控或警告规则串）
     operator: Mapped[str] = mapped_column(String(100), default="")  # 操作人（每次测量）
     violate_reason: Mapped[str] = mapped_column(Text, default="")  # 失控原因（来自 LIS violateReason）
     violate_deal: Mapped[str] = mapped_column(Text, default="")  # 失控处理（来自 LIS violateDeal）

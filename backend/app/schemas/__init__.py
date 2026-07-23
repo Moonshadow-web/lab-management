@@ -333,6 +333,7 @@ class QCDailyValueRead(BaseModel):
     qc_date: str = ""
     value: float = 0.0
     is_out_of_control: bool = False
+    is_warning: bool = False
     rule_violated: str = ""
     operator: str = ""
     violate_reason: str = ""

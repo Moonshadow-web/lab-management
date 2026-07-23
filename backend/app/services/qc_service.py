@@ -1,12 +1,17 @@
 """室内质控计算服务：Westgard 多规则失控判定、聚合统计、质量目标查询。
 
-Westgard 在「按日期排序的每日测值序列」上做多规则判定（检验科常见简化：
-对同一水平(level)的一条时间序列应用规则）。命中以下任一规则即判为失控点：
+Westgard 多规则判定（检验科常见简化：对同一项目、同一仪器、同年月、同批号下
+所有水平的每日测值应用规则）。命中以下任一规则即判为失控点：
   1-3s : 单点超出 ±3s
   2-2s : 连续两点同侧超出 ±2s
-  R-4s : 连续两点差值 > 4s
+  R-4s : 相邻两测值差值 > 4s（跨水平、跨天均算）
   10-x : 连续十点同侧（均值同侧）
-1-2s 仅作警示、不计入失控（如需可在此扩展）。
+1-2s 仅作警示（warning）、不计入失控；R-4s 触发时较晚点判失控、较早点判警告。
+
+R-4s 判定说明（按 2026-07-24 需求）：把同一项目全部水平的每日测值按
+(date, level) 排成一条时间线，任意「相邻两点」——无论同一天不同水平、还是
+跨天同水平/不同水平——都参与 R-4s 判定；|前点 - 后点| > 4×max(前sd, 后sd)
+即触发，后点判失控(R-4s)、前点判警告(R-4s)。该判定仅依赖原始测值、互不级联。
 """
 import json
 import re
@@ -307,32 +312,35 @@ def _join(existing: str, rule: str) -> str:
     return (existing + ";" + rule) if existing else rule
 
 
-def evaluate_westgard(values: list[float], mean: float, sd: float) -> dict[int, str]:
-    """返回 {失控点索引: 触发规则(...)}。"""
+def evaluate_westgard(values: list[float], mean: float, sd: float):
+    """单水平 Westgard 失控规则：1-3s / 2-2s / 10-x。
+
+    1-2s 作为「警告（warning）」单独返回，不计入失控；R-4s 为跨水平规则
+    （同一天两个不同水平之差），不在此处理（见 evaluate_r4s_run / aggregate_project）。
+
+    返回 (ooc, warnings)：
+      ooc:      {idx: "1-3s"/"2-2s"/"10-x" 串}  失控点
+      warnings: {idx: "1-2s"}                   超出 ±2SD 但未超 ±3SD 且未被判失控的点
+    """
     ooc: dict[int, str] = {}
+    warnings: dict[int, str] = {}
     n = len(values)
     if n == 0 or sd <= 0:
-        return ooc
+        return ooc, warnings
     # 浮点容差：判定「超过」阈值时使用，避免恰好等于阈值（如相邻差恰好 = 4sd）被误判为失控。
     eps = 1e-9 * (abs(mean) + abs(sd) + 1)
-    # 1-3s
+    # 1-3s（同时标记 1-2s 警告：超出 ±2SD 但未超出 ±3SD）
     for i, v in enumerate(values):
         if v > mean + 3 * sd + eps or v < mean - 3 * sd - eps:
             ooc[i] = _join(ooc.get(i, ""), "1-3s")
+        elif v > mean + 2 * sd + eps or v < mean - 2 * sd - eps:
+            warnings[i] = "1-2s"
     # 2-2s
     for i in range(n - 1):
         a, b = values[i], values[i + 1]
         if (a > mean + 2 * sd + eps and b > mean + 2 * sd + eps) or (a < mean - 2 * sd - eps and b < mean - 2 * sd - eps):
             ooc[i] = _join(ooc.get(i, ""), "2-2s")
             ooc[i + 1] = _join(ooc.get(i + 1, ""), "2-2s")
-    # R-4s：失控点本身不参与相邻判定（避免已判失控的点级联误判其前后点也 R-4s）。
-    # 包括：被 1-3s / 2-2s / 10-x 判失控的点，以及本轮 R-4s 已判失控的点。
-    for i in range(n - 1):
-        if i in ooc or i + 1 in ooc:
-            continue
-        if abs(values[i] - values[i + 1]) > 4 * sd + eps:
-            ooc[i] = _join(ooc.get(i, ""), "R-4s")
-            ooc[i + 1] = _join(ooc.get(i + 1, ""), "R-4s")
     # 4-1s 已禁用
     # 10-x
     for i in range(n - 9):
@@ -340,7 +348,48 @@ def evaluate_westgard(values: list[float], mean: float, sd: float) -> dict[int, 
         if all(v > mean for v in w) or all(v < mean for v in w):
             for j in range(i, i + 10):
                 ooc[j] = _join(ooc.get(j, ""), "10-x")
-    return ooc
+    # 已被判失控的点不再单独标 1-2s 警告（避免警告与失控重复）
+    for k in list(warnings):
+        if k in ooc:
+            del warnings[k]
+    return ooc, warnings
+
+
+def evaluate_r4s_project(points: list[dict]) -> tuple[dict, dict]:
+    """跨「项目(同仪器/年/月/批号)」全部水平、按时间排序的相邻两测值 R-4s 判定。
+
+    points: list of {level, idx, value, sd, date}
+      level: 水平标识；idx: 该水平 values 中的下标；value: 测值；
+      sd:    该水平的靶值 SD（缺失/<=0 不参与）；date: qc_date 字符串（ISO，可排序）。
+    返回 (ooc_add, warn_add)：
+      ooc_add:  {(level, idx): "R-4s"}  触发 R-4s 的『后一点』（时间上较晚者）→ 判失控；
+      warn_add: {(level, idx): "R-4s"}  触发 R-4s 的『前一点』（时间上较早者）→ 判警告（不计入失控）。
+
+    规则（按 2026-07-24 需求）：
+      - 把同一项目所有水平的每日测值按 (date, level) 排成一条时间线；
+      - 任意『相邻两点』（无论同一天不同水平、还是跨天同/不同水平）都判 R-4s；
+      - |前点 - 后点| > 4 × max(前sd, 后sd) 即触发；
+      - 触发时：后点判失控(R-4s)、前点判警告(R-4s)；前点若已因其它规则失控则保持失控、不再改判警告。
+    该判定仅依赖原始测值，互不级联（不会因前点已失控而把后点连带误判）。
+    """
+    # 按 (date, level) 稳定排序，保留原始 (level, idx) 用于回写
+    pts = sorted(points, key=lambda p: (p["date"], str(p["level"])))
+    ooc_add: dict = {}
+    warn_add: dict = {}
+    m = len(pts)
+    for i in range(m - 1):
+        prev, curr = pts[i], pts[i + 1]
+        sdi, sdj = prev["sd"], curr["sd"]
+        if sdi <= 0 or sdj <= 0:
+            continue
+        thr = 4 * max(sdi, sdj)
+        eps = 1e-9 * (abs(prev["value"]) + abs(curr["value"]) + 1)
+        if abs(prev["value"] - curr["value"]) > thr + eps:
+            ooc_add[(curr["level"], curr["idx"])] = "R-4s"
+            # 前点：若已因本轮（作为更早 pair 的后点）判失控则保持失控；否则标警告
+            if (prev["level"], prev["idx"]) not in ooc_add:
+                warn_add[(prev["level"], prev["idx"])] = "R-4s"
+    return ooc_add, warn_add
 
 
 def _robust_stats(values: list[float]):
@@ -375,48 +424,96 @@ def _robust_stats(values: list[float]):
     return sum(vals) / len(vals), statistics.stdev(vals)
 
 
-def aggregate(values: list[float], target_mean: float, target_sd: float):
-    """由每日测值聚合月结统计；target_mean/target_sd 用于 Westgard 判定。
+def aggregate_project(levels: list[dict]):
+    """跨水平 Westgard 聚合（同一项目、同一仪器、同年月下多个水平的月结）。
 
-    返回的 mean/sd/cv 为**剔除失控点后**的「在控统计量」（用户要求：导入核算须去除失控点）。
-    原始全量统计量另存 all_mean/all_sd/all_cv 供追溯。Westgard 判定仍基于靶值（或缺失时本批全量），
-    不受剔除影响。
+    levels: list of dict {level, values, dates, target_mean, target_sd}
+      values: 按日期排序的每日测值；dates: 与 values 同序的 qc_date 字符串（用于跨水平按天分组）；
+      target_mean/target_sd: 靶值/靶SD，可为 0（缺失→本水平稳健估计）。
+    返回 {level: {mean, sd, cv, n, ooc, warnings, out_of_control_count, in_control_rate,
+                  all_mean, all_sd, all_cv}}。
+
+    规则：
+      - 单水平：1-3s / 2-2s / 10-x（失控），1-2s（警告，不计入失控）；
+      - 跨水平 R-4s：把本项目全部水平的每日测值按 (date, level) 排成时间线，
+        任意相邻两点（同天不同水平、跨天同/不同水平）之差 > 4×max(sd_i, sd_j)
+        → 后点判失控(R-4s)、前点判警告(R-4s)；
+      - 统计量在剔除失控点（含 R-4s）后计算。
     """
-    n = len(values)
-    if n == 0:
-        return {
-            "mean": 0.0, "sd": 0.0, "cv": 0.0, "n": 0,
-            "all_mean": 0.0, "all_sd": 0.0, "all_cv": 0.0,
-            "out_of_control_count": 0, "in_control_rate": 0.0,
-            "ooc": {},
+    from collections import defaultdict
+
+    if not levels:
+        return {}
+
+    per = {}
+    # 1) 单水平规则（1-3s / 2-2s / 10-x / 1-2s 警告）
+    for lv in levels:
+        values = lv["values"]
+        tm, ts = lv["target_mean"], lv["target_sd"]
+        if tm and ts:
+            em, es = tm, ts
+        else:
+            em, es = _robust_stats(values)
+        ooc, warnings = evaluate_westgard(values, em, es)
+        r4s_sd = ts if ts else es  # 跨水平 R-4s 用靶SD（缺失则用稳健估计 SD）
+        per[lv["level"]] = {
+            "values": values, "dates": lv["dates"],
+            "ooc": ooc, "warnings": warnings, "r4s_sd": r4s_sd,
         }
-    mean = sum(values) / n
-    sd = statistics.stdev(values) if n > 1 else 0.0
-    cv = (sd / mean * 100) if mean else 0.0
-    # Westgard 判定：优先用靶值（target_mean/target_sd）；若缺失则退化为「迭代剔除极端点」后估计的
-    # 均值/标准差，避免失控点抬高 SD 而漏判（不影响已带靶值的数据）。
-    if target_mean and target_sd:
-        eff_mean, eff_sd = target_mean, target_sd
-    else:
-        eff_mean, eff_sd = _robust_stats(values)
-    ooc = evaluate_westgard(values, eff_mean, eff_sd)
-    ooc_count = len(ooc)
-    in_control_rate = (n - ooc_count) / n if n else 0.0
-    # 剔除失控点后在控统计量（用户要求：均值/SD/CV 去除失控点重算）
-    in_control = [v for i, v in enumerate(values) if i not in ooc]
-    if in_control:
-        ic_mean = sum(in_control) / len(in_control)
-        ic_sd = statistics.stdev(in_control) if len(in_control) > 1 else 0.0
-        ic_cv = (ic_sd / ic_mean * 100) if ic_mean else 0.0
-    else:
-        # 全部失控时退化为全量，避免无值
-        ic_mean, ic_sd, ic_cv = mean, sd, cv
-    return {
-        "mean": ic_mean, "sd": ic_sd, "cv": ic_cv, "n": n,
-        "all_mean": mean, "all_sd": sd, "all_cv": cv,
-        "out_of_control_count": ooc_count, "in_control_rate": in_control_rate,
-        "ooc": ooc,
-    }
+
+    # 2) 跨水平 R-4s：把全部水平的每日测值按 (date, level) 排成一条时间线，
+    #    任意「相邻两点」都参与 R-4s 判定（同天不同水平 或 跨天同/不同水平）。
+    all_points = []
+    for lv in levels:
+        p = per[lv["level"]]
+        for idx, (v, d) in enumerate(zip(p["values"], p["dates"])):
+            all_points.append({
+                "level": lv["level"], "idx": idx,
+                "value": v, "sd": p["r4s_sd"], "date": d,
+            })
+    ooc_add, warn_add = evaluate_r4s_project(all_points)
+    for (level, idx), rule in ooc_add.items():
+        po = per[level]["ooc"]
+        po[idx] = _join(po.get(idx, ""), rule)
+    for (level, idx), rule in warn_add.items():
+        # 前点若已因其它规则失控则保持失控，不再改判警告
+        if idx in per[level]["ooc"]:
+            continue
+        pw = per[level]["warnings"]
+        pw[idx] = _join(pw.get(idx, ""), rule)
+
+    # 3) 统计量（剔除失控点后）
+    result = {}
+    for lv in levels:
+        p = per[lv["level"]]
+        values = p["values"]
+        ooc = p["ooc"]
+        n = len(values)
+        if n == 0:
+            result[lv["level"]] = {
+                "mean": 0.0, "sd": 0.0, "cv": 0.0, "n": 0,
+                "all_mean": 0.0, "all_sd": 0.0, "all_cv": 0.0,
+                "out_of_control_count": 0, "in_control_rate": 0.0,
+                "ooc": {}, "warnings": {},
+            }
+            continue
+        mean = sum(values) / n
+        sd = statistics.stdev(values) if n > 1 else 0.0
+        cv = (sd / mean * 100) if mean else 0.0
+        in_control = [v for i, v in enumerate(values) if i not in ooc]
+        if in_control:
+            ic_mean = sum(in_control) / len(in_control)
+            ic_sd = statistics.stdev(in_control) if len(in_control) > 1 else 0.0
+            ic_cv = (ic_sd / ic_mean * 100) if ic_mean else 0.0
+        else:
+            ic_mean, ic_sd, ic_cv = mean, sd, cv
+        result[lv["level"]] = {
+            "mean": ic_mean, "sd": ic_sd, "cv": ic_cv, "n": n,
+            "all_mean": mean, "all_sd": sd, "all_cv": cv,
+            "out_of_control_count": len(ooc), "in_control_rate": (n - len(ooc)) / n if n else 0.0,
+            "ooc": ooc, "warnings": p["warnings"],
+        }
+    return result
 
 
 # 月质控频次达标默认阈值（次/月）。可由检验组在文字段中改写。
