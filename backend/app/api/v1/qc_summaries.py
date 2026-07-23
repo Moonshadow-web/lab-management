@@ -568,6 +568,77 @@ def backfill_units(db: Session = Depends(get_db), user: User = Depends(get_curre
     return {"updated": updated, "total": len(rows), "samples": samples}
 
 
+@router.post("/_recalc", dependencies=[Depends(require_roles("admin", "qc_manager"))])
+def recalc_summaries(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """全量重算所有月结的 Westgard 判定与在控统计量。
+
+    当 evaluate_westgard 规则修复后，历史已上传的 daily values 仍按旧规则冻结。
+    本接口读取每个 summary 的每日测值，重新 aggregate，并更新 summary 统计量与 daily value 的失控标记。
+    返回 {updated, total, samples}（samples 列出部分变更项便于核对）。
+    """
+    summaries = db.query(QCMonthlySummary).all()
+    updated = 0
+    samples = []
+    for s in summaries:
+        dvs = db.query(QCDailyValue).filter_by(summary_id=s.id).order_by(QCDailyValue.qc_date).all()
+        if not dvs:
+            continue
+        values = [float(v.value) for v in dvs]
+        tm = s.target_mean or 0.0
+        ts = s.target_sd or 0.0
+        agg = aggregate(values, tm, ts)
+        changed = (
+            abs((s.mean or 0) - agg["mean"]) > 1e-9
+            or abs((s.sd or 0) - agg["sd"]) > 1e-9
+            or abs((s.cv or 0) - agg["cv"]) > 1e-9
+            or s.out_of_control_count != agg["out_of_control_count"]
+        )
+        s.mean = agg["mean"]
+        s.sd = agg["sd"]
+        s.cv = agg["cv"]
+        s.n = agg["n"]
+        s.out_of_control_count = agg["out_of_control_count"]
+        s.in_control_rate = agg["in_control_rate"]
+        # 重写每日测值：保留原始值与元数据，按新 ooc 更新失控标记
+        db.query(QCDailyValue).filter_by(summary_id=s.id).delete()
+        ooc_details = []
+        operators = set()
+        for idx, v in enumerate(dvs):
+            rule = agg["ooc"].get(idx, "")
+            op = (v.operator or "").strip()
+            if op:
+                operators.add(op)
+            if rule and (v.violate_reason or v.violate_deal):
+                parts = []
+                if v.violate_reason:
+                    parts.append(f"原因：{v.violate_reason}")
+                if v.violate_deal:
+                    parts.append(f"处理：{v.violate_deal}")
+                ooc_details.append(f"{v.qc_date} {s.test_item}({s.level}) 失控「{rule}」" + ("；" + "；".join(parts) if parts else ""))
+            db.add(QCDailyValue(
+                summary_id=s.id,
+                qc_date=v.qc_date,
+                value=v.value,
+                is_out_of_control=bool(rule),
+                rule_violated=rule,
+                operator=op,
+                violate_reason=(v.violate_reason or "") if rule else "",
+                violate_deal=(v.violate_deal or "") if rule else "",
+            ))
+        s.operator = "、".join(sorted(operators))
+        s.handling_note = "\n".join(ooc_details)
+        if changed or agg["ooc"]:
+            updated += 1
+            if len(samples) < 20:
+                samples.append({
+                    "id": s.id, "test_item": s.test_item, "instrument": s.instrument,
+                    "level": s.level, "lot_no": s.lot_no,
+                    "ooc_count": agg["out_of_control_count"],
+                })
+    db.commit()
+    return {"updated": updated, "total": len(summaries), "samples": samples}
+
+
 @router.get("/daily/project")
 def list_project_daily(
     year: int,
