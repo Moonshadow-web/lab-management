@@ -22,6 +22,7 @@ class RecipientIn(BaseModel):
     name: str
     email: str = ""
     phone: str = ""
+    wx_uid: str = ""            # 微信推送 ServerChan SendKey（复用此列，按人精准推送）
     channels: str = "email"
     enabled: bool = True
     rule_categories: str = ""   # 订阅的提醒分类(CSV)；空=不接收
@@ -32,6 +33,7 @@ class RecipientUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    wx_uid: Optional[str] = None
     channels: Optional[str] = None
     enabled: Optional[bool] = None
     rule_categories: Optional[str] = None
