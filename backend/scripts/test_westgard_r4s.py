@@ -1,9 +1,10 @@
 """验证 Westgard 规则：
 - 单水平：1-3s / 2-2s / 10-x（失控），1-2s（警告，不计入失控）；
-- 跨水平 R-4s（2026-07-24 新规则）：把同一项目全部水平的每日测值按 (date, level)
-  排成一条时间线，任意『相邻两点』（同天不同水平、或跨天同/不同水平）都判定；
-  |前点 - 后点| > 4×max(前sd, 后sd) 即触发 → 后点判失控(R-4s)、前点判警告(R-4s)；
-  互不级联（前点已失控不会因后续 pair 被降级为警告）。
+- 跨水平 R-4s（2026-07-24 新规则，2026-07-22 修订同天判定）：把同一项目全部水平的
+  每日测值按 (date, level) 排成一条时间线，任意『相邻两点』（同天不同水平、或跨天
+  同/不同水平）都判定；|前点 - 后点| > 4×max(前sd, 后sd) 即触发；
+  触发规则：同一天两水平 → 两个都判失控(R-4s)；跨天相邻 → 后点判失控(R-4s)、
+  前点判警告(R-4s)；互不级联（前点已失控不会因后续 pair 被降级为警告）。
 - aggregate_project 统计量剔除失控点（含 R-4s 失控点）。
 """
 import sys, os
@@ -38,8 +39,8 @@ for i in (0, 2, 4):
     assert i not in warn3, f"点 {i} 不应警告"
 print("PASS 用例3：1-2s 警告（孤立）")
 
-print("\n=== 用例4：跨水平 R-4s（同天两水平差大→后点失控、前点警告）===")
-# 6-29 同天 L1=10、L2=60，差 50 > 4×max(1,1)=4 → R-4s；L2(后,按 level 序)=失控，L1(前)=警告
+print("\n=== 用例4：跨水平 R-4s（同天两水平差大→两个都判失控）===")
+# 6-03 同天 L1=10、L2=60，差 50 > 4×max(1,1)=4 → R-4s；两个水平都判失控（不再把前点降为警告）
 levels = [
     {"level": "L1", "values": [10, 10, 10],
      "dates": ["2026-06-01", "2026-06-02", "2026-06-03"],
@@ -51,14 +52,14 @@ levels = [
 res = aggregate_project(levels)
 print("L1 ooc:", res["L1"]["ooc"], "L1 warn:", res["L1"]["warnings"])
 print("L2 ooc:", res["L2"]["ooc"], "L2 warn:", res["L2"]["warnings"])
-assert "R-4s" in res["L2"]["ooc"].get(2, ""), "6-03 L2=60 应判 R-4s（与同日 L1 跨水平，后点失控）"
-assert "R-4s" in res["L1"]["warnings"].get(2, ""), "6-03 L1=10 应判 R-4s 警告（前点）"
-assert 2 not in res["L1"]["ooc"], "前点 L1 不应判失控（仅警告）"
+assert "R-4s" in res["L2"]["ooc"].get(2, ""), "6-03 L2=60 应判 R-4s（与同日 L1 跨水平）"
+assert "R-4s" in res["L1"]["ooc"].get(2, ""), "6-03 L1=10 同天触发也应判 R-4s 失控（两个水平都失控）"
+assert 2 not in res["L1"]["warnings"], "同天前点 L1 应判失控，不再标警告"
 # 其余相邻对差值均为 0，不应触发 R-4s
 for lv in ("L1", "L2"):
     for i in (0, 1):
         assert "R-4s" not in res[lv]["ooc"].get(i, ""), f"{lv} idx{i} 不应 R-4s"
-print("PASS 用例4：同天跨水平 R-4s（后点失控/前点警告）")
+print("PASS 用例4：同天跨水平 R-4s（两个水平都失控）")
 
 print("\n=== 用例5：跨水平 R-4s（跨天不同水平相邻）→ 后点失控、前点警告 ===")
 # 周一三五各做一个水平：L1 在 d1/d3，L2 在 d2/d4；d3 L1=10 与 d4 L2=60 相邻跨天 → R-4s
@@ -125,5 +126,25 @@ print("L1 ooc:", res8["L1"]["ooc"], "失控数:", res8["L1"]["out_of_control_cou
 print(f"剔除后 mean={res8['L1']['mean']:.4f} sd={res8['L1']['sd']:.4f} cv={res8['L1']['cv']:.2f}%")
 assert res8["L1"]["out_of_control_count"] >= 1, "应检出至少 1 个失控点"
 print("PASS 用例8：失控点被检出并剔除重算")
+
+print("\n=== 用例9：同天两水平都失控 + 跨天相邻（同天失控点不因跨天对被降级）===")
+# 6-01 同天 L1=10、L2=60（同天→两个都失控）；6-02 L1=10。
+# 时间线：(6-01,L1,10)-(6-01,L2,60) 同天→都失控；(6-01,L2,60)-(6-02,L1,10) 跨天→L1(6-02)失控、L2(6-01)若非已失控则警告。
+# 因 L2(6-01) 已同天失控，跨天对不再把它降级为警告；L1(6-01) 同天已失控、也不是跨天后点，保持失控。
+levels9 = [
+    {"level": "L1", "values": [10, 10],
+     "dates": ["2026-06-01", "2026-06-02"], "target_mean": 10, "target_sd": 1},
+    {"level": "L2", "values": [60],
+     "dates": ["2026-06-01"], "target_mean": 10, "target_sd": 1},
+]
+res9 = aggregate_project(levels9)
+print("L1:", {k: (res9['L1']['ooc'].get(k), res9['L1']['warnings'].get(k)) for k in (0, 1)})
+print("L2:", {k: (res9['L2']['ooc'].get(k), res9['L2']['warnings'].get(k)) for k in (0,)})
+assert "R-4s" in res9["L1"]["ooc"].get(0, ""), "6-01 L1=10 同天触发应判失控"
+assert "R-4s" in res9["L2"]["ooc"].get(0, ""), "6-01 L2=60 同天触发应判失控"
+assert "R-4s" in res9["L1"]["ooc"].get(1, ""), "6-02 L1=10 跨天相邻应判失控（后点）"
+assert 0 not in res9["L2"]["warnings"], "L2(6-01) 已同天失控，不应被跨天对降级为警告"
+assert 0 not in res9["L1"]["warnings"], "L1(6-01) 已同天失控，不应被标警告"
+print("PASS 用例9：同天失控点 + 跨天相邻 不降级")
 
 print("\n全部用例通过 ✅")

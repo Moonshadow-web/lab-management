@@ -25,6 +25,7 @@
 - qc_target：一批次一靶值；水平1/2/3；conventional/immediate；SI 界值 services/qc_target.py。
 - 质量要求：三源同表 quality_requirements(wst403-2024/bj-hr-2025/nccl-2026)；GET /quality-requirements/_meta/matrix 综合比对视图；lookup_quality_goal 优先级 表cv>bjhr-cv>nccl-tea/3>json>字典>默认10%。
 - QC月结/LJ：上传 LIS 时 _ensure_report_draft 生成5段模板落库；LJ 图项目+水平多选；已移除月小结Excel导出与质控图PDF。
+- **Westgard 月结判定（R-4s 同天两水平都失控，2026-07-22 确认）**：`qc_service.evaluate_r4s_project` 把同项目全部水平按 (date, level) 排时间线，任意相邻对 |Δ|>4×max(sd_i,sd_j) 触发 R-4s；**同一天两个水平都判失控(ooc)**，跨天相邻则后点失控/前点警告(warning→is_warning 字段、不计入失控)；已失控点不被跨天对降级（不级联）。单水平 1-3s/2-2s/10-x 失控、1-2s 仅警告。统计量剔除失控点重算。验证脚本 backend/scripts/test_westgard_r4s.py（9 用例全过）。前端 QCList.vue 日值与 LJ 表用黄色「警告」标签区分 is_warning。
 - 文档预览：xlsx/xls 用 exceljs 转 HTML；docx mammoth；pdf 直接；后端补正确 media_type。
 
 ## 原始结果附件 + max_allowed_packet（重要）
@@ -46,6 +47,7 @@
 - **接入流程（给用户）**：登录 sctapi.ftqq.com 用微信扫码关注「方糖」→ 复制 SendKey → 后台接收人填 ServerChan Key + 渠道勾含 serverchan → 点「发送测试」验证 → 后续质评/校准提醒推微信。
 - **隐藏 bug 已修 + 端到端已验证（2026-07-24）**：原 `reminders.py` 的 `RecipientIn/RecipientUpdate` Pydantic 模型**缺 `wx_uid` 字段**，PUT 静默丢弃前端传来的 SendKey → Key 落不了库。修复 commit `a795f89`（build mark `serverchan-wxuid-fix-2026-07-23`，已部署）。用户 SendKey 已写入接收人 id=1（金子铮）、channels=email,serverchan；`wx-test` 返回 code:0 SUCCESS、真实 `run_reminders` 微信 `wx_sent:1` → 通道完全打通。**改接收人 API 务必保留 `wx_uid` 字段。**
 - 既有通道：站内 notifications + 邮件(smtp) + 微信(serverchan)，三路并行、渠道可任意组合。
+- **多人接收操作约定（2026-07-24）**：ServerChan 一人一 Key，不能共用；让同事接收 = 每人各自去 sctapi.ftqq.com 扫码拿 SendKey → 后台「提醒设置→发送人→新增发送人」填姓名+ServerChan Key(wx_uid)+渠道勾 serverchan+订阅分类(rule_categories，空=不收)。分类取值：`eqa_biochem_coag`(生化+凝血质评)/`eqa_immuno`(免疫质评)/`calibration`(设备校准)，多类逗号分隔。后端 `POST /recipients` 已具备，前端有「新增发送人」按钮；也可把名单(姓名+Key+订阅范围)交 AI 批量建。现有接收人若渠道含 serverchan 但 wx_uid 为空则微信发不出，需各自补 Key。
 - **已实现（commit 29ee1a9 已部署，build mark `wxpusher-channel-2026-07-23`）**：
   - `NotifyRecipient.wx_uid` 新列（启动 `_ensure_missing_columns` 自动补，幂等，无迁移风险）；`channels` 支持 `wxpusher`（可组合 `email,wxpusher`）。
   - `config.py`：`WXPUSHER_ENABLED`/`WXPUSHER_APP_TOKEN`（读 env）；Cloud Run 环境变量已写入 `cloudbaserc.json`。
