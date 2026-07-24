@@ -107,7 +107,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "scheduling-rules2-2026-07-24"
+_BUILD_MARK = "scheduling-selfheal-2026-07-24"
 
 
 def get_build_mark() -> str:
@@ -124,6 +124,31 @@ router = APIRouter(prefix="/_diag", tags=["diag"])
 def diag_build():
     """返回构建标记，确认当前服役容器版本（免鉴权，仅探针）。"""
     return {"build": _BUILD_MARK, "has_self_heal": True}
+
+
+# 临时排班诊断端点（验证用，确认自愈后移除）。
+@router.get("/dbg-scheduling")
+def diag_scheduling():
+    from ...core.database import engine
+    out: dict = {}
+    try:
+        from sqlalchemy import text as _t
+        with engine.connect() as c:
+            # 列存在性
+            cols = [r[0] for r in c.execute(_t(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+                "WHERE TABLE_NAME='scheduling_posts'")).fetchall()]
+            out["scheduling_posts_columns"] = cols
+            out["scheduling_config_exists"] = bool(c.execute(_t(
+                "SELECT 1 FROM INFORMATION_SCHEMA.TABLES "
+                "WHERE TABLE_NAME='scheduling_config'")).fetchone())
+            rows = c.execute(_t(
+                "SELECT id,name,preferred_people,is_fever_day FROM scheduling_posts "
+                "ORDER BY `order`")).fetchall()
+            out["posts"] = [dict(r._mapping) for r in rows]
+    except Exception as e:  # noqa: BLE001
+        out["error"] = repr(e)
+    return out
 
 
 @router.get("/copy-from-sqlite")

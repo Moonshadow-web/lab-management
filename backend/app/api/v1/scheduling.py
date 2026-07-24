@@ -100,16 +100,16 @@ def _load_config(db: Session) -> SchedulingConfig:
 
 def _pick_person(post: SchedulingPost, people: list, excluded: set, occupied: set,
                  assigned_today: set, post_cursor: dict) -> str:
-    """为某岗挑一人：优先 preferred_people（轮转），不足则回退到通用池（轮转）。
+    """为某岗挑一人：按固定岗优先人「优先级递减」排，除非该人当天不在岗（休息/病假/开会/行政/质控）
+    或已被排了别的岗，否则优先排他；都不可用才回退到通用池（轮换分散）。
 
-    排除：被排除人员、当天占用（休息/病假/开会/行政/质控）、当天已排其他岗。
+    与用户约定一致：preferred_people[0] 优先级最高，[1] 次之……不是轮转均摊。
     """
-    pref = [x for x in (post.preferred_people or [])
-            if x and x not in excluded and x not in occupied and x not in assigned_today]
-    if pref:
-        c = post_cursor.get(post.id, 0) % len(pref)
-        post_cursor[post.id] = c + 1
-        return pref[c]
+    for cand in (post.preferred_people or []):
+        if (cand and cand not in excluded and cand not in occupied
+                and cand not in assigned_today):
+            return cand
+    # 固定优先人均不在岗：回退通用池（轮换，避免总压同一个人）
     pool = [x for x in people
             if x and x not in excluded and x not in occupied and x not in assigned_today]
     if not pool:

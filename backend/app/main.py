@@ -55,15 +55,25 @@ DEFAULT_EXCLUDED_PEOPLE = ["王学晶", "李东", "管理员", "技术支持", "
 
 
 def ensure_scheduling_defaults(db):
-    """岗位定义 + 排班配置 种子：表为空时灌入。幂等。"""
-    if not db.query(SchedulingPost).first():
-        for name, group, required, only_weekday, required_weekday, order, preferred, is_fever in DEFAULT_SCHEDULING_POSTS:
-            db.add(SchedulingPost(
-                name=name, group=group, required=required,
-                only_weekday=only_weekday, required_weekday=required_weekday, order=order,
-                preferred_people=preferred, is_fever_day=is_fever,
-            ))
-        db.commit()
+    """岗位定义 + 排班配置 种子：按 name upsert（幂等，且会把 preferred_people 等刷新到最新）。
+
+    即便岗位已存在（如首次部署的空壳），也会回填固定岗优先人 / 发热白班标记，
+    避免「升级后岗位定义里优先人为空」导致自动生成不按固定人排。
+    """
+    existing = {p.name: p for p in db.query(SchedulingPost).all()}
+    for name, group, required, only_weekday, required_weekday, order, preferred, is_fever in DEFAULT_SCHEDULING_POSTS:
+        p = existing.get(name)
+        if p is None:
+            p = SchedulingPost(name=name)
+            db.add(p)
+        p.group = group
+        p.required = required
+        p.only_weekday = only_weekday
+        p.required_weekday = required_weekday
+        p.order = order
+        p.preferred_people = preferred
+        p.is_fever_day = is_fever
+    db.commit()
     # 排班配置（单行 id=1）
     cfg = db.get(SchedulingConfig, 1)
     if not cfg:
@@ -95,11 +105,11 @@ def _on_connect_raise_max_allowed_packet(dbapi_conn, conn_record):
 
 
 def _ensure_missing_columns():
-    """MySQL/任意 dialect 补列：create_all 只建缺失表、不补已存在表的新列。
+    """MySQL/任意 dialect 自愈：补齐缺失表 + 缺失列（逐表/逐列容错）。
 
-    用 inspector 比对模型定义与线上表结构，凡模型有而表缺的列，
-    执行 ALTER TABLE ADD COLUMN（仅 ADD，绝不 DROP）。幂等：已存在的列跳过，
-    每次启动调用，不破坏数据。覆盖所有表，避免「加了模型字段却忘了迁列」导致的 500。
+    - 缺失表：table.create(bind=engine, checkfirst=True)（幂等）。
+    - 缺失列：ALTER TABLE ADD COLUMN（仅 ADD，绝不 DROP）。
+    逐表/逐列 try，单点失败不影响其余，避免「某表 DDL 异常导致整体建表中断」。
     """
     try:
         inspector = sa_inspect(engine)
@@ -109,6 +119,11 @@ def _ensure_missing_columns():
     for table in Base.metadata.tables.values():
         try:
             if not inspector.has_table(table.name):
+                try:
+                    table.create(bind=engine, checkfirst=True)
+                    logger.info("自动建表 %s", table.name)
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("自动建表失败(忽略) %s: %s", table.name, e)
                 continue
             existing = {c["name"] for c in inspector.get_columns(table.name)}
         except Exception:  # noqa: BLE001
@@ -640,9 +655,12 @@ async def lifespan(app: FastAPI):
         logger.error("self-heal db error (non-fatal): %s", e)
     try:
         Base.metadata.create_all(bind=engine)
+    except Exception as e:  # noqa: BLE001
+        logger.error("init error (create_all): %s", e)
+    try:
         _migrate_schema()
     except Exception as e:  # noqa: BLE001
-        logger.error("init error (create_all/migrate): %s", e)
+        logger.error("init error (migrate): %s", e)
     try:
         _raise_max_allowed_packet()
     except Exception as e:  # noqa: BLE001
