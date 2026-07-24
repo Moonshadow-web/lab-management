@@ -27,6 +27,7 @@
 - QC月结/LJ：上传 LIS 时 _ensure_report_draft 生成5段模板落库；LJ 图项目+水平多选；已移除月小结Excel导出与质控图PDF。
 - **Westgard 月结判定（R-4s 同天两水平都失控，2026-07-22 确认）**：`qc_service.evaluate_r4s_project` 把同项目全部水平按 (date, level) 排时间线，任意相邻对 |Δ|>4×max(sd_i,sd_j) 触发 R-4s；**同一天两个水平都判失控(ooc)**，跨天相邻则后点失控/前点警告(warning→is_warning 字段、不计入失控)；已失控点不被跨天对降级（不级联）。单水平 1-3s/2-2s/10-x 失控、1-2s 仅警告。统计量剔除失控点重算。验证脚本 backend/scripts/test_westgard_r4s.py（9 用例全过）。前端 QCList.vue 日值与 LJ 表用黄色「警告」标签区分 is_warning。
 - 文档预览：xlsx/xls 用 exceljs 转 HTML；docx mammoth；pdf 直接；后端补正确 media_type。
+- **排班(scheduling)模块（2026-07-24 新增框架）**：三表 SchedulingPost(岗位定义:name唯一/group=day|night|special/required/only_weekday[仅星期]/required_weekday[必填星期]/order)/SchedulingPlan(计划name+起止)/SchedulingAssignment(plan_id+date+weekday+is_workday+post_id+person[User.full_name]+status[在岗/质控/开会/病假]+is_early+is_continuous)。`main.py` 启动 `ensure_scheduling_defaults` 种子灌14标准岗(幂等)。API前缀 `/scheduling/{posts,plans,assignments}`+自定义 `POST /generate`(轮转生成,周末跳过,早/连班挑人连续≤2天)/`GET /grid`(岗×日矩阵)/`GET /my-today`(current_user的某日岗)。提醒引擎 DEFAULT_RULES 加 `shift_early`/`shift_continuous`(ref_kind=shift,lead_days=1,提前一天提醒)；接收人 rule_categories 含这两类才收早/连班提醒。前端菜单「排班管理」(moduleKey scheduling,写权限['admin','specialty_leader'])，Dashboard 有「今日我的岗位」卡。局限：周末/节假日不生成、生成为基础轮转无冲突约束、矩阵暂不支持前端直改。
 
 ## 原始结果附件 + max_allowed_packet（重要）
 - 字节存 MySQL BLOB（ComparisonAttachment/InterlabAttachment.data，LONGBLOB 16MB），不落磁盘。

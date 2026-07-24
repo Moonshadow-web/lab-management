@@ -52,3 +52,16 @@ export function getMyToday(params) {
 export function generateScheduling(data) {
   return request.post('/api/v1/scheduling/generate', data)
 }
+
+// 排班全局配置（排除人员 / 生成窗口）
+export function getSchedulingConfig() {
+  return request.get('/api/v1/scheduling/config')
+}
+export function updateSchedulingConfig(data) {
+  return request.put('/api/v1/scheduling/config', data)
+}
+
+// 手动录入/修改单个单元格（夜班、休息/病假/开会/行政/质控等）
+export function setSchedulingCell(data) {
+  return request.post('/api/v1/scheduling/cell', data)
+}

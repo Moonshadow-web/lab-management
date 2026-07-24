@@ -604,6 +604,8 @@ class SchedulingPostBase(BaseModel):
     only_weekday: int | None = None
     required_weekday: int | None = None
     order: int = 0
+    preferred_people: list[str] = []   # 该岗固定/优先人员（按顺序轮转）
+    is_fever_day: bool = False         # 发热白班：每月固定一人、每4个工作日一班
     notes: str = ""
 
 
@@ -626,6 +628,7 @@ class SchedulingPlanBase(BaseModel):
     name: str = ""
     start_date: str = ""
     end_date: str = ""
+    fever_day_person: str = ""    # 发热白班固定人员（full_name）；空=按普通白班轮转
     notes: str = ""
 
 
@@ -651,7 +654,7 @@ class SchedulingAssignmentBase(BaseModel):
     is_workday: bool = True
     post_id: int = 0
     person: str = ""
-    status: str = "在岗"        # 在岗 / 质控 / 开会 / 病假
+    status: str = "在岗"        # 在岗 / 休息 / 病假 / 开会 / 行政 / 质控
     is_early: bool = False
     is_continuous: bool = False
     note: str = ""
@@ -671,10 +674,36 @@ class SchedulingAssignmentRead(SchedulingAssignmentBase):
     updated_at: datetime | None = None
 
 
+class SchedulingConfigBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    excluded_people: list[str] = []      # 不参与任何排班的人员
+    default_window_days: int = 14        # 常规排班生成窗口
+    early_continuous_window_days: int = 30  # 早班/连班可提前排的天数
+    notes: str = ""
+
+
+class SchedulingConfigRead(SchedulingConfigBase):
+    id: int = 1
+    updated_at: datetime | None = None
+
+
 class SchedulingGenerateRequest(BaseModel):
     """自动生成排班请求。"""
     plan_id: int
     people: list[str] | None = None   # 生免组人员名单（full_name）；缺省用全部活跃用户
     start: str | None = None           # 覆盖计划起止日期（YYYY-MM-DD）
     end: str | None = None
+    days: int | None = None            # 生成天数（从 start 起算）；设定后用 start+days-1 作为结束
+
+
+class SchedulingCellRequest(BaseModel):
+    """手动录入/修改单个单元格（按 plan_id+date+post_id upsert）。"""
+    plan_id: int
+    date: str
+    post_id: int
+    person: str = ""
+    status: str = "在岗"
+    is_early: bool = False
+    is_continuous: bool = False
+    note: str = ""
 

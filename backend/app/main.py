@@ -25,40 +25,51 @@ from .services.notification_service import refresh_calibration_notifications, re
 from .services.reminder_engine import ensure_reminder_defaults, run_reminders
 from .services.comparison_report import ensure_comparison_defaults
 from .models.scheduling import (
-    SchedulingPost, POST_GROUP_DAY, POST_GROUP_NIGHT, POST_GROUP_SPECIAL,
+    SchedulingPost, SchedulingConfig, POST_GROUP_DAY, POST_GROUP_NIGHT, POST_GROUP_SPECIAL,
 )
 
 
 # 生免组标准岗位（表为空时灌入，幂等）。顺序即展示顺序。
-# (name, group, required, only_weekday, required_weekday, order)
+# (name, group, required, only_weekday, required_weekday, order, preferred_people, is_fever_day)
+# preferred_people：该岗固定/优先人员（按顺序轮转）；空=从通用池轮转。
+# is_fever_day：发热白班，每月固定一人、每4个工作日一班（具体人由计划的 fever_day_person 指定）。
 DEFAULT_SCHEDULING_POSTS = [
-    ("门1岗", POST_GROUP_DAY, True, None, None, 1),
-    ("门2岗", POST_GROUP_DAY, True, None, None, 2),
-    ("门诊辅助岗", POST_GROUP_DAY, False, None, None, 3),
-    ("急诊1岗", POST_GROUP_DAY, True, None, None, 4),
-    ("急诊2岗", POST_GROUP_DAY, True, None, None, 5),
-    ("病房岗", POST_GROUP_DAY, True, None, None, 6),
-    ("电泳岗", POST_GROUP_DAY, False, None, 3, 7),     # 周四必有
-    ("凝血岗", POST_GROUP_DAY, True, None, None, 8),
-    ("免1岗", POST_GROUP_DAY, True, None, None, 9),
-    ("免2岗", POST_GROUP_DAY, True, None, None, 10),
-    ("发热白班", POST_GROUP_DAY, True, None, None, 11),
-    ("质谱岗", POST_GROUP_SPECIAL, True, 2, None, 12),  # 仅周三
-    ("生化夜班", POST_GROUP_NIGHT, True, None, None, 13),
-    ("发热夜班", POST_GROUP_NIGHT, True, None, None, 14),
+    ("门1岗", POST_GROUP_DAY, True, None, None, 1, ["朱春阳", "郑飞", "夏立娇"], False),
+    ("门2岗", POST_GROUP_DAY, True, None, None, 2, ["朱春阳", "郑飞", "夏立娇"], False),
+    ("门诊辅助岗", POST_GROUP_DAY, False, None, None, 3, ["朱春阳", "郑飞", "夏立娇"], False),
+    ("急诊1岗", POST_GROUP_DAY, True, None, None, 4, ["姚建民", "秦满红"], False),
+    ("急诊2岗", POST_GROUP_DAY, True, None, None, 5, ["姚建民", "秦满红"], False),
+    ("病房岗", POST_GROUP_DAY, True, None, None, 6, ["杨静"], False),
+    ("电泳岗", POST_GROUP_DAY, False, None, 3, 7, ["秦东芳"], False),     # 周四必有
+    ("凝血岗", POST_GROUP_DAY, True, None, None, 8, ["孔亚龙", "吕文娟", "郑飞"], False),
+    ("免1岗", POST_GROUP_DAY, True, None, None, 9, ["赵海元", "吕文娟"], False),
+    ("免2岗", POST_GROUP_DAY, True, None, None, 10, ["王春馨"], False),
+    ("发热白班", POST_GROUP_DAY, True, None, None, 11, [], True),        # 固定人由计划 fever_day_person 指定
+    ("质谱岗", POST_GROUP_SPECIAL, True, 2, None, 12, ["秦东芳"], False),  # 仅周三
+    ("生化夜班", POST_GROUP_NIGHT, True, None, None, 13, [], False),      # 科室提前录入，不自动生成
+    ("发热夜班", POST_GROUP_NIGHT, True, None, None, 14, [], False),      # 科室提前录入，不自动生成
 ]
+
+# 不参与任何排班的人员（full_name）。金子铮仍参与排班，故仅排除「管理员」这一账号本身。
+DEFAULT_EXCLUDED_PEOPLE = ["王学晶", "李东", "管理员", "技术支持", "访客"]
 
 
 def ensure_scheduling_defaults(db):
-    """岗位定义种子：表为空时灌入生免组标准岗位。幂等。"""
-    if db.query(SchedulingPost).first():
-        return
-    for name, group, required, only_weekday, required_weekday, order in DEFAULT_SCHEDULING_POSTS:
-        db.add(SchedulingPost(
-            name=name, group=group, required=required,
-            only_weekday=only_weekday, required_weekday=required_weekday, order=order,
-        ))
-    db.commit()
+    """岗位定义 + 排班配置 种子：表为空时灌入。幂等。"""
+    if not db.query(SchedulingPost).first():
+        for name, group, required, only_weekday, required_weekday, order, preferred, is_fever in DEFAULT_SCHEDULING_POSTS:
+            db.add(SchedulingPost(
+                name=name, group=group, required=required,
+                only_weekday=only_weekday, required_weekday=required_weekday, order=order,
+                preferred_people=preferred, is_fever_day=is_fever,
+            ))
+        db.commit()
+    # 排班配置（单行 id=1）
+    cfg = db.get(SchedulingConfig, 1)
+    if not cfg:
+        db.add(SchedulingConfig(id=1, excluded_people=list(DEFAULT_EXCLUDED_PEOPLE),
+                                default_window_days=14, early_continuous_window_days=30))
+        db.commit()
 
 logger = logging.getLogger("reminder")
 

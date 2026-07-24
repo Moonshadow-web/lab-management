@@ -27,7 +27,7 @@ from .reagent_management import (
     TestItemReagent, InstrumentReagent,
 )
 from .module_permission import ModulePermission, DEFAULT_MODULE_PERMISSIONS, ALL_MODULES, ALL_ROLES
-from .scheduling import SchedulingPost, SchedulingPlan, SchedulingAssignment
+from .scheduling import SchedulingPost, SchedulingPlan, SchedulingAssignment, SchedulingConfig
 
 __all__ = [
     "User",
@@ -72,5 +72,5 @@ __all__ = [
     "ReagentItem", "ReagentStock", "InventoryCheck", "InventoryCheckItem",
     "ReagentOrder", "ReagentOrderItem", "Receiving", "ReceivingItem",
     "ReagentConsumption", "TestItemReagent", "InstrumentReagent",
-    "SchedulingPost", "SchedulingPlan", "SchedulingAssignment",
+    "SchedulingPost", "SchedulingPlan", "SchedulingAssignment", "SchedulingConfig",
 ]
