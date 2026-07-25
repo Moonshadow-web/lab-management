@@ -31,6 +31,7 @@ from ...models.scheduling import (
     POST_GROUP_SPECIAL,
     ASSIGN_STATUS_ONDUTY,
     ASSIGN_STATUS_ALL,
+    STATUS_CATEGORIES,
 )
 from ...models.user import User
 from ...schemas import (
@@ -46,6 +47,7 @@ from ...schemas import (
     SchedulingConfigRead,
     SchedulingGenerateRequest,
     SchedulingCellRequest,
+    SchedulingBatchRequest,
 )
 
 WRITE_ROLES = ("admin", "specialty_leader")
@@ -147,11 +149,15 @@ def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
                 SchedulingAssignment.date >= start, SchedulingAssignment.date <= end)
         .all()
     )
+    post_by_id = {p.id: p for p in posts}
     occupied: dict[str, set] = {}
     protected_cells: set = set()
     existing_on_duty: dict[tuple, SchedulingAssignment] = {}
     for a in existing:
-        if a.status != ASSIGN_STATUS_ONDUTY:
+        post = post_by_id.get(a.post_id) if a.post_id else None
+        is_night = post is not None and post.group == POST_GROUP_NIGHT
+        # 非在岗状态、或夜班岗的在岗记录，都视为当天被占用（不能排白班），且受保护不被覆盖。
+        if a.status != ASSIGN_STATUS_ONDUTY or is_night:
             occupied.setdefault(a.date, set()).add(a.person)
             protected_cells.add((a.date, a.post_id))
         else:
@@ -286,20 +292,30 @@ def put_config(payload: SchedulingConfigRead, db: Session = Depends(get_db),
 @router.post("/cell")
 def set_cell(req: SchedulingCellRequest, db: Session = Depends(get_db),
              user: User = Depends(require_roles(*WRITE_ROLES))):
-    """手动录入/修改单个单元格（按 plan_id+date+post_id upsert）。用于夜班、休息/病假/开会/行政/质控等提前录入。"""
+    """手动录入/修改单个单元格（upsert）。
+    - 在岗：必须指定岗位(post_id)，按 (plan_id,date,post_id) 唯一。
+    - 休息/病假/开会/行政/质控/教学/采血/卫生部门上：post_id 可空，按 (plan_id,date,person,post_id IS NULL) 唯一（一人一天一条无岗位记录）。
+    用于夜班、发热门诊、休息等提前录入。
+    """
     if req.status not in ASSIGN_STATUS_ALL:
         raise HTTPException(status_code=400, detail=f"无效状态：{req.status}")
-    if not req.person and req.status == ASSIGN_STATUS_ONDUTY:
-        raise HTTPException(status_code=400, detail="在岗状态需指定人员")
+    if not req.person:
+        raise HTTPException(status_code=400, detail="请指定人员")
+    if req.status == ASSIGN_STATUS_ONDUTY and req.post_id is None:
+        raise HTTPException(status_code=400, detail="在岗状态需指定岗位")
     d = datetime.strptime(req.date, "%Y-%m-%d").date()
-    exist = (
+    q = (
         db.query(SchedulingAssignment)
         .filter(SchedulingAssignment.plan_id == req.plan_id,
-                SchedulingAssignment.date == req.date,
-                SchedulingAssignment.post_id == req.post_id)
-        .first()
+                SchedulingAssignment.date == req.date)
     )
+    if req.post_id is not None:
+        q = q.filter(SchedulingAssignment.post_id == req.post_id)
+    else:
+        q = q.filter(SchedulingAssignment.post_id.is_(None), SchedulingAssignment.person == req.person)
+    exist = q.first()
     if exist:
+        exist.post_id = req.post_id
         exist.person = req.person
         exist.status = req.status
         exist.is_early = req.is_early
@@ -321,6 +337,49 @@ def set_cell(req: SchedulingCellRequest, db: Session = Depends(get_db),
     return a
 
 
+@router.post("/batch")
+def batch_set(req: SchedulingBatchRequest, db: Session = Depends(get_db),
+              user: User = Depends(require_roles(*WRITE_ROLES))):
+    """批量录入一批非白班约束（夜班、发热门诊、休息、病假……）。按 items 逐条 upsert，返回写入条数。"""
+    plan = db.get(SchedulingPlan, req.plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="排班计划不存在")
+    upserted = 0
+    for it in req.items:
+        if it.status not in ASSIGN_STATUS_ALL or not it.person:
+            continue
+        if it.status == ASSIGN_STATUS_ONDUTY and it.post_id is None:
+            continue
+        d = datetime.strptime(it.date, "%Y-%m-%d").date()
+        q = (
+            db.query(SchedulingAssignment)
+            .filter(SchedulingAssignment.plan_id == req.plan_id,
+                    SchedulingAssignment.date == it.date)
+        )
+        if it.post_id is not None:
+            q = q.filter(SchedulingAssignment.post_id == it.post_id)
+        else:
+            q = q.filter(SchedulingAssignment.post_id.is_(None), SchedulingAssignment.person == it.person)
+        exist = q.first()
+        if exist:
+            exist.status = it.status
+            exist.is_early = it.is_early
+            exist.is_continuous = it.is_continuous
+            exist.note = it.note
+            exist.weekday = d.weekday()
+            exist.is_workday = d.weekday() < 5
+            if it.post_id is not None:
+                exist.post_id = it.post_id
+        else:
+            db.add(SchedulingAssignment(
+                plan_id=req.plan_id, date=it.date, weekday=d.weekday(), is_workday=d.weekday() < 5,
+                post_id=it.post_id, person=it.person, status=it.status,
+                is_early=it.is_early, is_continuous=it.is_continuous, note=it.note))
+        upserted += 1
+    db.commit()
+    return {"ok": True, "upserted": upserted}
+
+
 @router.get("/grid")
 def grid(plan_id: int = Query(...), start: str | None = None, end: str | None = None,
          db: Session = Depends(get_db), user: User = Depends(get_current_user)):
@@ -332,6 +391,11 @@ def grid(plan_id: int = Query(...), start: str | None = None, end: str | None = 
     if not s or not e:
         raise HTTPException(status_code=400, detail="缺少日期范围")
     posts = db.query(SchedulingPost).order_by(SchedulingPost.order).all()
+    # 展示顺序：白班 → 特殊岗 → 夜班
+    posts.sort(key=lambda p: (
+        0 if p.group == POST_GROUP_DAY else (1 if p.group == POST_GROUP_SPECIAL else 2),
+        p.order or 0,
+    ))
     dates = [d.strftime("%Y-%m-%d") for d in _daterange(s, e)]
     rows = (
         db.query(SchedulingAssignment)
@@ -339,18 +403,29 @@ def grid(plan_id: int = Query(...), start: str | None = None, end: str | None = 
                 SchedulingAssignment.date >= s, SchedulingAssignment.date <= e)
         .all()
     )
-    cells: dict[int, dict[str, dict]] = {}
+    post_id_set = {p.id for p in posts}
+    post_cells: dict[str, dict] = {}
+    status_cells: dict[str, dict] = {}
     for a in rows:
-        cells.setdefault(a.post_id, {})[a.date] = {
-            "id": a.id, "person": a.person, "status": a.status,
-            "is_early": a.is_early, "is_continuous": a.is_continuous, "note": a.note,
-        }
+        if a.post_id and a.post_id in post_id_set:
+            post_cells.setdefault(f"post:{a.post_id}", {})[a.date] = {
+                "id": a.id, "person": a.person, "status": a.status,
+                "is_early": a.is_early, "is_continuous": a.is_continuous, "note": a.note,
+            }
+        elif a.status in STATUS_CATEGORIES:
+            cell = status_cells.setdefault(f"status:{a.status}", {}).setdefault(a.date, {"persons": []})
+            cell["persons"].append({"id": a.id, "person": a.person, "note": a.note})
+    row_defs = [{"kind": "post", "id": p.id, "name": p.name, "group": p.group,
+                 "required": p.required, "is_fever_day": p.is_fever_day} for p in posts]
+    row_defs += [{"kind": "status", "key": s, "name": s} for s in STATUS_CATEGORIES]
     return {
         "plan_id": plan_id,
         "dates": dates,
         "posts": [{"id": p.id, "name": p.name, "group": p.group, "required": p.required,
                    "is_fever_day": p.is_fever_day} for p in posts],
-        "cells": cells,
+        "status_rows": [{"key": s, "label": s} for s in STATUS_CATEGORIES],
+        "rows": row_defs,
+        "cells": {**post_cells, **status_cells},
     }
 
 

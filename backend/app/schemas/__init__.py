@@ -652,9 +652,9 @@ class SchedulingAssignmentBase(BaseModel):
     date: str = ""
     weekday: int = 0
     is_workday: bool = True
-    post_id: int = 0
+    post_id: int | None = None
     person: str = ""
-    status: str = "在岗"        # 在岗 / 休息 / 病假 / 开会 / 行政 / 质控
+    status: str = "在岗"        # 在岗 / 休息 / 病假 / 开会 / 行政 / 质控 / 教学 / 采血 / 卫生部门上
     is_early: bool = False
     is_continuous: bool = False
     note: str = ""
@@ -697,13 +697,30 @@ class SchedulingGenerateRequest(BaseModel):
 
 
 class SchedulingCellRequest(BaseModel):
-    """手动录入/修改单个单元格（按 plan_id+date+post_id upsert）。"""
+    """手动录入/修改单个单元格（按 plan_id+date+post_id upsert；post_id 为空表示无岗位的状态记录）。"""
     plan_id: int
     date: str
-    post_id: int
+    post_id: int | None = None
     person: str = ""
     status: str = "在岗"
     is_early: bool = False
     is_continuous: bool = False
     note: str = ""
+
+
+class SchedulingBatchItem(BaseModel):
+    """批量录入中的单条：某人某天某状态（或某夜班岗）。"""
+    person: str
+    date: str
+    post_id: int | None = None     # 夜班岗传岗位 id；状态类留空
+    status: str = "在岗"
+    is_early: bool = False
+    is_continuous: bool = False
+    note: str = ""
+
+
+class SchedulingBatchRequest(BaseModel):
+    """批量录入一批非白班约束（夜班、发热门诊、休息、病假……），按 items 逐条 upsert。"""
+    plan_id: int
+    items: list[SchedulingBatchItem] = []
 

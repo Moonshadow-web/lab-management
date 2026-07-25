@@ -324,6 +324,16 @@ def _migrate_schema():
             )
         except Exception:
             pass
+        # 2026-07-24（第三轮排班重构）：非在岗记录 post_id 归 NULL（历史 post_id=0 脏数据）。
+        # 历史「休息/病假…」手动录入曾默认 post_id=0；现 post_id 可空且按 person 唯一，
+        # 将 post_id=0 的非在岗记录置 NULL，避免与新的 NULL 记录形成重复。
+        try:
+            conn.exec_driver_sql(
+                "UPDATE scheduling_assignments SET post_id=NULL "
+                "WHERE post_id=0 AND status<>'在岗'"
+            )
+        except Exception:
+            pass
 
     # 室间比对 / 室间质评 标记（has_eqa / has_interlab）计算较重（需遍历 215 个项目
     # 与 EQA 计划做关联匹配，且在 CFS 网络盘上偏慢），放到后台初始化（见

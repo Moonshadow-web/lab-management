@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <!-- 我的今日 -->
+    <!-- 今日我的岗位 -->
     <el-card class="block">
       <template #header>
         <div class="card-head">
@@ -25,192 +25,236 @@
       </div>
     </el-card>
 
-    <!-- 排班设置 -->
-    <el-card class="block">
-      <template #header>
-        <div class="card-head">
-          <span>排班设置</span>
-          <el-button size="small" type="primary" @click="openConfig">配置</el-button>
+    <el-tabs v-model="activeTab" class="sched-tabs">
+      <!-- 月视图排班表 -->
+      <el-tab-pane label="月视图排班表" name="month">
+        <div class="grid-ctrl">
+          <el-select v-model="selPlan" placeholder="选择计划" style="width: 200px" @change="onPlanChange">
+            <el-option v-for="p in planOptions" :key="p.id" :label="p.name" :value="p.id" />
+          </el-select>
+          <el-date-picker v-model="monthValue" type="month" value-format="YYYY-MM" placeholder="选择月份" style="width: 160px" @change="onMonthChange" />
+          <el-select v-model="genDays" style="width: 120px" title="生成天数">
+            <el-option v-for="d in [7,14,30]" :key="d" :label="`生成${d}天`" :value="d" />
+          </el-select>
+          <el-button type="primary" :loading="generating" @click="onGenerate">生成白班</el-button>
+          <el-button :loading="gridLoading" @click="loadGrid">查询</el-button>
         </div>
-      </template>
-      <div class="cfg-summary">
-        <span>不参与排班：<b>{{ configExcludedText || '（无）' }}</b></span>
-        <el-divider direction="vertical" />
-        <span>常规生成：<b>{{ genDays }}</b> 天</span>
-        <el-divider direction="vertical" />
-        <span>早/连班可提前：<b>{{ earlyContDays }}</b> 天</span>
-      </div>
-      <el-alert type="info" :closable="false" class="tip" title="排班规则说明">
-        ① 夜班（生化夜班/发热夜班）由科室提前录入，系统不自动生成；② 发热白班为每月固定一人、每4个工作日一班（在「排班计划」里指定固定人）；
-        ③ 休息/病假/开会/行政/质控 日期人数不定，需提前在下方「手动录入」；④ 自动生成仅排工作日白班岗，按各岗固定人员轮转；
-        ⑤ 排除名单中的人员永不被排入。
-      </el-alert>
-    </el-card>
+        <el-alert type="info" :closable="false" class="tip" title="使用说明">
+          ① 先在「批量录入」录入夜班/发热/休息等非白班约束；② 点「生成白班」自动排工作日岗（固定岗按优先级，夜班人员当天自动跳过）；
+          ③ 点任意单元格可编辑/补录；④ 桌面端为矩阵、手机端自动切换为按日卡片。
+        </el-alert>
 
-    <!-- 岗位定义 -->
-    <el-card class="block">
-      <template #header><span>岗位定义</span></template>
-      <CrudTable
-        ref="postCrud"
-        :columns="postColumns"
-        :fetch="fetchPosts"
-        search-placeholder="搜索岗位..."
-        :show-add="auth.canWrite('scheduling')"
-        :can-write="auth.canWrite('scheduling')"
-        @add="onAddPost"
-        @edit="onEditPost"
-        @delete="onDeletePost"
-      />
-      <EditDialog
-        v-model="postDialog"
-        :title="postEditingId ? '编辑岗位' : '新增岗位'"
-        :form="postForm"
-        :fields="postFields"
-        :rules="postRules"
-        :submitting="submitting"
-        @submit="onSubmitPost"
-      />
-    </el-card>
+        <div v-if="grid.dates.length" class="legend">
+          <span class="lg" v-for="l in LEGEND" :key="l.k"><i :class="'dot ' + l.c"></i>{{ l.t }}</span>
+        </div>
 
-    <!-- 排班计划 -->
-    <el-card class="block">
-      <template #header><span>排班计划</span></template>
-      <CrudTable
-        ref="planCrud"
-        :columns="planColumns"
-        :fetch="fetchPlans"
-        search-placeholder="搜索计划..."
-        :show-add="auth.canWrite('scheduling')"
-        :can-write="auth.canWrite('scheduling')"
-        @add="onAddPlan"
-        @edit="onEditPlan"
-        @delete="onDeletePlan"
-      />
-      <EditDialog
-        v-model="planDialog"
-        :title="planEditingId ? '编辑计划' : '新增计划'"
-        :form="planForm"
-        :fields="planFields"
-        :rules="planRules"
-        :submitting="submitting"
-        @submit="onSubmitPlan"
-      />
-    </el-card>
+        <!-- 桌面矩阵 -->
+        <div v-if="!isMobile" class="grid-wrap">
+          <el-table :data="grid.rows" border class="grid" :max-height="580">
+            <el-table-column label="岗位 / 状态" fixed width="128">
+              <template #default="{ row }">
+                <div class="row-head">
+                  <span>{{ row.name }}</span>
+                  <el-tag v-if="row.kind === 'post' && row.group === 'night'" size="small" type="danger">夜</el-tag>
+                  <el-tag v-else-if="row.kind === 'post' && row.is_fever_day" size="small" type="success">发热</el-tag>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column v-for="d in grid.dates" :key="d" :label="fmtDate(d)" :width="92" align="center">
+              <template #default="{ row }">
+                <div class="cell" :class="cellClass(row, d)" @click="openCellEditor(row, d)">
+                  <template v-if="row.kind === 'post'">
+                    <span class="person">{{ postCell(row, d).person || '—' }}</span>
+                    <span v-if="postCell(row, d).is_early" class="mini-tag early">早</span>
+                    <span v-if="postCell(row, d).is_continuous" class="mini-tag cont">连</span>
+                    <span v-if="postCell(row, d).status && postCell(row, d).status !== '在岗'" class="mini-tag st">{{ postCell(row, d).status }}</span>
+                  </template>
+                  <template v-else>
+                    <span v-for="p in statusCell(row, d).persons" :key="p.id" class="person-chip">{{ p.person }}</span>
+                    <span v-if="!statusCell(row, d).persons.length" class="muted">—</span>
+                  </template>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
 
-    <!-- 排班表 -->
-    <el-card class="block">
-      <template #header>
-        <div class="card-head">
-          <span>排班表</span>
-          <div class="grid-ctrl">
-            <el-select v-model="selPlan" placeholder="选择计划" style="width: 200px" @change="onPlanChange">
-              <el-option v-for="p in planOptions" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-            <el-date-picker v-model="gridStart" type="date" value-format="YYYY-MM-DD" placeholder="开始" style="width: 150px" />
-            <el-date-picker v-model="gridEnd" type="date" value-format="YYYY-MM-DD" placeholder="结束" style="width: 150px" />
-            <el-select v-model="genDays" style="width: 120px" title="生成天数">
-              <el-option v-for="d in [7,14,30]" :key="d" :label="`生成${d}天`" :value="d" />
-            </el-select>
-            <el-button type="primary" :loading="generating" @click="onGenerate">生成排班</el-button>
-            <el-button :loading="gridLoading" @click="loadGrid">查询</el-button>
+        <!-- 移动端日卡 -->
+        <div v-else class="mobile-cards">
+          <div v-for="d in grid.dates" :key="d" class="day-card">
+            <div class="day-head" :class="{ weekend: isWeekend(d) }">{{ fmtDate(d) }}</div>
+            <div v-for="row in grid.rows" :key="rowKey(row)" class="day-row" :class="cellClass(row, d)" @click="openCellEditor(row, d)">
+              <span class="dr-name">{{ row.name }}</span>
+              <span class="dr-val">
+                <template v-if="row.kind === 'post'">
+                  {{ postCell(row, d).person || '—' }}
+                  <template v-if="postCell(row, d).is_early"> 早</template>
+                  <template v-if="postCell(row, d).is_continuous"> 连</template>
+                  <template v-if="postCell(row, d).status && postCell(row, d).status !== '在岗'"> ·{{ postCell(row, d).status }}</template>
+                </template>
+                <template v-else>{{ statusCell(row, d).persons.map(p => p.person).join('、') || '—' }}</template>
+              </span>
+            </div>
           </div>
         </div>
-      </template>
-      <el-input
-        v-model="peopleText"
-        type="textarea"
-        :rows="2"
-        class="people-input"
-        placeholder="生成时白班岗的通用轮转人员（缺省用系统全部活跃用户）。各岗固定人员优先于此处；排除名单人员自动跳过。每行一个姓名，或逗号分隔。"
-      />
-      <el-table v-if="grid.dates.length" :data="grid.posts" border class="grid" :max-height="520">
-        <el-table-column prop="name" label="岗位" fixed width="140">
-          <template #default="{ row }">
-            <div class="post-cell">
-              <span>{{ row.name }}</span>
-              <el-tag size="small" :type="groupType(row.group)">{{ groupLabel(row.group) }}</el-tag>
-              <el-tag v-if="row.is_fever_day" size="small" type="success">发热固定</el-tag>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column v-for="d in grid.dates" :key="d" :label="fmtDate(d)" :width="104" align="center">
-          <template #default="{ row }">
-            <div class="cell" :class="cellClass(row, d)">
-              <span class="person">{{ cellOf(row, d).person || '—' }}</span>
-              <span v-if="cellOf(row, d).is_early" class="mini-tag early">早</span>
-              <span v-if="cellOf(row, d).is_continuous" class="mini-tag cont">连</span>
-              <span v-if="cellOf(row, d).status && cellOf(row, d).status !== '在岗'" class="mini-tag st">{{ cellOf(row, d).status }}</span>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-empty v-else description="请选择计划并设置日期范围后查询/生成" />
-    </el-card>
+        <el-empty v-if="!grid.dates.length" description="请选择计划与月份后查询" />
+      </el-tab-pane>
 
-    <!-- 手动录入 / 修改分配 -->
-    <el-card class="block">
-      <template #header>
-        <div class="card-head">
-          <span>手动录入 / 修改分配（夜班、休息、病假、开会、行政、质控等提前录入）</span>
+      <!-- 批量录入 -->
+      <el-tab-pane label="批量录入" name="batch">
+        <el-form :model="batchForm" label-width="110px" class="batch-form">
+          <el-row :gutter="12">
+            <el-col :span="8">
+              <el-form-item label="类型">
+                <el-select v-model="batchForm.type" style="width: 100%">
+                  <el-option v-for="t in BATCH_TYPES" :key="t.value" :label="t.label" :value="t.value" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="每 N 天">
+                <el-input-number v-model="batchForm.everyN" :min="1" :max="31" />
+                <span class="hint">（发热门诊填 4）</span>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="限星期">
+                <el-select v-model="batchForm.weekdays" multiple collapse-tags placeholder="不限" style="width: 100%">
+                  <el-option v-for="w in WEEKDAY_OPTS" :key="w.value" :label="w.label" :value="w.value" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="8">
+              <el-form-item label="起始日期">
+                <el-date-picker v-model="batchForm.start" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="结束日期">
+                <el-date-picker v-model="batchForm.end" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="当前计划">
+                <el-select v-model="selPlan" placeholder="选择计划" style="width: 100%" @change="onPlanChange">
+                  <el-option v-for="p in planOptions" :key="p.id" :label="p.name" :value="p.id" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item label="人员">
+            <el-input v-model="batchForm.people" type="textarea" :rows="4" placeholder="每行一个姓名，如 张三 / 李四" />
+          </el-form-item>
+          <el-form-item label="备注">
+            <el-input v-model="batchForm.note" placeholder="可选" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" :loading="batchSaving" @click="submitBatch">生成并录入</el-button>
+            <span class="tip-text">按筛选条件为每位人员逐日生成记录（夜班类绑定对应夜班岗，其余为无岗位状态）</span>
+          </el-form-item>
+        </el-form>
+      </el-tab-pane>
+
+      <!-- 岗位定义 -->
+      <el-tab-pane label="岗位定义" name="posts">
+        <CrudTable
+          ref="postCrud"
+          :columns="postColumns"
+          :fetch="fetchPosts"
+          search-placeholder="搜索岗位..."
+          :show-add="auth.canWrite('scheduling')"
+          :can-write="auth.canWrite('scheduling')"
+          @add="onAddPost"
+          @edit="onEditPost"
+          @delete="onDeletePost"
+        />
+        <EditDialog
+          v-model="postDialog"
+          :title="postEditingId ? '编辑岗位' : '新增岗位'"
+          :form="postForm"
+          :fields="postFields"
+          :rules="postRules"
+          :submitting="submitting"
+          @submit="onSubmitPost"
+        />
+      </el-tab-pane>
+
+      <!-- 排班计划 -->
+      <el-tab-pane label="排班计划" name="plans">
+        <CrudTable
+          ref="planCrud"
+          :columns="planColumns"
+          :fetch="fetchPlans"
+          search-placeholder="搜索计划..."
+          :show-add="auth.canWrite('scheduling')"
+          :can-write="auth.canWrite('scheduling')"
+          @add="onAddPlan"
+          @edit="onEditPlan"
+          @delete="onDeletePlan"
+        />
+        <EditDialog
+          v-model="planDialog"
+          :title="planEditingId ? '编辑计划' : '新增计划'"
+          :form="planForm"
+          :fields="planFields"
+          :rules="planRules"
+          :submitting="submitting"
+          @submit="onSubmitPlan"
+        />
+      </el-tab-pane>
+
+      <!-- 设置 -->
+      <el-tab-pane label="设置" name="config">
+        <div class="cfg-summary">
+          <span>不参与排班：<b>{{ configExcludedText || '（无）' }}</b></span>
+          <el-divider direction="vertical" />
+          <span>常规生成：<b>{{ genDays }}</b> 天</span>
+          <el-divider direction="vertical" />
+          <span>早/连班可提前：<b>{{ earlyContDays }}</b> 天</span>
+          <el-button size="small" type="primary" @click="openConfig">配置</el-button>
+        </div>
+      </el-tab-pane>
+    </el-tabs>
+
+    <!-- 单元格编辑弹窗 -->
+    <el-dialog v-model="cellEdit.open" :title="cellTitle" width="440px">
+      <template v-if="cellEdit.kind === 'post'">
+        <el-form label-width="80px">
+          <el-form-item label="人员"><UserSelect v-model="cellPostForm.person" /></el-form-item>
+          <el-form-item label="早班/连班">
+            <el-switch v-model="cellPostForm.is_early" active-text="早" />
+            <el-switch v-model="cellPostForm.is_continuous" active-text="连" style="margin-left: 12px" />
+          </el-form-item>
+          <el-form-item label="备注"><el-input v-model="cellPostForm.note" placeholder="可选" /></el-form-item>
+        </el-form>
+        <div class="dlg-actions">
+          <el-button type="primary" :loading="cellSaving" @click="savePostCell">保存</el-button>
+          <el-button v-if="cellPostForm.id" type="danger" plain :loading="cellSaving" @click="deletePostCell">删除</el-button>
         </div>
       </template>
-      <el-form :model="cellForm" label-width="110px" class="cell-form">
-        <el-row :gutter="12">
-          <el-col :span="8">
-            <el-form-item label="计划">
-              <el-select v-model="cellForm.plan_id" style="width: 100%">
-                <el-option v-for="p in planOptions" :key="p.id" :label="p.name" :value="p.id" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="日期">
-              <el-date-picker v-model="cellForm.date" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="岗位">
-              <el-select v-model="cellForm.post_id" style="width: 100%">
-                <el-option v-for="p in postsAll" :key="p.id" :label="p.name + (p.is_fever_day ? '（发热）' : '')" :value="p.id" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="8">
-            <el-form-item label="人员">
-              <UserSelect v-model="cellForm.person" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="状态">
-              <el-select v-model="cellForm.status" style="width: 100%">
-                <el-option v-for="s in STATUS_OPTS" :key="s.value" :label="s.label" :value="s.value" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="早班 / 连班">
-              <el-switch v-model="cellForm.is_early" active-text="早" style="margin-right: 10px" />
-              <el-switch v-model="cellForm.is_continuous" active-text="连" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="16">
-            <el-form-item label="备注">
-              <el-input v-model="cellForm.note" placeholder="可选" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label=" ">
-              <el-button type="primary" :loading="cellSaving" @click="saveCell">保存此格</el-button>
-              <el-button :disabled="!cellId" @click="deleteCell">删除此格</el-button>
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
-    </el-card>
+      <template v-else>
+        <div class="persons-list">
+          <el-tag
+            v-for="p in cellExistingPersons"
+            :key="p.id"
+            closable
+            class="person-tag"
+            @close="removeStatusPerson(p.id)"
+          >{{ p.person }}<span v-if="p.note" class="pn-note">（{{ p.note }}）</span></el-tag>
+          <span v-if="!cellExistingPersons.length" class="muted">该状态暂无人员</span>
+        </div>
+        <el-divider />
+        <el-form label-width="60px">
+          <el-form-item label="人员"><UserSelect v-model="cellPersonForm.person" /></el-form-item>
+          <el-form-item label="备注"><el-input v-model="cellPersonForm.note" placeholder="可选" /></el-form-item>
+        </el-form>
+        <div class="dlg-actions">
+          <el-button type="primary" :loading="cellSaving" @click="addStatusPerson">添加</el-button>
+        </div>
+      </template>
+    </el-dialog>
 
     <!-- 排班配置弹窗 -->
     <EditDialog
@@ -226,7 +270,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../components/CrudTable.vue'
 import EditDialog from '../../components/EditDialog.vue'
@@ -235,22 +279,38 @@ import { useAuthStore } from '../../store/auth'
 import {
   listSchedulingPosts, createSchedulingPost, updateSchedulingPost, deleteSchedulingPost,
   listSchedulingPlans, createSchedulingPlan, updateSchedulingPlan, deleteSchedulingPlan,
-  listSchedulingAssignments, deleteSchedulingAssignment,
+  deleteSchedulingAssignment,
   getSchedulingGrid, getMyToday, generateScheduling,
-  getSchedulingConfig, updateSchedulingConfig, setSchedulingCell,
+  getSchedulingConfig, updateSchedulingConfig, setSchedulingCell, batchSchedulingCells,
 } from '../../api/scheduling'
 import { listActiveUsers } from '../../api/users'
 
 const auth = useAuthStore()
-const todayStr = new Date().toISOString().slice(0, 10)
+function pad(n) { return String(n).padStart(2, '0') }
+function localDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
+const todayStr = localDate(new Date())
 
-const STATUS_OPTS = [
-  { label: '在岗', value: '在岗' },
+const STATUS_CLASS = {
+  '病假': 'c-sick', '质控': 'c-qc', '开会': 'c-meeting', '休息': 'c-rest',
+  '行政': 'c-admin', '教学': 'c-teach', '采血': 'c-blood', '卫生部门上': 'c-hygiene',
+}
+const LEGEND = [
+  { k: 'rest', t: '休息', c: 'c-rest' }, { k: 'sick', t: '病假', c: 'c-sick' },
+  { k: 'meeting', t: '开会', c: 'c-meeting' }, { k: 'admin', t: '行政', c: 'c-admin' },
+  { k: 'qc', t: '质控', c: 'c-qc' }, { k: 'teach', t: '教学', c: 'c-teach' },
+  { k: 'blood', t: '采血', c: 'c-blood' }, { k: 'hygiene', t: '卫生部门上', c: 'c-hygiene' },
+]
+const BATCH_TYPES = [
+  { label: '夜班（生化）', value: 'night_bio', post_name: '生化夜班' },
+  { label: '夜班（发热）', value: 'night_fever', post_name: '发热夜班' },
   { label: '休息', value: '休息' },
   { label: '病假', value: '病假' },
   { label: '开会', value: '开会' },
   { label: '行政', value: '行政' },
   { label: '质控', value: '质控' },
+  { label: '教学', value: '教学' },
+  { label: '采血', value: '采血' },
+  { label: '卫生部门上', value: '卫生部门上' },
 ]
 
 function parsePeople(text) {
@@ -325,9 +385,6 @@ const WEEKDAY_OPTS = [
 ]
 const WEEKDAY_TEXT = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
-function groupLabel(g) { return { day: '白班', night: '夜班', special: '特殊' }[g] || g }
-function groupType(g) { return { day: 'primary', night: 'danger', special: 'warning' }[g] || 'info' }
-
 const postColumns = [
   { prop: 'name', label: '岗位名称', width: 130 },
   { prop: 'group', label: '分组', width: 90, formatter: (r) => `<el-tag size="small" type="${groupType(r.group)}">${groupLabel(r.group)}</el-tag>` },
@@ -346,22 +403,19 @@ const postFields = [
   { prop: 'only_weekday', label: '仅该星期出现', type: 'select', options: [...WEEKDAY_NULL, ...WEEKDAY_OPTS] },
   { prop: 'required_weekday', label: '该星期必填', type: 'select', options: [...WEEKDAY_NULL, ...WEEKDAY_OPTS] },
   { prop: 'is_fever_day', label: '发热白班(固定人每4天一班)', type: 'switch' },
-  { prop: 'preferred_people', label: '固定/优先人员', type: 'textarea', placeholder: '逗号或换行分隔，按顺序轮转，如 孔亚龙,吕文娟,郑飞' },
+  { prop: 'preferred_people', label: '固定/优先人员', type: 'textarea', placeholder: '逗号或换行分隔，按顺序优先级递减，如 孔亚龙,吕文娟,郑飞' },
   { prop: 'order', label: '显示顺序', type: 'number' },
   { prop: 'notes', label: '备注', type: 'textarea' },
 ]
 const postRules = { name: [{ required: true, message: '请填写岗位名称', trigger: 'blur' }] }
 const emptyPost = () => ({ name: '', group: 'day', required: true, only_weekday: null, required_weekday: null, is_fever_day: false, preferred_people: '', order: 0, notes: '' })
 const postForm = reactive(emptyPost())
-
+function groupLabel(g) { return { day: '白班', night: '夜班', special: '特殊' }[g] || g }
+function groupType(g) { return { day: 'primary', night: 'danger', special: 'warning' }[g] || 'info' }
 function fetchPosts(params) { return listSchedulingPosts(params) }
 function onAddPost() { Object.assign(postForm, emptyPost()); postEditingId.value = null; postDialog.value = true }
 function onEditPost(row) {
-  Object.assign(postForm, emptyPost(), {
-    ...row,
-    is_fever_day: !!row.is_fever_day,
-    preferred_people: (row.preferred_people || []).join('\n'),
-  })
+  Object.assign(postForm, emptyPost(), { ...row, is_fever_day: !!row.is_fever_day, preferred_people: (row.preferred_people || []).join('\n') })
   postEditingId.value = row.id; postDialog.value = true
 }
 async function onSubmitPost() {
@@ -407,7 +461,6 @@ const planFields = computed(() => [
 const planRules = { name: [{ required: true, message: '请填写计划名称', trigger: 'blur' }] }
 const emptyPlan = () => ({ name: '', start_date: '', end_date: '', fever_day_person: '', notes: '' })
 const planForm = reactive(emptyPlan())
-
 function fetchPlans(params) { return listSchedulingPlans(params) }
 function onAddPlan() { Object.assign(planForm, emptyPlan()); planEditingId.value = null; planDialog.value = true }
 function onEditPlan(row) { Object.assign(planForm, emptyPlan(), row); planEditingId.value = row.id; planDialog.value = true }
@@ -431,31 +484,34 @@ async function onDeletePlan(row) {
   loadPlanOptions()
 }
 
-// ---------------- 排班表 ----------------
+// ---------------- 月视图 ----------------
+const activeTab = ref('month')
+const isMobile = ref(false)
+function checkMobile() { isMobile.value = window.innerWidth < 768 }
 const planOptions = ref([])
 const postsAll = ref([])
 const selPlan = ref(null)
+const monthValue = ref('')
 const gridStart = ref('')
 const gridEnd = ref('')
-const peopleText = ref('')
 const generating = ref(false)
 const gridLoading = ref(false)
-const grid = reactive({ dates: [], posts: [], cells: {} })
+const grid = reactive({ dates: [], rows: [], cells: {}, posts: [], status_rows: [] })
 
-function cellOf(row, d) { return (grid.cells[row.id] && grid.cells[row.id][d]) || {} }
+function rowKey(row) { return row.kind === 'post' ? `post:${row.id}` : `status:${row.key}` }
+function postCell(row, d) { return (grid.cells[rowKey(row)] && grid.cells[rowKey(row)][d]) || {} }
+function statusCell(row, d) { return (grid.cells[rowKey(row)] && grid.cells[rowKey(row)][d]) || { persons: [] } }
 function cellClass(row, d) {
-  const c = cellOf(row, d)
-  if (c.status === '病假') return 'c-sick'
-  if (c.status === '质控') return 'c-qc'
-  if (c.status === '开会') return 'c-meeting'
-  if (c.status === '休息') return 'c-rest'
-  if (c.status === '行政') return 'c-admin'
-  return ''
+  const status = row.kind === 'post' ? postCell(row, d).status : row.key
+  return STATUS_CLASS[status] || ''
 }
 function fmtDate(d) {
   const dt = new Date(d + 'T00:00:00')
   return `${d.slice(5)} ${WEEKDAY_TEXT[dt.getDay() === 0 ? 6 : dt.getDay() - 1]}`
 }
+function isWeekend(d) { const w = new Date(d + 'T00:00:00').getDay(); return w === 0 || w === 6 }
+function lastDayOfMonth(y, m) { const d = new Date(y, m, 0); return `${y}-${pad(m)}-${pad(d.getDate())}` }
+
 async function loadPostsAll() {
   try { const res = await listSchedulingPosts({ page: 1, page_size: 100 }); postsAll.value = res.items || [] }
   catch (e) { postsAll.value = [] }
@@ -464,82 +520,178 @@ async function loadPlanOptions() {
   try {
     const res = await listSchedulingPlans({ page: 1, page_size: 100 })
     planOptions.value = res.items || []
-    if (!selPlan.value && planOptions.value.length) {
-      selPlan.value = planOptions.value[0].id
-      onPlanChange(selPlan.value)
-    }
+    if (!selPlan.value && planOptions.value.length) selPlan.value = planOptions.value[0].id
   } catch (e) { planOptions.value = [] }
 }
 function onPlanChange(id) {
   const p = planOptions.value.find((x) => x.id === id)
-  if (p) { gridStart.value = p.start_date; gridEnd.value = p.end_date }
+  if (p && !monthValue.value) { gridStart.value = p.start_date; gridEnd.value = p.end_date }
 }
-function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
+function onMonthChange() {
+  if (!monthValue.value) return
+  const [y, m] = monthValue.value.split('-').map(Number)
+  gridStart.value = `${monthValue.value}-01`
+  gridEnd.value = lastDayOfMonth(y, m)
+  loadGrid()
 }
 async function loadGrid() {
   if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
+  if (!gridStart.value || !gridEnd.value) return
   gridLoading.value = true
   try {
     const res = await getSchedulingGrid({ plan_id: selPlan.value, start: gridStart.value, end: gridEnd.value })
     grid.dates = res.dates || []
-    grid.posts = res.posts || []
+    grid.rows = res.rows || []
     grid.cells = res.cells || {}
+    grid.posts = res.posts || []
+    grid.status_rows = res.status_rows || []
   } catch (e) { ElMessage.error('查询失败') }
   finally { gridLoading.value = false }
 }
 async function onGenerate() {
   if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
-  let people = null
-  if (peopleText.value.trim()) people = parsePeople(peopleText.value)
-  const start = gridStart.value || undefined
+  if (!gridStart.value || !gridEnd.value) { ElMessage.warning('请先选择月份'); return }
   generating.value = true
   try {
-    const res = await generateScheduling({ plan_id: selPlan.value, people, start, days: genDays.value })
+    const res = await generateScheduling({ plan_id: selPlan.value, start: gridStart.value, end: gridEnd.value })
     ElMessage.success(`已生成 ${res.generated} 条分配`)
-    if (start && genDays.value) gridEnd.value = addDays(start, genDays.value - 1)
     loadGrid()
   } catch (e) { ElMessage.error('生成失败') }
   finally { generating.value = false }
 }
 
-// ---------------- 手动录入单元格 ----------------
+// ---------------- 单元格编辑 ----------------
+const cellEdit = reactive({ open: false, kind: '', rowId: null, statusKey: '', rowName: '', date: '' })
+const cellTitle = computed(() => `编辑 ${cellEdit.rowName} · ${cellEdit.date}`)
 const cellSaving = ref(false)
-const cellId = computed(() => {
-  const c = grid.cells[cellForm.post_id] && grid.cells[cellForm.post_id][cellForm.date]
-  return c ? c.id : null
-})
-const cellForm = reactive({ plan_id: null, date: todayStr, post_id: null, person: '', status: '在岗', is_early: false, is_continuous: false, note: '' })
-async function saveCell() {
-  if (!cellForm.plan_id) { ElMessage.warning('请选择计划'); return }
-  if (!cellForm.date || !cellForm.post_id) { ElMessage.warning('请选择日期与岗位'); return }
-  if (!cellForm.person) { ElMessage.warning('请选择人员'); return }
+const cellExistingPersons = ref([])
+const cellPostForm = reactive({ id: null, person: '', is_early: false, is_continuous: false, note: '' })
+const cellPersonForm = reactive({ person: '', note: '' })
+
+function openCellEditor(row, d) {
+  cellEdit.kind = row.kind
+  cellEdit.rowName = row.name
+  cellEdit.date = d
+  if (row.kind === 'post') {
+    cellEdit.rowId = row.id
+    const c = postCell(row, d)
+    cellPostForm.id = c.id || null
+    cellPostForm.person = c.person || ''
+    cellPostForm.is_early = !!c.is_early
+    cellPostForm.is_continuous = !!c.is_continuous
+    cellPostForm.note = c.note || ''
+  } else {
+    cellEdit.statusKey = row.key
+    const c = statusCell(row, d)
+    cellExistingPersons.value = c.persons ? [...c.persons] : []
+    cellPersonForm.person = ''
+    cellPersonForm.note = ''
+  }
+  cellEdit.open = true
+}
+async function savePostCell() {
+  if (!cellPostForm.person) { ElMessage.warning('请选择人员'); return }
   cellSaving.value = true
   try {
-    await setSchedulingCell({ ...cellForm })
+    await setSchedulingCell({
+      plan_id: selPlan.value, date: cellEdit.date, post_id: cellEdit.rowId,
+      person: cellPostForm.person, status: '在岗',
+      is_early: cellPostForm.is_early, is_continuous: cellPostForm.is_continuous, note: cellPostForm.note,
+    })
     ElMessage.success('已保存')
+    cellEdit.open = false
     loadGrid()
   } catch (e) { ElMessage.error('保存失败') }
   finally { cellSaving.value = false }
 }
-async function deleteCell() {
-  const id = cellId.value
-  if (!id) { ElMessage.warning('该格当前无记录'); return }
+async function deletePostCell() {
+  if (!cellPostForm.id) return
   await ElMessageBox.confirm('确认删除该分配记录？', '提示', { type: 'warning' })
-  await deleteSchedulingAssignment(id)
+  await deleteSchedulingAssignment(cellPostForm.id)
   ElMessage.success('已删除')
+  cellEdit.open = false
+  loadGrid()
+}
+async function addStatusPerson() {
+  if (!cellPersonForm.person) { ElMessage.warning('请选择人员'); return }
+  cellSaving.value = true
+  try {
+    await setSchedulingCell({
+      plan_id: selPlan.value, date: cellEdit.date, post_id: null,
+      person: cellPersonForm.person, status: cellEdit.statusKey, note: cellPersonForm.note,
+    })
+    ElMessage.success('已添加')
+    cellPersonForm.person = ''
+    cellPersonForm.note = ''
+    loadGrid()
+    // 重新载入编辑框内现有人员
+    const c = statusCell({ kind: 'status', key: cellEdit.statusKey }, cellEdit.date)
+    cellExistingPersons.value = c.persons ? [...c.persons] : []
+  } catch (e) { ElMessage.error('添加失败') }
+  finally { cellSaving.value = false }
+}
+async function removeStatusPerson(id) {
+  await deleteSchedulingAssignment(id)
+  ElMessage.success('已移除')
+  cellExistingPersons.value = cellExistingPersons.value.filter((p) => p.id !== id)
   loadGrid()
 }
 
+// ---------------- 批量录入 ----------------
+const batchSaving = ref(false)
+const batchForm = reactive({ type: '休息', everyN: 1, weekdays: [], start: '', end: '', people: '', note: '' })
+async function submitBatch() {
+  if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
+  const people = parsePeople(batchForm.people)
+  if (!people.length) { ElMessage.warning('请至少填写一名人员'); return }
+  if (!batchForm.start || !batchForm.end) { ElMessage.warning('请选择起止日期'); return }
+  const type = BATCH_TYPES.find((t) => t.value === batchForm.type)
+  let post_id = null
+  if (type.post_name) {
+    const p = postsAll.value.find((x) => x.name === type.post_name)
+    if (!p) { ElMessage.error(`未找到岗位「${type.post_name}」，请先在岗位定义中创建`); return }
+    post_id = p.id
+  }
+  const status = type.post_name ? '在岗' : type.value
+  const items = []
+  const [sy, sm, sd] = batchForm.start.split('-').map(Number)
+  const [ey, em, ed] = batchForm.end.split('-').map(Number)
+  let idx = 0
+  const cur = new Date(sy, sm - 1, sd)
+  const endD = new Date(ey, em - 1, ed)
+  while (cur <= endD) {
+    const wd = (cur.getDay() + 6) % 7
+    if ((!batchForm.weekdays.length || batchForm.weekdays.includes(wd)) && idx % batchForm.everyN === 0) {
+      const ds = localDate(cur)
+      for (const person of people) items.push({ person, date: ds, post_id, status, note: batchForm.note })
+    }
+    cur.setDate(cur.getDate() + 1)
+    idx++
+  }
+  if (!items.length) { ElMessage.warning('筛选条件下无匹配日期'); return }
+  batchSaving.value = true
+  try {
+    const res = await batchSchedulingCells({ plan_id: selPlan.value, items })
+    ElMessage.success(`已录入 ${res.upserted} 条`)
+  } catch (e) { ElMessage.error('批量录入失败') }
+  finally { batchSaving.value = false }
+}
+
+// ---------------- 初始化 ----------------
 onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
   loadMyToday()
   loadPlanOptions()
   loadPostsAll()
   loadConfigSummary()
   listActiveUsers().then((us) => { userOptions.value = us || [] }).catch(() => {})
+  const now = new Date()
+  monthValue.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`
+  onMonthChange()
 })
+onBeforeUnmount(() => { window.removeEventListener('resize', checkMobile) })
+
 async function loadConfigSummary() {
   try {
     const cfg = await getSchedulingConfig()
@@ -554,24 +706,47 @@ async function loadConfigSummary() {
 .page { display: flex; flex-direction: column; gap: 16px; }
 .block { margin: 0; }
 .card-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-.grid-ctrl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.people-input { margin-bottom: 10px; }
-.tip { margin-bottom: 10px; }
+.tip { margin: 10px 0; }
 .cfg-summary { font-size: 14px; color: #555; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .my-today { display: flex; flex-wrap: wrap; gap: 8px; }
 .mt-chip { font-size: 14px; padding: 6px 10px; }
 .tag-sub { margin-left: 4px; opacity: 0.8; font-size: 12px; }
-.post-cell { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
-.cell { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 38px; justify-content: center; }
+.sched-tabs { background: #fff; padding: 8px 12px; border-radius: 8px; }
+.grid-ctrl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 8px; font-size: 12px; color: #666; }
+.legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
+.grid-wrap { overflow-x: auto; }
+.row-head { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.cell { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 38px; justify-content: center; cursor: pointer; }
+.cell:hover { background: #f5f7fa; }
 .person { font-size: 13px; }
+.person-chip { display: inline-block; font-size: 12px; margin: 1px 2px; padding: 1px 5px; background: #eef3fb; border-radius: 3px; }
 .mini-tag { font-size: 11px; line-height: 1; padding: 1px 4px; border-radius: 3px; }
 .mini-tag.early { background: #fdf6ec; color: #e6a23c; }
 .mini-tag.cont { background: #f0f9eb; color: #67c23a; }
 .mini-tag.st { background: #fef0f0; color: #f56c6c; }
+.muted { color: #bbb; }
 .c-sick { background: #fef0f0; }
 .c-qc { background: #fdf6ec; }
 .c-meeting { background: #f4f4f5; }
 .c-rest { background: #eef3fb; }
 .c-admin { background: #f3ecfb; }
-.cell-form { margin-top: 4px; }
+.c-teach { background: #eafaf0; }
+.c-blood { background: #fdeef5; }
+.c-hygiene { background: #eef7f8; }
+.batch-form { margin-top: 8px; max-width: 920px; }
+.hint { font-size: 12px; color: #999; margin-left: 6px; }
+.tip-text { font-size: 12px; color: #999; margin-left: 10px; }
+.dlg-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+.persons-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 28px; }
+.person-tag { font-size: 13px; }
+.pn-note { opacity: 0.7; font-size: 11px; }
+.mobile-cards { display: flex; flex-direction: column; gap: 12px; }
+.day-card { border: 1px solid #ebeef5; border-radius: 8px; overflow: hidden; }
+.day-head { background: #f5f7fa; padding: 6px 12px; font-weight: 600; font-size: 14px; }
+.day-head.weekend { background: #fdf0f0; }
+.day-row { display: flex; justify-content: space-between; padding: 6px 12px; border-top: 1px solid #f2f2f2; font-size: 13px; cursor: pointer; }
+.day-row:hover { background: #f5f7fa; }
+.dr-name { color: #666; }
+.dr-val { color: #303133; text-align: right; }
 </style>

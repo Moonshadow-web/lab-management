@@ -65,3 +65,8 @@ export function updateSchedulingConfig(data) {
 export function setSchedulingCell(data) {
   return request.post('/api/v1/scheduling/cell', data)
 }
+
+// 批量录入一批非白班约束（夜班、发热门诊、休息、病假……）
+export function batchSchedulingCells(data) {
+  return request.post('/api/v1/scheduling/batch', data)
+}
