@@ -562,7 +562,11 @@ def aggregate_project(levels: list[dict]):
 
     # 1.5) 上传表格「规则列」覆盖（若提供）：有上传规则的点以「上传规则」为准，
     #      不再采用后端计算的 Westgard；同单元格多规则按严重度取最严重者
-    #      （1-3S 覆盖 1-2S）。空单元格回落到后端计算。
+    #      （1-3S 覆盖 1-2S）。
+    #      - 本次上传含「规则列」(rule_column_present=True) 时，空单元格一律视为在控
+    #        （清空后端计算的 ooc / 警告），因为空即代表 LIS 未标注失控；
+    #      - 本次上传不含「规则列」时，空单元格回落到后端 Westgard 计算（保持兼容，
+    #        老数据不会因缺列而被误翻成在控）。
     #      带上传规则的点（无论失控/警告）整体冻结，不参与后续跨水平 R-4s。
     uploaded_present: set[tuple] = set()
     for lv in levels:
@@ -570,20 +574,27 @@ def aggregate_project(levels: list[dict]):
         values = lv["values"]
         ooc = per[lv["level"]]["ooc"]
         warnings = per[lv["level"]]["warnings"]
+        rule_col = bool(lv.get("rule_column_present", False))
         for idx in range(len(values)):
             cell = vr[idx] if idx < len(vr) else ""
             parsed = _parse_rule_cell(cell)
-            if not parsed:
-                continue
-            uploaded_present.add((lv["level"], idx))
-            cls, resolved = _resolve_uploaded_rules(parsed)
-            if cls == "ooc":
-                ooc[idx] = resolved
-                warnings.pop(idx, None)
-            elif cls == "warning":
-                warnings[idx] = resolved
+            if parsed:
+                uploaded_present.add((lv["level"], idx))
+                cls, resolved = _resolve_uploaded_rules(parsed)
+                if cls == "ooc":
+                    ooc[idx] = resolved
+                    warnings.pop(idx, None)
+                elif cls == "warning":
+                    warnings[idx] = resolved
+                    ooc.pop(idx, None)
+                # cls == ""：解析出但均无法识别 → 不覆盖（保持后端计算）
+            elif rule_col:
+                # 含规则列但本单元格为空 → 一律视为在控（清空后端判定 + 冻结 R-4s）
                 ooc.pop(idx, None)
-            # cls == ""：解析出但均无法识别 → 不覆盖（保持后端计算）
+                warnings.pop(idx, None)
+                # 冻结：既不再参与跨水平 R-4s，也避免被 R-4s 反标为失控
+                uploaded_present.add((lv["level"], idx))
+            # 未含规则列 → 保持后端计算不动
 
     # 2) 跨水平 R-4s：把全部水平的每日测值按 (date, level) 排成一条时间线，
     #    任意「相邻两点」都参与 R-4s 判定（同天不同水平 或 跨天同/不同水平）。

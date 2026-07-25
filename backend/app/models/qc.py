@@ -62,6 +62,7 @@ class QCMonthlySummary(Base):
     in_control_rate: Mapped[float] = mapped_column(Float, default=0.0)  # 在控率
     quality_goal: Mapped[str] = mapped_column(String(50), default="")  # 质量目标（允许不精密度）
     handling_note: Mapped[str] = mapped_column(Text, default="")  # 失控处理说明
+    rule_column_present: Mapped[bool] = mapped_column(default=False)  # 上传时是否识别到规则列（空单元格据此判在控）
     pdf_path: Mapped[str] = mapped_column(String(500), default="")  # 质控图PDF相对路径
     pdf_filename: Mapped[str] = mapped_column(String(500), default="")  # 质控图原始文件名
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

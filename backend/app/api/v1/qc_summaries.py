@@ -143,6 +143,7 @@ def _write_summary_level(
     unit: str, quality_goal: str,
     target_mean: float, target_sd: float, target_cv: float,
     agg: dict, dmeta: list,
+    rule_column_present: bool = False,
 ) -> tuple[QCMonthlySummary, bool]:
     """按单水平聚合结果落库（upsert 月结行 + 重建每日测值）。
 
@@ -184,6 +185,7 @@ def _write_summary_level(
     summ.out_of_control_count = agg["out_of_control_count"]
     summ.in_control_rate = agg["in_control_rate"]
     summ.quality_goal = quality_goal
+    summ.rule_column_present = rule_column_present  # 空单元格判在控的依据
     db.flush()
     # 重建每日测值（dmeta 与 agg 索引对齐；ooc 来自 R-4s/单水平，warnings 仅作黄色警告）
     db.query(QCDailyValue).filter_by(summary_id=summ.id).delete()
@@ -496,6 +498,7 @@ def upload_qc_summary(
         block_keys.add((instrument_id if sel_inst else None, inst, d.year, d.month))
 
     # 按「项目(仪器,年,月,项目,批号)」归组：跨水平 R-4s 需要同一项目多个水平同批计算
+    rule_col_present = "violate_rule" in hmap  # 本次上传是否识别到规则列（空单元格据此判在控）
     projects: dict[tuple, list] = {}
     for key, values in groups.items():
         year, month, test_item, lot_no, level, instrument = key
@@ -512,6 +515,7 @@ def upload_qc_summary(
             "dates": sdates,
             "daily_meta": sdmeta,
             "violate_rules": [t[5] for t in sdmeta],  # 与 values 同序的上传规则原始串
+            "rule_column_present": rule_col_present,  # 空单元格据此判在控
             "target_mean": m["target_mean"],
             "target_sd": m["target_sd"],
             "unit": m["unit"],
@@ -544,6 +548,7 @@ def upload_qc_summary(
                 quality_goal=quality_goal,
                 target_mean=tm, target_sd=ts, target_cv=target_cv,
                 agg=agg, dmeta=spec["daily_meta"],
+                rule_column_present=spec.get("rule_column_present", False),
             )
             if is_new:
                 created += 1
@@ -669,6 +674,7 @@ def recalc_summaries(db: Session = Depends(get_db), user: User = Depends(get_cur
                 "level": s.level, "values": values, "dates": dates,
                 "daily_meta": dmeta,
                 "violate_rules": [(v.uploaded_rule or "") for v in dvs],
+                "rule_column_present": bool(s.rule_column_present),
                 "target_mean": s.target_mean or 0.0,
                 "target_sd": s.target_sd or 0.0,
                 "unit": s.unit, "instrument_no": s.instrument_no,
@@ -698,6 +704,7 @@ def recalc_summaries(db: Session = Depends(get_db), user: User = Depends(get_cur
                 quality_goal=quality_goal,
                 target_mean=tm, target_sd=ts, target_cv=target_cv,
                 agg=agg, dmeta=spec["daily_meta"],
+                rule_column_present=spec.get("rule_column_present", False),
             )
             if (summ.out_of_control_count != before_ooc
                     or abs((summ.mean or 0) - (before_mean or 0)) > 1e-9

@@ -1,8 +1,11 @@
 """验证「上传表格规则列覆盖后端 Westgard」(2026-07-26)：
 - 同单元格多规则按严重度取最严重者（1-3S 覆盖 1-2S）。
 - 有上传规则的点以「上传规则」为准（失控/警告），不再采用后端计算；
-  空单元格回落到后端 Westgard。
-- 带上传规则的点（失控或警告）整体冻结，不参与跨水平 R-4s。
+  并整体冻结，不参与跨水平 R-4s。
+- 空单元格的两种分支：
+  · 本次上传含「规则列」(rule_column_present=True) → 一律视为在控
+    （清空后端 ooc/警告，且冻结 R-4s，不会被反标为失控）；
+  · 本次上传不含「规则列」→ 回落后端 Westgard（老数据不误翻）。
 - 原始上传规则落库（uploaded_rule），经 _recalc 仍生效。
 """
 import sys, os
@@ -13,12 +16,13 @@ from app.services.qc_service import (
 )
 
 
-def lvl(level, values, rules=None, tm=1.0, ts=0.03):
+def lvl(level, values, rules=None, tm=1.0, ts=0.03, rule_col=False):
     dates = [f"2026-06-{i+1:02d}" for i in range(len(values))]
     return {
         "level": level, "values": values, "dates": dates,
         "daily_meta": [(dates[i], values[i], "", "", "") for i in range(len(values))],
         "violate_rules": rules if rules is not None else [""] * len(values),
+        "rule_column_present": rule_col,  # 空单元格据此判在控
         "target_mean": tm, "target_sd": ts, "unit": "", "instrument_no": "",
         "test_item_aliases": "",
     }
@@ -84,5 +88,22 @@ res = aggregate_project([l1, l2])
 assert "R-4s" in res["1"]["ooc"].get(0, ""), res["1"]["ooc"]
 assert "R-4s" in res["2"]["ooc"].get(0, ""), res["2"]["ooc"]
 print("PASS 用例E 跨水平 R-4s 生效:", res["1"]["ooc"], res["2"]["ooc"])
+
+print("\n=== 用例F：空单元格 + 上传含规则列(rule_col=True) → 一律在控（清空后端 1-3S）===")
+lv = lvl("1", [1.0, 1.0, 1.0, 1.85, 1.0], rules=["", "", "", "", ""], rule_col=True)
+res = aggregate_project([lv])
+a = res["1"]
+assert 3 not in a["ooc"], a["ooc"]          # 后端算出的 1-3S 被清空
+assert 3 not in a["warnings"], a["warnings"]
+assert a["out_of_control_count"] == 0
+print("PASS 用例F 空+含规则列 → 在控 ooc=", a["ooc"])
+
+print("\n=== 用例G：空单元格 + 上传不含规则列(rule_col=False) → 回落端 Westgard（1-3S 仍判）===")
+lv = lvl("1", [1.0, 1.0, 1.0, 1.85, 1.0], rules=["", "", "", "", ""], rule_col=False)
+res = aggregate_project([lv])
+a = res["1"]
+assert "1-3s" in a["ooc"].get(3, ""), a["ooc"]   # 老数据/缺列不误翻
+assert a["out_of_control_count"] == 1
+print("PASS 用例G 空+无规则列 → 回落后端 ooc=", a["ooc"])
 
 print("\nALL PASS ✅")

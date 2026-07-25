@@ -308,6 +308,7 @@ class QCMonthlySummaryBase(BaseModel):
     in_control_rate: float = 0.0
     quality_goal: str = ""
     handling_note: str = ""
+    rule_column_present: bool = False  # 上传时是否识别到规则列（空单元格据此判在控）
     pdf_path: str = ""
     pdf_filename: str = ""
 
@@ -730,5 +731,6 @@ class SchedulingBatchRequest(BaseModel):
     plan_id: int
     items: list[SchedulingBatchItem] = []
     prune: bool = False
-    prune_keys: list[list[str]] = []  # [[date, status], ...]
+    prune_keys: list[list[str]] = []  # [[date, status], ...] 状态行裁剪
+    prune_post_keys: list[list[str]] = []  # [[date, str(post_id)], ...] 岗位行(夜班/发热)裁剪
 
