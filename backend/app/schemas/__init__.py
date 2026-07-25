@@ -720,7 +720,14 @@ class SchedulingBatchItem(BaseModel):
 
 
 class SchedulingBatchRequest(BaseModel):
-    """批量录入一批非白班约束（夜班、发热门诊、休息、病假……），按 items 逐条 upsert。"""
+    """批量录入一批非白班约束（夜班、发热门诊、休息、病假……），按 items 逐条 upsert。
+
+    prune + prune_keys 用于「矩阵整体保存」场景：把 prune_keys 列出的
+    (date, status) 对，裁剪为本次提交的 persons 集合（删除未提交的人员），
+    实现单元格「取消勾选即移除」。仅对无岗位状态记录（post_id 为空）生效。
+    """
     plan_id: int
     items: list[SchedulingBatchItem] = []
+    prune: bool = False
+    prune_keys: list[list[str]] = []  # [[date, status], ...]
 

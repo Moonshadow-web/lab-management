@@ -369,11 +369,18 @@ def set_cell(req: SchedulingCellRequest, db: Session = Depends(get_db),
 @router.post("/batch")
 def batch_set(req: SchedulingBatchRequest, db: Session = Depends(get_db),
               user: User = Depends(require_roles(*WRITE_ROLES))):
-    """批量录入一批非白班约束（夜班、发热门诊、休息、病假……）。按 items 逐条 upsert，返回写入条数。"""
+    """批量录入一批非白班约束（夜班、发热门诊、休息、病假……）。按 items 逐条 upsert，返回写入条数。
+
+    prune=True 时，把 prune_keys 列出的 (date, status) 对裁剪为本次提交的 persons：
+    删除该 (date, status) 下、不在提交人员集合中的无岗位记录（实现「取消勾选即移除」）。
+    仅对 post_id 为空的状态记录生效，不影响夜班/发热等绑定岗位的录入。
+    """
     plan = db.get(SchedulingPlan, req.plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="排班计划不存在")
     upserted = 0
+    # 提交人员按 (date, status) 归组，供 prune 比对
+    submitted: dict[tuple, set] = {}
     for it in req.items:
         if it.status not in ASSIGN_STATUS_ALL or not it.person:
             continue
@@ -405,6 +412,27 @@ def batch_set(req: SchedulingBatchRequest, db: Session = Depends(get_db),
                 post_id=it.post_id, person=it.person, status=it.status,
                 is_early=it.is_early, is_continuous=it.is_continuous, note=it.note))
         upserted += 1
+        if it.post_id is None:
+            submitted.setdefault((it.date, it.status), set()).add(it.person)
+    # prune：把 prune_keys 中列出的 (date, status) 裁剪为提交人员集合
+    if req.prune:
+        for key in req.prune_keys:
+            if len(key) != 2:
+                continue
+            date_s, status_s = key[0], key[1]
+            if status_s not in STATUS_CATEGORIES:
+                continue
+            keep = submitted.get((date_s, status_s), set())
+            q = (
+                db.query(SchedulingAssignment)
+                .filter(SchedulingAssignment.plan_id == req.plan_id,
+                        SchedulingAssignment.date == date_s,
+                        SchedulingAssignment.status == status_s,
+                        SchedulingAssignment.post_id.is_(None))
+            )
+            if keep:
+                q = q.filter(SchedulingAssignment.person.notin_(keep))
+            q.delete(synchronize_session=False)
     db.commit()
     return {"ok": True, "upserted": upserted}
 

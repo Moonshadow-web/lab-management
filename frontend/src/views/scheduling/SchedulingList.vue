@@ -102,6 +102,47 @@
 
       <!-- 批量录入 -->
       <el-tab-pane label="批量录入" name="batch">
+        <!-- 状态矩阵录入：日期×状态，单元格多选人员 -->
+        <div class="bm-block">
+          <div class="bm-toolbar">
+            <span class="bm-title">状态行矩阵录入</span>
+            <el-date-picker v-model="matrixMonth" type="month" value-format="YYYY-MM" placeholder="选择月份" style="width: 160px" @change="loadMatrix" />
+            <el-button :loading="matrixLoading" @click="loadMatrix">加载矩阵</el-button>
+            <el-button type="primary" :loading="matrixSaving" @click="saveMatrix">保存矩阵</el-button>
+            <span class="tip-text">每行=一种状态，每列=一天；单元格下拉多选人员（可多人）；保存时按矩阵整体覆盖该月状态行，取消勾选即移除</span>
+          </div>
+          <div v-if="matrixDates.length" class="bm-wrap">
+            <table class="bm-table">
+              <thead>
+                <tr>
+                  <th class="bm-corner">状态 \ 日期</th>
+                  <th v-for="d in matrixDates" :key="d" :class="{ weekend: isWeekend(d) }">
+                    <div class="bm-date">{{ d.slice(8) }}</div>
+                    <div class="bm-wd">{{ WEEKDAY_TEXT[(new Date(d + 'T00:00:00').getDay() + 6) % 7] }}</div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="st in MATRIX_STATUSES" :key="st">
+                  <th :class="['bm-rowhead', STATUS_CLASS[st]]">{{ st }}</th>
+                  <td v-for="d in matrixDates" :key="d" :class="{ weekend: isWeekend(d) }">
+                    <el-select
+                      v-model="matrix[st][d]"
+                      multiple collapse-tags collapse-tags-tooltip
+                      size="small" placeholder="" class="bm-select"
+                      :disabled="!matrixLoaded"
+                    >
+                      <el-option v-for="p in peopleOptions" :key="p" :label="p" :value="p" />
+                    </el-select>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <el-empty v-else description="选择月份后点「加载矩阵」" />
+        </div>
+
+        <el-divider content-position="left">夜班 / 发热白班录入（绑定岗位，周期方式）</el-divider>
         <el-form :model="batchForm" label-width="110px" class="batch-form">
           <el-row :gutter="12">
             <el-col :span="8">
@@ -646,6 +687,73 @@ const batchTypeSpacing = computed(() => {
   const t = BATCH_TYPES.find((x) => x.value === batchForm.type)
   return !!(t && t.spacing)
 })
+
+// 状态矩阵批量录入：日期×状态，单元格多选人员
+const MATRIX_STATUSES = ['休息', '病假', '开会', '行政', '质控', '教学']
+const matrixMonth = ref('')
+const matrixDates = ref([])
+const matrix = reactive({})
+const matrixLoaded = ref(false)
+const matrixLoading = ref(false)
+const matrixSaving = ref(false)
+const peopleOptions = computed(() => (userOptions.value || []).map((u) => u.full_name || u.username))
+function _monthDates(y, m) {
+  const n = new Date(y, m, 0).getDate()
+  const out = []
+  for (let day = 1; day <= n; day++) out.push(`${y}-${pad(m)}-${pad(day)}`)
+  return out
+}
+async function loadMatrix() {
+  if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
+  if (!matrixMonth.value) { ElMessage.warning('请选择月份'); return }
+  matrixLoading.value = true
+  try {
+    const [y, m] = matrixMonth.value.split('-').map(Number)
+    const start = `${matrixMonth.value}-01`
+    const end = lastDayOfMonth(y, m)
+    const dates = _monthDates(y, m)
+    matrixDates.value = dates
+    for (const st of MATRIX_STATUSES) {
+      matrix[st] = matrix[st] || {}
+      for (const d of dates) matrix[st][d] = matrix[st][d] || []
+    }
+    const res = await getSchedulingGrid({ plan_id: selPlan.value, start, end })
+    for (const row of (res.rows || [])) {
+      if (row.kind !== 'status') continue
+      const st = row.key
+      if (!MATRIX_STATUSES.includes(st)) continue
+      const cell = (res.cells || {})[`status:${st}`] || {}
+      for (const d of dates) {
+        const persons = (cell[d] && cell[d].persons) || []
+        matrix[st][d] = persons.map((p) => p.person)
+      }
+    }
+    matrixLoaded.value = true
+  } catch (e) { ElMessage.error('加载矩阵失败') }
+  finally { matrixLoading.value = false }
+}
+async function saveMatrix() {
+  if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
+  if (!matrixLoaded.value) { ElMessage.warning('请先加载矩阵'); return }
+  matrixSaving.value = true
+  try {
+    const items = []
+    const prune_keys = []
+    for (const st of MATRIX_STATUSES) {
+      for (const d of matrixDates.value) {
+        prune_keys.push([d, st])
+        for (const person of (matrix[st][d] || [])) {
+          if (person) items.push({ person, date: d, post_id: null, status: st, note: '' })
+        }
+      }
+    }
+    const res = await batchSchedulingCells({ plan_id: selPlan.value, items, prune: true, prune_keys })
+    ElMessage.success(`已保存（写入 ${res.upserted} 条）`)
+    loadGrid()
+  } catch (e) { ElMessage.error('保存失败') }
+  finally { matrixSaving.value = false }
+}
+
 async function submitBatch() {
   if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
   const people = parsePeople(batchForm.people)
@@ -753,4 +861,19 @@ async function loadConfigSummary() {
 .day-row:hover { background: #f5f7fa; }
 .dr-name { color: #666; }
 .dr-val { color: #303133; text-align: right; }
+.bm-block { background: #fff; border: 1px solid #ebeef5; border-radius: 8px; padding: 12px; }
+.bm-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.bm-title { font-weight: 600; font-size: 15px; }
+.bm-wrap { overflow-x: auto; }
+.bm-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.bm-table th, .bm-table td { border: 1px solid #ebeef5; padding: 4px 6px; text-align: center; }
+.bm-corner { background: #f5f7fa; min-width: 92px; position: sticky; left: 0; z-index: 2; }
+.bm-table thead th { background: #f5f7fa; font-weight: 600; }
+.bm-table thead th.weekend { background: #fdf0f0; }
+.bm-rowhead { background: #fafafa; font-weight: 600; position: sticky; left: 0; z-index: 1; min-width: 72px; }
+.bm-table tbody td.weekend { background: #fdfafa; }
+.bm-date { font-weight: 600; font-size: 13px; }
+.bm-wd { font-size: 11px; color: #999; }
+.bm-select { width: 100%; }
+.bm-select :deep(.el-select__tags-text) { max-width: 60px; }
 </style>
