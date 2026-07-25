@@ -144,3 +144,8 @@ export function deleteInstrumentReagent(id) {
 export function autoMatchAssociations(reset = false) {
   return request.post(`/api/v1/reagent/associations/_auto-match?reset=${reset}`)
 }
+
+// 待关联建议：返回未关联但可匹配 / 真正无候选的试剂，供人工审核采纳
+export function getAssociationSuggestions(params = {}) {
+  return request.get('/api/v1/reagent/associations/suggestions', { params })
+}

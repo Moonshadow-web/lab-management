@@ -68,7 +68,7 @@
 
       <div class="entry-scroll">
         <template v-for="grp in filteredProjects" :key="'p'+grp.test_item_id">
-          <h4 class="grp-title">项目：{{ grp.test_item_name }} <span class="muted" v-if="grp.test_item_aliases">（{{ grp.test_item_aliases }}）</span></h4>
+          <h4 class="grp-title">项目：{{ grp.test_item_name }}</h4>
           <el-table :data="grp.items" border size="small">
             <el-table-column label="试剂 / 校准品" min-width="200">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>

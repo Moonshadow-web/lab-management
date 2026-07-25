@@ -61,7 +61,7 @@
       <div class="entry-scroll">
         <!-- 按项目 -->
         <template v-for="grp in filteredProjects" :key="'p'+grp.test_item_id">
-          <h4 class="grp-title">项目：{{ grp.test_item_name }} <span class="muted" v-if="grp.test_item_aliases">（{{ grp.test_item_aliases }}）</span></h4>
+          <h4 class="grp-title">项目：{{ grp.test_item_name }}</h4>
           <el-table :data="grp.items" border size="small">
             <el-table-column label="试剂 / 校准品" min-width="200">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
@@ -248,7 +248,7 @@ async function onNewCheck() {
 function buildSections(useRecorded) {
   const secs = []
   for (const g of tpl.value.by_project) {
-    secs.push({ heading: '项目：' + g.test_item_name + (g.test_item_aliases ? `（${g.test_item_aliases}）` : ''), items: g.items.map(it => ({
+    secs.push({ heading: '项目：' + g.test_item_name, items: g.items.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
       current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',

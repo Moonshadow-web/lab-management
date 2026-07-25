@@ -15,7 +15,7 @@
       <el-tag type="info">仪器-耗材关联：{{ instTotal }} 条</el-tag>
     </div>
 
-    <el-tabs v-model="activeTab" class="tabs">
+    <el-tabs v-model="activeTab" class="tabs" @tab-change="onTabChange">
       <!-- 项目 ↔ 试剂 -->
       <el-tab-pane label="项目 ↔ 试剂" name="project">
         <div class="toolbar">
@@ -90,6 +90,102 @@
           :total="instTotal" :page-sizes="[20, 50, 100]" layout="total, sizes, prev, pager, next"
           @current-change="loadInst" @size-change="instPage=1; loadInst()" />
       </el-tab-pane>
+
+      <!-- 待关联建议 -->
+      <el-tab-pane label="待关联建议" name="suggest">
+        <div class="toolbar">
+          <el-select v-model="sugLib" placeholder="全部责任库" clearable style="width:140px" @change="loadSuggestions">
+            <el-option label="生化凝血" value="生化凝血" />
+            <el-option label="免疫" value="免疫" />
+          </el-select>
+          <el-button :icon="Refresh" @click="loadSuggestions" :loading="sugLoading">刷新建议</el-button>
+          <el-button type="success" :icon="Check" :loading="adoptingAll" @click="adoptAll" v-if="canWrite">批量采纳全部建议</el-button>
+          <el-tag type="success">可匹配：项目 {{ testSug.length }} / 仪器 {{ instSug.length }}</el-tag>
+          <el-tag type="warning">需人工：项目 {{ testOrph.length }} / 仪器 {{ instOrph.length }}</el-tag>
+        </div>
+        <el-alert type="info" :closable="false" show-icon style="margin-bottom:10px"
+          title="系统按名称匹配出「本可关联却未关联」的试剂。绿色为已给出候选建议（可直接采纳或改选），黄色为无自动候选需人工判断。" />
+
+        <h4 class="grp-title">项目 ↔ 试剂（系统建议匹配）</h4>
+        <el-table v-loading="sugLoading" :data="testSug" border stripe size="small" empty-text="无">
+          <el-table-column prop="reagent_name" label="试剂 / 校准品 / 质控品" min-width="240" show-overflow-tooltip />
+          <el-table-column prop="reagent_type" label="类型" width="100" />
+          <el-table-column prop="library" label="责任库" width="90" />
+          <el-table-column label="建议关联项目" min-width="240">
+            <template #default="{ row }">
+              <el-select v-model="row._sel" filterable placeholder="选择项目" style="width:100%">
+                <el-option v-for="o in testItemOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+              <span class="muted" style="font-size:11px">匹配度 {{ row.score }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
+            <template #default="{ row }">
+              <el-button size="small" type="primary" :loading="row._loading" @click="adoptTest(row)">采纳</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <h4 class="grp-title">项目 ↔ 试剂（无自动候选，需人工）</h4>
+        <el-table :data="testOrph" border stripe size="small" empty-text="无">
+          <el-table-column prop="reagent_name" label="试剂 / 校准品 / 质控品" min-width="240" show-overflow-tooltip />
+          <el-table-column prop="reagent_type" label="类型" width="100" />
+          <el-table-column prop="library" label="责任库" width="90" />
+          <el-table-column label="选择项目" min-width="240">
+            <template #default="{ row }">
+              <el-select v-model="row._sel" filterable placeholder="选择项目" style="width:100%">
+                <el-option v-for="o in testItemOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
+            <template #default="{ row }">
+              <el-button size="small" type="primary" :loading="row._loading" @click="adoptTest(row)">关联</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <h4 class="grp-title">仪器 ↔ 耗材（系统建议匹配）</h4>
+        <el-table v-loading="sugLoading" :data="instSug" border stripe size="small" empty-text="无">
+          <el-table-column prop="reagent_name" label="耗材" min-width="240" show-overflow-tooltip />
+          <el-table-column prop="reagent_type" label="类型" width="100" />
+          <el-table-column prop="library" label="责任库" width="90" />
+          <el-table-column label="建议关联仪器" min-width="260">
+            <template #default="{ row }">
+              <el-select v-model="row._sel" filterable placeholder="选择仪器" style="width:100%">
+                <el-option v-for="o in instrumentOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+              <span class="muted" style="font-size:11px">
+                候选：{{ row.candidates.slice(0,3).map(c => c.instrument_name + (c.instrument_model ? '('+c.instrument_model+')' : '')).join('、') }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
+            <template #default="{ row }">
+              <el-button size="small" type="primary" :loading="row._loading" @click="adoptInst(row)">采纳</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <h4 class="grp-title">仪器 ↔ 耗材（无自动候选，需人工）</h4>
+        <el-table :data="instOrph" border stripe size="small" empty-text="无">
+          <el-table-column prop="reagent_name" label="耗材" min-width="240" show-overflow-tooltip />
+          <el-table-column prop="reagent_type" label="类型" width="100" />
+          <el-table-column prop="library" label="责任库" width="90" />
+          <el-table-column label="选择仪器" min-width="260">
+            <template #default="{ row }">
+              <el-select v-model="row._sel" filterable placeholder="选择仪器" style="width:100%">
+                <el-option v-for="o in instrumentOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
+            <template #default="{ row }">
+              <el-button size="small" type="primary" :loading="row._loading" @click="adoptInst(row)">关联</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 新增/编辑 项目-试剂 关联 -->
@@ -144,11 +240,11 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, MagicStick } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import {
   listTestItemReagents, createTestItemReagent, updateTestItemReagent, deleteTestItemReagent,
   listInstrumentReagents, createInstrumentReagent, updateInstrumentReagent, deleteInstrumentReagent,
-  autoMatchAssociations,
+  autoMatchAssociations, getAssociationSuggestions,
 } from '../../api/reagent'
 import { listTestItems } from '../../api/testItems'
 import { listReagentItems } from '../../api/reagent'
@@ -179,6 +275,11 @@ const projFiltered = computed(() => {
 // 仪器-耗材
 const instItems = ref([]), instTotal = ref(0), instPage = ref(1), instPageSize = ref(50)
 const instLoading = ref(false), instQ = ref('')
+
+// 待关联建议
+const sugLib = ref('')
+const sugLoading = ref(false), adoptingAll = ref(false)
+const testSug = ref([]), testOrph = ref([]), instSug = ref([]), instOrph = ref([])
 
 const matching = ref(false)
 const submitting = ref(false)
@@ -321,6 +422,76 @@ async function onDeleteInst(row) {
   const ins = row.instrument_model ? `${row.instrument_name}（${row.instrument_model}）` : row.instrument_name
   await ElMessageBox.confirm(`确认删除「${ins} ↔ ${row.reagent_name}」？`, '提示', { type: 'warning' })
   await deleteInstrumentReagent(row.id); ElMessage.success('已删除'); loadInst()
+}
+
+function onTabChange(name) {
+  if (name === 'suggest') loadSuggestions()
+}
+
+async function loadSuggestions() {
+  if (!testItemOptions.value.length) await loadOptions()
+  sugLoading.value = true
+  try {
+    const params = {}
+    if (sugLib.value) params.library = sugLib.value
+    const r = await getAssociationSuggestions(params)
+    testSug.value = (r.test_item_suggestions || []).map(x => ({ ...x, _sel: x.candidate_test_item_id, _loading: false }))
+    testOrph.value = (r.test_item_orphans || []).map(x => ({ ...x, _sel: null, _loading: false }))
+    instSug.value = (r.instrument_suggestions || []).map(x => ({ ...x, _sel: x.candidates?.[0]?.instrument_id || null, _loading: false }))
+    instOrph.value = (r.instrument_orphans || []).map(x => ({ ...x, _sel: null, _loading: false }))
+  } catch (e) {
+    ElMessage.error('加载建议失败：' + errText(e))
+  } finally { sugLoading.value = false }
+}
+
+async function adoptTest(row) {
+  if (!row._sel) { ElMessage.warning('请选择要关联的项目'); return }
+  row._loading = true
+  try {
+    await createTestItemReagent({
+      test_item_id: row._sel, reagent_item_id: row.reagent_id,
+      role: (row.reagent_type === '校准品' || row.reagent_type === '质控品') ? row.reagent_type : '试剂',
+      auto_matched: false,
+    })
+    ElMessage.success('已关联')
+    testSug.value = testSug.value.filter(r => r.reagent_id !== row.reagent_id)
+    testOrph.value = testOrph.value.filter(r => r.reagent_id !== row.reagent_id)
+    loadProj()
+  } catch (e) {
+    ElMessage.error('关联失败：' + errText(e))
+  } finally { row._loading = false }
+}
+
+async function adoptInst(row) {
+  if (!row._sel) { ElMessage.warning('请选择要关联的仪器'); return }
+  row._loading = true
+  try {
+    await createInstrumentReagent({ instrument_id: row._sel, reagent_item_id: row.reagent_id, role: '耗材', auto_matched: false })
+    ElMessage.success('已关联')
+    instSug.value = instSug.value.filter(r => r.reagent_id !== row.reagent_id)
+    instOrph.value = instOrph.value.filter(r => r.reagent_id !== row.reagent_id)
+    loadInst()
+  } catch (e) {
+    ElMessage.error('关联失败：' + errText(e))
+  } finally { row._loading = false }
+}
+
+async function adoptAll() {
+  const rows = [...testSug.value, ...instSug.value]
+  if (!rows.length) { ElMessage.info('没有可采纳的建议'); return }
+  adoptingAll.value = true
+  let ok = 0, fail = 0
+  try {
+    for (const row of rows) {
+      try {
+        if (row.candidates) await createInstrumentReagent({ instrument_id: row._sel, reagent_item_id: row.reagent_id, role: '耗材', auto_matched: false })
+        else await createTestItemReagent({ test_item_id: row._sel, reagent_item_id: row.reagent_id, role: (row.reagent_type === '校准品' || row.reagent_type === '质控品') ? row.reagent_type : '试剂', auto_matched: false })
+        ok++
+      } catch { fail++ }
+    }
+    ElMessage.success(`批量采纳完成：成功 ${ok} 条${fail ? `，失败 ${fail} 条` : ''}`)
+    await loadSuggestions(); loadProj(); loadInst()
+  } finally { adoptingAll.value = false }
 }
 
 onMounted(() => { loadOptions(); loadProj(); loadInst() })

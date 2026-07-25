@@ -911,6 +911,29 @@ def _alnum_tokens(s: str) -> list:
             if len(t) >= 2 and any(c.isalpha() for c in t)]
 
 
+def _core_name(s: str) -> str:
+    """提取检验项目「核心词」：去掉括号内容（如 (ATIII)）与末尾罗马数字，
+    便于试剂名按核心词匹配——「抗凝血酶III」→ 抗凝血酶，能命中
+    「抗凝血酶测定试剂盒（发色底物法）」这类本可关联却因带后缀而漏匹配的试剂。"""
+    s = _re.sub(r"\([^)]*\)", "", str(s or ""))
+    s = _re.sub(r"[IVX]+$", "", s)
+    return _norm_match(s)
+
+
+def _best_test_item_match(rn: str, test_norms):
+    """在 test_norms[(id, tn, tn_core, aliases)] 中为归一化试剂名 rn 找最佳匹配项。
+    返回 (best_test_item_id, best_score)。core 词（去括号/罗马数字）可显著提升召回。"""
+    best, best_score = None, 0
+    for tid, tn, tn_core, tals in test_norms:
+        for cand in ([tn, tn_core] + tals):
+            if not cand or cand in GENERIC_CLASS_TOKENS:
+                continue
+            score = len(cand) if cand in rn else (len(rn) if (rn and rn in cand) else 0)
+            if score > best_score:
+                best_score, best = score, tid
+    return best, best_score
+
+
 @router.post("/associations/_auto-match", response_model=dict)
 def auto_match_associations(
     reset: bool = Query(False, description="true 时先清空已有自动匹配记录再重新生成"),
@@ -929,7 +952,7 @@ def auto_match_associations(
 
     tests = db.query(TestItem).all()
     test_norms = [
-        (t.id, _norm_match(t.name),
+        (t.id, _norm_match(t.name), _core_name(t.name),
          [_norm_match(a) for a in str(t.aliases or "").split(",") if a.strip()])
         for t in tests
     ]
@@ -940,14 +963,7 @@ def auto_match_associations(
         if r.type == "耗材":
             continue
         rn = _norm_match(r.name)
-        best, best_score = None, 0
-        for tid, tn, tals in test_norms:
-            for cand in ([tn] + tals):
-                if not cand or cand in GENERIC_CLASS_TOKENS:
-                    continue
-                score = len(cand) if cand in rn else (len(rn) if (rn and rn in cand) else 0)
-                if score > best_score:
-                    best_score, best = score, tid
+        best, best_score = _best_test_item_match(rn, test_norms)
         if best and best_score >= 2:
             if not db.query(TestItemReagent).filter_by(test_item_id=best, reagent_item_id=r.id).first():
                 db.add(TestItemReagent(
@@ -1036,6 +1052,106 @@ def _enrich_instrument_reagents(rows):
             "reagent_library": ri.library if ri else "",
         })
     return out
+
+
+@router.get("/associations/suggestions", response_model=dict)
+def association_suggestions(
+    library: str = Query("", description="责任库过滤（空=全部）"),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """找出「本可关联却未关联」的试剂，供人工审核采纳。
+
+    返回四组：
+    - test_item_suggestions：未关联任何项目的 试剂/校准品/质控品，按名称对项目模糊匹配得到候选(candidate_test_item_id)，score>=2；
+    - test_item_orphans：未关联且无明显候选匹配的上述试剂（需人工判断）；
+    - instrument_suggestions：未关联任何仪器的 耗材，按名称对仪器模糊匹配得到候选(instrument_id 列表，含得分)，score>=3；
+    - instrument_orphans：未关联且无候选匹配的 耗材。
+    停用仪器与停用试剂不参与匹配。
+    """
+    linked_test_ids = {r.reagent_item_id for r in db.query(TestItemReagent.reagent_item_id).all()}
+    linked_inst_ids = {r.reagent_item_id for r in db.query(InstrumentReagent.reagent_item_id).all()}
+
+    tests = db.query(TestItem).all()
+    test_norms = [
+        (t.id, _norm_match(t.name), _core_name(t.name),
+         [_norm_match(a) for a in str(t.aliases or "").split(",") if a.strip()])
+        for t in tests
+    ]
+    insts = db.query(Instrument).all()
+    inst_idx = []
+    for ins in insts:
+        if getattr(ins, "status", None) == "停用":
+            continue
+        full = _norm_match((ins.name or "") + " " + (getattr(ins, "model", None) or ""))
+        alnum = _alnum_tokens((ins.name or "") + " " + (getattr(ins, "model", None) or ""))
+        cn_name = _norm_match(ins.name or "")
+        inst_idx.append((ins.id, ins.name, getattr(ins, "model", None), full, alnum, cn_name))
+
+    reagents = db.query(ReagentItem).filter(ReagentItem.is_active == True).all()
+
+    test_item_suggestions, test_item_orphans = [], []
+    instrument_suggestions, instrument_orphans = [], []
+    for r in reagents:
+        if library and r.library != library:
+            continue
+        if r.type == "耗材":
+            if r.id in linked_inst_ids:
+                continue
+            rn = _norm_match(r.name)
+            r_alnum = _alnum_tokens(r.name)
+            matched = []
+            for iid, iname, imodel, full, alnum, cn_name in inst_idx:
+                score = 0
+                for t in alnum:
+                    if len(t) >= 3 and t in rn:
+                        score = max(score, len(t))
+                for t in r_alnum:
+                    if len(t) >= 2 and t in full:
+                        score = max(score, len(t))
+                if len(cn_name) >= 4 and cn_name in rn:
+                    score = max(score, len(cn_name))
+                if score >= 3:
+                    matched.append((iid, iname, imodel, score))
+            if matched:
+                matched.sort(key=lambda x: -x[3])
+                instrument_suggestions.append({
+                    "reagent_id": r.id, "reagent_name": r.name, "reagent_type": r.type, "library": r.library,
+                    "candidates": [
+                        {"instrument_id": m[0], "instrument_name": m[1], "instrument_model": m[2], "score": m[3]}
+                        for m in matched
+                    ],
+                })
+            else:
+                instrument_orphans.append({
+                    "reagent_id": r.id, "reagent_name": r.name, "reagent_type": r.type, "library": r.library,
+                })
+        else:
+            if r.id in linked_test_ids:
+                continue
+            rn = _norm_match(r.name)
+            best, best_score = _best_test_item_match(rn, test_norms)
+            ti = next((t for t in tests if t.id == best), None)
+            if best and best_score >= 2:
+                test_item_suggestions.append({
+                    "reagent_id": r.id, "reagent_name": r.name, "reagent_type": r.type, "library": r.library,
+                    "candidate_test_item_id": best,
+                    "candidate_test_item_name": ti.name if ti else "",
+                    "score": best_score,
+                })
+            else:
+                test_item_orphans.append({
+                    "reagent_id": r.id, "reagent_name": r.name, "reagent_type": r.type, "library": r.library,
+                })
+
+    # 按得分降序，便于优先处理高置信度项
+    test_item_suggestions.sort(key=lambda x: -x["score"])
+    return {
+        "test_item_suggestions": test_item_suggestions,
+        "test_item_orphans": test_item_orphans,
+        "instrument_suggestions": instrument_suggestions,
+        "instrument_orphans": instrument_orphans,
+    }
 
 
 @router.get("/associations/test-items", response_model=dict)
