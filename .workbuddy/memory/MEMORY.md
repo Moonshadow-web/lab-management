@@ -20,18 +20,19 @@
 - EQA：/api/v1/eqa-plans；北京机构 01110025/4731。
 - 仪器 name 代号式归整(2026-07-23)：instruments.name=科室代号，model 原值；显示拼「名称（型号）」。
 - comparison：权威 WS/T 403—2024 字典 services/comparison_report.py，新TE查字典勿写死。
-- Westgard 月结 R-4s：同一天两水平都失控(ooc)，跨天相邻后点失控/前点警告(is_warning)。
+- Westgard 月结 R-4s（2026-07-25 改 SD 归一化）：相邻对先各自按本水平靶值归一化 z=(value-target_mean)/target_sd，再判 |z_前-z_后|>4 触发；同一天两水平都失控(ooc)，跨天相邻后点失控/前点警告(is_warning)。归一化为消除高低浓度水平(如甲肝IgM 水平1≠水平2)因原始浓度差导致的伪 R-4s。
 - 文档预览：xlsx exceljs / docx mammoth / pdf 直。
 
 ## 排班(scheduling)模块（第三轮重构 2026-07-24）
 - 四表 SchedulingPost(岗位)/SchedulingPlan(计划)/SchedulingAssignment(每日分配)/SchedulingConfig(配置)。
-- 状态枚举：在岗/休息/病假/开会/行政/质控/教学/采血/卫生部门上（与岗位平行，**post_id 可空**）。
+- 状态枚举：在岗/休息/病假/开会/行政/质控/教学（与岗位平行，**post_id 可空**；采血/卫生部门上经用户确认不存在，已移除）。
 - 夜班岗(group=night)由科室提前录入，不自动生成；发热白班(is_fever_day)固定人每4工作日一班。
 - 固定岗 preferred_people **优先级递减**（非轮转）；全部不可用才回退通用池。
 - 工作流：先批量录入夜班/发热/休息等非白班约束 → 再生成白班；生成时夜班人员当天被排除。
 - API：posts/plans/assignments CRUD + /generate + /cell(可空post upsert) + /batch(批量录入) + /grid(岗位行+状态行) + /my-today + /config。
 - 种子 14 岗 + 排除[王学晶,李东,管理员,技术支持,访客]，main.ensure_scheduling_defaults 按 name upsert。
 - 前端 SchedulingList.vue：月视图主页(日期列×岗位/状态行，桌面矩阵+移动端日卡，色标，点格编辑/删除)+批量录入+岗位/计划/设置 tab。
+- 用户 Excel 排班表简写：秦=秦满红，芳=秦东芳（批量录入时展开）；本环境无法读取图片，历史排班需用户以 Excel/文字提供。
 
 ## 提醒推送（仅 ServerChan/方糖）
 - WxPusher 通道已死(微信封禁)→已移除；现 站内+邮件+ServerChan(微信) 三路。

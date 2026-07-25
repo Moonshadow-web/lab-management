@@ -1,10 +1,12 @@
 """验证 Westgard 规则：
 - 单水平：1-3s / 2-2s / 10-x（失控），1-2s（警告，不计入失控）；
-- 跨水平 R-4s（2026-07-24 新规则，2026-07-22 修订同天判定）：把同一项目全部水平的
-  每日测值按 (date, level) 排成一条时间线，任意『相邻两点』（同天不同水平、或跨天
-  同/不同水平）都判定；|前点 - 后点| > 4×max(前sd, 后sd) 即触发；
+- 跨水平 R-4s（2026-07-24 新规则，2026-07-22 修订同天判定，2026-07-25 修订为 SD
+  归一化）：把同一项目全部水平的每日测值按 (date, level) 排成一条时间线，任意
+  『相邻两点』（同天不同水平、或跨天同/不同水平）都判定；每个测值先按各自水平靶值
+  归一化为 z=(value-target_mean)/target_sd，再判 |z_前 - z_后| > 4 即触发；
   触发规则：同一天两水平 → 两个都判失控(R-4s)；跨天相邻 → 后点判失控(R-4s)、
   前点判警告(R-4s)；互不级联（前点已失控不会因后续 pair 被降级为警告）。
+  归一化后高低浓度被拉到同一尺度，浓度差（如甲肝 IgM 水平1≠水平2）不再误报。
 - aggregate_project 统计量剔除失控点（含 R-4s 失控点）。
 """
 import sys, os
@@ -109,7 +111,7 @@ res7 = aggregate_project(levels7)
 print("L1:", {k: (res7['L1']['ooc'].get(k), res7['L1']['warnings'].get(k)) for k in (0, 1)})
 print("L2:", {k: (res7['L2']['ooc'].get(k), res7['L2']['warnings'].get(k)) for k in (0, 1, 2)})
 print("L3:", {k: (res7['L3']['ooc'].get(k), res7['L3']['warnings'].get(k)) for k in (0,)})
-# 该示例下所有相邻差（3/1/2/1/9）均 <= 4×max(5,5)=20，不应触发 R-4s
+# 该示例下各测值归一化后 z 均很小（差值 3/1/2/1/9 相对各自靶值/SD 归一化后 <<4），不应触发 R-4s
 for lv in ("L1", "L2", "L3"):
     assert not any("R-4s" in v for v in res7[lv]["ooc"].values()), f"{lv} 不应有 R-4s 失控"
     assert not any("R-4s" in v for v in res7[lv]["warnings"].values()), f"{lv} 不应有 R-4s 警告"
@@ -146,5 +148,39 @@ assert "R-4s" in res9["L1"]["ooc"].get(1, ""), "6-02 L1=10 跨天相邻应判失
 assert 0 not in res9["L2"]["warnings"], "L2(6-01) 已同天失控，不应被跨天对降级为警告"
 assert 0 not in res9["L1"]["warnings"], "L1(6-01) 已同天失控，不应被标警告"
 print("PASS 用例9：同天失控点 + 跨天相邻 不降级")
+
+print("\n=== 用例10：甲肝 IgM 跨水平 SD 归一化（浓度差不再误报 R-4s）===")
+# 水平1 靶值0.24/SD0.02，值~0.24；水平2 靶值2.40/SD0.20，值~2.4。
+# 旧逻辑（原始差）会把 ~2.1 的跨水平差当作 R-4s；归一化后各点 z 均很小（|z|<1），
+# 相邻对 |z_前 - z_后| << 4，不应触发 R-4s（真实反映：波动幅度正常）。
+levels10 = [
+    {"level": "L1", "values": [0.246, 0.246, 0.243, 0.240],
+     "dates": ["2026-06-02", "2026-06-09", "2026-06-23", "2026-06-30"],
+     "target_mean": 0.24, "target_sd": 0.02},
+    {"level": "L2", "values": [2.32, 2.56, 2.44, 2.49],
+     "dates": ["2026-06-04", "2026-06-11", "2026-06-18", "2026-06-25"],
+     "target_mean": 2.4, "target_sd": 0.2},
+]
+res10 = aggregate_project(levels10)
+print("L1 ooc:", res10["L1"]["ooc"], "L2 ooc:", res10["L2"]["ooc"])
+for lv in ("L1", "L2"):
+    assert not any("R-4s" in v for v in res10[lv]["ooc"].values()), f"{lv} 不应有 R-4s 失控（甲肝浓度差）"
+    assert not any("R-4s" in v for v in res10[lv]["warnings"].values()), f"{lv} 不应有 R-4s 警告"
+print("PASS 用例10：甲肝 IgM 跨水平归一化后不误报 R-4s")
+
+print("\n=== 用例11：用户示例 SD 归一化后触发 R-4s（两水平各偏离自己靶值>2SD）===")
+# 水平1 靶3/SD1，测5.5 → z=+2.5；水平2 靶10/SD1，测7.5 → z=-2.5；|z1-z2|=5>4 → R-4s。
+# 两水平同天相邻 → 两个都判失控。
+levels11 = [
+    {"level": "L1", "values": [5.5],
+     "dates": ["2026-06-01"], "target_mean": 3, "target_sd": 1},
+    {"level": "L2", "values": [7.5],
+     "dates": ["2026-06-01"], "target_mean": 10, "target_sd": 1},
+]
+res11 = aggregate_project(levels11)
+print("L1 ooc:", res11["L1"]["ooc"], "L2 ooc:", res11["L2"]["ooc"])
+assert "R-4s" in res11["L1"]["ooc"].get(0, ""), "L1=5.5(z=+2.5) 归一化应判 R-4s 失控"
+assert "R-4s" in res11["L2"]["ooc"].get(0, ""), "L2=7.5(z=-2.5) 归一化应判 R-4s 失控"
+print("PASS 用例11：用户示例归一化后 R-4s 正常触发")
 
 print("\n全部用例通过 ✅")

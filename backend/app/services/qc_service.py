@@ -4,15 +4,17 @@ Westgard 多规则判定（检验科常见简化：对同一项目、同一仪�
 所有水平的每日测值应用规则）。命中以下任一规则即判为失控点：
   1-3s : 单点超出 ±3s
   2-2s : 连续两点同侧超出 ±2s
-  R-4s : 相邻两测值差值 > 4s（跨水平、跨天均算）
+  R-4s : 相邻两测值（SD 归一化后）差值 > 4s（跨水平、跨天均算；归一化后高低浓度可比）
   10-x : 连续十点同侧（均值同侧）
 1-2s 仅作警示（warning）、不计入失控；R-4s 触发时：同一天两水平都判失控，跨天相邻则后点失控、前点警告。
 
-R-4s 判定说明（按 2026-07-24 需求，2026-07-22 修订同天判定）：把同一项目全部
-水平的每日测值按 (date, level) 排成一条时间线，任意「相邻两点」——无论同一天
-不同水平、还是跨天同水平/不同水平——都参与 R-4s 判定；|前点 - 后点| >
-4×max(前sd, 后sd) 即触发。触发规则：同一天两水平 → 两个都判失控(R-4s)；
-跨天相邻 → 后点判失控、前点判警告(R-4s)。该判定仅依赖原始测值、互不级联。
+R-4s 判定说明（按 2026-07-24 需求，2026-07-22 修订同天判定，2026-07-25 修订为
+SD 归一化）：把同一项目全部水平的每日测值按 (date, level) 排成一条时间线，
+任意「相邻两点」——无论同一天不同水平、还是跨天同/不同水平——都参与 R-4s
+判定；每个测值先按各自水平的靶值归一化为 z=(value-target_mean)/target_sd，
+再判 |z_前 - z_后| > 4 即触发（高低浓度被拉到同一尺度，只反映偏离各自靶值的
+程度，避免浓度差误报，如甲肝 IgM 水平1≠水平2）。触发规则：同一天两水平 →
+两个都判失控(R-4s)；跨天相邻 → 后点判失控、前点判警告(R-4s)。互不级联。
 """
 import json
 import re
@@ -357,24 +359,26 @@ def evaluate_westgard(values: list[float], mean: float, sd: float):
 
 
 def evaluate_r4s_project(points: list[dict]) -> tuple[dict, dict]:
-    """跨「项目(同仪器/年/月/批号)」全部水平、按时间排序的相邻两测值 R-4s 判定。
+    """跨「项目(同仪器/年/月/批号)」全部水平、按时间排序的相邻两测值 R-4s 判定（SD 归一化，2026-07-25）。
 
-    points: list of {level, idx, value, sd, date}
+    points: list of {level, idx, value, mean, sd, date}
       level: 水平标识；idx: 该水平 values 中的下标；value: 测值；
-      sd:    该水平的靶值 SD（缺失/<=0 不参与）；date: qc_date 字符串（ISO，可排序）。
+      mean/sd: 该水平的靶值均值/靶SD（缺失时用稳健估计，均 >0）；
+      date: qc_date 字符串（ISO，可排序）。
     返回 (ooc_add, warn_add)：
       ooc_add:  {(level, idx): "R-4s"}  触发 R-4s 的点 → 判失控；
       warn_add: {(level, idx): "R-4s"}  触发 R-4s 的『前一点』（跨天对）→ 判警告（不计入失控）。
 
-    规则（按 2026-07-24 需求，2026-07-22 修订同天判定）：
+    规则（按 2026-07-24 需求，2026-07-22 修订同天判定，2026-07-25 修订为 SD 归一化）：
       - 把同一项目所有水平的每日测值按 (date, level) 排成一条时间线；
       - 任意『相邻两点』（无论同一天不同水平、还是跨天同/不同水平）都判 R-4s；
-      - |前点 - 后点| > 4 × max(前sd, 后sd) 即触发；
-      - 触发时：
-          * 同一天（prev.date == curr.date）：两个水平都判失控(R-4s)；
-          * 跨天相邻：后点判失控(R-4s)、前点判警告(R-4s)；
+      - 每个测值先按各自水平的靶值归一化为 SD 倍数：z = (value - target_mean) / target_sd；
+        再判 |z_前 - z_后| > 4 即触发（即两点『偏离各自靶值的程度』之差超 4 个 SD）；
+        高低浓度被拉到同一尺度，只反映波动幅度，浓度差不会误报（如甲肝 IgM 水平1≠水平2）；
+      - 触发时：同一天（prev.date == curr.date）两个水平都判失控(R-4s)；
+        跨天相邻：后点判失控(R-4s)、前点判警告(R-4s)；
       - 前点若已因其它规则（或同天对）判失控，则保持失控、不再改判警告。
-    该判定仅依赖原始测值，互不级联（不会因前点已失控而把后点连带误判）。
+    该判定仅依赖归一化偏差，互不级联（不会因前点已失控而把后点连带误判）。
     """
     # 按 (date, level) 稳定排序，保留原始 (level, idx) 用于回写
     pts = sorted(points, key=lambda p: (p["date"], str(p["level"])))
@@ -383,12 +387,15 @@ def evaluate_r4s_project(points: list[dict]) -> tuple[dict, dict]:
     m = len(pts)
     for i in range(m - 1):
         prev, curr = pts[i], pts[i + 1]
+        mpi, mpj = prev.get("mean"), curr.get("mean")
         sdi, sdj = prev["sd"], curr["sd"]
-        if sdi <= 0 or sdj <= 0:
+        # 无靶值/无 SD（或估出 0）→ 该点无法归一化，跳过本对 R-4s
+        if not mpi or not mpj or sdi <= 0 or sdj <= 0:
             continue
-        thr = 4 * max(sdi, sdj)
-        eps = 1e-9 * (abs(prev["value"]) + abs(curr["value"]) + 1)
-        if abs(prev["value"] - curr["value"]) > thr + eps:
+        z_prev = (prev["value"] - mpi) / sdi
+        z_curr = (curr["value"] - mpj) / sdj
+        eps = 1e-9 * (abs(z_prev) + abs(z_curr) + 1)
+        if abs(z_prev - z_curr) > 4 + eps:
             if prev["date"] == curr["date"]:
                 # 同一天两个水平触发：两个都判失控
                 ooc_add[(prev["level"], prev["idx"])] = "R-4s"
@@ -446,7 +453,8 @@ def aggregate_project(levels: list[dict]):
     规则：
       - 单水平：1-3s / 2-2s / 10-x（失控），1-2s（警告，不计入失控）；
       - 跨水平 R-4s：把本项目全部水平的每日测值按 (date, level) 排成时间线，
-        任意相邻两点（同天不同水平、跨天同/不同水平）之差 > 4×max(sd_i, sd_j)
+        任意相邻两点（同天不同水平、跨天同/不同水平）先各自按本水平靶值归一化为
+        z=(value-mean)/sd，再判 |z_前 - z_后| > 4
         → 同天两水平都判失控(R-4s)、跨天后点判失控(R-4s)/前点判警告(R-4s)；
       - 统计量在剔除失控点（含 R-4s）后计算。
     """
@@ -466,20 +474,22 @@ def aggregate_project(levels: list[dict]):
             em, es = _robust_stats(values)
         ooc, warnings = evaluate_westgard(values, em, es)
         r4s_sd = ts if ts else es  # 跨水平 R-4s 用靶SD（缺失则用稳健估计 SD）
+        r4s_mean = em  # 跨水平 R-4s 归一化用靶均值（缺失则用稳健估计均值）
         per[lv["level"]] = {
             "values": values, "dates": lv["dates"],
-            "ooc": ooc, "warnings": warnings, "r4s_sd": r4s_sd,
+            "ooc": ooc, "warnings": warnings, "r4s_sd": r4s_sd, "r4s_mean": r4s_mean,
         }
 
     # 2) 跨水平 R-4s：把全部水平的每日测值按 (date, level) 排成一条时间线，
     #    任意「相邻两点」都参与 R-4s 判定（同天不同水平 或 跨天同/不同水平）。
+    #    每个点带上各自水平的 (mean, sd)，供 evaluate_r4s_project 做 SD 归一化。
     all_points = []
     for lv in levels:
         p = per[lv["level"]]
         for idx, (v, d) in enumerate(zip(p["values"], p["dates"])):
             all_points.append({
                 "level": lv["level"], "idx": idx,
-                "value": v, "sd": p["r4s_sd"], "date": d,
+                "value": v, "mean": p["r4s_mean"], "sd": p["r4s_sd"], "date": d,
             })
     ooc_add, warn_add = evaluate_r4s_project(all_points)
     for (level, idx), rule in ooc_add.items():
