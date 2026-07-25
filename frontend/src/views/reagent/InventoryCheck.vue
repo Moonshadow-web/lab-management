@@ -47,8 +47,13 @@
           <el-col :span="8"><el-form-item label="备注"><el-input v-model="checkForm.remark" /></el-form-item></el-col>
         </el-row>
       </el-form>
-      <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
-        <el-input v-model="dialogSearch" placeholder="模糊检索试剂/规格/编码..." clearable style="width:280px" />
+      <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <el-select v-model="categoryFilter" placeholder="全部分类" clearable style="width:130px" size="default">
+          <el-option label="试剂 / 校准品" value="reagent" />
+          <el-option label="耗材" value="consumable" />
+          <el-option label="质控品" value="control" />
+        </el-select>
+        <el-input v-model="dialogSearch" placeholder="模糊检索试剂/规格/编码/项目名(含英文别名如ALT)..." clearable style="width:340px" />
         <el-button @click="onPrintBlank" :icon="Printer" size="small">打印空白录入页</el-button>
         <span class="muted" style="font-size:12px">共 {{ totalEntries }} 项</span>
       </div>
@@ -56,17 +61,19 @@
       <div class="entry-scroll">
         <!-- 按项目 -->
         <template v-for="grp in filteredProjects" :key="'p'+grp.test_item_id">
-          <h4 class="grp-title">项目：{{ grp.test_item_name }}</h4>
+          <h4 class="grp-title">项目：{{ grp.test_item_name }} <span class="muted" v-if="grp.test_item_aliases">（{{ grp.test_item_aliases }}）</span></h4>
           <el-table :data="grp.items" border size="small">
-            <el-table-column label="试剂 / 校准品" min-width="220">
+            <el-table-column label="试剂 / 校准品" min-width="200">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
             </el-table-column>
-            <el-table-column label="类型" width="80"><template #default="{ row }">{{ row.type }}</template></el-table-column>
-            <el-table-column label="单位" width="70"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
-            <el-table-column label="当前库存" width="90" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
-            <el-table-column label="盘点余量" width="130">
+            <el-table-column label="材料编码" width="110">
+              <template #default="{ row }"><span class="muted">{{ row.material_code || '-' }}</span></template>
+            </el-table-column>
+            <el-table-column label="单位" width="65"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
+            <el-table-column label="当前库存" width="80" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
+            <el-table-column label="盘点余量" width="120">
               <template #default="{ row }">
-                <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:120px" controls-position="right" />
+                <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:110px" controls-position="right" />
               </template>
             </el-table-column>
           </el-table>
@@ -75,14 +82,17 @@
         <template v-for="grp in filteredInstruments" :key="'i'+grp.group">
           <h4 class="grp-title">仪器：{{ grp.group }} <span class="muted" v-if="grp.instruments.length">（{{ grp.instruments.join('、') }}）</span></h4>
           <el-table :data="grp.items" border size="small">
-            <el-table-column label="耗材" min-width="220">
+            <el-table-column label="耗材" min-width="200">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
             </el-table-column>
-            <el-table-column label="单位" width="70"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
-            <el-table-column label="当前库存" width="90" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
-            <el-table-column label="盘点余量" width="130">
+            <el-table-column label="材料编码" width="110">
+              <template #default="{ row }"><span class="muted">{{ row.material_code || '-' }}</span></template>
+            </el-table-column>
+            <el-table-column label="单位" width="65"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
+            <el-table-column label="当前库存" width="80" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
+            <el-table-column label="盘点余量" width="120">
               <template #default="{ row }">
-                <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:120px" controls-position="right" />
+                <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:110px" controls-position="right" />
               </template>
             </el-table-column>
           </el-table>
@@ -91,19 +101,22 @@
         <template v-if="filteredControls.length">
           <h4 class="grp-title">质控品（单独）</h4>
           <el-table :data="filteredControls" border size="small">
-            <el-table-column label="质控品" min-width="220">
+            <el-table-column label="质控品" min-width="200">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
             </el-table-column>
-            <el-table-column label="单位" width="70"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
-            <el-table-column label="当前库存" width="90" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
-            <el-table-column label="盘点余量" width="130">
+            <el-table-column label="材料编码" width="110">
+              <template #default="{ row }"><span class="muted">{{ row.material_code || '-' }}</span></template>
+            </el-table-column>
+            <el-table-column label="单位" width="65"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
+            <el-table-column label="当前库存" width="80" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
+            <el-table-column label="盘点余量" width="120">
               <template #default="{ row }">
-                <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:120px" controls-position="right" />
+                <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:110px" controls-position="right" />
               </template>
             </el-table-column>
           </el-table>
         </template>
-        <el-empty v-if="totalEntries === 0" description="该责任库暂无试剂/耗材（请先在试剂目录维护）" />
+        <el-empty v-if="totalEntries === 0" description="该分类/检索条件下无数据" />
       </div>
 
       <template #footer>
@@ -117,7 +130,7 @@
     <el-dialog v-model="viewVisible" :title="`盘库详情（${viewLibrary}）`" width="640px">
       <el-table :data="viewItems" border size="small">
         <el-table-column label="试剂/耗材" min-width="220">
-          <template #default="{ row }">{{ row._name || `(id=${row.item_id})` }} <span class="muted">{{ row._spec }}</span></template>
+          <template #default="{ row }">{{ row._name || `(id=${row.item_id})`}} <span class="muted">{{ row._spec }}</span></template>
         </el-table-column>
         <el-table-column label="批号" width="120"><template #default="{ row }">{{ row.batch_no || '-' }}</template></el-table-column>
         <el-table-column label="效期" width="110"><template #default="{ row }">{{ row.expiry_date || '-' }}</template></el-table-column>
@@ -148,6 +161,7 @@ const canWrite = computed(() => auth.canWrite('reagents'))
 const checks = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
 const dialogVisible = ref(false), submitting = ref(false)
 const dialogSearch = ref('')
+const categoryFilter = ref('')  // '' | 'reagent' | 'consumable' | 'control'
 const checkForm = ref({ check_date: '', check_type: '月末盘库', remark: '' })
 const tpl = ref(null)
 const quantities = reactive({})
@@ -171,21 +185,54 @@ function allItems() {
   out.push(...tpl.value.controls)
   return out
 }
-const totalEntries = computed(() => allItems().length)
+const totalEntries = computed(() => {
+  if (!tpl.value) return 0
+  let n = 0
+  if (categoryFilter.value === '' || categoryFilter.value === 'reagent')
+    for (const g of tpl.value.by_project) n += g.items.filter(matchItem).length
+  if (categoryFilter.value === '' || categoryFilter.value === 'consumable')
+    for (const g of tpl.value.by_instrument) n += g.items.filter(matchItem).length
+  if ((categoryFilter.value === '' || categoryFilter.value === 'control') && tpl.value.controls)
+    n += tpl.value.controls.filter(matchItem).length
+  return n
+})
 
+/** 模糊匹配：试剂名/规格/编码 + 项目中文名/英文别名 */
 function matchItem(it) {
   const kw = dialogSearch.value.trim().toLowerCase()
   if (!kw) return true
-  return (it.name || '').toLowerCase().includes(kw)
-    || (it.spec || '').toLowerCase().includes(kw)
-    || (it.material_code || '').toLowerCase().includes(kw)
+  // 试剂自身字段
+  if ((it.name || '').toLowerCase().includes(kw)) return true
+  if ((it.spec || '').toLowerCase().includes(kw)) return true
+  if ((it.material_code || '').toLowerCase().includes(kw)) return true
+  // 项目名称 + 英文别名（逗号分隔，支持 ALT / ATIII 等）
+  if (it.project_name && it.project_name.toLowerCase().includes(kw)) return true
+  if (it.project_aliases) {
+    for (const alias of it.project_aliases.split(','))
+      if (alias.trim().toLowerCase().includes(kw)) return true
+  }
+  return false
 }
-const filteredProjects = computed(() => tpl.value ? tpl.value.by_project.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length) : [])
-const filteredInstruments = computed(() => tpl.value ? tpl.value.by_instrument.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length) : [])
-const filteredControls = computed(() => tpl.value ? tpl.value.controls.filter(matchItem) : [])
+
+const filteredProjects = computed(() => {
+  if (!tpl.value) return []
+  if (categoryFilter.value && categoryFilter.value !== 'reagent') return []
+  return tpl.value.by_project.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length)
+})
+const filteredInstruments = computed(() => {
+  if (!tpl.value) return []
+  if (categoryFilter.value && categoryFilter.value !== 'consumable') return []
+  return tpl.value.by_instrument.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length)
+})
+const filteredControls = computed(() => {
+  if (!tpl.value || !tpl.value.controls) return []
+  if (categoryFilter.value && categoryFilter.value !== 'control') return []
+  return tpl.value.controls.filter(matchItem)
+})
 
 async function onNewCheck() {
   dialogSearch.value = ''
+  categoryFilter.value = ''
   checkForm.value = { check_date: new Date().toISOString().slice(0,10), check_type: '月末盘库', remark: '' }
   dialogVisible.value = true
   submitting.value = true
@@ -201,21 +248,24 @@ async function onNewCheck() {
 function buildSections(useRecorded) {
   const secs = []
   for (const g of tpl.value.by_project) {
-    secs.push({ heading: '项目：' + g.test_item_name, items: g.items.map(it => ({
-      name: it.name, spec: it.spec, unit: it.unit, current: it.current_stock,
+    secs.push({ heading: '项目：' + g.test_item_name + (g.test_item_aliases ? `（${g.test_item_aliases}）` : ''), items: g.items.map(it => ({
+      name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
+      current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
   }
   for (const g of tpl.value.by_instrument) {
     const extra = g.instruments.length ? `（${g.instruments.join('、')}）` : ''
     secs.push({ heading: '仪器：' + g.group + extra, items: g.items.map(it => ({
-      name: it.name, spec: it.spec, unit: it.unit, current: it.current_stock,
+      name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
+      current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
   }
   if (tpl.value.controls.length) {
     secs.push({ heading: '质控品（单独）', items: tpl.value.controls.map(it => ({
-      name: it.name, spec: it.spec, unit: it.unit, current: it.current_stock,
+      name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
+      current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
   }
@@ -226,9 +276,9 @@ function sectionHtml(secs) {
   let h = ''
   for (const s of secs) {
     h += `<h3>${s.heading}</h3>`
-    h += '<table><thead><tr><th>名称</th><th>规格</th><th>单位</th><th class="num">当前库存</th><th class="num">盘点余量</th></tr></thead><tbody>'
+    h += '<table><thead><tr><th>名称</th><th>规格</th><th>材料编码</th><th>单位</th><th class="num">当前库存</th><th class="num">盘点余量</th></tr></thead><tbody>'
     for (const it of s.items) {
-      h += `<tr><td>${it.name || ''}</td><td>${it.spec || ''}</td><td>${it.unit || ''}</td><td class="num">${it.current}</td><td class="num">${it.qty}</td></tr>`
+      h += `<tr><td>${it.name || ''}</td><td>${it.spec || ''}</td><td>${it.material_code || ''}</td><td>${it.unit || ''}</td><td class="num">${it.current}</td><td class="num">${it.qty}</td></tr>`
     }
     h += '</tbody></table>'
   }

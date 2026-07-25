@@ -56,14 +56,19 @@
         </el-row>
         <el-form-item label="备注"><el-input v-model="orderForm.remark" /></el-form-item>
       </el-form>
-      <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
-        <el-input v-model="dialogSearch" placeholder="模糊检索试剂/规格/编码..." clearable style="width:280px" />
+      <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <el-select v-model="categoryFilter" placeholder="全部分类" clearable style="width:130px" size="default">
+          <el-option label="试剂 / 校准品" value="reagent" />
+          <el-option label="耗材" value="consumable" />
+          <el-option label="质控品" value="control" />
+        </el-select>
+        <el-input v-model="dialogSearch" placeholder="模糊检索试剂/规格/编码/项目名(含英文别名如ALT)..." clearable style="width:340px" />
         <span class="muted" style="font-size:12px">共 {{ totalEntries }} 项</span>
       </div>
 
       <div class="entry-scroll">
         <template v-for="grp in filteredProjects" :key="'p'+grp.test_item_id">
-          <h4 class="grp-title">项目：{{ grp.test_item_name }}</h4>
+          <h4 class="grp-title">项目：{{ grp.test_item_name }} <span class="muted" v-if="grp.test_item_aliases">（{{ grp.test_item_aliases }}）</span></h4>
           <el-table :data="grp.items" border size="small">
             <el-table-column label="试剂 / 校准品" min-width="200">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
@@ -110,7 +115,7 @@
             </el-table-column>
           </el-table>
         </template>
-        <el-empty v-if="totalEntries === 0" description="该责任库暂无试剂/耗材（请先在试剂目录维护）" />
+        <el-empty v-if="totalEntries === 0" description="该分类/检索条件下无数据" />
       </div>
 
       <template #footer>
@@ -141,6 +146,7 @@ const canWrite = computed(() => auth.canWrite('reagents'))
 const orders = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
 const dialogVisible = ref(false), editingId = ref(null), submitting = ref(false)
 const dialogSearch = ref('')
+const categoryFilter = ref('')
 const orderForm = ref({ order_no: '', order_date: new Date().toISOString().slice(0,10), order_type: '月初订购', remark: '' })
 const tpl = ref(null)
 const quantities = reactive({})
@@ -161,18 +167,47 @@ function allItems() {
   out.push(...tpl.value.controls)
   return out
 }
-const totalEntries = computed(() => allItems().length)
+const totalEntries = computed(() => {
+  if (!tpl.value) return 0
+  let n = 0
+  if (categoryFilter.value === '' || categoryFilter.value === 'reagent')
+    for (const g of tpl.value.by_project) n += g.items.filter(matchItem).length
+  if (categoryFilter.value === '' || categoryFilter.value === 'consumable')
+    for (const g of tpl.value.by_instrument) n += g.items.filter(matchItem).length
+  if ((categoryFilter.value === '' || categoryFilter.value === 'control') && tpl.value.controls)
+    n += tpl.value.controls.filter(matchItem).length
+  return n
+})
 
+/** 模糊匹配：试剂名/规格/编码 + 项目中文名/英文别名 */
 function matchItem(it) {
   const kw = dialogSearch.value.trim().toLowerCase()
   if (!kw) return true
-  return (it.name || '').toLowerCase().includes(kw)
-    || (it.spec || '').toLowerCase().includes(kw)
-    || (it.material_code || '').toLowerCase().includes(kw)
+  if ((it.name || '').toLowerCase().includes(kw)) return true
+  if ((it.spec || '').toLowerCase().includes(kw)) return true
+  if ((it.material_code || '').toLowerCase().includes(kw)) return true
+  if (it.project_name && it.project_name.toLowerCase().includes(kw)) return true
+  if (it.project_aliases) {
+    for (const alias of it.project_aliases.split(','))
+      if (alias.trim().toLowerCase().includes(kw)) return true
+  }
+  return false
 }
-const filteredProjects = computed(() => tpl.value ? tpl.value.by_project.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length) : [])
-const filteredInstruments = computed(() => tpl.value ? tpl.value.by_instrument.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length) : [])
-const filteredControls = computed(() => tpl.value ? tpl.value.controls.filter(matchItem) : [])
+const filteredProjects = computed(() => {
+  if (!tpl.value) return []
+  if (categoryFilter.value && categoryFilter.value !== 'reagent') return []
+  return tpl.value.by_project.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length)
+})
+const filteredInstruments = computed(() => {
+  if (!tpl.value) return []
+  if (categoryFilter.value && categoryFilter.value !== 'consumable') return []
+  return tpl.value.by_instrument.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length)
+})
+const filteredControls = computed(() => {
+  if (!tpl.value || !tpl.value.controls) return []
+  if (categoryFilter.value && categoryFilter.value !== 'control') return []
+  return tpl.value.controls.filter(matchItem)
+})
 
 async function loadTemplate() {
   const r = await getReagentTemplate({ library: reagentStore.library })
@@ -182,6 +217,7 @@ async function loadTemplate() {
 
 function onNewOrder() {
   dialogSearch.value = ''
+  categoryFilter.value = ''
   orderForm.value = { order_no: 'ORD-' + new Date().toISOString().slice(0,7) + '-001', order_date: new Date().toISOString().slice(0,10), order_type: '月初订购', remark: '' }
   editingId.value = null
   for (const k in quantities) delete quantities[k]
@@ -191,6 +227,7 @@ function onNewOrder() {
 
 function onEdit(row) {
   dialogSearch.value = ''
+  categoryFilter.value = ''
   editingId.value = row.id
   orderForm.value = { order_no: row.order_no, order_date: row.order_date, order_type: row.order_type, remark: row.remark || '' }
   for (const k in quantities) delete quantities[k]

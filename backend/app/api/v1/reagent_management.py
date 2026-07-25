@@ -191,24 +191,32 @@ def get_inventory_check(check_id: int, db: Session = Depends(get_db), _=Depends(
     return check
 
 
-def _item_dto(ri: ReagentItem, stock_map: dict) -> dict:
+def _item_dto(ri: ReagentItem, stock_map: dict,
+               project_name: str = "", project_aliases: str = "") -> dict:
     return {
         "item_id": ri.id, "name": ri.name, "spec": ri.spec, "type": ri.type,
-        "unit": ri.unit, "material_code": ri.material_code,
+        "unit": ri.unit, "material_code": ri.material_code or "",
         "current_stock": int(stock_map.get(ri.id, 0)), "library": ri.library,
+        "project_name": project_name,
+        "project_aliases": project_aliases,
     }
+
+
+# 仪器名关键词黑名单——这些仪器不产生耗材盘库条目（流水线等）
+_NO_CONSUMABLE_INSTRUMENT_KEYWORDS = ("流水线",)
 
 
 def build_reagent_template(db: Session, library: str) -> dict:
     """构建盘库/订购录入模板，按「项目 / 仪器家族 / 质控品」分组。
 
-    - by_project：通过 项目↔试剂 关联(role=试剂/校准品) 归组，_library 过滤；
-      额外补充「未关联项目的试剂/校准品」。
+    规则：
+    - by_project：通过 项目↔试剂 关联(role=试剂/校准品) 归组，_library 过滤，
+      仅含在用试剂(is_active=True)；额外补充「未关联项目的试剂/校准品」。
     - by_instrument：通过 仪器↔耗材 关联(role=耗材) 归组，按仪器家族(总型号)合并
-      （如 AU生化仪 多台共用耗材只列一次），未入族的按单台仪器归组；
+      （如 AU生化仪 多台共用耗材只列一次），排除停用仪器与流水线；
       额外补充「未关联仪器的耗材」。
-    - controls：type=质控品 且 library 匹配（单独列出，不与项目/耗材重复）。
-    每个物品带 current_stock（实时库存合计）。
+    - controls：type=质控品 且 library 匹配且 is_active（单独列出）。
+    每个物品带 current_stock（实时库存合计）+ project_name/project_aliases（供前端模糊检索）。
     """
     stock_map = {}
     for iid, qty in db.query(
@@ -216,12 +224,16 @@ def build_reagent_template(db: Session, library: str) -> dict:
     ).group_by(ReagentStock.item_id).all():
         stock_map[iid] = qty
 
-    # ── 按项目 ──
+    # ── 按项目（仅在用试剂）──
     tir_rows = (
         db.query(TestItemReagent, TestItem, ReagentItem)
         .join(TestItem, TestItem.id == TestItemReagent.test_item_id)
         .join(ReagentItem, ReagentItem.id == TestItemReagent.reagent_item_id)
-        .filter(TestItemReagent.role.in_(["试剂", "校准品"]), ReagentItem.library == library)
+        .filter(
+            TestItemReagent.role.in_(["试剂", "校准品"]),
+            ReagentItem.library == library,
+            ReagentItem.is_active == True,
+        )
         .order_by(TestItem.name, ReagentItem.name)
         .all()
     )
@@ -231,30 +243,43 @@ def build_reagent_template(db: Session, library: str) -> dict:
         linked_reagent_ids.add(ri.id)
         key = ti.id
         if key not in proj_map:
-            proj_map[key] = {"test_item_id": ti.id, "test_item_name": ti.name, "items": []}
-        proj_map[key]["items"].append(_item_dto(ri, stock_map))
-    # 未关联项目的试剂/校准品
+            proj_map[key] = {"test_item_id": ti.id, "test_item_name": ti.name,
+                             "test_item_aliases": ti.aliases or "", "items": []}
+        proj_map[key]["items"].append(_item_dto(ri, stock_map, ti.name, ti.aliases or ""))
+    # 未关联项目的试剂/校准品（仅在用）
     orphans = (
         db.query(ReagentItem)
-        .filter(ReagentItem.type.in_(["试剂", "校准品"]), ReagentItem.library == library)
+        .filter(ReagentItem.type.in_(["试剂", "校准品"]),
+                ReagentItem.library == library,
+                ReagentItem.is_active == True)
         .order_by(ReagentItem.name).all()
     )
     orphan_items = [r for r in orphans if r.id not in linked_reagent_ids]
     if orphan_items:
         proj_map["__orphan__"] = {
             "test_item_id": None, "test_item_name": "未关联项目的试剂 / 校准品",
-            "items": [_item_dto(r, stock_map) for r in orphan_items],
+            "test_item_aliases": "", "items": [_item_dto(r, stock_map) for r in orphan_items],
         }
     by_project = list(proj_map.values())
 
-    # ── 按仪器家族 ──
+    # ── 按仪器家族（仅在用仪器 + 非流水线 + 在用耗材）──
     ir_rows = (
         db.query(InstrumentReagent, Instrument, ReagentItem)
         .join(Instrument, Instrument.id == InstrumentReagent.instrument_id)
         .join(ReagentItem, ReagentItem.id == InstrumentReagent.reagent_item_id)
-        .filter(InstrumentReagent.role == "耗材", ReagentItem.library == library)
+        .filter(
+            InstrumentReagent.role == "耗材",
+            ReagentItem.library == library,
+            ReagentItem.is_active == True,
+            Instrument.status != "停用",
+        )
         .all()
     )
+    # 过滤掉流水线类仪器
+    ir_rows = [
+        (ir, ins, ri) for ir, ins, ri in ir_rows
+        if not any(kw in (ins.name or "") for kw in _NO_CONSUMABLE_INSTRUMENT_KEYWORDS)
+    ]
     fam_members = db.query(InstrumentFamilyMember).all()
     fam_by_inst = {m.instrument_id: m.family_id for m in fam_members}
     fam_names = {f.id: f.name for f in db.query(InstrumentFamily).all()}
@@ -270,14 +295,19 @@ def build_reagent_template(db: Session, library: str) -> dict:
         gkey_s = str(gkey)
         if gkey_s not in fam_map:
             fam_map[gkey_s] = {"group": gname, "instruments": [], "items": []}
-        if ins.name and ins.name not in fam_map[gkey_s]["instruments"]:
-            fam_map[gkey_s]["instruments"].append(ins.name)
+        # 显示格式：名称(model)
+        ins_label = ins.name
+        if ins.model:
+            ins_label = f"{ins.name}({ins.model})"
+        if ins_label and ins_label not in fam_map[gkey_s]["instruments"]:
+            fam_map[gkey_s]["instruments"].append(ins_label)
         if not any(it["item_id"] == ri.id for it in fam_map[gkey_s]["items"]):
             fam_map[gkey_s]["items"].append(_item_dto(ri, stock_map))
-    # 未关联仪器的耗材
+    # 未关联仪器的耗材（仅在用）
     cons_orphans = (
         db.query(ReagentItem)
-        .filter(ReagentItem.type == "耗材", ReagentItem.library == library)
+        .filter(ReagentItem.type == "耗材", ReagentItem.library == library,
+                ReagentItem.is_active == True)
         .order_by(ReagentItem.name).all()
     )
     cons_orphan_items = [r for r in cons_orphans if r.id not in linked_consumable_ids]
@@ -288,11 +318,13 @@ def build_reagent_template(db: Session, library: str) -> dict:
         }
     by_instrument = list(fam_map.values())
 
-    # ── 质控品（单独）──
+    # ── 质控品（单独，仅在用）──
     controls = [
         _item_dto(r, stock_map) for r in
-        db.query(ReagentItem).filter(ReagentItem.type == "质控品", ReagentItem.library == library)
-        .order_by(ReagentItem.name).all()
+        db.query(ReagentItem).filter(
+            ReagentItem.type == "质控品", ReagentItem.library == library,
+            ReagentItem.is_active == True,
+        ).order_by(ReagentItem.name).all()
     ]
 
     return {"by_project": by_project, "by_instrument": by_instrument, "controls": controls}
