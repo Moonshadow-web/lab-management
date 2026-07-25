@@ -111,13 +111,13 @@
                 </el-select>
               </el-form-item>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="8" v-if="batchTypeSpacing">
               <el-form-item label="每 N 天">
                 <el-input-number v-model="batchForm.everyN" :min="1" :max="31" />
                 <span class="hint">（发热门诊填 4）</span>
               </el-form-item>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="8" v-if="batchTypeSpacing">
               <el-form-item label="限星期">
                 <el-select v-model="batchForm.weekdays" multiple collapse-tags placeholder="不限" style="width: 100%">
                   <el-option v-for="w in WEEKDAY_OPTS" :key="w.value" :label="w.label" :value="w.value" />
@@ -292,22 +292,26 @@ const todayStr = localDate(new Date())
 
 const STATUS_CLASS = {
   '病假': 'c-sick', '质控': 'c-qc', '开会': 'c-meeting', '休息': 'c-rest',
-  '行政': 'c-admin', '教学': 'c-teach',
+  '行政': 'c-admin', '教学': 'c-teach', '早班': 'c-early', '连班': 'c-cont',
 }
 const LEGEND = [
   { k: 'rest', t: '休息', c: 'c-rest' }, { k: 'sick', t: '病假', c: 'c-sick' },
   { k: 'meeting', t: '开会', c: 'c-meeting' }, { k: 'admin', t: '行政', c: 'c-admin' },
   { k: 'qc', t: '质控', c: 'c-qc' }, { k: 'teach', t: '教学', c: 'c-teach' },
+  { k: 'early', t: '早班', c: 'c-early' }, { k: 'cont', t: '连班', c: 'c-cont' },
 ]
 const BATCH_TYPES = [
   { label: '夜班（生化）', value: 'night_bio', post_name: '生化夜班' },
   { label: '夜班（发热）', value: 'night_fever', post_name: '发热夜班' },
+  { label: '发热门诊白班', value: 'fever_day', post_name: '发热白班', spacing: true },
   { label: '休息', value: '休息' },
   { label: '病假', value: '病假' },
   { label: '开会', value: '开会' },
   { label: '行政', value: '行政' },
   { label: '质控', value: '质控' },
   { label: '教学', value: '教学' },
+  { label: '早班', value: '早班' },
+  { label: '连班', value: '连班' },
 ]
 
 function parsePeople(text) {
@@ -637,6 +641,11 @@ async function removeStatusPerson(id) {
 // ---------------- 批量录入 ----------------
 const batchSaving = ref(false)
 const batchForm = reactive({ type: '休息', everyN: 1, weekdays: [], start: '', end: '', people: '', note: '' })
+// 「每 N 天 / 限星期」字段仅对发热门诊白班（spacing）类型有意义，避免用户困惑
+const batchTypeSpacing = computed(() => {
+  const t = BATCH_TYPES.find((x) => x.value === batchForm.type)
+  return !!(t && t.spacing)
+})
 async function submitBatch() {
   if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
   const people = parsePeople(batchForm.people)

@@ -132,7 +132,8 @@ def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
     - 发热白班（is_fever_day）：若计划设了 fever_day_person，则该人每 4 个工作日上一班（当月固定一人），
       且其仍参与普通白班轮转；未设则该岗按普通白班轮转。
     - 既有「非在岗」记录（休息/病假/开会/行政/质控）受保护、不被覆盖，且占用该人当天名额。
-    - 每天白班人员中挑早班/连班各一名，尽量不同人，每人连续最多 2 天。
+    - 早班/连班作为独立无岗位状态行生成：每人连上 2 天早班 → 退下连上 2 天连班，流水线轮转；
+      当天早班与连班必为不同人；自动排除当天休息/病假/开会/行政/质控/夜班/发热的人。
     """
     posts = db.query(SchedulingPost).order_by(SchedulingPost.order).all()
     if not posts:
@@ -165,9 +166,8 @@ def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
 
     assignments: list[SchedulingAssignment] = []
     post_cursor: dict[int, int] = {p.id: 0 for p in posts}
-    early_state = {"person": None, "streak": 0}
-    cont_state = {"person": None, "streak": 0}
     fever_day_idx = 0
+    fever_busy_by_date: dict[str, str] = {}  # 发热白班当天该人需排除出早班/连班
 
     for cur in _daterange(start, end):
         weekday = cur.weekday()
@@ -190,6 +190,7 @@ def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
                             post_id=fp.id, person=person, status=ASSIGN_STATUS_ONDUTY))
                         assigned_today.add(person)
                         day_people.append(person)
+                        fever_busy_by_date[date_str] = person
                 fever_day_idx += 1
 
         # 普通白班岗（含周三质谱、周四电泳等）
@@ -213,36 +214,64 @@ def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
             assigned_today.add(person)
             day_people.append(person)
 
-        # 早班 / 连班：在当天白班人员中挑，尽量不是同一人，每人连续最多 2 天
-        if day_people:
-            if early_state["person"] in day_people and early_state["streak"] < 2:
-                early_state["streak"] += 1
-            else:
-                cands = [x for x in day_people if x != cont_state["person"]]
-                early_state["person"] = cands[0] if cands else day_people[0]
-                early_state["streak"] = 1
-            if cont_state["person"] in day_people and cont_state["streak"] < 2:
-                cont_state["streak"] += 1
-            else:
-                cands = [x for x in day_people if x != early_state["person"]]
-                cont_state["person"] = cands[0] if cands else day_people[0]
-                cont_state["streak"] = 1
-            for a in assignments:
-                if a.date == date_str and a.person == early_state["person"]:
-                    a.is_early = True
-                if a.date == date_str and a.person == cont_state["person"]:
-                    a.is_continuous = True
+    # 早班 / 连班：作为独立的无岗位状态行生成（对齐用户 Excel 版式）。
+    # 流水线规则：每人连上 2 天早班 → 退下连上 2 天连班；下一人在其 早班 期间顶上。
+    # 故 early_seq[i]=roster[(i//2)%n]，连班=早班序列整体后移 2 天（当天早班与连班必不同人）。
+    # 自动排除当天休息/病假/开会/行政/质控/夜班/发热的人。
+    if people_pool and len(people_pool) >= 2:
+        roster = list(people_pool)
+        workdays = [cur for cur in _daterange(start, end) if cur.weekday() < 5]
+        early_seq = [roster[(i // 2) % len(roster)] for i in range(len(workdays))]
+        cont_seq = [roster[((i - 2) // 2) % len(roster)] for i in range(len(workdays))]
+        early_assigns: list[SchedulingAssignment] = []
+        for i, cur in enumerate(workdays):
+            date_str = cur.strftime("%Y-%m-%d")
+            busy = occupied.get(date_str, set())
+            if date_str in fever_busy_by_date:  # 发热白班当天该人排除出早班/连班
+                busy = busy | {fever_busy_by_date[date_str]}
+            e = early_seq[i]
+            c = cont_seq[i]
+            # 早班人当天不在岗则顺延到下一位
+            if e in busy:
+                for k in range(1, len(roster)):
+                    cand = roster[(i // 2 + k) % len(roster)]
+                    if cand not in busy:
+                        e = cand
+                        break
+            # 连班人当天不在岗，或和早班撞同一个人，则顺延到下一位（保证不同人）
+            if c in busy or c == e:
+                for k in range(1, len(roster)):
+                    cand = roster[((i - 2) // 2 + k) % len(roster)]
+                    if cand not in busy and cand != e:
+                        c = cand
+                        break
+            if e and e not in busy:
+                early_assigns.append(SchedulingAssignment(
+                    plan_id=plan.id, date=date_str, weekday=cur.weekday(), is_workday=True,
+                    post_id=None, person=e, status=ASSIGN_STATUS_EARLY))
+            if c and c not in busy and c != e:
+                early_assigns.append(SchedulingAssignment(
+                    plan_id=plan.id, date=date_str, weekday=cur.weekday(), is_workday=True,
+                    post_id=None, person=c, status=ASSIGN_STATUS_CONTINUOUS))
 
-    # 先删范围内所有「在岗」自动记录（保留非在岗的手动记录），再写入新生成
+    # 先删范围内「在岗」自动记录，以及旧的早班/连班状态行（保留手动录入的休息/病假/质控等），再写入新生成
     db.query(SchedulingAssignment).filter(
         SchedulingAssignment.plan_id == plan.id,
         SchedulingAssignment.date >= start,
         SchedulingAssignment.date <= end,
         SchedulingAssignment.status == ASSIGN_STATUS_ONDUTY,
     ).delete(synchronize_session=False)
+    db.query(SchedulingAssignment).filter(
+        SchedulingAssignment.plan_id == plan.id,
+        SchedulingAssignment.date >= start,
+        SchedulingAssignment.date <= end,
+        SchedulingAssignment.status.in_([ASSIGN_STATUS_EARLY, ASSIGN_STATUS_CONTINUOUS]),
+    ).delete(synchronize_session=False)
     db.add_all(assignments)
+    if people_pool and len(people_pool) >= 2:
+        db.add_all(early_assigns)
     db.commit()
-    return len(assignments)
+    return len(assignments) + (len(early_assigns) if (people_pool and len(people_pool) >= 2) else 0)
 
 
 @router.post("/generate")
