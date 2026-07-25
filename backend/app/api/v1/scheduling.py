@@ -371,16 +371,18 @@ def batch_set(req: SchedulingBatchRequest, db: Session = Depends(get_db),
               user: User = Depends(require_roles(*WRITE_ROLES))):
     """批量录入一批非白班约束（夜班、发热门诊、休息、病假……）。按 items 逐条 upsert，返回写入条数。
 
-    prune=True 时，把 prune_keys 列出的 (date, status) 对裁剪为本次提交的 persons：
-    删除该 (date, status) 下、不在提交人员集合中的无岗位记录（实现「取消勾选即移除」）。
-    仅对 post_id 为空的状态记录生效，不影响夜班/发热等绑定岗位的录入。
+    prune=True 时：
+    - prune_keys（[date, status]）把无岗位状态记录裁剪为提交人员集合（取消勾选即移除）。
+    - prune_post_keys（[date, str(post_id)]）把绑定岗位的录入（夜班/发热白班）裁剪为提交人员集合。
+    两者配合实现「矩阵整体保存」：单元格取消勾选即移除对应记录。
     """
     plan = db.get(SchedulingPlan, req.plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="排班计划不存在")
     upserted = 0
-    # 提交人员按 (date, status) 归组，供 prune 比对
+    # 提交人员按 (date, status) / (date, post_id) 归组，供 prune 比对
     submitted: dict[tuple, set] = {}
+    submitted_posts: dict[tuple, set] = {}
     for it in req.items:
         if it.status not in ASSIGN_STATUS_ALL or not it.person:
             continue
@@ -414,6 +416,8 @@ def batch_set(req: SchedulingBatchRequest, db: Session = Depends(get_db),
         upserted += 1
         if it.post_id is None:
             submitted.setdefault((it.date, it.status), set()).add(it.person)
+        else:
+            submitted_posts.setdefault((it.date, it.post_id), set()).add(it.person)
     # prune：把 prune_keys 中列出的 (date, status) 裁剪为提交人员集合
     if req.prune:
         for key in req.prune_keys:
@@ -429,6 +433,27 @@ def batch_set(req: SchedulingBatchRequest, db: Session = Depends(get_db),
                         SchedulingAssignment.date == date_s,
                         SchedulingAssignment.status == status_s,
                         SchedulingAssignment.post_id.is_(None))
+            )
+            if keep:
+                q = q.filter(SchedulingAssignment.person.notin_(keep))
+            q.delete(synchronize_session=False)
+    # prune：岗位行(夜班/发热白班) 裁剪为提交人员集合
+    if req.prune:
+        for key in req.prune_post_keys:
+            if len(key) != 2:
+                continue
+            date_s, pid_s = key[0], key[1]
+            try:
+                pid = int(pid_s)
+            except (ValueError, TypeError):
+                continue
+            keep = submitted_posts.get((date_s, pid), set())
+            q = (
+                db.query(SchedulingAssignment)
+                .filter(SchedulingAssignment.plan_id == req.plan_id,
+                        SchedulingAssignment.date == date_s,
+                        SchedulingAssignment.post_id == pid,
+                        SchedulingAssignment.status == ASSIGN_STATUS_ONDUTY)
             )
             if keep:
                 q = q.filter(SchedulingAssignment.person.notin_(keep))

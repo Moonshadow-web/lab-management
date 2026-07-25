@@ -105,17 +105,17 @@
         <!-- 状态矩阵录入：日期×状态，单元格多选人员 -->
         <div class="bm-block">
           <div class="bm-toolbar">
-            <span class="bm-title">状态行矩阵录入</span>
+            <span class="bm-title">排班矩阵录入</span>
             <el-date-picker v-model="matrixMonth" type="month" value-format="YYYY-MM" placeholder="选择月份" style="width: 160px" @change="loadMatrix" />
             <el-button :loading="matrixLoading" @click="loadMatrix">加载矩阵</el-button>
             <el-button type="primary" :loading="matrixSaving" @click="saveMatrix">保存矩阵</el-button>
-            <span class="tip-text">每行=一种状态，每列=一天；单元格下拉多选人员（可多人）；保存时按矩阵整体覆盖该月状态行，取消勾选即移除</span>
+            <span class="tip-text">每行=一种排班项（休息/病假/开会/行政/质控/教学/夜班/发热白班），每列=一天；单元格下拉多选人员（一人占一行显示，可多人）；保存时按矩阵整体覆盖该月，取消勾选即移除</span>
           </div>
           <div v-if="matrixDates.length" class="bm-wrap">
             <table class="bm-table">
               <thead>
                 <tr>
-                  <th class="bm-corner">状态 \ 日期</th>
+                  <th class="bm-corner">排班 \ 日期</th>
                   <th v-for="d in matrixDates" :key="d" :class="{ weekend: isWeekend(d) }">
                     <div class="bm-date">{{ d.slice(8) }}</div>
                     <div class="bm-wd">{{ WEEKDAY_TEXT[(new Date(d + 'T00:00:00').getDay() + 6) % 7] }}</div>
@@ -123,12 +123,12 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="st in MATRIX_STATUSES" :key="st">
-                  <th :class="['bm-rowhead', STATUS_CLASS[st]]">{{ st }}</th>
+                <tr v-for="r in MATRIX_ROWS" :key="r.key" :class="{ 'bm-row-tall': r.tall }">
+                  <th :class="['bm-rowhead', STATUS_CLASS[r.key] || '']">{{ r.label }}</th>
                   <td v-for="d in matrixDates" :key="d" :class="{ weekend: isWeekend(d) }">
                     <el-select
-                      v-model="matrix[st][d]"
-                      multiple collapse-tags collapse-tags-tooltip
+                      v-model="matrix[r.key][d]"
+                      multiple
                       size="small" placeholder="" class="bm-select"
                       :disabled="!matrixLoaded"
                     >
@@ -688,8 +688,20 @@ const batchTypeSpacing = computed(() => {
   return !!(t && t.spacing)
 })
 
-// 状态矩阵批量录入：日期×状态，单元格多选人员
-const MATRIX_STATUSES = ['休息', '病假', '开会', '行政', '质控', '教学']
+// 排班矩阵批量录入：日期×排班项，单元格多选人员
+// kind=status：无岗位状态行（休息/病假/开会/行政/质控/教学）
+// kind=post：绑定岗位行（夜班/发热白班），key=岗位名，与种子岗位一致
+const MATRIX_ROWS = [
+  { key: '休息', label: '休息', kind: 'status', tall: true },
+  { key: '病假', label: '病假', kind: 'status' },
+  { key: '开会', label: '开会', kind: 'status' },
+  { key: '行政', label: '行政', kind: 'status' },
+  { key: '质控', label: '质控', kind: 'status' },
+  { key: '教学', label: '教学', kind: 'status' },
+  { key: '生化夜班', label: '夜班(生化)', kind: 'post' },
+  { key: '发热夜班', label: '夜班(发热)', kind: 'post' },
+  { key: '发热白班', label: '发热白班', kind: 'post', fever: true },
+]
 const matrixMonth = ref('')
 const matrixDates = ref([])
 const matrix = reactive({})
@@ -703,6 +715,11 @@ function _monthDates(y, m) {
   for (let day = 1; day <= n; day++) out.push(`${y}-${pad(m)}-${pad(day)}`)
   return out
 }
+function _postNameToId() {
+  const map = {}
+  for (const p of (postsAll.value || [])) map[p.name] = p.id
+  return map
+}
 async function loadMatrix() {
   if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
   if (!matrixMonth.value) { ElMessage.warning('请选择月份'); return }
@@ -713,19 +730,27 @@ async function loadMatrix() {
     const end = lastDayOfMonth(y, m)
     const dates = _monthDates(y, m)
     matrixDates.value = dates
-    for (const st of MATRIX_STATUSES) {
-      matrix[st] = matrix[st] || {}
-      for (const d of dates) matrix[st][d] = matrix[st][d] || []
+    for (const r of MATRIX_ROWS) {
+      matrix[r.key] = matrix[r.key] || {}
+      for (const d of dates) matrix[r.key][d] = matrix[r.key][d] || []
     }
     const res = await getSchedulingGrid({ plan_id: selPlan.value, start, end })
-    for (const row of (res.rows || [])) {
-      if (row.kind !== 'status') continue
-      const st = row.key
-      if (!MATRIX_STATUSES.includes(st)) continue
-      const cell = (res.cells || {})[`status:${st}`] || {}
-      for (const d of dates) {
-        const persons = (cell[d] && cell[d].persons) || []
-        matrix[st][d] = persons.map((p) => p.person)
+    const postMap = _postNameToId()
+    for (const r of MATRIX_ROWS) {
+      if (r.kind === 'status') {
+        const cell = (res.cells || {})[`status:${r.key}`] || {}
+        for (const d of dates) {
+          const persons = (cell[d] && cell[d].persons) || []
+          matrix[r.key][d] = persons.map((p) => p.person)
+        }
+      } else {
+        const pid = postMap[r.key]
+        if (!pid) continue
+        const cell = (res.cells || {})[`post:${pid}`] || {}
+        for (const d of dates) {
+          const c = cell[d]
+          matrix[r.key][d] = c && c.person ? [c.person] : []
+        }
       }
     }
     matrixLoaded.value = true
@@ -738,16 +763,24 @@ async function saveMatrix() {
   matrixSaving.value = true
   try {
     const items = []
-    const prune_keys = []
-    for (const st of MATRIX_STATUSES) {
+    const prune_keys = []        // 状态行 [date, status]
+    const prune_post_keys = []   // 岗位行 [date, post_id]
+    const postMap = _postNameToId()
+    for (const r of MATRIX_ROWS) {
       for (const d of matrixDates.value) {
-        prune_keys.push([d, st])
-        for (const person of (matrix[st][d] || [])) {
-          if (person) items.push({ person, date: d, post_id: null, status: st, note: '' })
+        const people = (matrix[r.key][d] || []).filter(Boolean)
+        if (r.kind === 'status') {
+          prune_keys.push([d, r.key])
+          for (const person of people) items.push({ person, date: d, post_id: null, status: r.key, note: '' })
+        } else {
+          const pid = postMap[r.key]
+          if (!pid) continue
+          prune_post_keys.push([d, String(pid)])
+          for (const person of people) items.push({ person, date: d, post_id: pid, status: '在岗', note: '' })
         }
       }
     }
-    const res = await batchSchedulingCells({ plan_id: selPlan.value, items, prune: true, prune_keys })
+    const res = await batchSchedulingCells({ plan_id: selPlan.value, items, prune: true, prune_keys, prune_post_keys })
     ElMessage.success(`已保存（写入 ${res.upserted} 条）`)
     loadGrid()
   } catch (e) { ElMessage.error('保存失败') }
@@ -875,5 +908,13 @@ async function loadConfigSummary() {
 .bm-date { font-weight: 600; font-size: 13px; }
 .bm-wd { font-size: 11px; color: #999; }
 .bm-select { width: 100%; }
-.bm-select :deep(.el-select__tags-text) { max-width: 60px; }
+/* 单元格顶部对齐，便于高行内多标签换行堆叠 */
+.bm-table td { vertical-align: top; padding-top: 6px; padding-bottom: 6px; }
+/* 休息等高行：约可容纳5名人名，一人占一行 */
+.bm-row-tall td { height: 124px; }
+.bm-row-tall .bm-select { min-height: 112px; }
+/* 多选标签完整显示姓名、自动换行，不截断 */
+.bm-select :deep(.el-select__tags) { flex-wrap: wrap; max-width: 100%; gap: 2px; align-items: flex-start; }
+.bm-select :deep(.el-select__tags-text) { max-width: none; }
+.bm-select :deep(.el-tag) { max-width: 100%; }
 </style>
