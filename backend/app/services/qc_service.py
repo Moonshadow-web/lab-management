@@ -624,6 +624,7 @@ def draft_report(instrument: str, year: int, month: int, summaries: list, daily_
             trend = any(r in ("10-x",) for r in p["rules"])
             shift = any(r in ("2-2s", "22s", "R-4s") for r in p["rules"])
             occ = any(r in ("1-3s",) for r in p["rules"])
+            warn = any(r in ("1-2s",) for r in p["rules"])
             tags = []
             if trend:
                 tags.append("趋势性改变(10-x)")
@@ -631,7 +632,11 @@ def draft_report(instrument: str, year: int, month: int, summaries: list, daily_
                 tags.append("漂移/偏移(2-2s/R-4s)")
             if occ:
                 tags.append("偶发失控(1-3s)")
-            drift_lines.append(f"{p['name']}({p['level']})：{'、'.join(tags)}")
+            if warn:
+                tags.append("偶发警告(1-2s)")
+            # tags 为空（理论上不会发生：rules 已非空则必含上述之一）则不输出空冒号行
+            if tags:
+                drift_lines.append(f"{p['name']}({p['level']})：{'、'.join(tags)}")
     drift_trend = ("；".join(drift_lines) + "。") if drift_lines else "各项目未见明显漂移或趋势性改变，质控稳定。"
 
     # 三、四：CV% 达标判定 —— 汇总式：只列不合格项，后接「其余项目均已达标」
