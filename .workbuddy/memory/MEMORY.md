@@ -21,6 +21,7 @@
 - 仪器 name 代号式归整(2026-07-23)：instruments.name=科室代号，model 原值；显示拼「名称（型号）」。
 - comparison：权威 WS/T 403—2024 字典 services/comparison_report.py，新TE查字典勿写死。
 - Westgard 月结 R-4s（2026-07-25 晚修订冻结）：相邻对先各自按本水平靶值归一化 z=(value-target_mean)/target_sd，再判 |z_前-z_后|>4 触发；**同一天两水平都失控(ooc)**，跨天相邻**只标后点(当天)失控**、前点不标任何 R-4s 标记（**警告仅由 1-2s 产生**，R-4s 不再产生警告）。**已失控点冻结**：一旦判失控(1-3s/2-2s/R-4s/10-x)即只留存、不再参与后续任何规则——不作为 R-4s 相邻对参与点，也不计入 10-x 连续同侧（失控点打断 10-x 计数）。归一化消除高低浓度水平(如甲肝IgM)因原始浓度差导致的伪 R-4s。表面抗原 06-13 案例：水平1 用错质控品得 0.441(1-3s 真实失控)，冻结后同天的在控 3.6 不再被误判 R-4s。
+- **上传表格规则列覆盖后端 Westgard（2026-07-26，用户要求）**：若 LIS 导出含规则列（表头映射见 `_COLUMN_ALIASES.violate_rule`：失控规则/violateRule/westgard规则 等），该列**逐点覆盖**后端计算——同单元格多规则按严重度取最严重者（1-3S > 2-2S > R-4S > 10-x > 1-2S），**1-3S 覆盖 1-2S**（判失控、不标警告）；空单元格回落到后端 Westgard；带上传规则的点（失控或警告）**整体冻结、不参与跨水平 R-4s**。原始值落库 `qc_daily_values.uploaded_rule`（main._ensure_missing_columns 自动 ADD COLUMN），`_recalc` 亦据此覆盖。**旧数据需重新上传**才会带上传规则（此前版本不读该列）。上传响应含 `rule_column_matched` 标志是否识别到规则列。
 - 文档预览：xlsx exceljs / docx mammoth / pdf 直。
 
 ## 排班(scheduling)模块（第三轮重构 2026-07-24）
