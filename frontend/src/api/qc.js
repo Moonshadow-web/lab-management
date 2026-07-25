@@ -18,12 +18,20 @@ export function deleteQC(id) {
 export function listQCSummaries(params) {
   return request.get('/api/v1/qc-summaries', { params })
 }
-export function uploadQCSummary(file, instrumentId) {
+export function uploadQCSummary(file, instrumentId, onProgress) {
   const form = new FormData()
   form.append('file', file)
   if (instrumentId) form.append('instrument_id', instrumentId)
   return request.post('/api/v1/qc-summaries/upload', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    // onProgress(pct:number) —— 仅在浏览器能拿到 content-length 时回调百分比，
+    // 否则 pct 持续为 0（由调用方降级为「上传中…」文案）
+    onUploadProgress: onProgress
+      ? (e) => {
+          const pct = e.total ? Math.round((e.loaded / e.total) * 100) : 0
+          onProgress(pct)
+        }
+      : undefined,
   })
 }
 export function getQCDaily(id) {

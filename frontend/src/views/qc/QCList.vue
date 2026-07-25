@@ -32,8 +32,22 @@
               :value="opt.id"
             />
           </el-select>
-          <el-button v-if="auth.canWrite('qc')" type="primary" @click="triggerCsv">上传该仪器 LIS 数据(CSV/XLSX)</el-button>
+          <el-button v-if="auth.canWrite('qc')" type="primary" :loading="uploading" @click="triggerCsv">上传该仪器 LIS 数据(CSV/XLSX)</el-button>
           <input ref="csvInput" type="file" accept=".csv,.xlsx,.xls" hidden @change="onCsvChange" />
+          <div v-if="uploading" class="upload-progress">
+            <el-progress
+              :percentage="uploadPercent"
+              :stroke-width="16"
+              :text-inside="true"
+              :status="uploadStage === 'parsing' ? '' : undefined"
+            />
+            <span class="upload-stage-text">
+              <template v-if="uploadStage === 'parsing'">服务端解析中，请稍候…</template>
+              <template v-else-if="uploadPercent >= 100">上传完成，等待服务端处理…</template>
+              <template v-else-if="uploadPercent > 0">上传中 {{ uploadPercent }}%</template>
+              <template v-else>上传中…（进度未知）</template>
+            </span>
+          </div>
           <span class="hint">
             月结按所选仪器分块；上传前先在下拉中选好受控仪器（绑定仪器台账），系统按每日测值跑 Westgard 判失控并自动草拟文字小结。
           </span>
@@ -700,6 +714,9 @@ const monthValue = ref('')
 const summaryRows = ref([])
 const loadingSummary = ref(false)
 const uploadInstrumentId = ref(null)   // 月结筛选 + 上传 时选定的受控仪器
+const uploading = ref(false)            // LIS 上传进行中（控制进度条显隐 + 按钮 loading）
+const uploadPercent = ref(0)            // 上传百分比 0-100（file 字节上传进度）
+const uploadStage = ref('uploading')    // 'uploading' | 'parsing'(字节传完，等服务端解析)
 const csvInput = ref(null)
 const reportMap = reactive({})         // blockKey -> 文字报告对象
 
@@ -1196,8 +1213,14 @@ async function onCsvChange(e) {
     e.target.value = ''
     return
   }
+  uploading.value = true
+  uploadPercent.value = 0
+  uploadStage.value = 'uploading'
   try {
-    const res = await uploadQCSummary(file, uploadInstrumentId.value)
+    const res = await uploadQCSummary(file, uploadInstrumentId.value, (pct) => {
+      uploadPercent.value = pct
+      if (pct >= 100) uploadStage.value = 'parsing'
+    })
     ElMessage.success(`上传成功：新增 ${res.created} 条，更新 ${res.updated} 条`)
     if (res.items && res.items.length) {
       const it = res.items[0]
@@ -1208,6 +1231,9 @@ async function onCsvChange(e) {
   } catch (err) {
     ElMessage.error('上传失败：' + (err.response?.data?.detail || err.message))
   } finally {
+    uploading.value = false
+    uploadPercent.value = 0
+    uploadStage.value = 'uploading'
     e.target.value = ''
   }
 }
