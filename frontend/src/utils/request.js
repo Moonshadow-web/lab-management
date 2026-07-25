@@ -3,7 +3,8 @@ import axios from 'axios'
 const API_BASE = '/'
 const request = axios.create({
   baseURL: API_BASE,
-  timeout: 15000,
+  // 大文件(仪器LIS/质控 Excel)上传+服务端解析耗时较长，放宽至 120s
+  timeout: 120000,
 })
 
 // 刷新锁 + 并发请求队列：多个请求同时 401 时只发一次 refresh
@@ -76,7 +77,8 @@ request.interceptors.response.use(
         const resp = await axios.post(
           API_BASE + 'api/v1/auth/refresh',
           { refresh_token: refreshToken },
-          { baseURL: API_BASE, timeout: 15000 }
+          // 续期接口本身很快，但放宽到 30s 以免弱网/服务端抖动误断
+          { baseURL: API_BASE, timeout: 30000 }
         )
         const data = resp.data
         const newAccess = data.access_token
