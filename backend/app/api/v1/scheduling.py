@@ -294,7 +294,7 @@ def set_cell(req: SchedulingCellRequest, db: Session = Depends(get_db),
              user: User = Depends(require_roles(*WRITE_ROLES))):
     """手动录入/修改单个单元格（upsert）。
     - 在岗：必须指定岗位(post_id)，按 (plan_id,date,post_id) 唯一。
-    - 休息/病假/开会/行政/质控/教学/采血/卫生部门上：post_id 可空，按 (plan_id,date,person,post_id IS NULL) 唯一（一人一天一条无岗位记录）。
+    - 休息/病假/开会/行政/质控/教学：post_id 可空，按 (plan_id,date,person,post_id IS NULL) 唯一（一人一天一条无岗位记录）。
     用于夜班、发热门诊、休息等提前录入。
     """
     if req.status not in ASSIGN_STATUS_ALL:

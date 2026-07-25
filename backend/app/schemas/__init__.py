@@ -654,7 +654,7 @@ class SchedulingAssignmentBase(BaseModel):
     is_workday: bool = True
     post_id: int | None = None
     person: str = ""
-    status: str = "在岗"        # 在岗 / 休息 / 病假 / 开会 / 行政 / 质控 / 教学 / 采血 / 卫生部门上
+    status: str = "在岗"        # 在岗 / 休息 / 病假 / 开会 / 行政 / 质控 / 教学
     is_early: bool = False
     is_continuous: bool = False
     note: str = ""

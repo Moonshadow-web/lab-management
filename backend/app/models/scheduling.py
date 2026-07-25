@@ -7,7 +7,7 @@
   preferred_people 为该岗的固定/优先人员（按优先级递减）；is_fever_day 标记发热白班（每月固定一人、每4天一班）。
 - SchedulingPlan：排班计划（一个命名周期，含起止日期）；fever_day_person 为该计划发热白班的固定人员。
 - SchedulingAssignment：每日每岗的具体分配（谁上、状态、是否早班/连班）。
-  post_id 对「在岗」白班/夜班岗必填；对「休息/病假/开会/行政/质控/教学/采血/卫生部门上」等
+  post_id 对「在岗」白班/夜班岗必填；对「休息/病假/开会/行政/质控/教学」等
   与岗位平行的非在岗状态可空（一人一天可有多条无岗位记录，如同时休息、开会）。
 - SchedulingConfig：排班全局配置（单行 id=1）：排除人员、生成窗口天数等。
 
@@ -29,7 +29,7 @@ POST_GROUP_SPECIAL = "special"
 # 每日分配状态。
 # 在岗=正常上班（自动生成 / 手动录入，必须绑定岗位）；其余均为「与岗位平行的非在岗状态」，
 # 表示某人当天以该状态占用（不参与白班自动轮转、记录受保护不被覆盖），可无岗位（post_id 为空）。
-# 状态类别（无岗位，按人聚合到月视图的「状态行」）：休息 / 病假 / 开会 / 行政 / 质控 / 教学 / 采血 / 卫生部门上。
+# 状态类别（无岗位，按人聚合到月视图的「状态行」）：休息 / 病假 / 开会 / 行政 / 质控 / 教学。
 ASSIGN_STATUS_ONDUTY = "在岗"
 ASSIGN_STATUS_REST = "休息"
 ASSIGN_STATUS_QC = "质控"
@@ -37,14 +37,11 @@ ASSIGN_STATUS_MEETING = "开会"
 ASSIGN_STATUS_SICK = "病假"
 ASSIGN_STATUS_ADMIN = "行政"
 ASSIGN_STATUS_TEACH = "教学"
-ASSIGN_STATUS_BLOOD = "采血"
-ASSIGN_STATUS_HYGIENE = "卫生部门上"
 
-# 与岗位平行、无岗位的状态（月视图单独成行；对齐用户 Excel 含 教学/采血/卫生部门上 等）。
+# 与岗位平行、无岗位的状态（月视图单独成行；对齐用户 Excel 含 教学 等）。
 STATUS_CATEGORIES = [
     ASSIGN_STATUS_REST, ASSIGN_STATUS_SICK, ASSIGN_STATUS_MEETING,
     ASSIGN_STATUS_ADMIN, ASSIGN_STATUS_QC, ASSIGN_STATUS_TEACH,
-    ASSIGN_STATUS_BLOOD, ASSIGN_STATUS_HYGIENE,
 ]
 
 ASSIGN_STATUS_ALL = [ASSIGN_STATUS_ONDUTY, *STATUS_CATEGORIES]

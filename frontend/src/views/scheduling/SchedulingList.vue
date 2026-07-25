@@ -292,13 +292,12 @@ const todayStr = localDate(new Date())
 
 const STATUS_CLASS = {
   '病假': 'c-sick', '质控': 'c-qc', '开会': 'c-meeting', '休息': 'c-rest',
-  '行政': 'c-admin', '教学': 'c-teach', '采血': 'c-blood', '卫生部门上': 'c-hygiene',
+  '行政': 'c-admin', '教学': 'c-teach',
 }
 const LEGEND = [
   { k: 'rest', t: '休息', c: 'c-rest' }, { k: 'sick', t: '病假', c: 'c-sick' },
   { k: 'meeting', t: '开会', c: 'c-meeting' }, { k: 'admin', t: '行政', c: 'c-admin' },
   { k: 'qc', t: '质控', c: 'c-qc' }, { k: 'teach', t: '教学', c: 'c-teach' },
-  { k: 'blood', t: '采血', c: 'c-blood' }, { k: 'hygiene', t: '卫生部门上', c: 'c-hygiene' },
 ]
 const BATCH_TYPES = [
   { label: '夜班（生化）', value: 'night_bio', post_name: '生化夜班' },
@@ -309,8 +308,6 @@ const BATCH_TYPES = [
   { label: '行政', value: '行政' },
   { label: '质控', value: '质控' },
   { label: '教学', value: '教学' },
-  { label: '采血', value: '采血' },
-  { label: '卫生部门上', value: '卫生部门上' },
 ]
 
 function parsePeople(text) {
@@ -732,8 +729,6 @@ async function loadConfigSummary() {
 .c-rest { background: #eef3fb; }
 .c-admin { background: #f3ecfb; }
 .c-teach { background: #eafaf0; }
-.c-blood { background: #fdeef5; }
-.c-hygiene { background: #eef7f8; }
 .batch-form { margin-top: 8px; max-width: 920px; }
 .hint { font-size: 12px; color: #999; margin-left: 6px; }
 .tip-text { font-size: 12px; color: #999; margin-left: 10px; }
