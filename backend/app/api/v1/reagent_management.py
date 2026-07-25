@@ -22,6 +22,7 @@ from ...models.reagent_management import (
 )
 from ...models.test_item import TestItem
 from ...models.instrument import Instrument
+from ...models.instrument_family import InstrumentFamily, InstrumentFamilyMember
 from ...models.user import User
 from ...schemas.reagent_management import (
     ReagentItemCreate, ReagentItemUpdate, ReagentItemRead,
@@ -127,6 +128,7 @@ def delete_reagent_item(
 def list_stock(
     q: str = Query("", description="搜索试剂名称/品牌"),
     type: Optional[str] = Query(None),
+    library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
     low_stock_only: bool = Query(False, description="只显示低于最低库存预警的"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -143,6 +145,9 @@ def list_stock(
     if type:
         item_ids2 = [r[0] for r in db.query(ReagentItem.id).filter(ReagentItem.type == type).all()]
         base = base.filter(ReagentStock.item_id.in_(item_ids2))
+    if library:
+        item_ids3 = [r[0] for r in db.query(ReagentItem.id).filter(ReagentItem.library == library).all()]
+        base = base.filter(ReagentStock.item_id.in_(item_ids3))
     if low_stock_only:
         # 仅显示低于最低库存预警的：join 试剂目录，按 min_stock>0 且 数量<min_stock 过滤
         base = base.join(ReagentItem, ReagentItem.id == ReagentStock.item_id).filter(
@@ -161,13 +166,17 @@ def list_stock(
 
 @router.get("/inventory-checks", response_model=dict)
 def list_inventory_checks(
+    library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    total = db.query(InventoryCheck).count()
-    rows = db.query(InventoryCheck).order_by(InventoryCheck.check_date.desc()).offset(
+    base = db.query(InventoryCheck)
+    if library:
+        base = base.filter(InventoryCheck.library == library)
+    total = base.count()
+    rows = base.order_by(InventoryCheck.check_date.desc()).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size,
@@ -182,12 +191,134 @@ def get_inventory_check(check_id: int, db: Session = Depends(get_db), _=Depends(
     return check
 
 
+def _item_dto(ri: ReagentItem, stock_map: dict) -> dict:
+    return {
+        "item_id": ri.id, "name": ri.name, "spec": ri.spec, "type": ri.type,
+        "unit": ri.unit, "material_code": ri.material_code,
+        "current_stock": int(stock_map.get(ri.id, 0)), "library": ri.library,
+    }
+
+
+def build_reagent_template(db: Session, library: str) -> dict:
+    """构建盘库/订购录入模板，按「项目 / 仪器家族 / 质控品」分组。
+
+    - by_project：通过 项目↔试剂 关联(role=试剂/校准品) 归组，_library 过滤；
+      额外补充「未关联项目的试剂/校准品」。
+    - by_instrument：通过 仪器↔耗材 关联(role=耗材) 归组，按仪器家族(总型号)合并
+      （如 AU生化仪 多台共用耗材只列一次），未入族的按单台仪器归组；
+      额外补充「未关联仪器的耗材」。
+    - controls：type=质控品 且 library 匹配（单独列出，不与项目/耗材重复）。
+    每个物品带 current_stock（实时库存合计）。
+    """
+    stock_map = {}
+    for iid, qty in db.query(
+        ReagentStock.item_id, func.coalesce(func.sum(ReagentStock.quantity), 0)
+    ).group_by(ReagentStock.item_id).all():
+        stock_map[iid] = qty
+
+    # ── 按项目 ──
+    tir_rows = (
+        db.query(TestItemReagent, TestItem, ReagentItem)
+        .join(TestItem, TestItem.id == TestItemReagent.test_item_id)
+        .join(ReagentItem, ReagentItem.id == TestItemReagent.reagent_item_id)
+        .filter(TestItemReagent.role.in_(["试剂", "校准品"]), ReagentItem.library == library)
+        .order_by(TestItem.name, ReagentItem.name)
+        .all()
+    )
+    proj_map = {}
+    linked_reagent_ids = set()
+    for tir, ti, ri in tir_rows:
+        linked_reagent_ids.add(ri.id)
+        key = ti.id
+        if key not in proj_map:
+            proj_map[key] = {"test_item_id": ti.id, "test_item_name": ti.name, "items": []}
+        proj_map[key]["items"].append(_item_dto(ri, stock_map))
+    # 未关联项目的试剂/校准品
+    orphans = (
+        db.query(ReagentItem)
+        .filter(ReagentItem.type.in_(["试剂", "校准品"]), ReagentItem.library == library)
+        .order_by(ReagentItem.name).all()
+    )
+    orphan_items = [r for r in orphans if r.id not in linked_reagent_ids]
+    if orphan_items:
+        proj_map["__orphan__"] = {
+            "test_item_id": None, "test_item_name": "未关联项目的试剂 / 校准品",
+            "items": [_item_dto(r, stock_map) for r in orphan_items],
+        }
+    by_project = list(proj_map.values())
+
+    # ── 按仪器家族 ──
+    ir_rows = (
+        db.query(InstrumentReagent, Instrument, ReagentItem)
+        .join(Instrument, Instrument.id == InstrumentReagent.instrument_id)
+        .join(ReagentItem, ReagentItem.id == InstrumentReagent.reagent_item_id)
+        .filter(InstrumentReagent.role == "耗材", ReagentItem.library == library)
+        .all()
+    )
+    fam_members = db.query(InstrumentFamilyMember).all()
+    fam_by_inst = {m.instrument_id: m.family_id for m in fam_members}
+    fam_names = {f.id: f.name for f in db.query(InstrumentFamily).all()}
+    fam_map = {}
+    linked_consumable_ids = set()
+    for ir, ins, ri in ir_rows:
+        linked_consumable_ids.add(ri.id)
+        fam_id = fam_by_inst.get(ins.id)
+        if fam_id:
+            gkey, gname = ("fam", fam_id), fam_names.get(fam_id, f"仪器组{fam_id}")
+        else:
+            gkey, gname = ("inst", ins.id), (ins.name or f"仪器{ins.id}")
+        gkey_s = str(gkey)
+        if gkey_s not in fam_map:
+            fam_map[gkey_s] = {"group": gname, "instruments": [], "items": []}
+        if ins.name and ins.name not in fam_map[gkey_s]["instruments"]:
+            fam_map[gkey_s]["instruments"].append(ins.name)
+        if not any(it["item_id"] == ri.id for it in fam_map[gkey_s]["items"]):
+            fam_map[gkey_s]["items"].append(_item_dto(ri, stock_map))
+    # 未关联仪器的耗材
+    cons_orphans = (
+        db.query(ReagentItem)
+        .filter(ReagentItem.type == "耗材", ReagentItem.library == library)
+        .order_by(ReagentItem.name).all()
+    )
+    cons_orphan_items = [r for r in cons_orphans if r.id not in linked_consumable_ids]
+    if cons_orphan_items:
+        fam_map["__cons_orphan__"] = {
+            "group": "未关联仪器的耗材", "instruments": [],
+            "items": [_item_dto(r, stock_map) for r in cons_orphan_items],
+        }
+    by_instrument = list(fam_map.values())
+
+    # ── 质控品（单独）──
+    controls = [
+        _item_dto(r, stock_map) for r in
+        db.query(ReagentItem).filter(ReagentItem.type == "质控品", ReagentItem.library == library)
+        .order_by(ReagentItem.name).all()
+    ]
+
+    return {"by_project": by_project, "by_instrument": by_instrument, "controls": controls}
+
+
+@router.get("/template", response_model=dict)
+def get_reagent_template(
+    library: str = Query("", description="责任库（生化凝血/免疫），为空返回全部"),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """盘库/订购录入模板：按项目、仪器家族、质控品分组，含实时库存。"""
+    libs = [library] if library else ["生化凝血", "免疫"]
+    result = {}
+    for lib in libs:
+        result[lib] = build_reagent_template(db, lib)
+    return result
+
+
 @router.post("/inventory-checks", response_model=InventoryCheckRead)
 def create_inventory_check(
     data: InventoryCheckCreate, db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "lab_technician")),
 ):
     check = InventoryCheck(
+        library=data.library or "",
         check_date=data.check_date,
         check_type=data.check_type,
         operator=user.full_name or user.username,
@@ -202,16 +333,26 @@ def create_inventory_check(
         )
         db.add(item)
         # 同步更新 reagent_stock
-        stock = db.query(ReagentStock).filter(
-            ReagentStock.item_id == it.item_id,
-            ReagentStock.batch_no == it.batch_no,
-        ).first()
-        if stock:
-            stock.quantity = it.recorded_quantity
-            stock.last_updated = datetime.utcnow()
+        # 盘库按「总余量」录入：若未指定批号，视为对该物品做全量盘点，
+        # 先清空该物品全部批次库存，再写入一条总余量，保证实时库存与盘库数一致。
+        if it.batch_no and it.batch_no.strip():
+            stock = db.query(ReagentStock).filter(
+                ReagentStock.item_id == it.item_id,
+                ReagentStock.batch_no == it.batch_no,
+            ).first()
+            if stock:
+                stock.quantity = it.recorded_quantity
+                stock.last_updated = datetime.utcnow()
+            else:
+                db.add(ReagentStock(
+                    item_id=it.item_id, batch_no=it.batch_no,
+                    expiry_date=it.expiry_date, quantity=it.recorded_quantity,
+                ))
         else:
+            for s in db.query(ReagentStock).filter(ReagentStock.item_id == it.item_id).all():
+                db.delete(s)
             db.add(ReagentStock(
-                item_id=it.item_id, batch_no=it.batch_no,
+                item_id=it.item_id, batch_no="",
                 expiry_date=it.expiry_date, quantity=it.recorded_quantity,
             ))
     db.commit()
@@ -225,13 +366,17 @@ def create_inventory_check(
 
 @router.get("/orders", response_model=dict)
 def list_orders(
+    library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    total = db.query(ReagentOrder).count()
-    rows = db.query(ReagentOrder).order_by(ReagentOrder.order_date.desc()).offset(
+    base = db.query(ReagentOrder)
+    if library:
+        base = base.filter(ReagentOrder.library == library)
+    total = base.count()
+    rows = base.order_by(ReagentOrder.order_date.desc()).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size,
@@ -252,7 +397,7 @@ def create_order(
     user: User = Depends(require_roles("admin", "lab_technician")),
 ):
     order = ReagentOrder(
-        order_no=data.order_no, order_date=data.order_date,
+        library=data.library or "", order_no=data.order_no, order_date=data.order_date,
         order_type=data.order_type, status="草稿",
         operator=user.full_name or user.username, remark=data.remark,
     )
@@ -273,6 +418,7 @@ def update_order(
     order = db.query(ReagentOrder).get(order_id)
     if not order:
         raise HTTPException(404, "订购单未找到")
+    order.library = data.library or ""
     order.order_date = data.order_date
     order.order_type = data.order_type
     order.status = data.status
@@ -365,13 +511,20 @@ def export_order_form(
 
 @router.get("/receivings", response_model=dict)
 def list_receivings(
+    library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫），按收货明细试剂归属过滤"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    total = db.query(Receiving).count()
-    rows = db.query(Receiving).order_by(Receiving.receipt_date.desc()).offset(
+    base = db.query(Receiving)
+    if library:
+        lib_item_ids = [r[0] for r in db.query(ReagentItem.id).filter(ReagentItem.library == library).all()]
+        recv_ids = [r[0] for r in db.query(ReceivingItem.receiving_id).filter(
+            ReceivingItem.item_id.in_(lib_item_ids)).distinct().all()]
+        base = base.filter(Receiving.id.in_(recv_ids))
+    total = base.count()
+    rows = base.order_by(Receiving.receipt_date.desc()).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size,
@@ -428,6 +581,8 @@ def create_receiving(
 @router.get("/consumption", response_model=dict)
 def list_consumption(
     year_month: Optional[str] = Query(None, description="YYYY-MM"),
+    library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
+    q: str = Query("", description="搜索试剂名称/品牌"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -436,6 +591,15 @@ def list_consumption(
     base = db.query(ReagentConsumption)
     if year_month:
         base = base.filter(ReagentConsumption.year_month == year_month)
+    if library or q.strip():
+        ri_base = db.query(ReagentItem.id)
+        if library:
+            ri_base = ri_base.filter(ReagentItem.library == library)
+        if q.strip():
+            kw = f"%{q.strip()}%"
+            ri_base = ri_base.filter(or_(ReagentItem.name.like(kw), ReagentItem.brand.like(kw)))
+        item_ids = [r[0] for r in ri_base.all()]
+        base = base.filter(ReagentConsumption.item_id.in_(item_ids))
     total = base.count()
     rows = base.order_by(ReagentConsumption.year_month.desc(), ReagentConsumption.item_id).offset(
         (page - 1) * page_size

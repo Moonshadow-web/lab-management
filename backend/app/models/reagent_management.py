@@ -106,6 +106,7 @@ class InventoryCheck(Base):
     __tablename__ = "reagent_inventory_checks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    library: Mapped[str] = mapped_column(String(20), default="", index=True)  # 责任库：生化凝血/免疫
     check_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     check_type: Mapped[str] = mapped_column(String(20), default="月末盘库")
     operator: Mapped[str] = mapped_column(String(100), default="")
@@ -146,6 +147,7 @@ class ReagentOrder(Base):
     __tablename__ = "reagent_orders"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    library: Mapped[str] = mapped_column(String(20), default="", index=True)  # 责任库：生化凝血/免疫
     order_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     order_date: Mapped[date] = mapped_column(Date, nullable=False)
     order_type: Mapped[str] = mapped_column(String(20), default="月初订购")

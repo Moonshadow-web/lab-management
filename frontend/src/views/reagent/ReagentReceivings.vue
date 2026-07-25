@@ -4,6 +4,7 @@
       <h2 class="title">到货接收</h2>
       <p class="sub">试剂送货到货录入，记录批号/效期/数量，自动增加库存。</p>
     </div>
+    <LibraryTabs @change="refresh" />
     <div class="toolbar">
       <el-button type="primary" :icon="Plus" @click="onNewReceiving" v-if="canWrite">新增收货</el-button>
       <el-button :icon="Refresh" @click="refresh">刷新</el-button>
@@ -67,10 +68,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Refresh, Delete } from '@element-plus/icons-vue'
-import { listReagentReceivings, createReagentReceiving, getReagentReceiving, listReagentItems } from '../../api/reagent'
+import { listReagentReceivings, createReagentReceiving, getReagentReceiving, listAllReagentItems } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
+import { useReagentStore } from '../../store/reagent'
+import { errText } from '../../utils/errText'
+import LibraryTabs from '../../components/reagent/LibraryTabs.vue'
 
 const auth = useAuthStore()
+const reagentStore = useReagentStore()
 const canWrite = computed(() => auth.canWrite('reagents'))
 const receivings = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
 const dialogVisible = ref(false), submitting = ref(false), searchItem = ref(''), allItems = ref([])
@@ -80,14 +85,15 @@ const items = ref([])
 async function refresh() {
   loading.value = true
   try {
-    const r = await listReagentReceivings({ page: page.value, page_size: pageSize.value })
+    const r = await listReagentReceivings({ library: reagentStore.library, page: page.value, page_size: pageSize.value })
     receivings.value = r.items; total.value = r.total
-  } catch (e) { ElMessage.error('加载失败') } finally { loading.value = false }
+  } catch (e) { ElMessage.error('加载失败：' + errText(e)) } finally { loading.value = false }
 }
 async function loadItems() {
   if (allItems.value.length) return
-  const r = await listReagentItems({ page: 1, page_size: 500 })
-  allItems.value = r.items
+  // 默认只加载当前责任库试剂，便于在本库内选择；搜索不到时可切库
+  const all = await listAllReagentItems({ library: reagentStore.library })
+  allItems.value = all
 }
 function onNewReceiving() {
   loadItems()

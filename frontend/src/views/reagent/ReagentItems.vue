@@ -5,12 +5,17 @@
       <p class="sub">试剂、校准品、质控品、耗材一览表。支持搜索、筛选、Excel导入。</p>
     </div>
 
+    <LibraryTabs @change="refresh" />
+
     <div class="toolbar">
       <el-input v-model="q" placeholder="搜索名称/品牌/编码..." clearable style="width:280px" @keyup.enter="refresh" @clear="refresh">
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
       <el-select v-model="filterType" placeholder="全部类型" clearable style="width:130px" @change="refresh">
         <el-option v-for="t in types" :key="t" :label="t" :value="t" />
+      </el-select>
+      <el-select v-model="filterLibrary" placeholder="全责任库" clearable style="width:130px" @change="refresh">
+        <el-option v-for="lib in libs" :key="lib" :label="lib" :value="lib" />
       </el-select>
       <el-button :icon="Refresh" @click="refresh">刷新</el-button>
       <el-button type="primary" :icon="Plus" @click="onAdd" v-if="canWrite">新增</el-button>
@@ -22,6 +27,12 @@
       <el-table-column prop="name" label="名称" min-width="200" show-overflow-tooltip />
       <el-table-column prop="type" label="类型" width="90" />
       <el-table-column prop="category" label="类别" width="90" />
+      <el-table-column prop="library" label="责任库" width="100">
+        <template #default="{ row }">
+          <el-tag v-if="row.library" size="small" :type="row.library === '免疫' ? 'warning' : 'success'">{{ row.library }}</el-tag>
+          <span v-else class="muted">—</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="brand" label="品牌" width="130" />
       <el-table-column prop="spec" label="规格" width="160" show-overflow-tooltip />
       <el-table-column prop="material_code" label="材料编码" width="130" />
@@ -55,11 +66,14 @@
           <el-col :span="8"><el-form-item label="类别"><el-select v-model="form.category" style="width:100%">
             <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
           </el-select></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="单位"><el-input v-model="form.unit" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="责任库"><el-select v-model="form.library" clearable placeholder="自动" style="width:100%">
+            <el-option v-for="lib in libs" :key="lib" :label="lib" :value="lib" />
+          </el-select></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="品牌"><el-input v-model="form.brand" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="材料编码"><el-input v-model="form.material_code" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="品牌"><el-input v-model="form.brand" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="材料编码"><el-input v-model="form.material_code" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="单位"><el-input v-model="form.unit" /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
           <el-col :span="12"><el-form-item label="规格"><el-input v-model="form.spec" /></el-form-item></el-col>
@@ -99,20 +113,25 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Upload } from '@element-plus/icons-vue'
 import { listReagentItems, createReagentItem, updateReagentItem, deleteReagentItem, importReagentFromExcel } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
+import { useReagentStore, LIBRARIES } from '../../store/reagent'
+import { errText } from '../../utils/errText'
+import LibraryTabs from '../../components/reagent/LibraryTabs.vue'
 
 const auth = useAuthStore()
+const reagentStore = useReagentStore()
 const canWrite = computed(() => auth.canWrite('reagents'))
 const types = ['试剂', '校准品', '质控品', '耗材']
 const categories = ['生化', '免疫', '凝血', '血气', '尿液', '其他']
+const libs = LIBRARIES
 
 const items = ref([]), total = ref(0), page = ref(1), pageSize = ref(50), loading = ref(false)
-const q = ref(''), filterType = ref('')
+const q = ref(''), filterType = ref(''), filterLibrary = ref('')
 const dialogVisible = ref(false), editingId = ref(null), submitting = ref(false)
 const importVisible = ref(false), uploading = ref(false)
 const uploadFile = ref(null)
 
 const emptyForm = () => ({
-  name: '', type: '试剂', category: '', brand: '', spec: '', material_code: '',
+  name: '', type: '试剂', category: '', library: '', brand: '', spec: '', material_code: '',
   unit: '', manufacturer: '', supplier: '', min_stock: 0, remark: '', is_active: true,
 })
 const form = reactive(emptyForm())
@@ -123,10 +142,11 @@ async function refresh() {
     const params = { page: page.value, page_size: pageSize.value }
     if (q.value.trim()) params.q = q.value.trim()
     if (filterType.value) params.type = filterType.value
+    if (filterLibrary.value) params.library = filterLibrary.value
     const r = await listReagentItems(params)
     items.value = r.items; total.value = r.total
   } catch (e) {
-    ElMessage.error('加载失败：' + (e?.response?.data?.detail || e.message))
+    ElMessage.error('加载失败：' + errText(e))
   } finally { loading.value = false }
 }
 
@@ -176,4 +196,5 @@ onMounted(refresh)
 .sub { margin: 4px 0 0; color: #64748b; font-size: 13px; }
 .toolbar { display: flex; gap: 10px; align-items: center; margin: 8px 0 12px; flex-wrap: wrap; }
 .pager { margin: 10px 0 16px; display: flex; justify-content: flex-end; }
+.muted { color: #cbd5e1; }
 </style>

@@ -4,8 +4,9 @@
       <h2 class="title">实时库存</h2>
       <p class="sub">当前库存余额（按试剂+批号+效期明细），低于预警值的标红提醒。</p>
     </div>
+    <LibraryTabs @change="refresh" />
     <div class="toolbar">
-      <el-input v-model="q" placeholder="搜索试剂名称..." clearable style="width:250px" @keyup.enter="refresh" @clear="refresh">
+      <el-input v-model="q" placeholder="搜索试剂名称/品牌..." clearable style="width:250px" @keyup.enter="refresh" @clear="refresh">
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
       <el-select v-model="filterType" placeholder="全部类型" clearable style="width:130px" @change="refresh">
@@ -41,9 +42,12 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh } from '@element-plus/icons-vue'
-import { listReagentStock } from '../../api/reagent'
-import { listReagentItems } from '../../api/reagent'
+import { listReagentStock, listAllReagentItems } from '../../api/reagent'
+import { useReagentStore } from '../../store/reagent'
+import { errText } from '../../utils/errText'
+import LibraryTabs from '../../components/reagent/LibraryTabs.vue'
 
+const reagentStore = useReagentStore()
 const items = ref([]), total = ref(0), page = ref(1), pageSize = ref(50), loading = ref(false)
 const q = ref(''), filterType = ref(''), lowOnly = ref(false)
 const types = ['试剂','校准品','质控品','耗材']
@@ -52,15 +56,15 @@ const itemMap = ref({})
 async function refresh() {
   loading.value = true
   try {
-    const params = { page: page.value, page_size: pageSize.value }
+    const params = { page: page.value, page_size: pageSize.value, library: reagentStore.library }
     if (q.value.trim()) params.q = q.value.trim()
     if (filterType.value) params.type = filterType.value
     if (lowOnly.value) params.low_stock_only = true
     const r = await listReagentStock(params)
-    // 映射 item_id → item name 和 min_stock
+    // 映射 item_id → item name 和 min_stock（分页拉全，避免超 page_size 触发 422）
     if (Object.keys(itemMap.value).length === 0) {
-      const ri = await listReagentItems({ page: 1, page_size: 500 })
-      for (const it of ri.items) itemMap.value[it.id] = it
+      const all = await listAllReagentItems({ library: reagentStore.library })
+      for (const it of all) itemMap.value[it.id] = it
     }
     for (const s of r.items) {
       const it = itemMap.value[s.item_id]
@@ -69,7 +73,7 @@ async function refresh() {
     }
     items.value = r.items; total.value = r.total
   } catch (e) {
-    ElMessage.error('加载失败：' + (e?.response?.data?.detail || e.message))
+    ElMessage.error('加载失败：' + errText(e))
   } finally { loading.value = false }
 }
 onMounted(refresh)

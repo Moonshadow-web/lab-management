@@ -140,6 +140,7 @@ class InventoryCheckItemCreate(InventoryCheckItemBase):
 
 
 class InventoryCheckBase(BaseModel):
+    library: str = ""
     check_date: date
     check_type: str = "月末盘库"
     operator: str = ""
@@ -189,6 +190,7 @@ class ReagentOrderItemRead(ReagentOrderItemBase):
 
 
 class ReagentOrderBase(BaseModel):
+    library: str = ""
     order_no: str
     order_date: date
     order_type: str = "月初订购"

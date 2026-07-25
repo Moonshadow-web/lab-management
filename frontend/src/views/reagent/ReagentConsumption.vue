@@ -4,8 +4,12 @@
       <h2 class="title">月消耗统计</h2>
       <p class="sub">月末盘库后计算各试剂月消耗量（= 上期结余 + 本期入库 - 期末结余），用于填写设备处物流出库记录。</p>
     </div>
+    <LibraryTabs @change="refresh" />
     <div class="toolbar">
       <el-date-picker v-model="month" type="month" value-format="YYYY-MM" placeholder="选择月份" style="width:160px" @change="refresh" />
+      <el-input v-model="q" placeholder="搜索试剂名称/品牌..." clearable style="width:220px" @keyup.enter="refresh" @clear="refresh">
+        <template #prefix><el-icon><Search /></el-icon></template>
+      </el-input>
       <el-button type="primary" :loading="calculating" @click="onCalculate" v-if="canWrite">计算月消耗</el-button>
       <el-button :icon="Refresh" @click="refresh">刷新</el-button>
     </div>
@@ -36,28 +40,34 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
-import { listReagentConsumption, calculateConsumption, listReagentItems } from '../../api/reagent'
+import { Refresh, Search } from '@element-plus/icons-vue'
+import { listReagentConsumption, calculateConsumption, listAllReagentItems } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
+import { useReagentStore } from '../../store/reagent'
+import { errText } from '../../utils/errText'
+import LibraryTabs from '../../components/reagent/LibraryTabs.vue'
 
 const auth = useAuthStore()
+const reagentStore = useReagentStore()
 const canWrite = computed(() => auth.canWrite('reagents'))
 const items = ref([]), total = ref(0), page = ref(1), pageSize = ref(50), loading = ref(false)
 const month = ref(new Date().toISOString().slice(0,7)), calculating = ref(false)
+const q = ref('')
 const itemMap = ref({})
 
 async function refresh() {
   loading.value = true
   try {
-    const params = { year_month: month.value || '', page: page.value, page_size: pageSize.value }
+    const params = { year_month: month.value || '', library: reagentStore.library, page: page.value, page_size: pageSize.value }
+    if (q.value.trim()) params.q = q.value.trim()
     const r = await listReagentConsumption(params)
     if (Object.keys(itemMap.value).length === 0) {
-      const ri = await listReagentItems({ page: 1, page_size: 500 })
-      for (const it of ri.items) itemMap.value[it.id] = it.name
+      const all = await listAllReagentItems({ library: reagentStore.library })
+      for (const it of all) itemMap.value[it.id] = it.name
     }
-    for (const c of r.items) c._item_name = itemMap.value[c.item_id] || ''
+    for (const c of r.items) c._item_name = itemMap.value[c.item_id] || `(id=${c.item_id})`
     items.value = r.items; total.value = r.total
-  } catch (e) { ElMessage.error('加载失败') } finally { loading.value = false }
+  } catch (e) { ElMessage.error('加载失败：' + errText(e)) } finally { loading.value = false }
 }
 async function onCalculate() {
   if (!month.value) { ElMessage.warning('请选择月份'); return }
@@ -66,7 +76,7 @@ async function onCalculate() {
     const r = await calculateConsumption(month.value)
     ElMessage.success(`已计算 ${r.year_month}，新增 ${r.added} 条`)
     refresh()
-  } catch (e) { ElMessage.error('计算失败') } finally { calculating.value = false }
+  } catch (e) { ElMessage.error('计算失败：' + errText(e)) } finally { calculating.value = false }
 }
 onMounted(refresh)
 </script>

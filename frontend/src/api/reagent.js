@@ -9,6 +9,26 @@ export function listReagentItems(params) {
   return request.get('/api/v1/reagent/items', { params })
 }
 
+// 分页拉全试剂目录（后端 page_size 上限 200，超 200 触发 422）。
+// 用于在库存/月消耗等页面一次性拿到全部试剂映射，避免 [object Object] 报错。
+export async function listAllReagentItems(extra = {}) {
+  let page = 1
+  const all = []
+  while (true) {
+    const r = await listReagentItems({ page, page_size: 200, ...extra })
+    all.push(...(r.items || []))
+    if (all.length >= (r.total || 0) || (r.items || []).length === 0) break
+    page += 1
+    if (page > 100) break
+  }
+  return all
+}
+
+// 盘库/订购录入模板：按项目、仪器家族、质控品分组（含实时库存）
+export function getReagentTemplate(params) {
+  return request.get('/api/v1/reagent/template', { params })
+}
+
 export function getReagentItem(id) {
   return request.get(`/api/v1/reagent/items/${id}`)
 }
