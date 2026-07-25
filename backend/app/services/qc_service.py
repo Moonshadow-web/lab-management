@@ -6,15 +6,16 @@ Westgard 多规则判定（检验科常见简化：对同一项目、同一仪�
   2-2s : 连续两点同侧超出 ±2s
   R-4s : 相邻两测值（SD 归一化后）差值 > 4s（跨水平、跨天均算；归一化后高低浓度可比）
   10-x : 连续十点同侧（均值同侧）
-1-2s 仅作警示（warning）、不计入失控；R-4s 触发时：同一天两水平都判失控，跨天相邻则后点失控、前点警告。
+1-2s 仅作警示（warning）、不计入失控；警告仅由 1-2s 规则产生（R-4s 不再给前点标警告）。R-4s 触发时：同一天两水平都判失控；跨天相邻则只标后点（当天）失控，前点不标任何 R-4s 标记。
 
 R-4s 判定说明（按 2026-07-24 需求，2026-07-22 修订同天判定，2026-07-25 修订为
-SD 归一化）：把同一项目全部水平的每日测值按 (date, level) 排成一条时间线，
+SD 归一化 + 冻结）：把同一项目全部水平的每日测值按 (date, level) 排成一条时间线，
 任意「相邻两点」——无论同一天不同水平、还是跨天同/不同水平——都参与 R-4s
 判定；每个测值先按各自水平的靶值归一化为 z=(value-target_mean)/target_sd，
 再判 |z_前 - z_后| > 4 即触发（高低浓度被拉到同一尺度，只反映偏离各自靶值的
 程度，避免浓度差误报，如甲肝 IgM 水平1≠水平2）。触发规则：同一天两水平 →
-两个都判失控(R-4s)；跨天相邻 → 后点判失控、前点判警告(R-4s)。互不级联。
+两个都判失控(R-4s)；跨天相邻 → 只标后点(当天)失控(R-4s)、前点不标任何 R-4s
+标记。已失控(ooc)点（含单点规则已判/本轮已判）冻结，不参与本对及后续相邻对。
 """
 import json
 import re
@@ -345,12 +346,27 @@ def evaluate_westgard(values: list[float], mean: float, sd: float):
             ooc[i] = _join(ooc.get(i, ""), "2-2s")
             ooc[i + 1] = _join(ooc.get(i + 1, ""), "2-2s")
     # 4-1s 已禁用
-    # 10-x
-    for i in range(n - 9):
-        w = values[i : i + 10]
-        if all(v > mean for v in w) or all(v < mean for v in w):
-            for j in range(i, i + 10):
-                ooc[j] = _join(ooc.get(j, ""), "10-x")
+    # 10-x：连续十点同侧（均值同侧）。已失控(ooc)点打断计数——失控点只留存，
+    # 不参与后续统计，故遇到 ooc 点重置连续计数，从下一个在控点重新开始累计。
+    run = 0  # 当前连续同侧计数（+n 上侧 / -n 下侧）
+    for i, v in enumerate(values):
+        if i in ooc:
+            run = 0
+            continue
+        if v > mean + eps:
+            run = run + 1 if run > 0 else 1
+        elif v < mean - eps:
+            run = run - 1 if run < 0 else -1
+        else:
+            run = 0  # 等于均值不打断也不计入连续同侧
+        if run >= 10:
+            for j in range(i - run + 1, i + 1):
+                if "10-x" not in ooc.get(j, ""):
+                    ooc[j] = _join(ooc.get(j, ""), "10-x")
+        elif run <= -10:
+            for j in range(i + run, i + 1):
+                if "10-x" not in ooc.get(j, ""):
+                    ooc[j] = _join(ooc.get(j, ""), "10-x")
     # 已被判失控的点不再单独标 1-2s 警告（避免警告与失控重复）
     for k in list(warnings):
         if k in ooc:
@@ -358,35 +374,37 @@ def evaluate_westgard(values: list[float], mean: float, sd: float):
     return ooc, warnings
 
 
-def evaluate_r4s_project(points: list[dict]) -> tuple[dict, dict]:
+def evaluate_r4s_project(points: list[dict]) -> dict:
     """跨「项目(同仪器/年/月/批号)」全部水平、按时间排序的相邻两测值 R-4s 判定（SD 归一化，2026-07-25）。
 
-    points: list of {level, idx, value, mean, sd, date}
+    points: list of {level, idx, value, mean, sd, date, ooc}
       level: 水平标识；idx: 该水平 values 中的下标；value: 测值；
       mean/sd: 该水平的靶值均值/靶SD（缺失时用稳健估计，均 >0）；
-      date: qc_date 字符串（ISO，可排序）。
-    返回 (ooc_add, warn_add)：
-      ooc_add:  {(level, idx): "R-4s"}  触发 R-4s 的点 → 判失控；
-      warn_add: {(level, idx): "R-4s"}  触发 R-4s 的『前一点』（跨天对）→ 判警告（不计入失控）。
+      date: qc_date 字符串（ISO，可排序）；
+      ooc:  该点是否已因『其它规则』判失控（1-3s/2-2s/10-x）→ 冻结，不参与 R-4s。
+    返回 ooc_add: {(level, idx): "R-4s"}  触发 R-4s 的失控点。
 
-    规则（按 2026-07-24 需求，2026-07-22 修订同天判定，2026-07-25 修订为 SD 归一化）：
+    规则（按 2026-07-24 需求，2026-07-22 修订同天判定，2026-07-25 修订为 SD 归一化 + 冻结）：
       - 把同一项目所有水平的每日测值按 (date, level) 排成一条时间线；
-      - 任意『相邻两点』（无论同一天不同水平、还是跨天同/不同水平）都判 R-4s；
-      - 每个测值先按各自水平的靶值归一化为 SD 倍数：z = (value - target_mean) / target_sd；
-        再判 |z_前 - z_后| > 4 即触发（即两点『偏离各自靶值的程度』之差超 4 个 SD）；
-        高低浓度被拉到同一尺度，只反映波动幅度，浓度差不会误报（如甲肝 IgM 水平1≠水平2）；
+      - 相邻两点各自按本水平靶值归一化为 SD 倍数：z = (value - mean) / sd；
+        再判 |z_前 - z_后| > 4 即触发（高低浓度拉到同一尺度，只反映波动幅度）；
+      - 已失控(ooc)点冻结：前点若已 ooc 则跳过本对（不再作为 R-4s 的参与点），
+        后点若已 ooc 则本对不触发（前点在控、不再给前点标任何 R-4s 标记）；
+        本轮已判 R-4s 的点也即时加入冻结集，互不级联；
       - 触发时：同一天（prev.date == curr.date）两个水平都判失控(R-4s)；
-        跨天相邻：后点判失控(R-4s)、前点判警告(R-4s)；
-      - 前点若已因其它规则（或同天对）判失控，则保持失控、不再改判警告。
-    该判定仅依赖归一化偏差，互不级联（不会因前点已失控而把后点连带误判）。
+        跨天相邻：只标后点(当天)判失控(R-4s)，前点不标任何 R-4s 标记
+        （警告仅由 1-2s 规则产生）。
     """
     # 按 (date, level) 稳定排序，保留原始 (level, idx) 用于回写
     pts = sorted(points, key=lambda p: (p["date"], str(p["level"])))
     ooc_add: dict = {}
-    warn_add: dict = {}
+    # 冻结集：单点规则已判失控的 + 本轮已判 R-4s 的，均不参与后续相邻对
+    frozen = {(p["level"], p["idx"]) for p in pts if p.get("ooc")}
     m = len(pts)
     for i in range(m - 1):
         prev, curr = pts[i], pts[i + 1]
+        if (prev["level"], prev["idx"]) in frozen or (curr["level"], curr["idx"]) in frozen:
+            continue
         mpi, mpj = prev.get("mean"), curr.get("mean")
         sdi, sdj = prev["sd"], curr["sd"]
         # 无靶值/无 SD（或估出 0）→ 该点无法归一化，跳过本对 R-4s
@@ -397,16 +415,16 @@ def evaluate_r4s_project(points: list[dict]) -> tuple[dict, dict]:
         eps = 1e-9 * (abs(z_prev) + abs(z_curr) + 1)
         if abs(z_prev - z_curr) > 4 + eps:
             if prev["date"] == curr["date"]:
-                # 同一天两个水平触发：两个都判失控
+                # 同一天两个水平触发：两个都判失控，并冻结
                 ooc_add[(prev["level"], prev["idx"])] = "R-4s"
                 ooc_add[(curr["level"], curr["idx"])] = "R-4s"
+                frozen.add((prev["level"], prev["idx"]))
+                frozen.add((curr["level"], curr["idx"]))
             else:
-                # 跨天相邻：后点失控、前点警告
+                # 跨天相邻：只标后点(当天)失控，前点不标任何 R-4s 标记
                 ooc_add[(curr["level"], curr["idx"])] = "R-4s"
-                # 前点：若已因本轮（作为更早 pair 的后点）判失控则保持失控；否则标警告
-                if (prev["level"], prev["idx"]) not in ooc_add:
-                    warn_add[(prev["level"], prev["idx"])] = "R-4s"
-    return ooc_add, warn_add
+                frozen.add((curr["level"], curr["idx"]))
+    return ooc_add
 
 
 def _robust_stats(values: list[float]):
@@ -455,7 +473,8 @@ def aggregate_project(levels: list[dict]):
       - 跨水平 R-4s：把本项目全部水平的每日测值按 (date, level) 排成时间线，
         任意相邻两点（同天不同水平、跨天同/不同水平）先各自按本水平靶值归一化为
         z=(value-mean)/sd，再判 |z_前 - z_后| > 4
-        → 同天两水平都判失控(R-4s)、跨天后点判失控(R-4s)/前点判警告(R-4s)；
+        → 同天两水平都判失控(R-4s)、跨天只标后点(当天)失控(R-4s)/前点不标 R-4s；
+        **已失控点冻结**：单点规则已判失控的点不参与 R-4s 相邻对及后续统计；
       - 统计量在剔除失控点（含 R-4s）后计算。
     """
     from collections import defaultdict
@@ -482,7 +501,8 @@ def aggregate_project(levels: list[dict]):
 
     # 2) 跨水平 R-4s：把全部水平的每日测值按 (date, level) 排成一条时间线，
     #    任意「相邻两点」都参与 R-4s 判定（同天不同水平 或 跨天同/不同水平）。
-    #    每个点带上各自水平的 (mean, sd)，供 evaluate_r4s_project 做 SD 归一化。
+    #    每个点带上各自水平的 (mean, sd)，供 evaluate_r4s_project 做 SD 归一化；
+    #    已因单点规则失控(ooc)的点冻结，不参与 R-4s 相邻对。
     all_points = []
     for lv in levels:
         p = per[lv["level"]]
@@ -490,17 +510,12 @@ def aggregate_project(levels: list[dict]):
             all_points.append({
                 "level": lv["level"], "idx": idx,
                 "value": v, "mean": p["r4s_mean"], "sd": p["r4s_sd"], "date": d,
+                "ooc": idx in p["ooc"],
             })
-    ooc_add, warn_add = evaluate_r4s_project(all_points)
+    ooc_add = evaluate_r4s_project(all_points)
     for (level, idx), rule in ooc_add.items():
         po = per[level]["ooc"]
         po[idx] = _join(po.get(idx, ""), rule)
-    for (level, idx), rule in warn_add.items():
-        # 前点若已因其它规则失控则保持失控，不再改判警告
-        if idx in per[level]["ooc"]:
-            continue
-        pw = per[level]["warnings"]
-        pw[idx] = _join(pw.get(idx, ""), rule)
 
     # 3) 统计量（剔除失控点后）
     result = {}
