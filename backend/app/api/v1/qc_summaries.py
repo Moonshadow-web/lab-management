@@ -112,6 +112,9 @@ _COLUMN_ALIASES = {
     "operator": ["操作人", "操作者", "operator", "operatorpersonname", "operatorname", "检验者"],
     "violate_reason": ["失控原因", "violatereason", "失控理由", "reason"],
     "violate_deal": ["失控处理", "violatedeal", "处理", "deal", "处置"],
+    # 上传表格规则列（LIS 导出，如 violateRule）：覆盖后端 Westgard 判定
+    "violate_rule": ["失控规则", "violaterule", "violate_rule", "violaterule",
+                      "判失控规则", "失控判据", "westgard规则", "westgardrule", "失控规则列"],
 }
 
 
@@ -186,7 +189,7 @@ def _write_summary_level(
     db.query(QCDailyValue).filter_by(summary_id=summ.id).delete()
     operators: set[str] = set()
     ooc_details: list[str] = []
-    for idx, (qc_date, val, op, vreason, vdeal) in enumerate(dmeta):
+    for idx, (qc_date, val, op, vreason, vdeal, vrule) in enumerate(dmeta):
         rule = agg["ooc"].get(idx, "")
         warn = agg["warnings"].get(idx, "")
         is_ooc = bool(rule)
@@ -213,6 +216,7 @@ def _write_summary_level(
             operator=(op or ""),
             violate_reason=(vreason or "") if is_ooc else "",
             violate_deal=(vdeal or "") if is_ooc else "",
+            uploaded_rule=(vrule or ""),
         ))
     summ.operator = "、".join(sorted(operators))
     summ.handling_note = "\n".join(ooc_details)
@@ -475,7 +479,8 @@ def upload_qc_summary(
         op = (get("operator") or "").strip()
         vreason = (get("violate_reason") or "").strip()
         vdeal = (get("violate_deal") or "").strip()
-        daily_meta.setdefault(key, []).append((d.strftime("%Y-%m-%d"), v, op, vreason, vdeal))
+        vrule = (get("violate_rule") or "").strip()  # 上传表格规则列（覆盖后端Westgard）
+        daily_meta.setdefault(key, []).append((d.strftime("%Y-%m-%d"), v, op, vreason, vdeal, vrule))
         if key not in meta:
             ti_name = (get("test_item") or "").strip()
             matched = find_test_item_by_name(db, ti_name, instrument=inst) if ti_name else None
@@ -506,6 +511,7 @@ def upload_qc_summary(
             "values": svalues,
             "dates": sdates,
             "daily_meta": sdmeta,
+            "violate_rules": [t[5] for t in sdmeta],  # 与 values 同序的上传规则原始串
             "target_mean": m["target_mean"],
             "target_sd": m["target_sd"],
             "unit": m["unit"],
@@ -566,6 +572,8 @@ def upload_qc_summary(
         "updated": updated,
         "groups": len(groups),
         "items": items,
+        # 是否识别到上传表格的「规则列」（violateRule 等）；未识别则仍按后端 Westgard 判定
+        "rule_column_matched": "violate_rule" in hmap,
     }
 
 
@@ -654,12 +662,13 @@ def recalc_summaries(db: Session = Depends(get_db), user: User = Depends(get_cur
             values = [float(v.value) for v in dvs]
             dates = [v.qc_date for v in dvs]
             dmeta = [
-                (v.qc_date, v.value, (v.operator or ""), (v.violate_reason or ""), (v.violate_deal or ""))
+                (v.qc_date, v.value, (v.operator or ""), (v.violate_reason or ""), (v.violate_deal or ""), (v.uploaded_rule or ""))
                 for v in dvs
             ]
             levels.append({
                 "level": s.level, "values": values, "dates": dates,
                 "daily_meta": dmeta,
+                "violate_rules": [(v.uploaded_rule or "") for v in dvs],
                 "target_mean": s.target_mean or 0.0,
                 "target_sd": s.target_sd or 0.0,
                 "unit": s.unit, "instrument_no": s.instrument_no,

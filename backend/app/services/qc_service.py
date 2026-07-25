@@ -316,6 +316,67 @@ def _join(existing: str, rule: str) -> str:
     return (existing + ";" + rule) if existing else rule
 
 
+# ===== 上传表格「规则列」解析与优先级（2026-07-26） =====
+# 失控级规则（一律判失控 ooc）；1-2s 为警告级（不计入失控）。
+_OOC_RULES = {"1-3s", "2-2s", "R-4s", "10-x", "4-1s"}
+_WARN_RULES = {"1-2s"}
+# 严重度（越大越严重），用于同单元格多规则时取最严重者、并决定显示顺序
+_RULE_SEVERITY = {"1-2s": 0, "10-x": 1, "R-4s": 2, "2-2s": 3, "1-3s": 4}
+
+
+def _normalize_rule_token(tok: str) -> str | None:
+    """把单条规则 token 归一化为规范名；无法识别返回 None。"""
+    s = (tok or "").strip().lower().replace(" ", "").replace("（", "(").replace("）", ")")
+    tbl = {
+        "1-2s": "1-2s", "1_2s": "1-2s", "12s": "1-2s",
+        "1-3s": "1-3s", "1_3s": "1-3s", "13s": "1-3s",
+        "2-2s": "2-2s", "2_2s": "2-2s", "22s": "2-2s",
+        "r-4s": "R-4s", "r4s": "R-4s", "r_4s": "R-4s",
+        "4-1s": "4-1s", "4_1s": "4-1s", "41s": "4-1s",
+        "10-x": "10-x", "10x": "10-x", "10_x": "10-x",
+    }
+    return tbl.get(s)
+
+
+def _parse_rule_cell(cell: str) -> list[str]:
+    """把上传表格的规则单元格解析为规范规则名列表（去重、保序、忽略无法识别项）。
+
+    支持分隔符：; , / 、 空格 以及中文连接词「和」「与」。
+    例：'1-2S, 1-3S' → ['1-2s', '1-3s']
+    """
+    if not cell:
+        return []
+    raw = re.split(r"[;,\/、\s和或与]+", str(cell).strip())
+    out: list[str] = []
+    for r in raw:
+        r = r.strip()
+        if not r:
+            continue
+        norm = _normalize_rule_token(r)
+        if norm:
+            out.append(norm)
+    seen: set[str] = set()
+    return [x for x in out if not (x in seen or seen.add(x))]
+
+
+def _resolve_uploaded_rules(parsed: list[str]) -> tuple[str, str]:
+    """把解析后的规则列表解析为 (分类, 规则串)。
+
+    分类：'ooc'（失控）/ 'warning'（警告）/ ''（无有效规则）。
+    规则串：失控时按严重度降序拼接多规则（1-2s 被更严重的规则覆盖，不写入）；
+           警告时固定 '1-2s'。
+    即：同一单元格同时有 1-2S 与 1-3S 时，用 1-3S 覆盖（判失控，不标警告）。
+    """
+    ooc_rules = [r for r in parsed if r in _OOC_RULES]
+    warn_rules = [r for r in parsed if r in _WARN_RULES]
+    if ooc_rules:
+        ordered = sorted(set(ooc_rules), key=lambda x: -_RULE_SEVERITY[x])
+        return "ooc", ";".join(ordered)
+    if warn_rules:
+        return "warning", "1-2s"
+    return "", ""
+
+
 def evaluate_westgard(values: list[float], mean: float, sd: float):
     """单水平 Westgard 失控规则：1-3s / 2-2s / 10-x。
 
@@ -499,6 +560,31 @@ def aggregate_project(levels: list[dict]):
             "ooc": ooc, "warnings": warnings, "r4s_sd": r4s_sd, "r4s_mean": r4s_mean,
         }
 
+    # 1.5) 上传表格「规则列」覆盖（若提供）：有上传规则的点以「上传规则」为准，
+    #      不再采用后端计算的 Westgard；同单元格多规则按严重度取最严重者
+    #      （1-3S 覆盖 1-2S）。空单元格回落到后端计算。
+    #      带上传规则的点（无论失控/警告）整体冻结，不参与后续跨水平 R-4s。
+    uploaded_present: set[tuple] = set()
+    for lv in levels:
+        vr = lv.get("violate_rules") or []
+        values = lv["values"]
+        ooc = per[lv["level"]]["ooc"]
+        warnings = per[lv["level"]]["warnings"]
+        for idx in range(len(values)):
+            cell = vr[idx] if idx < len(vr) else ""
+            parsed = _parse_rule_cell(cell)
+            if not parsed:
+                continue
+            uploaded_present.add((lv["level"], idx))
+            cls, resolved = _resolve_uploaded_rules(parsed)
+            if cls == "ooc":
+                ooc[idx] = resolved
+                warnings.pop(idx, None)
+            elif cls == "warning":
+                warnings[idx] = resolved
+                ooc.pop(idx, None)
+            # cls == ""：解析出但均无法识别 → 不覆盖（保持后端计算）
+
     # 2) 跨水平 R-4s：把全部水平的每日测值按 (date, level) 排成一条时间线，
     #    任意「相邻两点」都参与 R-4s 判定（同天不同水平 或 跨天同/不同水平）。
     #    每个点带上各自水平的 (mean, sd)，供 evaluate_r4s_project 做 SD 归一化；
@@ -510,7 +596,7 @@ def aggregate_project(levels: list[dict]):
             all_points.append({
                 "level": lv["level"], "idx": idx,
                 "value": v, "mean": p["r4s_mean"], "sd": p["r4s_sd"], "date": d,
-                "ooc": idx in p["ooc"],
+                "ooc": idx in p["ooc"] or (lv["level"], idx) in uploaded_present,
             })
     ooc_add = evaluate_r4s_project(all_points)
     for (level, idx), rule in ooc_add.items():

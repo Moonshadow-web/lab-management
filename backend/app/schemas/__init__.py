@@ -338,6 +338,7 @@ class QCDailyValueRead(BaseModel):
     operator: str = ""
     violate_reason: str = ""
     violate_deal: str = ""
+    uploaded_rule: str = ""  # 上传表格规则列原始值（覆盖后端Westgard判定）
 
 
 # ---------------- QCMonthlyReport（月结文字部分） ----------------

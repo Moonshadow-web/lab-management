@@ -83,6 +83,7 @@ class QCDailyValue(Base):
     operator: Mapped[str] = mapped_column(String(100), default="")  # 操作人（每次测量）
     violate_reason: Mapped[str] = mapped_column(Text, default="")  # 失控原因（来自 LIS violateReason）
     violate_deal: Mapped[str] = mapped_column(Text, default="")  # 失控处理（来自 LIS violateDeal）
+    uploaded_rule: Mapped[str] = mapped_column(String(200), default="")  # 上传表格规则列原始值（覆盖后端Westgard判定）
 
 
 class QCMonthlyReport(Base):
