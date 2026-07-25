@@ -1,7 +1,7 @@
 <template>
   <div class="library-tabs">
     <span class="label">责任库：</span>
-    <el-radio-group :model-value="library" @update:model-value="onChange" size="small">
+    <el-radio-group v-model="selected" size="small" @change="onRadioChange">
       <el-radio-button v-for="lib in libs" :key="lib" :value="lib">{{ lib }}</el-radio-button>
     </el-radio-group>
     <span class="hint">（生化凝血 / 免疫 分开管理，两人各管一类）</span>
@@ -9,14 +9,19 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useReagentStore, LIBRARIES } from '../../store/reagent'
 
 const reagentStore = useReagentStore()
 const libs = LIBRARIES
-const library = computed(() => reagentStore.library)
+const selected = ref(reagentStore.library)
 
-function onChange(val) {
+// 外部切换（如其他页面修改了 store）时同步回来
+watch(() => reagentStore.library, (val) => {
+  if (val !== selected.value) selected.value = val
+})
+
+function onRadioChange(val) {
   reagentStore.setLibrary(val)
   emit('change', val)
 }
