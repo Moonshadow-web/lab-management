@@ -172,6 +172,27 @@ def _ensure_missing_columns():
             except Exception as e:  # noqa: BLE001
                 logger.warning("QC 兜底补列失败(忽略) %s.%s: %s", tname, colname, e)
 
+    # 2026-07-26 修正：scheduling_assignments.post_id 模型为 nullable=True，
+    # 但线上 MySQL 旧列是 NOT NULL（建表时定的），导致状态行(post_id 为空)INSERT
+    # 被拒(IntegrityError 1048)，矩阵「保存矩阵」整体 500。此处把该列改为可空
+    # （仅 MySQL；SQLite 由 create_all 按模型建表已可空，跳过）。幂等。
+    if engine.dialect.name == "mysql":
+        try:
+            with engine.connect() as c:
+                row = c.exec_driver_sql(
+                    "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='scheduling_assignments' "
+                    "AND COLUMN_NAME='post_id'"
+                ).fetchone()
+            if row is not None and str(row[0]).upper() == "NO":
+                with engine.begin() as conn:
+                    conn.exec_driver_sql(
+                        "ALTER TABLE scheduling_assignments MODIFY post_id INTEGER NULL"
+                    )
+                logger.info("修正 scheduling_assignments.post_id 为可空")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("修正 scheduling_assignments.post_id 可空失败(忽略): %s", e)
+
 
 def _migrate_schema():
     """为已存在的表补齐新增列（create_all 不会 ALTER 旧表）。
