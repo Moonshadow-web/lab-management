@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "scheduling-v12-swap-2026-07-26"
+_BUILD_MARK = "inst-immuno-model-split-2026-07-26-2342"
 
 
 def get_build_mark() -> str:

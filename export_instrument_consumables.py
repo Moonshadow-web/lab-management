@@ -13,32 +13,41 @@ except ImportError:
 
 
 def extract_base_model(name: str, model: str = "") -> str:
-    """与后端 _extract_instrument_base_model 完全一致（含家族映射表）。"""
-    # 家族映射表（用户 2026-07-26 确认）
+    """与后端 _extract_instrument_base_model 完全一致（含家族映射表 + 免疫model覆盖）。"""
     FAMILY_MAP = {
         "AU5800": "AU58",
         "TOP700A": "TOP700",
         "TOP700B": "TOP700",
         "TOP700C": "TOP700",
-        "免疫分析仪": "罗氏Cobas6000",
-        "DXA5000": None,  # 无耗材，不显示
+        "免疫分析仪": "罗氏Cobas6000",  # 默认；e411/A6200 在下面按 model 覆盖
+        "DXA5000": None,
+    }
+    IMMUNO_MODEL_MAP = {
+        "罗氏e411": "罗氏e411",
+        "安图A6200": "安图A6200",
     }
     if not name:
         return (model or "").strip()
-    raw = name.strip()
-    if raw in FAMILY_MAP:
-        return FAMILY_MAP[raw]
-    m = re.match(r"^([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)", raw)
+    raw_name = name.strip()
+    raw_model = (model or "").strip()
+
+    if raw_name in FAMILY_MAP:
+        mapped = FAMILY_MAP[raw_name]
+        if raw_name == "免疫分析仪" and raw_model in IMMUNO_MODEL_MAP:
+            return IMMUNO_MODEL_MAP[raw_model]
+        return mapped
+
+    m = re.match(r"^([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)", raw_name)
     if m:
         base = m.group(1)
         base = re.sub(r"-\d+$", "", base)
         if not base.isdigit() and len(base) >= 2:
             return FAMILY_MAP.get(base, base)
-    if model:
-        m2 = re.search(r"([A-Za-z]{2,}\d*[A-Za-z]*)", model)
+    if raw_model:
+        m2 = re.search(r"([A-Za-z]{2,}\d*[A-Za-z]*)", raw_model)
         if m2 and len(m2.group(1)) >= 2:
             return FAMILY_MAP.get(m2.group(1), m2.group(1))
-    return raw
+    return raw_name
 
 
 def main():

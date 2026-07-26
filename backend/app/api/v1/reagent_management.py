@@ -1141,42 +1141,58 @@ def _enrich_test_item_reagents(rows):
     return out
 
 
+# 仪器家族映射表（用户 2026-07-26 确认）。
+# 键为仪器 name（精确匹配）；值为目标总型号，None 表示无耗材不显示。
+# 特殊：name 相同但 model 不同的（如"免疫分析仪"有 e601/e602/e411/A6200），
+#       在 _extract_instrument_base_model 中用 _IMMUNO_MODEL_MAP 按 model 二次区分。
 INSTRUMENT_FAMILY_MAP = {
     "AU5800": "AU58",              # AU5800 属于 AU58 家族
     "TOP700A": "TOP700",           # TOP700 系列（A/B/C）合并
     "TOP700B": "TOP700",
     "TOP700C": "TOP700",
-    "免疫分析仪": "罗氏Cobas6000",  # 罗氏 e601/e602 均属 Cobas6000
+    "免疫分析仪": "罗氏Cobas6000",  # 默认归 Cobas6000（e601/e602），e411/A6200 在下面按 model 覆盖
     "DXA5000": None,               # 无耗材，不显示
+}
+
+# 免疫分析仪的 model → 总型号覆盖（name 都是"免疫分析仪"，靠 model 区分）
+_IMMUNO_MODEL_MAP = {
+    "罗氏e411": "罗氏e411",         # 耗材独立，不通用于 Cobas6000
+    "安图A6200": "安图A6200",       # 耗材独立，不通用于 Cobas6000
 }
 
 
 def _extract_instrument_base_model(name: str, model: str = "") -> str:
     """从仪器 name/model 中提取「总型号」，用于合并同型号多台仪器的耗材关联。
 
-    优先级：① 精确家族映射表 → ② 正则提取（遇空格/中文即停，去尾部编号）
+    优先级：① 精确家族映射(name) + 免疫model覆盖 → ② 正则提取（去尾部编号）
             → ③ model 提取核心型号 → ④ 兜底返回原 name
     """
     if not name:
         return (model or "").strip()
-    raw = name.strip()
-    # ① 精确家族映射优先
-    if raw in INSTRUMENT_FAMILY_MAP:
-        return INSTRUMENT_FAMILY_MAP[raw]
+    raw_name = name.strip()
+    raw_model = (model or "").strip()
+
+    # ① 精确家族映射（name 级）
+    if raw_name in INSTRUMENT_FAMILY_MAP:
+        mapped = INSTRUMENT_FAMILY_MAP[raw_name]
+        # 免疫分析仪特殊处理：按 model 再细分
+        if raw_name == "免疫分析仪" and raw_model in _IMMUNO_MODEL_MAP:
+            return _IMMUNO_MODEL_MAP[raw_model]
+        return mapped
+
     # ② 正则提取总型号（遇空格/中文即停，去尾部实例编号）
-    m = re.match(r'^([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)', raw)
+    m = re.match(r'^([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)', raw_name)
     if m:
         base = m.group(1)
         base = re.sub(r'-\d+$', '', base)   # AU58-1 → AU58
         if not base.isdigit() and len(base) >= 2:
-            # 提取出的 base 可能也在家族映射中（如 AU5800 已在上一步处理）
             return INSTRUMENT_FAMILY_MAP.get(base, base)
     # ③ 从 model 提取核心型号
-    if model:
-        m2 = re.search(r'([A-Za-z]{2,}\d*[A-Za-z]*)', model)
+    if raw_model:
+        m2 = re.search(r'([A-Za-z]{2,}\d*[A-Za-z]*)', raw_model)
         if m2 and len(m2.group(1)) >= 2:
             return INSTRUMENT_FAMILY_MAP.get(m2.group(1), m2.group(1))
-    return raw
+    return raw_name
 
 
 def _enrich_instrument_reagents(rows):
