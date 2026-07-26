@@ -379,87 +379,94 @@ def batch_set(req: SchedulingBatchRequest, db: Session = Depends(get_db),
     plan = db.get(SchedulingPlan, req.plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="排班计划不存在")
-    upserted = 0
-    # 提交人员按 (date, status) / (date, post_id) 归组，供 prune 比对
-    submitted: dict[tuple, set] = {}
-    submitted_posts: dict[tuple, set] = {}
-    for it in req.items:
-        if it.status not in ASSIGN_STATUS_ALL or not it.person:
-            continue
-        if it.status == ASSIGN_STATUS_ONDUTY and it.post_id is None:
-            continue
-        d = datetime.strptime(it.date, "%Y-%m-%d").date()
-        q = (
-            db.query(SchedulingAssignment)
-            .filter(SchedulingAssignment.plan_id == req.plan_id,
-                    SchedulingAssignment.date == it.date)
-        )
-        if it.post_id is not None:
-            q = q.filter(SchedulingAssignment.post_id == it.post_id)
-        else:
-            q = q.filter(SchedulingAssignment.post_id.is_(None), SchedulingAssignment.person == it.person)
-        exist = q.first()
-        if exist:
-            exist.status = it.status
-            exist.is_early = it.is_early
-            exist.is_continuous = it.is_continuous
-            exist.note = it.note
-            exist.weekday = d.weekday()
-            exist.is_workday = d.weekday() < 5
-            if it.post_id is not None:
-                exist.post_id = it.post_id
-        else:
-            db.add(SchedulingAssignment(
-                plan_id=req.plan_id, date=it.date, weekday=d.weekday(), is_workday=d.weekday() < 5,
-                post_id=it.post_id, person=it.person, status=it.status,
-                is_early=it.is_early, is_continuous=it.is_continuous, note=it.note))
-        upserted += 1
-        if it.post_id is None:
-            submitted.setdefault((it.date, it.status), set()).add(it.person)
-        else:
-            submitted_posts.setdefault((it.date, it.post_id), set()).add(it.person)
-    # prune：把 prune_keys 中列出的 (date, status) 裁剪为提交人员集合
-    if req.prune:
-        for key in req.prune_keys:
-            if len(key) != 2:
-                continue
-            date_s, status_s = key[0], key[1]
-            if status_s not in STATUS_CATEGORIES:
-                continue
-            keep = submitted.get((date_s, status_s), set())
-            q = (
-                db.query(SchedulingAssignment)
-                .filter(SchedulingAssignment.plan_id == req.plan_id,
-                        SchedulingAssignment.date == date_s,
-                        SchedulingAssignment.status == status_s,
-                        SchedulingAssignment.post_id.is_(None))
-            )
-            if keep:
-                q = q.filter(SchedulingAssignment.person.notin_(keep))
-            q.delete(synchronize_session=False)
-    # prune：岗位行(夜班/发热白班) 裁剪为提交人员集合
-    if req.prune:
-        for key in req.prune_post_keys:
-            if len(key) != 2:
-                continue
-            date_s, pid_s = key[0], key[1]
-            try:
-                pid = int(pid_s)
-            except (ValueError, TypeError):
-                continue
-            keep = submitted_posts.get((date_s, pid), set())
-            q = (
-                db.query(SchedulingAssignment)
-                .filter(SchedulingAssignment.plan_id == req.plan_id,
-                        SchedulingAssignment.date == date_s,
-                        SchedulingAssignment.post_id == pid,
-                        SchedulingAssignment.status == ASSIGN_STATUS_ONDUTY)
-            )
-            if keep:
-                q = q.filter(SchedulingAssignment.person.notin_(keep))
-            q.delete(synchronize_session=False)
-    db.commit()
-    return {"ok": True, "upserted": upserted}
+    try:
+      return _batch_set_impl(req, db)
+    except Exception as _e:
+        import traceback
+        return {"ok": False, "error": repr(_e), "tb": traceback.format_exc()}
+
+def _batch_set_impl(req, db):
+      upserted = 0
+      # 提交人员按 (date, status) / (date, post_id) 归组，供 prune 比对
+      submitted: dict[tuple, set] = {}
+      submitted_posts: dict[tuple, set] = {}
+      for it in req.items:
+          if it.status not in ASSIGN_STATUS_ALL or not it.person:
+              continue
+          if it.status == ASSIGN_STATUS_ONDUTY and it.post_id is None:
+              continue
+          d = datetime.strptime(it.date, "%Y-%m-%d").date()
+          q = (
+              db.query(SchedulingAssignment)
+              .filter(SchedulingAssignment.plan_id == req.plan_id,
+                      SchedulingAssignment.date == it.date)
+          )
+          if it.post_id is not None:
+              q = q.filter(SchedulingAssignment.post_id == it.post_id)
+          else:
+              q = q.filter(SchedulingAssignment.post_id.is_(None), SchedulingAssignment.person == it.person)
+          exist = q.first()
+          if exist:
+              exist.status = it.status
+              exist.is_early = it.is_early
+              exist.is_continuous = it.is_continuous
+              exist.note = it.note
+              exist.weekday = d.weekday()
+              exist.is_workday = d.weekday() < 5
+              if it.post_id is not None:
+                  exist.post_id = it.post_id
+          else:
+              db.add(SchedulingAssignment(
+                  plan_id=req.plan_id, date=it.date, weekday=d.weekday(), is_workday=d.weekday() < 5,
+                  post_id=it.post_id, person=it.person, status=it.status,
+                  is_early=it.is_early, is_continuous=it.is_continuous, note=it.note))
+          upserted += 1
+          if it.post_id is None:
+              submitted.setdefault((it.date, it.status), set()).add(it.person)
+          else:
+              submitted_posts.setdefault((it.date, it.post_id), set()).add(it.person)
+      # prune：把 prune_keys 中列出的 (date, status) 裁剪为提交人员集合
+      if req.prune:
+          for key in req.prune_keys:
+              if len(key) != 2:
+                  continue
+              date_s, status_s = key[0], key[1]
+              if status_s not in STATUS_CATEGORIES:
+                  continue
+              keep = submitted.get((date_s, status_s), set())
+              q = (
+                  db.query(SchedulingAssignment)
+                  .filter(SchedulingAssignment.plan_id == req.plan_id,
+                          SchedulingAssignment.date == date_s,
+                          SchedulingAssignment.status == status_s,
+                          SchedulingAssignment.post_id.is_(None))
+              )
+              if keep:
+                  q = q.filter(SchedulingAssignment.person.notin_(keep))
+              q.delete(synchronize_session=False)
+      # prune：岗位行(夜班/发热白班) 裁剪为提交人员集合
+      if req.prune:
+          for key in req.prune_post_keys:
+              if len(key) != 2:
+                  continue
+              date_s, pid_s = key[0], key[1]
+              try:
+                  pid = int(pid_s)
+              except (ValueError, TypeError):
+                  continue
+              keep = submitted_posts.get((date_s, pid), set())
+              q = (
+                  db.query(SchedulingAssignment)
+                  .filter(SchedulingAssignment.plan_id == req.plan_id,
+                          SchedulingAssignment.date == date_s,
+                          SchedulingAssignment.post_id == pid,
+                          SchedulingAssignment.status == ASSIGN_STATUS_ONDUTY)
+              )
+              if keep:
+                  q = q.filter(SchedulingAssignment.person.notin_(keep))
+              q.delete(synchronize_session=False)
+      db.commit()
+      return {"ok": True, "upserted": upserted}
 
 
 @router.get("/grid")
