@@ -46,7 +46,7 @@ def build_docx(out_path, summaries, report, instrument_name, instrument_no, year
         s.bottom_margin = Cm(1.8)
         s.left_margin = Cm(1.8)
         s.right_margin = Cm(1.8)
-    _add_footer_code(sec, "BG-SM-CZ-012", year)
+    _add_footer_code(sec, "BG-SM-CZ-012", year, expire_date="2026.08.01")
 
     # 标题
     p = doc.add_paragraph()
@@ -60,13 +60,6 @@ def build_docx(out_path, summaries, report, instrument_name, instrument_no, year
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _run_font(p.add_run(sub), 10.5)
-
-    # 表单信息行：表格编号 / 科室 / 生效日期（与 CZ-012 表单一致）
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    _run_font(p.add_run(
-        "表格编号：BG-SM-CZ-012    民航总医院检验科生化免疫组       生效日期：2026.08.01"
-    ), 10.5)
 
     # 数据表格
     ncol = len(CZ012_HEADERS)
