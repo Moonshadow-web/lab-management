@@ -60,7 +60,7 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column v-for="d in grid.dates" :key="d" :label="fmtDate(d)" :width="92" align="center">
+            <el-table-column v-for="d in grid.dates" :key="d" :label="fmtDate(d)" :width="120" align="center">
               <template #default="{ row }">
                 <div class="cell" :class="cellClass(row, d)" @click="openCellEditor(row, d)">
                   <template v-if="row.kind === 'post'">
@@ -866,8 +866,8 @@ async function loadConfigSummary() {
 .row-head { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .cell { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 38px; justify-content: center; cursor: pointer; }
 .cell:hover { background: #f5f7fa; }
-.person { font-size: 13px; }
-.person-chip { display: inline-block; font-size: 12px; margin: 1px 2px; padding: 1px 5px; background: #eef3fb; border-radius: 3px; }
+.person { font-size: 13px; white-space: nowrap; }
+.person-chip { display: inline-block; font-size: 12px; margin: 1px 2px; padding: 1px 5px; background: #eef3fb; border-radius: 3px; white-space: nowrap; }
 .mini-tag { font-size: 11px; line-height: 1; padding: 1px 4px; border-radius: 3px; }
 .mini-tag.early { background: #fdf6ec; color: #e6a23c; }
 .mini-tag.cont { background: #f0f9eb; color: #67c23a; }
