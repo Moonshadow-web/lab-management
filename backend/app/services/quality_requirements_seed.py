@@ -139,7 +139,7 @@ WST403_ITEMS: list[dict[str, Any]] = [
     {"item_name": "α-羟丁酸脱氢酶", "cv": "7.5%", "bias": "10.0%", "tea": "25.0%"},
     {"item_name": "胆碱酯酶", "cv": "6.0%", "bias": "8.0%", "tea": "20.0%"},
     {"item_name": "铁",       "cv": "6.5%", "bias": "4.5%", "tea": "2.1 μmol/L (≤14 μmol/L)；15.0% (>14 μmol/L)"},
-    {"item_name": "镁",       "cv": "5.5%", "bias": "5.5%", "tea": "0.12 mmol/L (≤0.8 mmol/L)；15.0% (>0.8 mmol/L)"},
+    {"item_name": "镁",       "cv": "8.3%", "bias": "5.5%", "tea": "0.12 mmol/L (≤0.8 mmol/L)；15.0% (>0.8 mmol/L)"},
     {"item_name": "胱抑素 C", "cv": "6.0%", "bias": "8.0%", "tea": "20.0%"},
     {"item_name": "肌酸激酶-MB(μg/L)", "cv": "10.0%", "bias": "10.0%", "tea": "4.5 μg/L (≤15 μg/L)；30.0% (>15 μg/L)"},
     {"item_name": "肌酸激酶-MB(U/L)",  "cv": "10.0%", "bias": "8.0%",  "tea": "3.75 U/L (≤15 U/L)；25.0% (>15 U/L)"},
@@ -675,10 +675,65 @@ NCCL_ITEMS: list[dict[str, Any]] = [
 ]
 
 
+# ---------------- 用户指定尿液分析（docx 月小结 2026-06-12） ----------------
+# 来源：《室内质控月小结_2026年06月_12.docx》「质量目标（允许不精密度）」列。
+# 尿液分析项目（尿尿素/尿肌酐/尿钠/尿钾/尿氯/尿镁/尿磷/尿钙/尿糖/尿尿酸/尿淀粉酶/
+# 尿微量总蛋白 等）与血清同名项目在系统里并存，WS/T 403 只定义血清靶值。若仅按血清
+# 条目，contains 匹配会让尿液行被血清目标覆盖（如 尿肌酐→血清肌酐 4.0%）。
+# 故此处以「最高优先级源 wst403-2024」写入尿液专用目标，并同时提供
+# 「LIS 原名」与「test_items 规范名（尿液）」两种 key，使已上传(原名)与未来上传
+# (规范名) 的行都能命中，且血清查询仍由血清精确条目(strategy-1)优先而互不污染。
+URINE_DOCX_ITEMS: list[dict[str, Any]] = [
+    {"item_name": "尿尿素",                  "cv": "7%"},
+    {"item_name": "尿素（尿液）",             "cv": "7%"},
+    {"item_name": "尿尿酸",                  "cv": "8%"},
+    {"item_name": "尿酸（尿液）",             "cv": "8%"},
+    {"item_name": "尿微量总蛋白",              "cv": "14.7%"},
+    {"item_name": "微量总蛋白（尿液）",          "cv": "14.7%"},
+    {"item_name": "尿氯",                    "cv": "8.7%"},
+    {"item_name": "氯（尿液）",               "cv": "8.7%"},
+    {"item_name": "尿淀粉酶",                  "cv": "10%"},
+    {"item_name": "淀粉酶（尿液）",             "cv": "10%"},
+    {"item_name": "尿磷",                    "cv": "7.7%"},
+    {"item_name": "磷（尿液）",               "cv": "7.7%"},
+    {"item_name": "尿糖",                    "cv": "6.7%"},
+    {"item_name": "葡萄糖（尿液）",             "cv": "6.7%"},
+    {"item_name": "尿肌酐",                  "cv": "5.7%"},
+    {"item_name": "肌酐（尿液）",              "cv": "5.7%"},
+    {"item_name": "尿钙",                    "cv": "10.3%"},
+    {"item_name": "总钙（尿液）",              "cv": "10.3%"},
+    {"item_name": "尿钠",                    "cv": "8.7%"},
+    {"item_name": "钠（尿液）",               "cv": "8.7%"},
+    {"item_name": "尿钾",                    "cv": "9.7%"},
+    {"item_name": "钾（尿液）",               "cv": "9.7%"},
+    {"item_name": "尿镁",                    "cv": "8.3%"},
+    {"item_name": "镁（尿液）",               "cv": "8.3%"},
+    {"item_name": "尿ɑ1微球蛋白",             "cv": "8.3%"},
+    {"item_name": "尿α1微球蛋白",             "cv": "8.3%"},
+    {"item_name": "尿球蛋白G",                "cv": "6%"},
+    {"item_name": "尿IgG",                  "cv": "6%"},
+    {"item_name": "17-羟类固醇",              "cv": "10%"},
+    {"item_name": "17-酮类固醇",              "cv": "10%"},
+    {"item_name": "尿香草扁桃酸",              "cv": "10%"},
+    {"item_name": "香草扁桃酸",               "cv": "10%"},
+    {"item_name": "NAG",                    "cv": "10%"},
+    {"item_name": "N-乙酰-β-D-氨基葡萄糖苷酶（尿液）", "cv": "10%"},
+    {"item_name": "微量白蛋白",               "cv": "10.0%"},
+    {"item_name": "尿微量白蛋白",             "cv": "10.0%"},
+]
+
+
 def all_seed() -> list[dict[str, Any]]:
     """返回全部 (source, item_name, category, cv, bias, tea, unit) 待灌库字典。"""
     out: list[dict[str, Any]] = []
     for it in WST403_ITEMS:
+        out.append({
+            "source": "wst403-2024", "category": it.get("category", ""),
+            "item_code": it.get("item_code", ""), "item_name": it["item_name"],
+            "cv": it.get("cv", ""), "bias": it.get("bias", ""), "tea": it.get("tea", ""),
+            "unit": it.get("unit", ""),
+        })
+    for it in URINE_DOCX_ITEMS:
         out.append({
             "source": "wst403-2024", "category": it.get("category", ""),
             "item_code": it.get("item_code", ""), "item_name": it["item_name"],
