@@ -1,14 +1,8 @@
-# ====== Stage 1: 构建前端 ======
-FROM node:20-alpine AS frontend-builder
-WORKDIR /build
-COPY frontend/package*.json ./
-RUN npm ci --production=false
-COPY frontend/ ./
-# 强制清掉任何构建缓存/旧产物，确保每次部署都重新构建前端（避免 CloudBase 构建缓存复用旧 dist）
-RUN rm -rf dist node_modules/.vite .vite 2>/dev/null || true
-RUN npm run build
+# 说明：前端产物由本地 `npm run build` 生成并提交到 git（frontend/dist），
+# 此处直接 COPY 已构建产物，避免在 CloudBase 云端重新构建前端时
+# 遇到的构建缓存/克隆陈旧问题（曾导致前端一直停留在旧构建）。
 
-# ====== Stage 2: 运行后端 + 托管前端 ======
+# ====== 运行后端 + 托管前端 ======
 FROM python:3.13-slim
 WORKDIR /app
 
@@ -24,8 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 后端代码
 COPY backend/ ./
 
-# 前端构建产物（main.py 在生产模式 serve 它）
-COPY --from=frontend-builder /build/dist ./frontend/dist
+# 前端构建产物（本地构建并提交到 git，main.py 在生产模式 serve 它）
+COPY frontend/dist ./frontend/dist
 
 # 初始数据备份（首次启动复制到持久卷，不覆盖已有数据）
 COPY data/app.db /app/backup/app.db
