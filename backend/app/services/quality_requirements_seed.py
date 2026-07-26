@@ -217,8 +217,16 @@ BJHR_ITEMS: list[dict[str, Any]] = [
     {"category": "3",  "item_name": "活化部分凝血活酶时间(APTT)", "cv": "正常6.5%/异常10.0%", "tea": "±15%"},
     {"category": "4",  "item_name": "纤维蛋白原(Fib)",       "cv": "正常9.0%/异常12.0%", "tea": "±20%", "unit": "g/L"},
     {"category": "5",  "item_name": "凝血酶时间(TT)",        "cv": "正常10.0%/异常12.0%", "tea": "±20%"},
-    {"category": "6",  "item_name": "D-二聚体(D-Dimer)",     "cv": "10.0%", "tea": "±30%", "unit": "μg/mL FEU 或 μg/mL DDU"},
+    {"category": "6",  "item_name": "D-二聚体(D-Dimer)",     "cv": "10%", "tea": "±30%", "unit": "μg/mL FEU 或 μg/mL DDU"},
     {"category": "7",  "item_name": "纤维蛋白(原)降解产物(FDP)", "cv": "11.7%", "tea": "±35%", "unit": "μg/mL"},
+    # —— 凝血特殊项（用户指定室内质控允许不精密度；非北京互认，借 bj-hr 源承载 cv 优先路径）——
+    # 名称与 test_items 规范名一致，确保按规范名精确命中。
+    {"category": "8",  "item_name": "血浆蛋白C活性",       "cv": "5.0%",  "remark": "用户指定室内质控允许不精密度"},
+    {"category": "8",  "item_name": "血浆蛋白S活性",       "cv": "8.3%",  "remark": "用户指定室内质控允许不精密度"},
+    {"category": "8",  "item_name": "血浆纤溶酶原活性",     "cv": "10%", "remark": "用户指定室内质控允许不精密度"},
+    {"category": "8",  "item_name": "狼疮抗凝物DRVVT试验",  "cv": "10.0%", "remark": "用户指定室内质控允许不精密度"},
+    {"category": "8",  "item_name": "狼疮抗凝物SCT试验",    "cv": "10%", "remark": "用户指定室内质控允许不精密度"},
+    {"category": "8",  "item_name": "抗凝血酶III",         "cv": "6.7%",  "remark": "用户指定室内质控允许不精密度"},
     {"category": "11", "item_name": "红细胞沉降率(ESR)",     "cv": "10.0%", "tea": "±3.0(≤10mm/h);±30%(>10mm/h)", "unit": "mm/h"},
     # 钾钠氯钙磷等
     {"category": "15", "item_name": "钾(K)",      "cv": "2.5%", "tea": "±6%",  "unit": "mmol/L"},

@@ -98,6 +98,8 @@ _LIS_ITEM_ALIASES = {
     "pt%": "凝血酶原时间",
     "inr": "凝血酶原时间",
     "inrratio": "凝血酶原时间",
+    "ratio": "凝血酶原时间",
+    "rat": "凝血酶原时间",
     "aptt": "活化部分凝血活酶时间",
     "tt": "凝血酶时间",
     "fib": "纤维蛋白原",
@@ -243,66 +245,127 @@ def _extract_first_pct(s: str) -> float | None:
     return None
 
 
-def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
+def _parse_cv_levels(cv_text: str) -> dict | None:
+    """解析「正常X%/异常Y%」形式的水平区分质量目标。
+
+    返回 {'正常': float, '异常': float}；无此写法返回 None。
+    用于凝血等「正常水平/异常水平允许不精密度不同」的项目。
+    """
+    if not cv_text:
+        return None
+    m = re.search(r"正常\s*([\d.]+)\s*%?\s*/\s*异常\s*([\d.]+)\s*%?", cv_text)
+    if m:
+        try:
+            return {"正常": float(m.group(1)), "异常": float(m.group(2))}
+        except ValueError:
+            return None
+    return None
+
+
+def _is_level2(level) -> bool:
+    """判断质控水平是否为「异常 / 水平2」。
+
+    水平字符串形如 '水平1' '水平2' '水平3' 或 '1' '2'；含「异常」或核心数字为 2 视为异常水平。
+    """
+    if not level:
+        return False
+    s = str(level).strip()
+    if "异常" in s:
+        return True
+    core = s.replace("水平", "").replace("Level", "").replace("level", "").strip()
+    return core == "2"
+
+
+def _extract_level_pct(cv_text: str, level=None) -> float | None:
+    """按水平提取质量目标百分比。
+
+    - 有「正常X%/异常Y%」区分时：水平2(异常)取 Y，其余(正常/水平1/水平3)取 X；
+    - 单一数值（如 D-二聚体 10%、FDP 11.7%）则原样返回，与水平无关。
+    """
+    parsed = _parse_cv_levels(cv_text)
+    if parsed:
+        if _is_level2(level):
+            return parsed.get("异常", parsed["正常"])
+        return parsed.get("正常", next(iter(parsed.values())))
+    return _extract_first_pct(cv_text)
+
+
+def _lookup_qr_goal(db: Session, test_item: str, aliases: str, level=None) -> str | None:
     """从 QualityRequirement 表中按项目名查找质量目标。
 
     优先级：wst403-2024.cv > bj-hr-2025.cv > nccl-2026.tea/3。
     匹配策略：精确匹配 > 子串含（主名或别名中有一段）。
+    level：质控水平（'水平1'/'水平2'/'水平3' 等）；cv 字段含「正常X%/异常Y%」时据此取对应值。
     """
     from .comparison_report import WST403_2024
 
-    def _match(items, source: str, field: str):
-        """在 items 中匹配第一条非空的目标字段值。"""
+    def _match(items, source: str, field: str, level=None):
+        """在 items 中匹配第一条非空的目标字段值（cv 字段按水平区分正常/异常）。"""
         for r in items:
             if r.source == source:
                 val = getattr(r, field, None)
                 if val and str(val).strip() not in ("", "/"):
-                    return str(val).strip()
+                    sval = str(val).strip()
+                    if field == "cv":
+                        # 单一干净百分比（如 5.0% / 6.7% / 10%）原样保留作者写法，
+                        # 避免 5.0%→5%、6.5%→6.5% 等精度丢失；「正常X%/异常Y%」才转数值按水平取。
+                        if re.match(r"^\d+(?:\.\d+)?%$", sval):
+                            return sval
+                        pct = _extract_level_pct(sval, level)
+                    else:
+                        pct = _extract_first_pct(sval)
+                    if pct is not None:
+                        return f"{pct:g}%"
         return None
 
     def _all(name: str) -> list:
-        """查询指定名称的所有 quality_requirements 记录。"""
+        """查询指定名称的所有 quality_requirements 记录（并集所有匹配策略，去重）。
+
+        注意：必须并集「精确 / 安全包含 / 别名词 / 括号代码」全部策略命中的行，
+        不能在某一步命中后短路——否则精确命中 NCCL（仅 tea、无 cv）行时会把
+        携带 cv 的 BJHR 行排除，导致凝血等项目只取到 NCCL tea/3 而非正确的
+        北京互认 cv（如 APTT 正常6.5%/异常10%）。
+        """
         from .quality_requirements_seed import contains_same_item
         all_qr = db.query(QualityRequirement).all()
         nname = _norm(name)
-        # 精确匹配（归一化括号/大小写，使 白蛋白（A）与 白蛋白(A) 互通）
-        rows = [r for r in all_qr if _norm(r.item_name) == nname]
-        # 安全包含匹配（双向，归一化），避免「钙」误入「降钙素原」等短字/前缀误匹配
-        if not rows:
-            rows = [r for r in all_qr if r.item_name and contains_same_item(nname, _norm(r.item_name))]
-        # 再试别名中的每个词（同样用安全包含）
-        if not rows:
-            for a in (aliases or "").replace("，", ",").split(","):
-                a = a.strip()
-                if not a:
-                    continue
-                na = _norm(a)
-                rows = [r for r in all_qr if r.item_name and contains_same_item(na, _norm(r.item_name))]
-                if rows:
-                    break
-        # 用「仪器档案检验项目」的别名/代码匹配质量目标条目的括号代码（如 HBsAg / HCV / HIV）。
-        # 即按本仪器实际做过的项目去对应质控项目；定性标志物（如 HBsAg）原先仅存定性 tea，
-        # 其规范名带括号代码，用此路径即可命中（前提：条目已补 cv）。
-        if not rows:
-            ti_codes = {(name or "").strip().upper()}
-            for w in _alias_words(aliases or ""):
-                if w:
-                    ti_codes.add(w.upper())
+        rows: list = []
+        seen = set()
+
+        def _add(r):
+            if id(r) not in seen:
+                seen.add(id(r))
+                rows.append(r)
+
+        # 1) 精确匹配（归一化括号/大小写，使 白蛋白（A）与 白蛋白(A) 互通）
+        for r in all_qr:
+            if _norm(r.item_name) == nname:
+                _add(r)
+        # 2) 安全包含匹配（双向，归一化），避免「钙」误入「降钙素原」等短字/前缀误匹配
+        for r in all_qr:
+            if r.item_name and contains_same_item(nname, _norm(r.item_name)):
+                _add(r)
+        # 3) 别名中的每个词（同样用安全包含）
+        for a in (aliases or "").replace("，", ",").split(","):
+            a = a.strip()
+            if not a:
+                continue
+            na = _norm(a)
             for r in all_qr:
-                rc = _paren_code(r.item_name)
-                if not rc:
-                    continue
-                # 精确匹配括号代码（如 HBsAg）；并兼容「qHBsAg ⊃ HBsAG」「HCVAb ⊃ HCV」
-                # 这类别名写法/大小写差异（LIS 简称经 find_test_item_by_name 命中定量项时别名不含 HBsAg）
-                hit = rc in ti_codes
-                if not hit:
-                    for w in ti_codes:
-                        if rc in w or w in rc:
-                            hit = True
-                            break
-                if hit:
-                    rows.append(r)
-                    break
+                if r.item_name and contains_same_item(na, _norm(r.item_name)):
+                    _add(r)
+        # 4) 用「仪器档案检验项目」的别名/代码匹配质量目标条目的括号代码
+        #    （如 HBsAg / HCV / HIV / D-Dimer）。仅做精确匹配，禁止子串包含——
+        #    否则 "PT"⊂"APTT"、"T"⊂"APTT"、"P"⊂"(P)" 会把凝血酶原时间/凝血酶时间/磷 等
+        #    无关项目误拉进来，导致 _match 按 DB 行序先取到错误的 cv。
+        ti_codes = {(name or "").strip().upper()}
+        for w in _alias_words(aliases or ""):
+            if w:
+                ti_codes.add(w.upper())
+        for r in all_qr:
+            rc = _paren_code(r.item_name)
+            if rc and rc in ti_codes:
+                _add(r)
         return rows or []
 
     items = _all(test_item)
@@ -310,21 +373,17 @@ def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
         return None
 
     # 1) wst403-2024.cv
-    v = _match(items, "wst403-2024", "cv")
+    v = _match(items, "wst403-2024", "cv", level)
     if v:
-        pct = _extract_first_pct(v)
-        if pct is not None:
-            return f"{pct:g}%"
+        return v
 
     # 2) bj-hr-2025.cv
-    v = _match(items, "bj-hr-2025", "cv")
+    v = _match(items, "bj-hr-2025", "cv", level)
     if v:
-        pct = _extract_first_pct(v)
-        if pct is not None:
-            return f"{pct:g}%"
+        return v
 
     # 3) nccl-2026.tea/3
-    v = _match(items, "nccl-2026", "tea")
+    v = _match(items, "nccl-2026", "tea", level)
     if v:
         pct = _extract_first_pct(v)
         if pct is not None:
@@ -345,7 +404,7 @@ def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
     return None
 
 
-def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None) -> str:
+def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None, level=None) -> str:
     """按项目名/别名查允许不精密度（质量目标）。
 
     优先级：
@@ -353,6 +412,8 @@ def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None) -
     2. 原有 qc_quality_goals.json 精确/子串匹配（保留兼容）
     3. WST403_2024 TE 字典 / 3
     4. 默认 "10%"
+
+    level：质控水平（'水平1'/'水平2'/'水平3'），用于 cv 含「正常X%/异常Y%」时取对应水平目标。
     """
     if not test_item:
         return ""
@@ -366,12 +427,12 @@ def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None) -
             cands = [canon, test_item] if canon != test_item else [test_item]
             # 优先返回非默认（非 10%）结果
             for nm in cands:
-                qr_goal = _lookup_qr_goal(db, nm, aliases)
+                qr_goal = _lookup_qr_goal(db, nm, aliases, level)
                 if qr_goal and qr_goal != "10%":
                     return qr_goal
             # 兜底：若候选都只能得到默认 10%（确有项目目标即为 10%），取首个有值者
             for nm in cands:
-                qr_goal = _lookup_qr_goal(db, nm, aliases)
+                qr_goal = _lookup_qr_goal(db, nm, aliases, level)
                 if qr_goal:
                     return qr_goal
         except Exception:
