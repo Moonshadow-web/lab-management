@@ -649,6 +649,14 @@ async function savePostCell() {
 async function deletePostCell() {
   if (!cellPostForm.id) return
   await ElMessageBox.confirm('确认删除该分配记录？', '提示', { type: 'warning' })
+  // 先取消早班/连班联动状态行，再删除岗位记录
+  if (cellPostForm.is_early || cellPostForm.is_continuous) {
+    await setSchedulingCell({
+      plan_id: selPlan.value, date: cellEdit.date, post_id: cellEdit.rowId,
+      person: cellPostForm.person, status: '在岗',
+      is_early: false, is_continuous: false, note: cellPostForm.note,
+    })
+  }
   await deleteSchedulingAssignment(cellPostForm.id)
   ElMessage.success('已删除')
   cellEdit.open = false

@@ -32,6 +32,8 @@ from ...models.scheduling import (
     ASSIGN_STATUS_ONDUTY,
     ASSIGN_STATUS_ALL,
     STATUS_CATEGORIES,
+    ASSIGN_STATUS_EARLY,
+    ASSIGN_STATUS_CONTINUOUS,
 )
 from ...models.user import User
 from ...schemas import (
@@ -318,6 +320,34 @@ def put_config(payload: SchedulingConfigRead, db: Session = Depends(get_db),
     return cfg
 
 
+def _sync_early_continuous_rows(db: Session, plan_id: int, date_str: str, person: str,
+                                is_early: bool, is_continuous: bool):
+    """岗位行保存早班/连班标记后，同步创建或删除对应的无岗位状态行。
+
+    这样月视图里「早班」「连班」独立状态行会自动显示岗位行已标记人员，实现联动。
+    """
+    if not person:
+        return
+    for flag, status in ((is_early, ASSIGN_STATUS_EARLY), (is_continuous, ASSIGN_STATUS_CONTINUOUS)):
+        q = db.query(SchedulingAssignment).filter(
+            SchedulingAssignment.plan_id == plan_id,
+            SchedulingAssignment.date == date_str,
+            SchedulingAssignment.post_id.is_(None),
+            SchedulingAssignment.person == person,
+            SchedulingAssignment.status == status,
+        )
+        if flag:
+            if not q.first():
+                d = datetime.strptime(date_str, "%Y-%m-%d").date()
+                db.add(SchedulingAssignment(
+                    plan_id=plan_id, date=date_str, weekday=d.weekday(), is_workday=d.weekday() < 5,
+                    post_id=None, person=person, status=status,
+                    is_early=False, is_continuous=False, note="",
+                ))
+        else:
+            q.delete(synchronize_session=False)
+
+
 @router.post("/cell")
 def set_cell(req: SchedulingCellRequest, db: Session = Depends(get_db),
              user: User = Depends(require_roles(*WRITE_ROLES))):
@@ -352,18 +382,19 @@ def set_cell(req: SchedulingCellRequest, db: Session = Depends(get_db),
         exist.note = req.note
         exist.weekday = d.weekday()
         exist.is_workday = d.weekday() < 5
-        db.commit()
-        db.refresh(exist)
-        return exist
-    a = SchedulingAssignment(
-        plan_id=req.plan_id, date=req.date, weekday=d.weekday(), is_workday=d.weekday() < 5,
-        post_id=req.post_id, person=req.person, status=req.status,
-        is_early=req.is_early, is_continuous=req.is_continuous, note=req.note,
-    )
-    db.add(a)
+    else:
+        exist = SchedulingAssignment(
+            plan_id=req.plan_id, date=req.date, weekday=d.weekday(), is_workday=d.weekday() < 5,
+            post_id=req.post_id, person=req.person, status=req.status,
+            is_early=req.is_early, is_continuous=req.is_continuous, note=req.note,
+        )
+        db.add(exist)
+    # 岗位行保存早班/连班标记时，同步维护对应无岗位状态行，实现月视图联动
+    if req.post_id is not None and req.status == ASSIGN_STATUS_ONDUTY:
+        _sync_early_continuous_rows(db, req.plan_id, req.date, req.person, req.is_early, req.is_continuous)
     db.commit()
-    db.refresh(a)
-    return a
+    db.refresh(exist)
+    return exist
 
 
 @router.post("/batch")
@@ -498,6 +529,18 @@ def grid(plan_id: int = Query(...), start: str | None = None, end: str | None = 
         elif a.status in STATUS_CATEGORIES:
             cell = status_cells.setdefault(f"status:{a.status}", {}).setdefault(a.date, {"persons": []})
             cell["persons"].append({"id": a.id, "person": a.person, "note": a.note})
+    # 岗位行标记了早班/连班的人，自动投影到对应状态行显示，实现月视图联动
+    for cell_map in post_cells.values():
+        for date_str, cell in cell_map.items():
+            person = cell.get("person")
+            if not person:
+                continue
+            for flag, status in ((cell.get("is_early"), ASSIGN_STATUS_EARLY),
+                                 (cell.get("is_continuous"), ASSIGN_STATUS_CONTINUOUS)):
+                if flag:
+                    sc = status_cells.setdefault(f"status:{status}", {}).setdefault(date_str, {"persons": []})
+                    if not any(p["person"] == person for p in sc["persons"]):
+                        sc["persons"].append({"id": cell.get("id"), "person": person, "note": cell.get("note") or ""})
     row_defs = [{"kind": "post", "id": p.id, "name": p.name, "group": p.group,
                  "required": p.required, "is_fever_day": p.is_fever_day} for p in posts]
     row_defs += [{"kind": "status", "key": s, "name": s} for s in STATUS_CATEGORIES]
