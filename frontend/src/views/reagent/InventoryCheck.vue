@@ -37,7 +37,7 @@
       @current-change="refresh" @size-change="page=1; refresh()" />
 
     <!-- 新建盘库弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="`新建盘库（${reagentStore.library}）`" width="960px" top="3vh">
+    <el-dialog v-model="dialogVisible" :title="`新建盘库（${reagentStore.library}）`" width="min(960px, 96vw)" top="3vh">
       <el-form :model="checkForm" label-width="80px" size="small">
         <el-row :gutter="12">
           <el-col :span="8"><el-form-item label="日期"><el-date-picker v-model="checkForm.check_date" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
@@ -63,15 +63,10 @@
         <template v-for="grp in filteredProjects" :key="'p'+grp.test_item_id">
           <h4 class="grp-title">项目：{{ grp.test_item_name }}</h4>
           <el-table :data="grp.items" border size="small">
-            <el-table-column label="试剂 / 校准品" min-width="200">
+            <el-table-column label="试剂 / 校准品" min-width="180">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
             </el-table-column>
-            <el-table-column label="材料编码" width="110">
-              <template #default="{ row }"><span class="muted">{{ row.material_code || '-' }}</span></template>
-            </el-table-column>
-            <el-table-column label="单位" width="65"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
-            <el-table-column label="当前库存" width="80" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
-            <el-table-column label="盘点余量" width="120">
+            <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
                 <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:110px" controls-position="right" />
               </template>
@@ -82,15 +77,10 @@
         <template v-for="grp in filteredInstruments" :key="'i'+grp.group">
           <h4 class="grp-title">仪器：{{ grp.group }} <span class="muted" v-if="grp.instruments.length">（{{ grp.instruments.join('、') }}）</span></h4>
           <el-table :data="grp.items" border size="small">
-            <el-table-column label="耗材" min-width="200">
+            <el-table-column label="耗材" min-width="180">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
             </el-table-column>
-            <el-table-column label="材料编码" width="110">
-              <template #default="{ row }"><span class="muted">{{ row.material_code || '-' }}</span></template>
-            </el-table-column>
-            <el-table-column label="单位" width="65"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
-            <el-table-column label="当前库存" width="80" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
-            <el-table-column label="盘点余量" width="120">
+            <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
                 <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:110px" controls-position="right" />
               </template>
@@ -101,15 +91,10 @@
         <template v-if="filteredControls.length">
           <h4 class="grp-title">质控品（单独）</h4>
           <el-table :data="filteredControls" border size="small">
-            <el-table-column label="质控品" min-width="200">
+            <el-table-column label="质控品" min-width="180">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
             </el-table-column>
-            <el-table-column label="材料编码" width="110">
-              <template #default="{ row }"><span class="muted">{{ row.material_code || '-' }}</span></template>
-            </el-table-column>
-            <el-table-column label="单位" width="65"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
-            <el-table-column label="当前库存" width="80" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
-            <el-table-column label="盘点余量" width="120">
+            <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
                 <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:110px" controls-position="right" />
               </template>

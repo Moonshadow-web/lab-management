@@ -45,7 +45,7 @@
       @current-change="refresh" @size-change="page=1; refresh()" />
 
     <!-- 新建/编辑订购弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="(editingId ? '编辑订购' : '新建订购') + `（${reagentStore.library}）`" width="960px" top="3vh">
+    <el-dialog v-model="dialogVisible" :title="(editingId ? '编辑订购' : '新建订购') + `（${reagentStore.library}）`" width="min(960px, 96vw)" top="3vh">
       <el-form :model="orderForm" label-width="80px" size="small">
         <el-row :gutter="12">
           <el-col :span="8"><el-form-item label="订单号"><el-input v-model="orderForm.order_no" placeholder="ORD-202607-001" /></el-form-item></el-col>
@@ -69,51 +69,39 @@
       <div class="entry-scroll">
         <template v-for="grp in filteredProjects" :key="'p'+grp.test_item_id">
           <h4 class="grp-title">项目：{{ grp.test_item_name }}</h4>
-          <el-table :data="grp.items" border size="small">
-            <el-table-column label="试剂 / 校准品" min-width="200">
-              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
-            </el-table-column>
-            <el-table-column label="材料编码" width="110"><template #default="{ row }">{{ row.material_code || '-' }}</template></el-table-column>
-            <el-table-column label="单位" width="70"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
-            <el-table-column label="当前库存" width="90" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
-            <el-table-column label="订购数量" width="130">
-              <template #default="{ row }">
-                <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:120px" controls-position="right" />
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="entry-card-list">
+            <div class="entry-card" v-for="it in grp.items" :key="it.item_id">
+              <div class="entry-card-name">{{ it.name }} <span class="muted">{{ it.spec }}</span></div>
+              <div class="entry-card-input">
+                <span class="muted">订购数量</span>
+                <el-input-number v-model="quantities[it.item_id]" :min="0" size="small" controls-position="right" />
+              </div>
+            </div>
+          </div>
         </template>
         <template v-for="grp in filteredInstruments" :key="'i'+grp.group">
           <h4 class="grp-title">仪器：{{ grp.group }} <span class="muted" v-if="grp.instruments.length">（{{ grp.instruments.join('、') }}）</span></h4>
-          <el-table :data="grp.items" border size="small">
-            <el-table-column label="耗材" min-width="200">
-              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
-            </el-table-column>
-            <el-table-column label="材料编码" width="110"><template #default="{ row }">{{ row.material_code || '-' }}</template></el-table-column>
-            <el-table-column label="单位" width="70"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
-            <el-table-column label="当前库存" width="90" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
-            <el-table-column label="订购数量" width="130">
-              <template #default="{ row }">
-                <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:120px" controls-position="right" />
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="entry-card-list">
+            <div class="entry-card" v-for="it in grp.items" :key="it.item_id">
+              <div class="entry-card-name">{{ it.name }} <span class="muted">{{ it.spec }}</span></div>
+              <div class="entry-card-input">
+                <span class="muted">订购数量</span>
+                <el-input-number v-model="quantities[it.item_id]" :min="0" size="small" controls-position="right" />
+              </div>
+            </div>
+          </div>
         </template>
         <template v-if="filteredControls.length">
           <h4 class="grp-title">质控品（单独）</h4>
-          <el-table :data="filteredControls" border size="small">
-            <el-table-column label="质控品" min-width="200">
-              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
-            </el-table-column>
-            <el-table-column label="材料编码" width="110"><template #default="{ row }">{{ row.material_code || '-' }}</template></el-table-column>
-            <el-table-column label="单位" width="70"><template #default="{ row }">{{ row.unit || '-' }}</template></el-table-column>
-            <el-table-column label="当前库存" width="90" align="center"><template #default="{ row }">{{ row.current_stock }}</template></el-table-column>
-            <el-table-column label="订购数量" width="130">
-              <template #default="{ row }">
-                <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:120px" controls-position="right" />
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="entry-card-list">
+            <div class="entry-card" v-for="it in filteredControls" :key="it.item_id">
+              <div class="entry-card-name">{{ it.name }} <span class="muted">{{ it.spec }}</span></div>
+              <div class="entry-card-input">
+                <span class="muted">订购数量</span>
+                <el-input-number v-model="quantities[it.item_id]" :min="0" size="small" controls-position="right" />
+              </div>
+            </div>
+          </div>
         </template>
         <el-empty v-if="totalEntries === 0" description="该分类/检索条件下无数据" />
       </div>
@@ -299,4 +287,13 @@ onMounted(refresh)
 .entry-scroll { max-height: 56vh; overflow: auto; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; }
 .grp-title { margin: 14px 0 6px; font-size: 14px; color: #0f172a; border-left: 4px solid #2563eb; padding-left: 8px; }
 .grp-title:first-child { margin-top: 4px; }
+/* 移动端卡片式录入：名称换行 + 数量输入在右，避免横向滑动 */
+.entry-card-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.entry-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; }
+.entry-card-name { flex: 1; min-width: 0; font-size: 13px; color: #0f172a; line-height: 1.4; word-break: break-word; }
+.entry-card-input { display: flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 480px) {
+  .entry-card { flex-direction: column; align-items: stretch; }
+  .entry-card-input { justify-content: space-between; }
+}
 </style>
