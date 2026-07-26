@@ -92,3 +92,19 @@ export function rejectSwap(id) {
 export function cancelSwap(id) {
   return request.post(`/api/v1/scheduling/swap/${id}/cancel`)
 }
+
+// 休息申请（自服务，无需审批）
+export function requestRest(data) {
+  return request.post('/api/v1/scheduling/rest-request', data)
+}
+export function listRestRequests(params) {
+  return request.get('/api/v1/scheduling/rest-request/list', { params })
+}
+export function cancelRest(id) {
+  return request.post(`/api/v1/scheduling/rest-request/${id}/cancel`)
+}
+
+// 休息花名册（本周/近两周/本月，哪些人休息）
+export function getRestRoster(params) {
+  return request.get('/api/v1/scheduling/rest-roster', { params })
+}

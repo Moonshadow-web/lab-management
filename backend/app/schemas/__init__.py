@@ -716,6 +716,27 @@ class SchedulingSwapRequestRead(SchedulingSwapRequestBase):
     updated_at: datetime | None = None
 
 
+class SchedulingRestRequestBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    person: str = ""
+    date: str = ""
+    status: str = "生效中"   # 生效中/已取消
+    assignment_id: int | None = None
+    note: str = ""
+
+
+class SchedulingRestRequestCreate(BaseModel):
+    """发起休息申请：仅填本人需要休息的日期（person 由后端取当前用户）。"""
+    date: str                              # YYYY-MM-DD
+    note: str = ""
+
+
+class SchedulingRestRequestRead(SchedulingRestRequestBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 class SchedulingConfigBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     excluded_people: list[str] = []      # 不参与任何排班的人员

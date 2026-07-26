@@ -27,10 +27,12 @@ from ...models.scheduling import (
     SchedulingAssignment,
     SchedulingConfig,
     SchedulingSwapRequest,
+    SchedulingRestRequest,
     POST_GROUP_DAY,
     POST_GROUP_NIGHT,
     POST_GROUP_SPECIAL,
     ASSIGN_STATUS_ONDUTY,
+    ASSIGN_STATUS_REST,
     ASSIGN_STATUS_ALL,
     STATUS_CATEGORIES,
     ASSIGN_STATUS_EARLY,
@@ -39,6 +41,8 @@ from ...models.scheduling import (
     SWAP_STATUS_CONFIRMED,
     SWAP_STATUS_REJECTED,
     SWAP_STATUS_CANCELED,
+    REST_STATUS_ACTIVE,
+    REST_STATUS_CANCELED,
 )
 from ...models.user import User
 from ...models.notification import Notification
@@ -59,9 +63,11 @@ from ...schemas import (
     MyScheduleItem,
     SchedulingSwapRequestCreate,
     SchedulingSwapRequestRead,
+    SchedulingRestRequestCreate,
+    SchedulingRestRequestRead,
 )
 
-WRITE_ROLES = ("admin", "specialty_leader")
+WRITE_ROLES = ("admin", "specialty_leader", "leader")
 
 posts_router = make_router(
     SchedulingPost, SchedulingPostRead, SchedulingPostCreate, SchedulingPostUpdate,
@@ -815,3 +821,99 @@ def cancel_swap(swap_id: int, db: Session = Depends(get_db),
     db.commit()
     db.refresh(swap)
     return swap
+
+
+@router.post("/rest-request", response_model=SchedulingRestRequestRead)
+def request_rest(req: SchedulingRestRequestCreate, db: Session = Depends(get_db),
+                 user: User = Depends(get_current_user)):
+    """自服务休息申请（无需审批）：登录人填本人某天需要休息，确认后直接在排班表写入一条
+    status=休息、post_id=None 的 assignment 记录（每条申请独占其行），便于取消时精确删除，
+    不影响他人/管理员录入的记录。仅本人可用（自服务写操作，绕过排班管理写权限）。"""
+    me = user.full_name or user.username
+    try:
+        d = datetime.strptime(req.date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="日期格式应为 YYYY-MM-DD")
+    if d < date.today():
+        raise HTTPException(status_code=400, detail="不能对过去的日期提交休息申请")
+    existing = (
+        db.query(SchedulingRestRequest)
+        .filter(SchedulingRestRequest.person == me,
+                SchedulingRestRequest.date == req.date,
+                SchedulingRestRequest.status == REST_STATUS_ACTIVE)
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail=f"您已在 {req.date} 提交了生效中的休息申请，无需重复提交")
+    assign = SchedulingAssignment(
+        plan_id=0, date=req.date, weekday=d.weekday(), is_workday=d.weekday() < 5,
+        post_id=None, person=me, status=ASSIGN_STATUS_REST,
+        is_early=False, is_continuous=False, note=req.note or "自服务休息申请",
+    )
+    db.add(assign)
+    db.flush()
+    rest = SchedulingRestRequest(
+        person=me, date=req.date, status=REST_STATUS_ACTIVE,
+        assignment_id=assign.id, note=req.note or "",
+    )
+    db.add(rest)
+    db.commit()
+    db.refresh(rest)
+    return rest
+
+
+@router.get("/rest-request/list", response_model=list[SchedulingRestRequestRead])
+def list_rest_requests(scope: str = Query("mine"),
+                        db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """休息申请列表。scope=mine(我发起的) / all(全部生效中)。用于「我的休息申请」页签展示与取消。"""
+    if scope not in ("mine", "all"):
+        raise HTTPException(status_code=400, detail="scope 仅支持 mine/all")
+    me = user.full_name or user.username
+    q = db.query(SchedulingRestRequest)
+    if scope == "mine":
+        q = q.filter(SchedulingRestRequest.person == me)
+    else:
+        q = q.filter(SchedulingRestRequest.status == REST_STATUS_ACTIVE)
+    return q.order_by(SchedulingRestRequest.date.desc()).all()
+
+
+@router.post("/rest-request/{rest_id}/cancel", response_model=SchedulingRestRequestRead)
+def cancel_rest(rest_id: int, db: Session = Depends(get_db),
+                user: User = Depends(get_current_user)):
+    """取消休息申请：删除其独占的 assignment 行，并标记申请为已取消。仅发起人本人可取消。"""
+    me = user.full_name or user.username
+    rest = db.get(SchedulingRestRequest, rest_id)
+    if not rest:
+        raise HTTPException(status_code=404, detail="休息申请不存在")
+    if rest.person != me:
+        raise HTTPException(status_code=403, detail="只能取消本人的休息申请")
+    if rest.status != REST_STATUS_ACTIVE:
+        raise HTTPException(status_code=400, detail=f"该申请已{rest.status}，无法取消")
+    if rest.assignment_id:
+        assign = db.get(SchedulingAssignment, rest.assignment_id)
+        if assign:
+            db.delete(assign)
+    rest.status = REST_STATUS_CANCELED
+    rest.updated_at = datetime.now()
+    db.commit()
+    db.refresh(rest)
+    return rest
+
+
+@router.get("/rest-roster")
+def rest_roster(range: str = Query("week"),
+                db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """本范围（本周/近两周/本月）内所有休息人员及日期，供工作台「今日我的岗位」展示休息花名册。"""
+    if range not in ("week", "fortnight", "month"):
+        raise HTTPException(status_code=400, detail="range 仅支持 week/fortnight/month")
+    today = date.today()
+    s, e = _resolve_range(range, today)
+    rows = (
+        db.query(SchedulingAssignment)
+        .filter(SchedulingAssignment.status == ASSIGN_STATUS_REST,
+                SchedulingAssignment.post_id.is_(None),
+                SchedulingAssignment.date >= s, SchedulingAssignment.date <= e)
+        .order_by(SchedulingAssignment.date, SchedulingAssignment.person)
+        .all()
+    )
+    return [{"date": a.date, "person": a.person, "note": a.note or ""} for a in rows]

@@ -36,7 +36,7 @@
           <el-select v-model="genDays" style="width: 120px" title="生成天数">
             <el-option v-for="d in [7,14,30]" :key="d" :label="`生成${d}天`" :value="d" />
           </el-select>
-          <el-button type="primary" :loading="generating" @click="onGenerate">生成白班</el-button>
+          <el-button v-if="isManager" type="primary" :loading="generating" @click="onGenerate">生成白班</el-button>
           <el-button :loading="gridLoading" @click="loadGrid">查询</el-button>
         </div>
         <el-alert type="info" :closable="false" class="tip" title="使用说明">
@@ -102,8 +102,8 @@
         <el-empty v-if="!grid.dates.length" description="请选择计划与月份后查询" />
       </el-tab-pane>
 
-      <!-- 批量录入 -->
-      <el-tab-pane label="批量录入" name="batch">
+      <!-- 批量录入（仅组长/管理员） -->
+      <el-tab-pane v-if="isManager" label="批量录入" name="batch">
         <!-- 状态矩阵录入：日期×状态，单元格多选人员 -->
         <div class="bm-block">
           <div class="bm-toolbar">
@@ -200,8 +200,8 @@
         </el-form>
       </el-tab-pane>
 
-      <!-- 岗位定义 -->
-      <el-tab-pane label="岗位定义" name="posts">
+      <!-- 岗位定义（仅组长/管理员） -->
+      <el-tab-pane v-if="isManager" label="岗位定义" name="posts">
         <CrudTable
           ref="postCrud"
           :columns="postColumns"
@@ -224,8 +224,8 @@
         />
       </el-tab-pane>
 
-      <!-- 排班计划 -->
-      <el-tab-pane label="排班计划" name="plans">
+      <!-- 排班计划（仅组长/管理员） -->
+      <el-tab-pane v-if="isManager" label="排班计划" name="plans">
         <CrudTable
           ref="planCrud"
           :columns="planColumns"
@@ -248,8 +248,8 @@
         />
       </el-tab-pane>
 
-      <!-- 设置 -->
-      <el-tab-pane label="设置" name="config">
+      <!-- 设置（仅组长/管理员） -->
+      <el-tab-pane v-if="isManager" label="设置" name="config">
         <div class="cfg-summary">
           <span>不参与排班：<b>{{ configExcludedText || '（无）' }}</b></span>
           <el-divider direction="vertical" />
@@ -290,6 +290,53 @@
               <template v-else-if="row.status === '待确认' && row.from_person === meName">
                 <el-button link type="warning" @click="cancelSwapReq(row)">取消</el-button>
               </template>
+              <span v-else class="muted">—</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
+
+      <!-- 我的休息申请（自服务，所有登录用户可用） -->
+      <el-tab-pane label="我的休息申请" name="rest">
+        <el-alert type="success" :closable="false" class="tip" title="自服务休息申请">
+          填写本人需要休息的日期，确认后班表直接录入「休息」；如后续不休，可随时取消（移除该休息记录）。
+        </el-alert>
+        <el-form :model="restForm" label-width="100px" class="rest-form">
+          <el-form-item label="休息日期">
+            <el-date-picker
+              v-model="restForm.date"
+              type="date"
+              value-format="YYYY-MM-DD"
+              :disabled-date="restDateDisabled"
+              placeholder="选择日期"
+              style="width: 220px"
+            />
+          </el-form-item>
+          <el-form-item label="备注">
+            <el-input v-model="restForm.note" placeholder="可选" style="width: 320px" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="warning" :loading="restSubmitting" @click="submitRest">提交休息申请</el-button>
+            <span class="tip-text">提交后将立即在班表写入「休息」。</span>
+          </el-form-item>
+        </el-form>
+
+        <el-divider content-position="left">我的休息申请</el-divider>
+        <el-empty v-if="!myRests.length" description="暂无休息申请" :image-size="60" />
+        <el-table v-else :data="myRests" size="small" style="width: 100%">
+          <el-table-column prop="date" label="日期" width="130" />
+          <el-table-column label="星期" width="90">
+            <template #default="{ row }">{{ weekdayText(row.date) }}</template>
+          </el-table-column>
+          <el-table-column prop="note" label="备注" min-width="160" show-overflow-tooltip />
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.status === '生效中' ? 'success' : 'info'" size="small">{{ row.status }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" align="center">
+            <template #default="{ row }">
+              <el-button v-if="row.status === '生效中'" link type="danger" @click="cancelRestReq(row)">取消</el-button>
               <span v-else class="muted">—</span>
             </template>
           </el-table-column>
@@ -381,6 +428,7 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRoute } from 'vue-router'
 import CrudTable from '../../components/CrudTable.vue'
 import EditDialog from '../../components/EditDialog.vue'
 import UserSelect from '../../components/UserSelect.vue'
@@ -392,10 +440,14 @@ import {
   getSchedulingGrid, getMyToday, generateScheduling,
   getSchedulingConfig, updateSchedulingConfig, setSchedulingCell, batchSchedulingCells,
   getMySchedule, requestSwap, listSwaps, confirmSwap, rejectSwap, cancelSwap,
+  requestRest, listRestRequests, cancelRest,
 } from '../../api/scheduling'
 import { listActiveUsers } from '../../api/users'
 
 const auth = useAuthStore()
+const route = useRoute()
+// 排班管理写权限 = 管理员 / 专业组长 / 组长。该值为 true 时可编辑排班；否则仅可查看、换班、申请休息。
+const isManager = computed(() => auth.canWrite('scheduling'))
 function pad(n) { return String(n).padStart(2, '0') }
 function localDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
 const todayStr = localDate(new Date())
@@ -680,6 +732,7 @@ const cellPostForm = reactive({ id: null, person: '', is_early: false, is_contin
 const cellPersonForm = reactive({ person: '', note: '' })
 
 function openCellEditor(row, d) {
+  if (!isManager.value) return  // 非组长/管理员仅可查看与换班，不允许直接编辑单元格
   cellEdit.kind = row.kind
   cellEdit.rowName = row.name
   cellEdit.date = d
@@ -977,6 +1030,48 @@ async function cancelSwapReq(row) {
   catch (e) { ElMessage.error('取消失败') }
 }
 
+// ---------------- 休息申请（自服务） ----------------
+const restForm = reactive({ date: '', note: '' })
+const myRests = ref([])
+const restSubmitting = ref(false)
+
+function weekdayText(d) {
+  const dt = new Date(d + 'T00:00:00')
+  return WEEKDAY_TEXT[dt.getDay() === 0 ? 6 : dt.getDay() - 1]
+}
+// 禁止选择过去的日期（后端也会拒绝）
+function restDateDisabled(date) {
+  const t = new Date()
+  t.setHours(0, 0, 0, 0)
+  return date.getTime() < t.getTime()
+}
+
+async function loadMyRests() {
+  try { myRests.value = (await listRestRequests({ scope: 'mine' })) || [] }
+  catch (e) { myRests.value = [] }
+}
+
+async function submitRest() {
+  if (!restForm.date) { ElMessage.warning('请选择休息日期'); return }
+  restSubmitting.value = true
+  try {
+    await requestRest({ date: restForm.date, note: restForm.note })
+    ElMessage.success('休息申请已提交，班表已录入「休息」')
+    restForm.date = ''
+    restForm.note = ''
+    loadMyRests()
+  } catch (e) { ElMessage.error(e?.response?.data?.detail || '提交失败') }
+  finally { restSubmitting.value = false }
+}
+
+async function cancelRestReq(row) {
+  try {
+    await cancelRest(row.id)
+    ElMessage.success('已取消休息申请，班表已移除该休息记录')
+    loadMyRests()
+  } catch (e) { ElMessage.error(e?.response?.data?.detail || '取消失败') }
+}
+
 // ---------------- 初始化 ----------------
 onMounted(() => {
   checkMobile()
@@ -989,11 +1084,21 @@ onMounted(() => {
   const now = new Date()
   monthValue.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`
   onMonthChange()
+  // 工作台跳转：?tab=swap / ?tab=rest 直达对应自服务页签
+  const qTab = route.query.tab
+  if (qTab === 'rest' || qTab === 'swap') activeTab.value = qTab
 })
 onBeforeUnmount(() => { window.removeEventListener('resize', checkMobile) })
 
-// 进入「我的换班」标签页时自动加载列表
-watch(activeTab, (t) => { if (t === 'myswap') loadMySwaps() })
+// 进入「我的换班 / 我的休息申请」标签页时自动加载列表
+watch(activeTab, (t) => {
+  if (t === 'myswap') loadMySwaps()
+  if (t === 'rest') loadMyRests()
+})
+// 支持从工作台带 ?tab=swap / ?tab=rest 直达对应页签
+watch(() => route.query.tab, (t) => {
+  if (t === 'rest' || t === 'swap') activeTab.value = t
+})
 
 async function loadConfigSummary() {
   try {

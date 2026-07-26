@@ -62,7 +62,7 @@ DEFAULT_MODULE_PERMISSIONS = {
     "verification":        ["admin", "specialty_leader"],
     "iso15189":            ["admin", "quality_manager", "qc_manager", "training_manager", "reagent_manager", "it_manager", "specialty_leader"],
     "quality-requirements": ["admin"],
-    "scheduling":          ["admin", "specialty_leader"],
+    "scheduling":          ["admin", "specialty_leader", "leader"],
 }
 
 

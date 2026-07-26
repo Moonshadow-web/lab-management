@@ -56,6 +56,11 @@ SWAP_STATUS_REJECTED = "已拒绝"
 SWAP_STATUS_CANCELED = "已取消"
 SWAP_STATUS_ALL = [SWAP_STATUS_PENDING, SWAP_STATUS_CONFIRMED, SWAP_STATUS_REJECTED, SWAP_STATUS_CANCELED]
 
+# 休息申请状态（自服务，无需审批：确认即写入排班表，取消即移除）
+REST_STATUS_ACTIVE = "生效中"
+REST_STATUS_CANCELED = "已取消"
+REST_STATUS_ALL = [REST_STATUS_ACTIVE, REST_STATUS_CANCELED]
+
 
 class SchedulingPost(Base):
     """岗位定义。每个岗位各一人；门诊辅助岗/电泳岗可空缺（required=False）。"""
@@ -134,6 +139,29 @@ class SchedulingSwapRequest(Base):
     )  # B 的班次；顶班场景为空
     status: Mapped[str] = mapped_column(String(20), default=SWAP_STATUS_PENDING)  # 待确认/已确认/已拒绝/已取消
     note: Mapped[str] = mapped_column(String(200), default="")  # 发起人留言
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SchedulingRestRequest(Base):
+    """休息申请（自服务，无需审批）。
+
+    登录人填本人哪天需要休息，确认后后端直接在排班表写入一条
+    status=休息、post_id=None 的 SchedulingAssignment，并记录本表
+    （assignment_id 指向写入行），便于取消时精确删除。
+    取消即软删本表（status=已取消）+ 删除对应 assignment 行。
+    """
+
+    __tablename__ = "scheduling_rest_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    person: Mapped[str] = mapped_column(String(100), index=True, default="")   # 申请人 full_name
+    date: Mapped[str] = mapped_column(String(20), index=True, default="")      # YYYY-MM-DD
+    status: Mapped[str] = mapped_column(String(20), default=REST_STATUS_ACTIVE)  # 生效中/已取消
+    assignment_id: Mapped[int | None] = mapped_column(
+        Integer, default=None, nullable=True, index=True
+    )  # 写入的 SchedulingAssignment 行 id（取消时删除）
+    note: Mapped[str] = mapped_column(String(200), default="")  # 申请人留言
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

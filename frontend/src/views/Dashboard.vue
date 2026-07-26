@@ -29,12 +29,14 @@
 
     <AppCard title="今日我的岗位" class="mt">
       <template #header-extra>
-        <el-radio-group v-model="rangeMode" size="small" @change="loadMySchedule">
+        <el-radio-group v-model="rangeMode" size="small" @change="onRangeChange">
           <el-radio-button label="week">本周</el-radio-button>
           <el-radio-button label="fortnight">近两周</el-radio-button>
           <el-radio-button label="month">本月</el-radio-button>
         </el-radio-group>
         <el-button size="small" @click="loadMyShifts">刷新</el-button>
+        <el-button size="small" type="primary" plain @click="go('/scheduling?tab=swap')">换班申请</el-button>
+        <el-button size="small" type="warning" plain @click="go('/scheduling?tab=rest')">休息申请</el-button>
       </template>
 
       <div v-if="myShifts.length" class="my-shifts">
@@ -81,6 +83,22 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <el-divider v-if="mySchedule.length && restRoster.length" />
+      <div v-if="restRoster.length" class="rest-roster">
+        <div class="rest-roster-title">本范围休息人员（{{ rangeLabel }}）</div>
+        <div class="rest-chips">
+          <el-tag
+            v-for="r in restRoster"
+            :key="r.date + '|' + r.person"
+            type="info"
+            effect="plain"
+            size="small"
+            class="rest-chip"
+          >{{ r.date }} · {{ r.person }}</el-tag>
+        </div>
+      </div>
+      <el-empty v-else-if="mySchedule.length" description="本范围无人申请休息" :image-size="50" />
     </AppCard>
 
     <AppCard title="提醒事项" class="mt">
@@ -131,7 +149,7 @@ import { listReagents } from '../api/reagents'
 import { listTraining } from '../api/training'
 import { listVerification } from '../api/verification'
 import { listNC } from '../api/nonconformity'
-import { getMyToday, getMySchedule } from '../api/scheduling'
+import { getMyToday, getMySchedule, getRestRoster } from '../api/scheduling'
 
 const router = useRouter()
 const stats = ref({
@@ -141,9 +159,11 @@ const stats = ref({
 const notices = ref([])
 const myShifts = ref([])
 const mySchedule = ref([])
+const restRoster = ref([])   // 本范围休息人员花名册
 const rangeMode = ref('week')  // week / fortnight / month
 const showAll = ref(false)  // false=仅未读（默认隐藏已读），true=显示全部
 const hasRead = computed(() => notices.value.some(n => n.is_read))
+const rangeLabel = computed(() => ({ week: '本周', fortnight: '近两周', month: '本月' }[rangeMode.value] || ''))
 
 function levelType(level) {
   if (level === 'danger') return 'danger'
@@ -225,6 +245,20 @@ async function loadMySchedule() {
   }
 }
 
+async function loadRestRoster() {
+  try {
+    restRoster.value = await getRestRoster({ range: rangeMode.value })
+  } catch (e) {
+    restRoster.value = []
+  }
+}
+
+// 切换范围时同步刷新「我的排班」与「休息花名册」
+function onRangeChange() {
+  loadMySchedule()
+  loadRestRoster()
+}
+
 async function onRead(row) {
   await markRead(row.id)
   // 默认「仅未读」视图下，已读后该项应隐藏，重新拉取列表
@@ -254,6 +288,7 @@ onMounted(() => {
   loadNotices()
   loadMyShifts()
   loadMySchedule()
+  loadRestRoster()
 })
 </script>
 
@@ -334,5 +369,22 @@ onMounted(() => {
 .muted {
   color: #999;
   font-size: 13px;
+}
+.rest-roster {
+  margin-top: 4px;
+}
+.rest-roster-title {
+  font-size: 13px;
+  color: #666;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.rest-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rest-chip {
+  font-weight: 500;
 }
 </style>
