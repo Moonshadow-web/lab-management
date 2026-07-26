@@ -741,8 +741,29 @@ class AssetCacheMiddleware(BaseHTTPMiddleware):
 app.add_middleware(AssetCacheMiddleware)
 
 app.include_router(api_router)
-from .api.v1.diag import router as diag_router  # noqa: E402 临时诊断路由（修复后删除）
+from .api.v1.diag import router as diag_router, capture_exception  # noqa: E402 临时诊断路由（修复后删除）
 app.include_router(diag_router, prefix="/api/v1")
+
+
+# 全局兜底：捕获非 HTTPException 的未处理异常，记录到 diag 环缓冲，便于 CloudBase
+# 等无 stdout 日志环境定位 500 根因。HTTPException（含业务校验）仍按原逻辑返回。
+from fastapi import HTTPException as _HTTPException  # noqa: E402
+from fastapi.exception_handlers import http_exception_handler as _http_exception_handler  # noqa: E402
+from starlette.requests import Request as _Request  # noqa: E402
+from starlette.responses import JSONResponse as _JSONResponse  # noqa: E402
+
+
+async def _global_uncaught_handler(request: _Request, exc: Exception):
+    if isinstance(exc, _HTTPException):
+        return await _http_exception_handler(request, exc)
+    capture_exception(exc, request_path=str(request.url.path))
+    return _JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+    )
+
+
+app.add_exception_handler(Exception, _global_uncaught_handler)
 
 # 本地磁盘文件预览（上云由云存储 SDK 的临时 URL 替代）
 if UPLOAD_ROOT.exists():
