@@ -25,7 +25,7 @@ from ...schemas import (
     QCMonthlyReportRead,
     QCMonthlyReportUpdate,
 )
-from ...services.qc_service import aggregate_project, lookup_quality_goal, draft_report, find_test_item_by_name
+from ...services.qc_service import aggregate_project, lookup_quality_goal, draft_report, find_test_item_by_name, _parse_rule_cell
 
 # 单位纠正映射：月结项目名(=LIS 上传的 test_item 原文) -> 正确单位。
 # 用于覆盖 LIS 文件里错误的「单位」列（如定性免疫项目被错填成 IU/mL / ng/L / 空）。
@@ -523,6 +523,18 @@ def upload_qc_summary(
             "test_item_aliases": m.get("test_item_aliases", ""),
         })
 
+    # 规则列解析诊断：统计非空格子中被成功识别 / 未被识别的数量，便于核对 LIS 写法
+    _rule_total = _rule_recognized = _rule_unrecognized = 0
+    for _lvls in projects.values():
+        for _spec in _lvls:
+            for _cell in (_spec.get("violate_rules") or []):
+                if str(_cell or "").strip():
+                    _rule_total += 1
+                    if _parse_rule_cell(_cell):
+                        _rule_recognized += 1
+                    else:
+                        _rule_unrecognized += 1
+
     created = 0
     updated = 0
     items = []
@@ -579,6 +591,10 @@ def upload_qc_summary(
         "items": items,
         # 是否识别到上传表格的「规则列」（violateRule 等）；未识别则仍按后端 Westgard 判定
         "rule_column_matched": "violate_rule" in hmap,
+        # 规则列解析诊断：非空格子中成功/未成功识别的数量（未识别>0 说明 LIS 写法仍需适配）
+        "rule_cells_total": _rule_total,
+        "rule_cells_recognized": _rule_recognized,
+        "rule_cells_unrecognized": _rule_unrecognized,
     }
 
 

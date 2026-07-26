@@ -325,17 +325,39 @@ _RULE_SEVERITY = {"1-2s": 0, "10-x": 1, "R-4s": 2, "2-2s": 3, "1-3s": 4}
 
 
 def _normalize_rule_token(tok: str) -> str | None:
-    """把单条规则 token 归一化为规范名；无法识别返回 None。"""
-    s = (tok or "").strip().lower().replace(" ", "").replace("（", "(").replace("）", ")")
+    """把单条规则 token 归一化为规范名；无法识别返回 None。
+
+    兼容 LIS 导出常见的写法变体：
+    - 全角/异形标点转半角：1－3S / 1～3S / 1–3S / 1:3S → 1-3s
+    - 去最外层括号：(1-3S) / （1-3S） → 1-3s
+    - 含中文说明的子串提取：1-3S(失控) / 失控1-3S / 1-3s失控 → 1-3s
+    - 无空格连写：13S / 22S / 10X → 1-3s / 2-2s / 10-x
+    """
+    if not tok:
+        return None
+    s = (tok or "").strip().lower()
+    # 全角/异形标点 → 半角，统一成连字符
+    s = s.replace("（", "(").replace("）", ")").replace("【", "[").replace("】", "]")
+    s = s.replace("－", "-").replace("—", "-").replace("–", "-").replace("～", "-").replace("~", "-")
+    s = s.replace("：", "-").replace(":", "-")
+    s = s.replace(" ", "").replace("_", "-")
+    # 去最外层括号（如 (1-3S) / [1-3S]）
+    s = s.strip("()[]")
     tbl = {
-        "1-2s": "1-2s", "1_2s": "1-2s", "12s": "1-2s",
-        "1-3s": "1-3s", "1_3s": "1-3s", "13s": "1-3s",
-        "2-2s": "2-2s", "2_2s": "2-2s", "22s": "2-2s",
-        "r-4s": "R-4s", "r4s": "R-4s", "r_4s": "R-4s",
-        "4-1s": "4-1s", "4_1s": "4-1s", "41s": "4-1s",
-        "10-x": "10-x", "10x": "10-x", "10_x": "10-x",
+        "1-2s": "1-2s", "12s": "1-2s",
+        "1-3s": "1-3s", "13s": "1-3s",
+        "2-2s": "2-2s", "22s": "2-2s",
+        "r-4s": "R-4s", "r4s": "R-4s",
+        "4-1s": "4-1s", "41s": "4-1s",
+        "10-x": "10-x", "10x": "10-x",
     }
-    return tbl.get(s)
+    if s in tbl:
+        return tbl[s]
+    # 子串提取：单元格里嵌了已知规则码（如 "1-3S(失控)"、"失控1-3S"）
+    for key, val in tbl.items():
+        if key in s:
+            return val
+    return None
 
 
 def _parse_rule_cell(cell: str) -> list[str]:
@@ -563,11 +585,14 @@ def aggregate_project(levels: list[dict]):
     # 1.5) 上传表格「规则列」覆盖（若提供）：有上传规则的点以「上传规则」为准，
     #      不再采用后端计算的 Westgard；同单元格多规则按严重度取最严重者
     #      （1-3S 覆盖 1-2S）。
-    #      - 本次上传含「规则列」(rule_column_present=True) 时，空单元格一律视为在控
+    #      - 本次上传含「规则列」(rule_column_present=True) 时，**真正空**的单元格一律视为在控
     #        （清空后端计算的 ooc / 警告），因为空即代表 LIS 未标注失控；
-    #      - 本次上传不含「规则列」时，空单元格回落到后端 Westgard 计算（保持兼容，
-    #        老数据不会因缺列而被误翻成在控）。
-    #      带上传规则的点（无论失控/警告）整体冻结，不参与后续跨水平 R-4s。
+    #      - 有内容但解析不出有效规则码的单元格（如 LIS 用了后端不认识的写法）：
+    #        **绝不能当成空单元格清零**——保持后端 Westgard 计算，避免把 LIS 标过的失控点误翻成在控；
+    #      - 本次上传不含「规则列」时，全部单元格回落到后端 Westgard 计算（保持兼容）。
+    #      带成功解析的上传规则的点（无论失控/警告）整体冻结，不参与后续跨水平 R-4s。
+    #      【关键修复 2026-07-26】之前把「解析失败」与「空单元格」混为一谈，导致含规则列但写法
+    #      不被识别的失控点被强制清零；现仅在「真正空」时清零。
     uploaded_present: set[tuple] = set()
     for lv in levels:
         vr = lv.get("violate_rules") or []
@@ -577,6 +602,17 @@ def aggregate_project(levels: list[dict]):
         rule_col = bool(lv.get("rule_column_present", False))
         for idx in range(len(values)):
             cell = vr[idx] if idx < len(vr) else ""
+            raw = (cell or "").strip()
+            if not raw:
+                # 真正空单元格
+                if rule_col:
+                    # 含规则列 → 空即 LIS 未标注失控 → 一律在控，并冻结 R-4s
+                    ooc.pop(idx, None)
+                    warnings.pop(idx, None)
+                    uploaded_present.add((lv["level"], idx))
+                # 无规则列 → 保持后端计算
+                continue
+            # 有内容：尝试解析上传规则
             parsed = _parse_rule_cell(cell)
             if parsed:
                 uploaded_present.add((lv["level"], idx))
@@ -587,14 +623,8 @@ def aggregate_project(levels: list[dict]):
                 elif cls == "warning":
                     warnings[idx] = resolved
                     ooc.pop(idx, None)
-                # cls == ""：解析出但均无法识别 → 不覆盖（保持后端计算）
-            elif rule_col:
-                # 含规则列但本单元格为空 → 一律视为在控（清空后端判定 + 冻结 R-4s）
-                ooc.pop(idx, None)
-                warnings.pop(idx, None)
-                # 冻结：既不再参与跨水平 R-4s，也避免被 R-4s 反标为失控
-                uploaded_present.add((lv["level"], idx))
-            # 未含规则列 → 保持后端计算不动
+                # cls == ""：解析出但均无法识别 → 保持后端计算（不强行清零！）
+            # 有内容但解析不出有效规则 → 保持后端 Westgard（不误翻成在控）
 
     # 2) 跨水平 R-4s：把全部水平的每日测值按 (date, level) 排成一条时间线，
     #    任意「相邻两点」都参与 R-4s 判定（同天不同水平 或 跨天同/不同水平）。

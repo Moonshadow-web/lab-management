@@ -106,4 +106,27 @@ assert "1-3s" in a["ooc"].get(3, ""), a["ooc"]   # 老数据/缺列不误翻
 assert a["out_of_control_count"] == 1
 print("PASS 用例G 空+无规则列 → 回落后端 ooc=", a["ooc"])
 
+print("\n=== 用例H【关键修复】：有内容但写法不被识别 + 含规则列 → 不得清零，保持后端 Westgard ===")
+# LIS 单元格写了后端不认识的文字（非真正空），rule_col=True 时旧逻辑会误清零 —— 现应保留后端 1-3S
+lv = lvl("1", [1.0, 1.0, 1.0, 1.85, 1.0], rules=["", "", "", "备注：复查后已纠正", ""], rule_col=True)
+res = aggregate_project([lv])
+a = res["1"]
+assert "1-3s" in a["ooc"].get(3, ""), a["ooc"]   # 未被误清为在控
+print("PASS 用例H 无法识别写法→保留后端 ooc=", a["ooc"])
+
+print("\n=== 用例I：LIS 写法变体 1-3S(失控) → 子串提取为 1-3s 失控 ===")
+lv = lvl("1", [1.0, 1.0, 1.0, 1.0, 1.0], rules=["", "", "", "1-3S(失控)", ""], rule_col=True)
+res = aggregate_project([lv])
+a = res["1"]
+assert a["ooc"].get(3) == "1-3s", a["ooc"]
+print("PASS 用例I 1-3S(失控) →", a["ooc"])
+
+print("\n=== 用例J：LIS 写法变体 10-X / 1－3S(全角) / 13S(无连字符) / 括号 / 前缀中文 → 均解析 ===")
+assert _parse_rule_cell("10-X")[0] == "10-x"
+assert _parse_rule_cell("1－3S")[0] == "1-3s"      # 全角 dash
+assert _parse_rule_cell("13S")[0] == "1-3s"        # 无连字符
+assert _parse_rule_cell("（1-3S）")[0] == "1-3s"   # 括号包裹
+assert _parse_rule_cell("失控1-3S")[0] == "1-3s"   # 前缀中文
+print("PASS 用例J 变体解析: 10-X→10-x, 1－3S→1-3s, 13S→1-3s, （1-3S）→1-3s, 失控1-3S→1-3s")
+
 print("\nALL PASS ✅")
