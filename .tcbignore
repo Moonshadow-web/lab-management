@@ -1,0 +1,36 @@
+# Dependencies (rebuilt in-cloud by Dockerfile: npm ci / pip install)
+node_modules/
+frontend/node_modules/
+dist/
+backend/__pycache__/
+__pycache__/
+*.pyc
+*.pyo
+*.pyo
+
+# Logs
+*.log
+backend_*.log
+
+# Scratch / large intermediate dirs (never needed for build context)
+_deploy_check/
+.workbuddy/
+outputs/
+docx_unpacked/
+proj_unpacked/
+_tmp_*.py
+_tmp_*.txt
+_tmp_*.ps1
+_read_interference.py
+check_*.py
+compare_*.py
+export_*.py
+extract_*.py
+age_units_output.txt
+audit_out.txt
+detailed_ref_output.txt
+compare_full_result.txt
+compare_result.txt
+
+# Local data samples (keep data/ itself — Dockerfile COPYs it)
+backend/sample_cz012*.docx

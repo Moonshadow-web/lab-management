@@ -48,3 +48,6 @@ compare_full_result.txt
 compare_result.txt
 docx_unpacked/
 proj_unpacked/
+
+# Deploy scratch / large intermediate dirs (must NOT be uploaded as build context)
+_deploy_check/
