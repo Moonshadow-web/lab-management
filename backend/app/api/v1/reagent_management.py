@@ -1145,22 +1145,29 @@ def _extract_instrument_base_model(name: str, model: str = "") -> str:
     """从仪器 name/model 中提取「总型号」，用于合并同型号多台仪器的耗材关联。
 
     规则（按优先级）：
-    1. name 首部字母数字词根：'DXI800 1号机' → 'DXI800'；'AU58-1' → 'AU58'
-    2. model 中提取核心型号：'贝克曼DXI800 1' → 'DXI800'
-    3. 兜底返回原 name
+    1. name 首部纯字母数字段（遇空格/中文即停）：'DXI800 1号机' → 'DXI800'；'AU58-1' → 'AU58-1' → 'AU58'
+    2. 去掉尾部实例编号（如 '-1', '-2'）：'AU58-1' → 'AU58'；'DXI800' 不变
+    3. model 中提取核心型号：'贝克曼DXI800 1' → 'DXI800'
+    4. 兜底返回原 name
     """
     if not name:
         return (model or "").strip()
-    # 取 name 开头的字母数字组合（允许连字符/空格分隔的多段）
-    m = re.match(r'^([A-Za-z0-9]+(?:[- ][A-Za-z0-9]+)*)', name.strip())
-    if m and len(m.group(1)) >= 3:
-        return m.group(1)
-    # 从 model 提取
+    cleaned = name.strip()
+    # 只取开头的字母+数字+连字符组合（遇到空格/中文字符即停）
+    m = re.match(r'^([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)', cleaned)
+    if m:
+        base = m.group(1)
+        # 去掉尾部实例编号（如 AU58-1 → AU58）
+        base = re.sub(r'-\d+$', '', base)
+        # 纯数字无效；至少 2 字符
+        if not base.isdigit() and len(base) >= 2:
+            return base
+    # 从 model 提取核心型号
     if model:
-        m2 = re.search(r'([A-Za-z]{2,}[\d]*[A-Za-z]*)', model)
-        if m2 and len(m2.group(1)) >= 3:
+        m2 = re.search(r'([A-Za-z]{2,}\d*[A-Za-z]*)', model)
+        if m2 and len(m2.group(1)) >= 2:
             return m2.group(1)
-    return name.strip()
+    return cleaned
 
 
 def _enrich_instrument_reagents(rows):
