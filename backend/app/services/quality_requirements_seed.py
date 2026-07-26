@@ -152,7 +152,7 @@ WST403_ITEMS: list[dict[str, Any]] = [
     {"item_name": "HbA1c (NGSP 单位)", "cv": "2.0%", "bias": "3.0%", "tea": "0.4% HbA1c (≤6.7%)；6.0% (>6.7%)"},
     {"item_name": "HbA1c (IFCC 单位)", "cv": "3.0%", "bias": "3.6%", "tea": "4.3 mmol/mol (≤50)；8.6% (>50)"},
     # 血气
-    {"item_name": "pH（血气）", "cv": "0.02", "bias": "0.015", "tea": "0.04"},
+    {"item_name": "pH（血气）", "cv": "2%", "bias": "0.015", "tea": "0.04"},
     {"item_name": "CO2 分压",   "cv": "4.0%", "bias": "4.0%", "tea": "5 mmHg (≤62.5)；8.0% (>62.5)"},
     {"item_name": "O2 分压",    "cv": "5.0%", "bias": "5.0%", "tea": "6 mmHg (≤60)；10.0% (>60)"},
     # 免疫
@@ -727,6 +727,29 @@ URINE_DOCX_ITEMS: list[dict[str, Any]] = [
 ]
 
 
+# 血气分析仪月小结 2026-06（docx _13）：按表修正质量目标；pH 目标=靶值*0.02（即相对 2%）。
+# 用 LIS 原名（Ca++/K+/Na+/PCO2/pH/PO2/tHb/氧和血红蛋白比率/氯./碳氧血红蛋白比率/血糖/高铁血红蛋白）
+# 精确匹配，source=wst403-2024（最高优先级）以覆盖 json/bjhr 同名较低值：
+#   PO2 5.0%→4.2%、PCO2 4.0%→2.7%、K+ 2.5%→2.0%、Na+ 默认10%→1.3%、Ca++ 2.0%→1.7%、高铁血红蛋白 6.5%→5.0%、
+#   tHb 默认10%→2.0%、氧和/碳氧血红蛋白比率(空)→5.0%。乳酸/氯./血糖 与现有值一致，一并显式落库以防血清项改值串扰。
+# 单位（仅 tHb 需纠正为 g/L）由 qc_summaries.QC_UNIT_OVERRIDES 处理，不在此处。
+BLOODGAS_DOCX_ITEMS: list[dict[str, Any]] = [
+    {"item_name": "Ca++",                  "cv": "1.7%"},
+    {"item_name": "K+",                    "cv": "2.0%"},
+    {"item_name": "Na+",                   "cv": "1.3%"},
+    {"item_name": "PCO2",                  "cv": "2.7%"},
+    {"item_name": "pH",                    "cv": "2%"},     # 靶值*0.02 = 相对 2%
+    {"item_name": "PO2",                   "cv": "4.2%"},
+    {"item_name": "tHb",                   "cv": "2.0%"},
+    {"item_name": "乳酸",                   "cv": "6.7%"},
+    {"item_name": "氧和血红蛋白比率",        "cv": "5.0%"},
+    {"item_name": "氯.",                    "cv": "1.5%"},
+    {"item_name": "碳氧血红蛋白比率",        "cv": "5.0%"},
+    {"item_name": "血糖",                   "cv": "3.0%"},
+    {"item_name": "高铁血红蛋白",            "cv": "5.0%"},
+]
+
+
 def all_seed() -> list[dict[str, Any]]:
     """返回全部 (source, item_name, category, cv, bias, tea, unit) 待灌库字典。"""
     out: list[dict[str, Any]] = []
@@ -738,6 +761,13 @@ def all_seed() -> list[dict[str, Any]]:
             "unit": it.get("unit", ""),
         })
     for it in URINE_DOCX_ITEMS:
+        out.append({
+            "source": "wst403-2024", "category": it.get("category", ""),
+            "item_code": it.get("item_code", ""), "item_name": it["item_name"],
+            "cv": it.get("cv", ""), "bias": it.get("bias", ""), "tea": it.get("tea", ""),
+            "unit": it.get("unit", ""),
+        })
+    for it in BLOODGAS_DOCX_ITEMS:
         out.append({
             "source": "wst403-2024", "category": it.get("category", ""),
             "item_code": it.get("item_code", ""), "item_name": it["item_name"],

@@ -73,6 +73,8 @@ QC_UNIT_OVERRIDES = {
     "尿香草扁桃酸": "mg/L", "香草扁桃酸": "mg/L",
     "微量白蛋白": "mg/L", "尿微量白蛋白": "mg/L",
     "镁": "mmol/L",
+    # 血气分析仪（来源：室内质控月小结_2026年06月_13.docx 单位列）
+    "tHb": "g/L",
 }
 
 router = make_router(
