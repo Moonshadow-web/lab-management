@@ -900,10 +900,13 @@ async function loadConfigSummary() {
 .bm-wrap { overflow-x: auto; }
 .bm-table { border-collapse: collapse; width: 100%; font-size: 12px; }
 .bm-table th, .bm-table td { border: 1px solid #ebeef5; padding: 4px 6px; text-align: center; }
+/* 日期列最小宽度：必须能容纳一个中文人名标签，否则标签被压到只剩 × */
+.bm-table thead th:not(.bm-corner),
+.bm-table tbody td { min-width: 92px; }
 .bm-corner { background: #f5f7fa; min-width: 92px; position: sticky; left: 0; z-index: 2; }
 .bm-table thead th { background: #f5f7fa; font-weight: 600; }
 .bm-table thead th.weekend { background: #fdf0f0; }
-.bm-rowhead { background: #fafafa; font-weight: 600; position: sticky; left: 0; z-index: 1; min-width: 72px; }
+.bm-rowhead { background: #fafafa; font-weight: 600; position: sticky; left: 0; z-index: 1; min-width: 92px; }
 .bm-table tbody td.weekend { background: #fdfafa; }
 .bm-date { font-weight: 600; font-size: 13px; }
 .bm-wd { font-size: 11px; color: #999; }
@@ -914,7 +917,9 @@ async function loadConfigSummary() {
 .bm-row-tall td { height: 124px; }
 .bm-row-tall .bm-select { min-height: 112px; }
 /* 多选标签完整显示姓名、自动换行，不截断 */
-.bm-select :deep(.el-select__tags) { flex-wrap: wrap; max-width: 100%; gap: 2px; align-items: flex-start; }
+.bm-select :deep(.el-select__tags) { flex-wrap: wrap; max-width: 100%; gap: 2px; align-items: flex-start; line-height: 1.4; }
 .bm-select :deep(.el-select__tags-text) { max-width: none; }
-.bm-select :deep(.el-tag) { max-width: 100%; }
+.bm-select :deep(.el-tag) { max-width: 100%; height: auto; line-height: 1.4; padding: 2px 5px; margin: 1px 0; font-size: 12px; }
+.bm-select :deep(.el-tag__content) { white-space: normal; word-break: keep-all; }
+.bm-select :deep(.el-tag__close) { margin-left: 2px; }
 </style>
