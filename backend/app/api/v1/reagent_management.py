@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from ...core.crud_base import paginate
 from ...core.database import get_db
@@ -46,6 +47,7 @@ def list_reagent_items(
     type: Optional[str] = Query(None, description="类型筛选"),
     category: Optional[str] = Query(None, description="类别筛选"),
     library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
+    show_inactive: bool = Query(False, description="显示停用项（默认仅启用）"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -64,10 +66,15 @@ def list_reagent_items(
         base = base.filter(ReagentItem.category == category)
     if library:
         base = base.filter(ReagentItem.library == library)
+    if not show_inactive:
+        base = base.filter(ReagentItem.is_active == True)
     total = base.count()
-    rows = base.order_by(ReagentItem.type, ReagentItem.category, ReagentItem.id).offset(
-        (page - 1) * page_size
-    ).limit(page_size).all()
+    # 默认排序：按年用量降序（多的在前），空值排最后，再按名称
+    rows = base.order_by(
+        ReagentItem.annual_usage.is_(None),
+        ReagentItem.annual_usage.desc(),
+        ReagentItem.name,
+    ).offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size,
             "items": [ReagentItemRead.model_validate(r) for r in rows]}
 
@@ -118,6 +125,31 @@ def delete_reagent_item(
     db.delete(item)
     db.commit()
     return {"ok": True}
+
+
+class _UsageUpdate(BaseModel):
+    item_id: int
+    annual_usage: int
+
+
+class _BatchUsageUpdate(BaseModel):
+    updates: list[_UsageUpdate]
+
+
+@router.post("/items/_batch-update-usage", response_model=dict)
+def batch_update_usage(
+    payload: _BatchUsageUpdate, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
+):
+    """批量写入试剂年用量（来自采购明细），用于目录/盘库/订购默认排序。"""
+    n = 0
+    for u in payload.updates:
+        it = db.query(ReagentItem).get(u.item_id)
+        if it:
+            it.annual_usage = int(u.annual_usage)
+            n += 1
+    db.commit()
+    return {"updated": n}
 
 
 # =============================================================================
@@ -191,15 +223,47 @@ def get_inventory_check(check_id: int, db: Session = Depends(get_db), _=Depends(
     return check
 
 
+@router.delete("/inventory-checks/{check_id}", response_model=dict)
+def delete_inventory_check(
+    check_id: int, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "lab_technician")),
+):
+    """删除整次盘库记录（级联删除其细项）。"""
+    check = db.query(InventoryCheck).get(check_id)
+    if not check:
+        raise HTTPException(404, "盘库未找到")
+    db.query(InventoryCheckItem).filter(InventoryCheckItem.check_id == check_id).delete()
+    db.delete(check)
+    db.commit()
+    return {"ok": True}
+
+
 def _item_dto(ri: ReagentItem, stock_map: dict,
                project_name: str = "", project_aliases: str = "") -> dict:
     return {
         "item_id": ri.id, "name": ri.name, "spec": ri.spec, "type": ri.type,
         "unit": ri.unit, "material_code": ri.material_code or "",
         "current_stock": int(stock_map.get(ri.id, 0)), "library": ri.library,
+        "min_stock": int(ri.min_stock or 0),
+        "annual_usage": int(ri.annual_usage or 0),
         "project_name": project_name,
         "project_aliases": project_aliases,
     }
+
+
+def _sort_items_by_usage(items: list) -> list:
+    """组内试剂按年用量降序（多的在前），空值排最后，再按名称。"""
+    return sorted(items, key=lambda it: (it.get("annual_usage", 0) == 0,
+                                         -(it.get("annual_usage", 0) or 0),
+                                         it.get("name", "")))
+
+
+def _group_usage_key(group: dict) -> int:
+    """组排序键：取组内最大年用量（空组排最后）。"""
+    items = group.get("items") or []
+    if not items:
+        return 0
+    return max((it.get("annual_usage", 0) or 0) for it in items)
 
 
 # 仪器名关键词黑名单——这些仪器不产生耗材盘库条目（流水线等）
@@ -261,6 +325,9 @@ def build_reagent_template(db: Session, library: str) -> dict:
             "test_item_aliases": "", "items": [_item_dto(r, stock_map) for r in orphan_items],
         }
     by_project = list(proj_map.values())
+    for g in by_project:
+        g["items"] = _sort_items_by_usage(g["items"])
+    by_project.sort(key=_group_usage_key, reverse=True)
 
     # ── 按仪器家族（仅在用仪器 + 非流水线 + 在用耗材）──
     ir_rows = (
@@ -317,6 +384,9 @@ def build_reagent_template(db: Session, library: str) -> dict:
             "items": [_item_dto(r, stock_map) for r in cons_orphan_items],
         }
     by_instrument = list(fam_map.values())
+    for g in by_instrument:
+        g["items"] = _sort_items_by_usage(g["items"])
+    by_instrument.sort(key=_group_usage_key, reverse=True)
 
     # ── 质控品（单独，仅在用）──
     controls = [
@@ -326,6 +396,7 @@ def build_reagent_template(db: Session, library: str) -> dict:
             ReagentItem.is_active == True,
         ).order_by(ReagentItem.name).all()
     ]
+    controls = _sort_items_by_usage(controls)
 
     return {"by_project": by_project, "by_instrument": by_instrument, "controls": controls}
 

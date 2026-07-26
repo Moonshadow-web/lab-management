@@ -11,11 +11,12 @@ export function listReagentItems(params) {
 
 // 分页拉全试剂目录（后端 page_size 上限 200，超 200 触发 422）。
 // 用于在库存/月消耗等页面一次性拿到全部试剂映射，避免 [object Object] 报错。
+// 默认包含停用项（show_inactive=true），保证盘库详情/打印的名称映射完整。
 export async function listAllReagentItems(extra = {}) {
   let page = 1
   const all = []
   while (true) {
-    const r = await listReagentItems({ page, page_size: 200, ...extra })
+    const r = await listReagentItems({ page, page_size: 200, show_inactive: true, ...extra })
     all.push(...(r.items || []))
     if (all.length >= (r.total || 0) || (r.items || []).length === 0) break
     page += 1
@@ -67,6 +68,10 @@ export function getInventoryCheck(id) {
 
 export function createInventoryCheck(data) {
   return request.post('/api/v1/reagent/inventory-checks', data)
+}
+
+export function deleteInventoryCheck(id) {
+  return request.delete(`/api/v1/reagent/inventory-checks/${id}`)
 }
 
 // ── 订购 ──

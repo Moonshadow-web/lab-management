@@ -25,10 +25,11 @@
       <el-table-column prop="created_at" label="创建时间" width="170">
         <template #default="{ row }">{{ row.created_at ? new Date(row.created_at).toLocaleString('zh-CN') : '-' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <el-button size="small" link type="primary" @click="onView(row)">详情</el-button>
           <el-button size="small" link type="primary" @click="onPrintCheck(row)">打印</el-button>
+          <el-button size="small" link type="danger" @click="onDeleteCheck(row)" v-if="canWrite">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -133,7 +134,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Refresh, Printer } from '@element-plus/icons-vue'
-import { listInventoryChecks, getInventoryCheck, createInventoryCheck, getReagentTemplate, listAllReagentItems } from '../../api/reagent'
+import { listInventoryChecks, getInventoryCheck, createInventoryCheck, deleteInventoryCheck, getReagentTemplate, listAllReagentItems } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
 import { useReagentStore } from '../../store/reagent'
 import { errText } from '../../utils/errText'
@@ -319,6 +320,14 @@ function onPrintView() {
 }
 
 function onPrintCheck(row) { onView(row).then(() => { if (viewVisible.value) onPrintView() }) }
+
+async function onDeleteCheck(row) {
+  await ElMessageBox.confirm(
+    `确认删除「${row.check_date} ${row.check_type}」盘库记录？该操作不可恢复。`,
+    '删除盘库', { type: 'warning' }
+  )
+  await deleteInventoryCheck(row.id); ElMessage.success('已删除'); refresh()
+}
 
 onMounted(refresh)
 </script>

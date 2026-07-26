@@ -72,6 +72,8 @@ class ReagentItem(Base):
     supplier: Mapped[str] = mapped_column(String(100), default="")
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)  # 目录参考单价
     min_stock: Mapped[int] = mapped_column(Integer, default=0)  # 最低库存预警量
+    annual_usage: Mapped[int] = mapped_column(Integer, default=0, server_default="0",
+                                              comment="年用量参考（采购明细），用于目录/盘库/订购默认排序（多的在前）")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     remark: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

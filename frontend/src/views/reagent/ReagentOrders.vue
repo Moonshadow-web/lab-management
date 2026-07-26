@@ -71,7 +71,10 @@
           <h4 class="grp-title">项目：{{ grp.test_item_name }}</h4>
           <div class="entry-card-list">
             <div class="entry-card" v-for="it in grp.items" :key="it.item_id">
-              <div class="entry-card-name">{{ it.name }} <span class="muted">{{ it.spec }}</span></div>
+              <div class="entry-card-name">
+                <div>{{ it.name }} <span class="muted">{{ it.spec }}</span></div>
+                <div class="card-stock">实时库存：{{ it.current_stock }} {{ it.unit }}<span v-if="it.min_stock">（最低 {{ it.min_stock }}）</span></div>
+              </div>
               <div class="entry-card-input">
                 <span class="muted">订购数量</span>
                 <el-input-number v-model="quantities[it.item_id]" :min="0" size="small" controls-position="right" />
@@ -83,7 +86,10 @@
           <h4 class="grp-title">仪器：{{ grp.group }} <span class="muted" v-if="grp.instruments.length">（{{ grp.instruments.join('、') }}）</span></h4>
           <div class="entry-card-list">
             <div class="entry-card" v-for="it in grp.items" :key="it.item_id">
-              <div class="entry-card-name">{{ it.name }} <span class="muted">{{ it.spec }}</span></div>
+              <div class="entry-card-name">
+                <div>{{ it.name }} <span class="muted">{{ it.spec }}</span></div>
+                <div class="card-stock">实时库存：{{ it.current_stock }} {{ it.unit }}<span v-if="it.min_stock">（最低 {{ it.min_stock }}）</span></div>
+              </div>
               <div class="entry-card-input">
                 <span class="muted">订购数量</span>
                 <el-input-number v-model="quantities[it.item_id]" :min="0" size="small" controls-position="right" />
@@ -95,7 +101,10 @@
           <h4 class="grp-title">质控品（单独）</h4>
           <div class="entry-card-list">
             <div class="entry-card" v-for="it in filteredControls" :key="it.item_id">
-              <div class="entry-card-name">{{ it.name }} <span class="muted">{{ it.spec }}</span></div>
+              <div class="entry-card-name">
+                <div>{{ it.name }} <span class="muted">{{ it.spec }}</span></div>
+                <div class="card-stock">实时库存：{{ it.current_stock }} {{ it.unit }}<span v-if="it.min_stock">（最低 {{ it.min_stock }}）</span></div>
+              </div>
               <div class="entry-card-input">
                 <span class="muted">订购数量</span>
                 <el-input-number v-model="quantities[it.item_id]" :min="0" size="small" controls-position="right" />
@@ -291,6 +300,7 @@ onMounted(refresh)
 .entry-card-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .entry-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; }
 .entry-card-name { flex: 1; min-width: 0; font-size: 13px; color: #0f172a; line-height: 1.4; word-break: break-word; }
+.card-stock { font-size: 12px; color: #2563eb; margin-top: 2px; }
 .entry-card-input { display: flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0; }
 @media (max-width: 480px) {
   .entry-card { flex-direction: column; align-items: stretch; }

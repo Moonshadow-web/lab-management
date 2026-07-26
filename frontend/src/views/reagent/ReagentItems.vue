@@ -17,6 +17,7 @@
       <el-select v-model="filterLibrary" placeholder="全责任库" clearable style="width:130px" @change="refresh">
         <el-option v-for="lib in libs" :key="lib" :label="lib" :value="lib" />
       </el-select>
+      <el-checkbox v-model="showInactive" border @change="refresh" style="margin-left:4px">显示停用</el-checkbox>
       <el-button :icon="Refresh" @click="refresh">刷新</el-button>
       <el-button type="primary" :icon="Plus" @click="onAdd" v-if="canWrite">新增</el-button>
       <el-button :icon="Upload" @click="onImport" v-if="canWrite">导入Excel</el-button>
@@ -38,6 +39,7 @@
       <el-table-column prop="material_code" label="材料编码" width="130" />
       <el-table-column prop="unit" label="单位" width="70" />
       <el-table-column prop="min_stock" label="最低库存" width="90" />
+      <el-table-column prop="annual_usage" label="年用量" width="90" sortable />
       <el-table-column label="状态" width="80">
         <template #default="{ row }">
           <el-tag :type="row.is_active ? 'success' : 'info'" size="small">{{ row.is_active ? '启用' : '停用' }}</el-tag>
@@ -126,6 +128,7 @@ const libs = LIBRARIES
 
 const items = ref([]), total = ref(0), page = ref(1), pageSize = ref(50), loading = ref(false)
 const q = ref(''), filterType = ref(''), filterLibrary = ref('')
+const showInactive = ref(false)
 const dialogVisible = ref(false), editingId = ref(null), submitting = ref(false)
 const importVisible = ref(false), uploading = ref(false)
 const uploadFile = ref(null)
@@ -143,6 +146,7 @@ async function refresh() {
     if (q.value.trim()) params.q = q.value.trim()
     if (filterType.value) params.type = filterType.value
     if (filterLibrary.value) params.library = filterLibrary.value
+    if (showInactive.value) params.show_inactive = true
     const r = await listReagentItems(params)
     items.value = r.items; total.value = r.total
   } catch (e) {
