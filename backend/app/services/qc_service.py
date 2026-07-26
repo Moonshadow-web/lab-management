@@ -70,48 +70,89 @@ def _alias_words(aliases: str) -> set[str]:
     return words
 
 
+# ---------------- LIS 导出常用简称/缩写 → 系统规范名 ----------------
+# 打通「直胆红素↔直接胆红素」「转肽酶↔γ-谷氨酰基转移酶」「GGT↔γ-谷氨酰基转移酶」
+# 「谷草转氨酶↔天门冬氨酸氨基转移酶」「AST/AST↔…」「低密脂蛋白↔低密度脂蛋白胆固醇」
+# 等。规范名需与 quality_requirements 种子使用的 item_name 一致，才能命中质量目标。
+# 仅做「原名 → 规范名」单向桥接；已在 TestItem/QualityRequirement 中的原名不受影响。
+_LIS_ITEM_ALIASES = {
+    "直胆红素": "直接胆红素",
+    "结合胆红素": "直接胆红素",
+    "腺苷酸脱氨酶": "腺苷脱氨酶",
+    "腺苷脱氨酶": "腺苷脱氨酶",
+    "ada": "腺苷脱氨酶",
+    "转肽酶": "γ-谷氨酰基转移酶",
+    "γ-谷氨酰转移酶": "γ-谷氨酰基转移酶",
+    "ggt": "γ-谷氨酰基转移酶",
+    "谷草转氨酶": "天门冬氨酸氨基转移酶",
+    "ast": "天门冬氨酸氨基转移酶",
+    "谷丙转氨酶": "丙氨酸氨基转移酶",
+    "alt": "丙氨酸氨基转移酶",
+    "低密脂蛋白": "低密度脂蛋白胆固醇",
+    "ldl": "低密度脂蛋白胆固醇",
+    "高密脂蛋白": "高密度脂蛋白胆固醇",
+    "hdl": "高密度脂蛋白胆固醇",
+}
+
+
+def _canon_item_name(name: str) -> str:
+    """把 LIS 常用简称/缩写桥接为系统规范名；无映射则返回原名。"""
+    return _LIS_ITEM_ALIASES.get(_norm(name), name)
+
+
 def find_test_item_by_name(db: Session, name: str, instrument: str = "") -> TestItem | None:
     """按项目名或别名匹配 test_items 表；返回最相似的一条或 None。
 
     若提供 instrument，则优先在该仪器（含 instrument_group）名下做过的项目中匹配，
     以利用「仪器档案的检验项目」来对应质控项目——同名项目跨仪器时定位更精准，
     取到的规范名/别名也更贴近该仪器实际使用的项目叫法。
+
+    匹配顺序：先按原名匹配；未命中再按 LIS 别名规范名（_canon_item_name）匹配，
+    以打通「直胆红素→直接胆红素」「GGT→γ-谷氨酰基转移酶」等简称/缩写。
     """
     if not name:
         return None
-    norm = _norm(name)
     inst_norm = _norm(instrument or "")
     rows = db.query(TestItem).all()
 
-    def _matches(r: TestItem) -> bool:
+    def _matches(r: TestItem, qnorm: str, qraw: str) -> bool:
         rn = _norm(r.name)
-        if rn == norm:
+        if rn == qnorm:
             return True
-        if norm in rn or rn in norm:
+        if qnorm in rn or rn in qnorm:
             return True
         for w in _alias_words(r.aliases or ""):
-            if w == norm or norm in w or w in norm:
+            if w == qnorm or qnorm in w or w in qnorm:
                 return True
-        for seg in re.split(r"[\s+]", name.strip()):
+        for seg in re.split(r"[\s+]", qraw.strip()):
             sn = _norm(seg)
             if sn and (sn in rn or rn in sn):
                 return True
         return False
 
-    # 优先：本仪器（含 instrument_group）名下的项目
-    if inst_norm:
+    def _try(qname: str) -> TestItem | None:
+        qnorm = _norm(qname)
+        # 优先：本仪器（含 instrument_group）名下的项目
+        if inst_norm:
+            for r in rows:
+                ri = _norm(r.instrument or "")
+                rg = _norm(r.instrument_group or "")
+                if (ri and (ri == inst_norm or inst_norm in ri or ri in inst_norm)) or \
+                   (rg and (rg == inst_norm or inst_norm in rg or rg in inst_norm)):
+                    if _matches(r, qnorm, qname):
+                        return r
+        # 兜底：全局匹配
         for r in rows:
-            ri = _norm(r.instrument or "")
-            rg = _norm(r.instrument_group or "")
-            if (ri and (ri == inst_norm or inst_norm in ri or ri in inst_norm)) or \
-               (rg and (rg == inst_norm or inst_norm in rg or rg in inst_norm)):
-                if _matches(r):
-                    return r
-    # 兜底：全局匹配（与原逻辑一致）
-    for r in rows:
-        if _matches(r):
-            return r
-    return None
+            if _matches(r, qnorm, qname):
+                return r
+        return None
+
+    hit = _try(name)
+    if hit is None:
+        canon = _canon_item_name(name)
+        if canon != name:
+            hit = _try(canon)
+    return hit
 
 
 def _paren_code(name: str) -> str:
@@ -157,18 +198,20 @@ def _lookup_qr_goal(db: Session, test_item: str, aliases: str) -> str | None:
         """查询指定名称的所有 quality_requirements 记录。"""
         from .quality_requirements_seed import contains_same_item
         all_qr = db.query(QualityRequirement).all()
-        # 精确匹配
-        rows = [r for r in all_qr if r.item_name == name]
-        # 安全包含匹配（双向），避免「钙」误入「降钙素原」等短字/前缀误匹配
+        nname = _norm(name)
+        # 精确匹配（归一化括号/大小写，使 白蛋白（A）与 白蛋白(A) 互通）
+        rows = [r for r in all_qr if _norm(r.item_name) == nname]
+        # 安全包含匹配（双向，归一化），避免「钙」误入「降钙素原」等短字/前缀误匹配
         if not rows:
-            rows = [r for r in all_qr if r.item_name and contains_same_item(name, r.item_name)]
+            rows = [r for r in all_qr if r.item_name and contains_same_item(nname, _norm(r.item_name))]
         # 再试别名中的每个词（同样用安全包含）
         if not rows:
             for a in (aliases or "").replace("，", ",").split(","):
                 a = a.strip()
                 if not a:
                     continue
-                rows = [r for r in all_qr if r.item_name and contains_same_item(a, r.item_name)]
+                na = _norm(a)
+                rows = [r for r in all_qr if r.item_name and contains_same_item(na, _norm(r.item_name))]
                 if rows:
                     break
         # 用「仪器档案检验项目」的别名/代码匹配质量目标条目的括号代码（如 HBsAg / HCV / HIV）。
@@ -254,12 +297,21 @@ def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None) -
             qr_goal = _lookup_qr_goal(db, test_item, aliases)
             if qr_goal:
                 return qr_goal
+            # 再试 LIS 别名规范名（如 直胆红素→直接胆红素、GGT→γ-谷氨酰基转移酶）
+            canon = _canon_item_name(test_item)
+            if canon != test_item:
+                qr_goal = _lookup_qr_goal(db, canon, aliases)
+                if qr_goal:
+                    return qr_goal
         except Exception:
             pass  # QR 表查询失败不影响主流程，回退到 JSON 文件
 
     # Step 2: 原有 JSON 文件匹配（保留兼容）
     goals = _load_goals()
     keys = {test_item}
+    canon = _canon_item_name(test_item)
+    if canon != test_item:
+        keys.add(canon)
     for a in (aliases or "").replace("，", ",").split(","):
         a = a.strip()
         if a:

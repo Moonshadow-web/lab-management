@@ -268,6 +268,8 @@ BJHR_ITEMS: list[dict[str, Any]] = [
     {"category": "58", "item_name": "脑钠肽(BNP)",       "cv": "10.0%", "tea": "±30%", "unit": "ng/L"},
     {"category": "59", "item_name": "N末端前脑钠肽(NT-ProBNP)", "cv": "10.0%", "tea": "±30%", "unit": "ng/L"},
     {"category": "60", "item_name": "糖化白蛋白(GA)",     "cv": "6.7%", "tea": "±20%", "unit": "%"},
+    # 白蛋白（A）：用户指定单位 g/dl、质量目标同糖化白蛋白（GA）
+    {"category": "60", "item_name": "白蛋白（A）",        "cv": "6.7%", "tea": "±20%", "unit": "g/dl"},
     {"category": "61", "item_name": "视黄醇结合蛋白(RBP)","cv": "8.3%", "tea": "±25%", "unit": "mg/L"},
     {"category": "62", "item_name": "α-L-岩藻糖苷酶(AFU)","cv": "10.0%", "tea": "±30%", "unit": "U/L"},
     {"category": "63", "item_name": "糖化血红蛋白A1c(HbA1c)","cv": "2.0%", "tea": "±6%", "unit": "%"},
