@@ -58,6 +58,7 @@
       </el-header>
       <el-main><router-view /></el-main>
     </el-container>
+    <SwapNotifier />
   </el-container>
 </template>
 
@@ -67,6 +68,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import { usePermissionStore } from '../store/permission'
 import { Share, Connection, Document, Menu, Close } from '@element-plus/icons-vue'
+import SwapNotifier from '../components/SwapNotifier.vue'
 
 const auth = useAuthStore()
 const route = useRoute()

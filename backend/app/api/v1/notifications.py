@@ -28,6 +28,11 @@ def list_notifications(
     query = db.query(Notification).outerjoin(
         read_subq, Notification.id == read_subq.c.notification_id
     )
+    # 私密消息仅本人可见；广播(NULL)对所有人可见（换班等私密提醒不会泄露给无关人）
+    query = query.filter(
+        (Notification.recipient_user_id.is_(None))
+        | (Notification.recipient_user_id == user.id)
+    )
     if unread_only:
         # 未读 = 该用户在 notification_reads 中无对应记录
         query = query.filter(read_subq.c.notification_id.is_(None))
@@ -86,6 +91,10 @@ def mark_all_read(db: Session = Depends(get_db), user: User = Depends(get_curren
         db.query(Notification.id)
         .outerjoin(already, Notification.id == already.c.notification_id)
         .filter(already.c.notification_id.is_(None))
+        .filter(
+            (Notification.recipient_user_id.is_(None))
+            | (Notification.recipient_user_id == user.id)
+        )
         .all()
     )
     for (nid,) in pending:
@@ -143,6 +152,10 @@ def send_notifications_by_email(
         db.query(Notification)
         .outerjoin(read_subq, Notification.id == read_subq.c.notification_id)
         .filter(read_subq.c.notification_id.is_(None))
+        .filter(
+            (Notification.recipient_user_id.is_(None))
+            | (Notification.recipient_user_id == admin.id)
+        )
         .order_by(Notification.level.desc(), Notification.id.desc())
         .all()
     )

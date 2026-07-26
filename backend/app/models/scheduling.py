@@ -49,6 +49,13 @@ STATUS_CATEGORIES = [
 
 ASSIGN_STATUS_ALL = [ASSIGN_STATUS_ONDUTY, *STATUS_CATEGORIES]
 
+# 换班申请状态
+SWAP_STATUS_PENDING = "待确认"
+SWAP_STATUS_CONFIRMED = "已确认"
+SWAP_STATUS_REJECTED = "已拒绝"
+SWAP_STATUS_CANCELED = "已取消"
+SWAP_STATUS_ALL = [SWAP_STATUS_PENDING, SWAP_STATUS_CONFIRMED, SWAP_STATUS_REJECTED, SWAP_STATUS_CANCELED]
+
 
 class SchedulingPost(Base):
     """岗位定义。每个岗位各一人；门诊辅助岗/电泳岗可空缺（required=False）。"""
@@ -99,7 +106,34 @@ class SchedulingAssignment(Base):
     status: Mapped[str] = mapped_column(String(20), default=ASSIGN_STATUS_ONDUTY)  # 在岗/休息/病假/开会/行政/质控
     is_early: Mapped[bool] = mapped_column(Boolean, default=False)        # 早班
     is_continuous: Mapped[bool] = mapped_column(Boolean, default=False)  # 连班
+    is_locked: Mapped[bool] = mapped_column(Boolean, default=False)  # 早/连班已换班：生成逻辑需跳过/保护此行（该人已上过该早/连班）
     note: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SchedulingSwapRequest(Base):
+    """换班申请。由 A（发起人）点击 B（接收人）的班次发起，B 在本人账号确认/拒绝。
+
+    - 双向对调：from_assignment_id(A 的班) 与 to_assignment_id(B 的班) 均非空，
+      确认后交换两条记录的 person（A 接 B 的班、B 接 A 的班）。
+    - 单向顶班：to_assignment_id 为空，表示 B「顶」A 的班（B 上 A 的班，A 当天改由 B 顶，
+      A 不另给出自己的班）。用于早/连班且 A 当月无班可换的场景。
+    确认后，若交换涉及早/连班，相关 assignment 置 is_locked=True，使下一轮按顺序生成时
+    跳过/保护已换班人（系统「记住」该人已上过该早/连班）。
+    """
+
+    __tablename__ = "scheduling_swap_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    from_person: Mapped[str] = mapped_column(String(100), index=True, default="")   # 发起人 full_name
+    to_person: Mapped[str] = mapped_column(String(100), index=True, default="")     # 接收人 full_name
+    from_assignment_id: Mapped[int] = mapped_column(Integer, default=0, index=True)  # A 的班次
+    to_assignment_id: Mapped[int | None] = mapped_column(
+        Integer, default=None, nullable=True
+    )  # B 的班次；顶班场景为空
+    status: Mapped[str] = mapped_column(String(20), default=SWAP_STATUS_PENDING)  # 待确认/已确认/已拒绝/已取消
+    note: Mapped[str] = mapped_column(String(200), default="")  # 发起人留言
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

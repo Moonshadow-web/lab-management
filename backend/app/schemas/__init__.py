@@ -676,6 +676,46 @@ class SchedulingAssignmentRead(SchedulingAssignmentBase):
     updated_at: datetime | None = None
 
 
+class MyScheduleItem(BaseModel):
+    """「今日我的岗位」只读排班表单项（含岗位名/分组）。"""
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    date: str = ""
+    weekday: int = 0
+    post_id: int | None = None
+    post_name: str = ""
+    group: str = ""
+    person: str = ""
+    status: str = ""
+    is_early: bool = False
+    is_continuous: bool = False
+    is_locked: bool = False
+
+
+class SchedulingSwapRequestBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    from_person: str = ""
+    to_person: str = ""
+    from_assignment_id: int = 0
+    to_assignment_id: int | None = None
+    status: str = "待确认"
+    note: str = ""
+
+
+class SchedulingSwapRequestCreate(BaseModel):
+    """发起换班：A 点击 B 的班次后提交。"""
+    from_assignment_id: int
+    to_person: str
+    to_assignment_id: int | None = None  # 双向对调时填 B 的班；顶班(单向)时留空
+    note: str = ""
+
+
+class SchedulingSwapRequestRead(SchedulingSwapRequestBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 class SchedulingConfigBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     excluded_people: list[str] = []      # 不参与任何排班的人员

@@ -172,6 +172,35 @@ def _ensure_missing_columns():
             except Exception as e:  # noqa: BLE001
                 logger.warning("QC 兜底补列失败(忽略) %s.%s: %s", tname, colname, e)
 
+    # 2026-07-26 修正：换班 + 私密提醒功能新增列兜底（同 QC 兜底思路，拦截 broken pipe 中断）。
+    _EXTRA_COLUMNS_FB = {
+        "notifications": [
+            "recipient_user_id INTEGER",
+        ],
+        "scheduling_assignments": [
+            "is_locked TINYINT(1) NOT NULL DEFAULT 0",
+        ],
+    }
+    try:
+        cur2 = {t.name: {c["name"] for c in inspector.get_columns(t.name)}
+                for t in Base.metadata.tables.values()
+                if inspector.has_table(t.name)}
+    except Exception:  # noqa: BLE001
+        cur2 = {}
+    for tname, cols in _EXTRA_COLUMNS_FB.items():
+        for coldef in cols:
+            colname = coldef.split(" ", 1)[0]
+            if cur2.get(tname) is not None and colname in cur2[tname]:
+                continue
+            try:
+                with engine.begin() as conn:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE `{tname}` ADD COLUMN {coldef}"
+                    )
+                logger.info("兜底补列 %s.%s", tname, colname)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("兜底补列失败(忽略) %s.%s: %s", tname, colname, e)
+
     # 2026-07-26 修正：scheduling_assignments.post_id 模型为 nullable=True，
     # 但线上 MySQL 旧列是 NOT NULL（建表时定的），导致状态行(post_id 为空)INSERT
     # 被拒(IntegrityError 1048)，矩阵「保存矩阵」整体 500。此处把该列改为可空

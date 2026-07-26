@@ -337,10 +337,13 @@ def run_reminders(db: Session, as_of: Optional[date] = None, dry_run: bool = Fal
             active_keys.add((f"reminder_{rule.category}", ref_id))
 
             level = "danger" if days_left < 0 else ("warning" if days_left <= rule.lead_days else "info")
-            notif_active.append((
-                f"reminder_{rule.category}", ref_id, it["title"], it["message"],
-                it["due_date"], level, rule.label,
-            ))
+            # 早班/连班提醒：仅通过邮件/微信推送，不写入站内通知（不在工作台「提醒事项」展示）。
+            # 注意：下方 email/微信投递逻辑仍正常执行，不受此限制影响。
+            if rule.category not in ("shift_early", "shift_continuous"):
+                notif_active.append((
+                    f"reminder_{rule.category}", ref_id, it["title"], it["message"],
+                    it["due_date"], level, rule.label,
+                ))
 
             log = db.query(ReminderSendLog).filter_by(
                 rule_id=rule.id, ref_type=ref_type, ref_id=ref_id

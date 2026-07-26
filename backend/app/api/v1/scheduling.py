@@ -26,6 +26,7 @@ from ...models.scheduling import (
     SchedulingPlan,
     SchedulingAssignment,
     SchedulingConfig,
+    SchedulingSwapRequest,
     POST_GROUP_DAY,
     POST_GROUP_NIGHT,
     POST_GROUP_SPECIAL,
@@ -34,8 +35,13 @@ from ...models.scheduling import (
     STATUS_CATEGORIES,
     ASSIGN_STATUS_EARLY,
     ASSIGN_STATUS_CONTINUOUS,
+    SWAP_STATUS_PENDING,
+    SWAP_STATUS_CONFIRMED,
+    SWAP_STATUS_REJECTED,
+    SWAP_STATUS_CANCELED,
 )
 from ...models.user import User
+from ...models.notification import Notification
 from ...schemas import (
     SchedulingPostCreate,
     SchedulingPostRead,
@@ -50,6 +56,9 @@ from ...schemas import (
     SchedulingGenerateRequest,
     SchedulingCellRequest,
     SchedulingBatchRequest,
+    MyScheduleItem,
+    SchedulingSwapRequestCreate,
+    SchedulingSwapRequestRead,
 )
 
 WRITE_ROLES = ("admin", "specialty_leader")
@@ -166,6 +175,14 @@ def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
         else:
             existing_on_duty[(a.date, a.post_id)] = a
 
+    # 已通过换班完成早/连班义务的人（is_locked 记录）：下一轮生成时不再为他们排早/连班，
+    # 实现「系统记住换过班的人已经上过该班了」。锁定行本身受保护、不被下方删除/覆盖。
+    served_people: set = {
+        a.person for a in existing
+        if a.is_locked and a.person
+        and a.status in (ASSIGN_STATUS_EARLY, ASSIGN_STATUS_CONTINUOUS)
+    }
+
     assignments: list[SchedulingAssignment] = []
     post_cursor: dict[int, int] = {p.id: 0 for p in posts}
     fever_day_idx = 0
@@ -233,25 +250,25 @@ def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
                 busy = busy | {fever_busy_by_date[date_str]}
             e = early_seq[i]
             c = cont_seq[i]
-            # 早班人当天不在岗则顺延到下一位
-            if e in busy:
+            # 早班人当天不在岗、或已通过换班完成早/连班义务，则顺延到下一位
+            if e in busy or e in served_people:
                 for k in range(1, len(roster)):
                     cand = roster[(i // 2 + k) % len(roster)]
-                    if cand not in busy:
+                    if cand not in busy and cand not in served_people:
                         e = cand
                         break
-            # 连班人当天不在岗，或和早班撞同一个人，则顺延到下一位（保证不同人）
-            if c in busy or c == e:
+            # 连班人当天不在岗、已换班完成义务，或和早班撞同一个人，则顺延到下一位（保证不同人）
+            if c in busy or c in served_people or c == e:
                 for k in range(1, len(roster)):
                     cand = roster[((i - 2) // 2 + k) % len(roster)]
-                    if cand not in busy and cand != e:
+                    if cand not in busy and cand not in served_people and cand != e:
                         c = cand
                         break
-            if e and e not in busy:
+            if e and e not in busy and e not in served_people:
                 early_assigns.append(SchedulingAssignment(
                     plan_id=plan.id, date=date_str, weekday=cur.weekday(), is_workday=True,
                     post_id=None, person=e, status=ASSIGN_STATUS_EARLY))
-            if c and c not in busy and c != e:
+            if c and c not in busy and c not in served_people and c != e:
                 early_assigns.append(SchedulingAssignment(
                     plan_id=plan.id, date=date_str, weekday=cur.weekday(), is_workday=True,
                     post_id=None, person=c, status=ASSIGN_STATUS_CONTINUOUS))
@@ -268,6 +285,7 @@ def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
         SchedulingAssignment.date >= start,
         SchedulingAssignment.date <= end,
         SchedulingAssignment.status.in_([ASSIGN_STATUS_EARLY, ASSIGN_STATUS_CONTINUOUS]),
+        SchedulingAssignment.is_locked == False,  # 换班锁定的行受保护，保留不被覆盖
     ).delete(synchronize_session=False)
     db.add_all(assignments)
     if people_pool and len(people_pool) >= 2:
@@ -580,3 +598,220 @@ def my_today(date: str | None = None, db: Session = Depends(get_db),
             "plan_id": a.plan_id,
         })
     return out
+
+
+def _user_by_name(db: Session, name: str) -> Optional[User]:
+    """按 full_name 或 username 解析系统用户。"""
+    if not name:
+        return None
+    return (
+        db.query(User)
+        .filter((User.full_name == name) | (User.username == name))
+        .first()
+    )
+
+
+def _resolve_range(range: str, today: date) -> tuple[str, str]:
+    """根据 range 计算起止日期：week=本周(周一~周日)，fortnight=本周~下周日(两周)，month=本月。"""
+    if range == "month":
+        start = today.replace(day=1)
+        nxt = start.replace(month=start.month + 1) if start.month < 12 else start.replace(year=start.year + 1, month=1)
+        end = nxt - timedelta(days=1)
+    elif range == "fortnight":
+        monday = today - timedelta(days=today.weekday())
+        start, end = monday, monday + timedelta(days=13)
+    else:  # week
+        monday = today - timedelta(days=today.weekday())
+        start, end = monday, monday + timedelta(days=6)
+    return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+
+
+@router.get("/my-schedule", response_model=list[MyScheduleItem])
+def my_schedule(range: str = Query("week"),
+                db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """当前用户在本周/近两周/本月的只读排班（含岗位名/分组）。用于工作台「今日我的岗位」扩展排班表。"""
+    if range not in ("week", "fortnight", "month"):
+        raise HTTPException(status_code=400, detail="range 仅支持 week/fortnight/month")
+    me = user.full_name or user.username
+    today = date.today()
+    s, e = _resolve_range(range, today)
+    rows = (
+        db.query(SchedulingAssignment)
+        .filter(SchedulingAssignment.person == me,
+                SchedulingAssignment.date >= s, SchedulingAssignment.date <= e)
+        .order_by(SchedulingAssignment.date, SchedulingAssignment.post_id)
+        .all()
+    )
+    out = []
+    for a in rows:
+        post = db.get(SchedulingPost, a.post_id) if a.post_id else None
+        out.append(MyScheduleItem(
+            id=a.id, date=a.date, weekday=a.weekday, post_id=a.post_id,
+            post_name=post.name if post else "",
+            group=post.group if post else "",
+            person=a.person, status=a.status,
+            is_early=a.is_early, is_continuous=a.is_continuous,
+            is_locked=a.is_locked,
+        ))
+    return out
+
+
+@router.post("/swap/request", response_model=SchedulingSwapRequestRead)
+def request_swap(req: SchedulingSwapRequestCreate, db: Session = Depends(get_db),
+                 user: User = Depends(get_current_user)):
+    """发起换班：发起人(A)点击 B 的班次后提交。
+
+    - to_assignment_id 给定 = 双向对调（A 选自己一个班与 B 的班互换）。
+    - to_assignment_id 为空 = 单向顶班（B 顶 A 的早/连班，A 当天被顶替）。
+    仅 A 本人可发起（from_assignment_id 必须是 A 的班次）；向接收人 B 推送私密站内通知。
+    """
+    me = user.full_name or user.username
+    fa = db.get(SchedulingAssignment, req.from_assignment_id)
+    if not fa:
+        raise HTTPException(status_code=404, detail="发起班次不存在")
+    if fa.person != me:
+        raise HTTPException(status_code=403, detail="只能用自己的班次发起换班")
+    to_user = _user_by_name(db, req.to_person)
+    if not to_user:
+        raise HTTPException(status_code=404, detail=f"接收人「{req.to_person}」不是系统用户")
+    if req.to_person == me:
+        raise HTTPException(status_code=400, detail="不能与自己换班")
+    if req.to_assignment_id:
+        ta = db.get(SchedulingAssignment, req.to_assignment_id)
+        if not ta:
+            raise HTTPException(status_code=404, detail="目标班次不存在")
+        if ta.is_locked:
+            raise HTTPException(status_code=400, detail="该班次已换班锁定，不能再换")
+    is_top = req.to_assignment_id is None
+    swap = SchedulingSwapRequest(
+        from_person=me, to_person=req.to_person,
+        from_assignment_id=req.from_assignment_id,
+        to_assignment_id=req.to_assignment_id,
+        status=SWAP_STATUS_PENDING, note=req.note,
+    )
+    db.add(swap)
+    db.flush()
+    db.add(Notification(
+        module="排班", ref_type="scheduling_swap", ref_id=swap.id,
+        title=f"换班申请：{me} 请求与您换班",
+        message=f"{me} 希望与您{'对调班次' if not is_top else '顶班'}。备注：{req.note or '无'}",
+        due_date=fa.date, level="info", recipient_user_id=to_user.id,
+    ))
+    db.commit()
+    db.refresh(swap)
+    return swap
+
+
+@router.get("/swap/list", response_model=list[SchedulingSwapRequestRead])
+def list_swaps(role: str = Query("all"),
+               db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """换班列表。role=pending_in(待我接收) / pending_out(我发起) / all(全部相关)。"""
+    if role not in ("pending_in", "pending_out", "all"):
+        raise HTTPException(status_code=400, detail="role 仅支持 pending_in/pending_out/all")
+    me = user.full_name or user.username
+    q = db.query(SchedulingSwapRequest)
+    if role == "pending_in":
+        q = q.filter(SchedulingSwapRequest.to_person == me,
+                     SchedulingSwapRequest.status == SWAP_STATUS_PENDING)
+    elif role == "pending_out":
+        q = q.filter(SchedulingSwapRequest.from_person == me)
+    else:
+        q = q.filter((SchedulingSwapRequest.from_person == me)
+                     | (SchedulingSwapRequest.to_person == me))
+    return q.order_by(SchedulingSwapRequest.created_at.desc()).all()
+
+
+def _swap_finalize(db: Session, swap: SchedulingSwapRequest, me: str) -> SchedulingSwapRequest:
+    """执行换班：双向对调交换 person，单向顶班改 from 班次 person 为接收人；涉及早/连班则锁定。"""
+    fa = db.get(SchedulingAssignment, swap.from_assignment_id)
+    if not fa:
+        raise HTTPException(status_code=404, detail="发起班次已不存在")
+    if swap.to_assignment_id:
+        ta = db.get(SchedulingAssignment, swap.to_assignment_id)
+        if not ta:
+            raise HTTPException(status_code=404, detail="目标班次已不存在")
+        fa.person, ta.person = ta.person, fa.person
+        if fa.is_early or fa.is_continuous or ta.is_early or ta.is_continuous:
+            fa.is_locked = True
+            ta.is_locked = True
+        db.add(fa)
+        db.add(ta)
+    else:
+        fa.person = swap.to_person
+        if fa.is_early or fa.is_continuous:
+            fa.is_locked = True
+        db.add(fa)
+    swap.status = SWAP_STATUS_CONFIRMED
+    swap.updated_at = datetime.now()
+    from_user = _user_by_name(db, swap.from_person)
+    if from_user:
+        db.add(Notification(
+            module="排班", ref_type="scheduling_swap", ref_id=swap.id,
+            title=f"换班已确认：{me} 接受了您的换班",
+            message=f"{me} 已确认与您的换班（{'顶班' if not swap.to_assignment_id else '双向对调'}）。",
+            due_date=fa.date, level="info", recipient_user_id=from_user.id,
+        ))
+    db.commit()
+    db.refresh(swap)
+    return swap
+
+
+@router.post("/swap/{swap_id}/confirm", response_model=SchedulingSwapRequestRead)
+def confirm_swap(swap_id: int, db: Session = Depends(get_db),
+                 user: User = Depends(get_current_user)):
+    """接收人(B)确认换班 → 执行对调/顶班并锁定早/连班，通知发起人。"""
+    me = user.full_name or user.username
+    swap = db.get(SchedulingSwapRequest, swap_id)
+    if not swap:
+        raise HTTPException(status_code=404, detail="换班申请不存在")
+    if swap.to_person != me:
+        raise HTTPException(status_code=403, detail="只有接收人可以确认换班")
+    if swap.status != SWAP_STATUS_PENDING:
+        raise HTTPException(status_code=400, detail=f"该申请已{swap.status}，无法确认")
+    return _swap_finalize(db, swap, me)
+
+
+@router.post("/swap/{swap_id}/reject", response_model=SchedulingSwapRequestRead)
+def reject_swap(swap_id: int, db: Session = Depends(get_db),
+                user: User = Depends(get_current_user)):
+    """接收人(B)拒绝换班。"""
+    me = user.full_name or user.username
+    swap = db.get(SchedulingSwapRequest, swap_id)
+    if not swap:
+        raise HTTPException(status_code=404, detail="换班申请不存在")
+    if swap.to_person != me:
+        raise HTTPException(status_code=403, detail="只有接收人可以拒绝换班")
+    if swap.status != SWAP_STATUS_PENDING:
+        raise HTTPException(status_code=400, detail=f"该申请已{swap.status}，无法拒绝")
+    swap.status = SWAP_STATUS_REJECTED
+    swap.updated_at = datetime.now()
+    from_user = _user_by_name(db, swap.from_person)
+    if from_user:
+        db.add(Notification(
+            module="排班", ref_type="scheduling_swap", ref_id=swap.id,
+            title=f"换班被拒绝：{me} 拒绝了您的换班",
+            message=f"{me} 拒绝了您的换班申请。",
+            level="warning", recipient_user_id=from_user.id,
+        ))
+    db.commit()
+    db.refresh(swap)
+    return swap
+
+
+@router.post("/swap/{swap_id}/cancel", response_model=SchedulingSwapRequestRead)
+def cancel_swap(swap_id: int, db: Session = Depends(get_db),
+                user: User = Depends(get_current_user)):
+    """发起人(A)取消换班。"""
+    me = user.full_name or user.username
+    swap = db.get(SchedulingSwapRequest, swap_id)
+    if not swap:
+        raise HTTPException(status_code=404, detail="换班申请不存在")
+    if swap.from_person != me:
+        raise HTTPException(status_code=403, detail="只有发起人可以取消换班")
+    if swap.status != SWAP_STATUS_PENDING:
+        raise HTTPException(status_code=400, detail=f"该申请已{swap.status}，无法取消")
+    swap.status = SWAP_STATUS_CANCELED
+    swap.updated_at = datetime.now()
+    db.commit()
+    db.refresh(swap)
+    return swap

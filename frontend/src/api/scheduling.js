@@ -70,3 +70,25 @@ export function setSchedulingCell(data) {
 export function batchSchedulingCells(data) {
   return request.post('/api/v1/scheduling/batch', data)
 }
+
+// 我的排班（本周 / 近两周 / 本月，只读）
+export function getMySchedule(params) {
+  return request.get('/api/v1/scheduling/my-schedule', { params })
+}
+
+// 换班
+export function requestSwap(data) {
+  return request.post('/api/v1/scheduling/swap/request', data)
+}
+export function listSwaps(params) {
+  return request.get('/api/v1/scheduling/swap/list', { params })
+}
+export function confirmSwap(id) {
+  return request.post(`/api/v1/scheduling/swap/${id}/confirm`)
+}
+export function rejectSwap(id) {
+  return request.post(`/api/v1/scheduling/swap/${id}/reject`)
+}
+export function cancelSwap(id) {
+  return request.post(`/api/v1/scheduling/swap/${id}/cancel`)
+}

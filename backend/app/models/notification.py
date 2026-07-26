@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.database import Base
@@ -21,6 +22,9 @@ class Notification(Base):
     due_date: Mapped[str] = mapped_column(String(30), default="")  # 到期日
     level: Mapped[str] = mapped_column(String(20), default="info")  # info/warning/danger
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    recipient_user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, default=None, nullable=True, index=True
+    )  # 私密消息接收人 user_id；NULL=广播（所有人可见），非 NULL=仅该用户可见（如换班通知）
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

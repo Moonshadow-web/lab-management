@@ -9,7 +9,7 @@ from app.core.security import get_current_user
 from app.models.test_item import TestItem
 from app.models.instrument import Instrument
 from app.models.document import Document
-from app.models.notification import Notification
+from app.models.notification import Notification, NotificationRead
 from app.models.qc import QCRecord
 from app.models.reagent import Reagent
 from app.models.training import TrainingRecord
@@ -43,11 +43,21 @@ async def dashboard_stats(
         count = db.execute(stmt).scalar() or 0
         result[key] = count
 
-    # 待办提醒：未读数
+    # 待办提醒：当前用户「可见且未读」数（私密消息 recipient_user_id=本人，广播 NULL 对所有人可见）
+    read_subq = (
+        select(NotificationRead.notification_id)
+        .where(NotificationRead.user_id == user.id)
+        .subquery()
+    )
     unread_stmt = (
         select(func.count())
         .select_from(Notification)
-        .where(Notification.is_read == False)  # noqa: E712
+        .outerjoin(read_subq, Notification.id == read_subq.c.notification_id)
+        .where(
+            (Notification.recipient_user_id.is_(None))
+            | (Notification.recipient_user_id == user.id),
+            read_subq.c.notification_id.is_(None),
+        )
     )
     unread = db.execute(unread_stmt).scalar() or 0
     result["unread_notifications"] = unread

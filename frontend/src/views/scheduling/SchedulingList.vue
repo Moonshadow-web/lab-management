@@ -64,13 +64,13 @@
               <template #default="{ row }">
                 <div class="cell" :class="cellClass(row, d)" @click="openCellEditor(row, d)">
                   <template v-if="row.kind === 'post'">
-                    <span class="person">{{ postCell(row, d).person || '—' }}</span>
+                    <span class="person clickable-person" @click.stop="openSwap(row, d, postCell(row, d).person, postCell(row, d).id)">{{ postCell(row, d).person || '—' }}</span>
                     <span v-if="postCell(row, d).is_early" class="mini-tag early">早</span>
                     <span v-if="postCell(row, d).is_continuous" class="mini-tag cont">连</span>
                     <span v-if="postCell(row, d).status && postCell(row, d).status !== '在岗'" class="mini-tag st">{{ postCell(row, d).status }}</span>
                   </template>
                   <template v-else>
-                    <span v-for="p in statusCell(row, d).persons" :key="p.id" class="person-chip">{{ p.person }}</span>
+                    <span v-for="p in statusCell(row, d).persons" :key="p.id" class="person-chip clickable-person" @click.stop="openSwap(row, d, p.person, p.id)">{{ p.person }}</span>
                     <span v-if="!statusCell(row, d).persons.length" class="muted">—</span>
                   </template>
                 </div>
@@ -87,12 +87,14 @@
               <span class="dr-name">{{ row.name }}</span>
               <span class="dr-val">
                 <template v-if="row.kind === 'post'">
-                  {{ postCell(row, d).person || '—' }}
+                  <span class="clickable-person" @click.stop="openSwap(row, d, postCell(row, d).person, postCell(row, d).id)">{{ postCell(row, d).person || '—' }}</span>
                   <template v-if="postCell(row, d).is_early"> 早</template>
                   <template v-if="postCell(row, d).is_continuous"> 连</template>
                   <template v-if="postCell(row, d).status && postCell(row, d).status !== '在岗'"> ·{{ postCell(row, d).status }}</template>
                 </template>
-                <template v-else>{{ statusCell(row, d).persons.map(p => p.person).join('、') || '—' }}</template>
+                <template v-else>
+                  <span v-for="p in statusCell(row, d).persons" :key="p.id" class="clickable-person" @click.stop="openSwap(row, d, p.person, p.id)">{{ p.person }}</span><template v-if="!statusCell(row, d).persons.length">—</template>
+                </template>
               </span>
             </div>
           </div>
@@ -257,6 +259,42 @@
           <el-button size="small" type="primary" @click="openConfig">配置</el-button>
         </div>
       </el-tab-pane>
+
+      <!-- 我的换班 -->
+      <el-tab-pane label="我的换班" name="myswap">
+        <div class="swap-toolbar">
+          <el-radio-group v-model="swapListRole" size="small" @change="loadMySwaps">
+            <el-radio-button label="pending_in">待我接收</el-radio-button>
+            <el-radio-button label="pending_out">我发起的</el-radio-button>
+            <el-radio-button label="all">全部</el-radio-button>
+          </el-radio-group>
+          <el-button size="small" @click="loadMySwaps">刷新</el-button>
+          <span class="tip-text">点击排班表上的「人名」即可发起换班；接收人确认后自动改班表。</span>
+        </div>
+        <el-empty v-if="!mySwaps.length" description="暂无换班记录" :image-size="60" />
+        <el-table v-else :data="mySwaps" size="small" style="width: 100%">
+          <el-table-column prop="from_person" label="发起人" width="110" />
+          <el-table-column prop="to_person" label="接收人" width="110" />
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="swapStatusType(row.status)" size="small">{{ row.status }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="note" label="备注" min-width="160" show-overflow-tooltip />
+          <el-table-column label="操作" width="200" align="center">
+            <template #default="{ row }">
+              <template v-if="row.status === '待确认' && row.to_person === meName">
+                <el-button link type="primary" @click="confirmSwapReq(row)">确认</el-button>
+                <el-button link type="danger" @click="rejectSwapReq(row)">拒绝</el-button>
+              </template>
+              <template v-else-if="row.status === '待确认' && row.from_person === meName">
+                <el-button link type="warning" @click="cancelSwapReq(row)">取消</el-button>
+              </template>
+              <span v-else class="muted">—</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 单元格编辑弹窗 -->
@@ -307,11 +345,41 @@
       :submitting="configSaving"
       @submit="saveConfig"
     />
+
+    <!-- 发起换班弹窗 -->
+    <el-dialog v-model="swapDialog" title="发起换班" width="460px">
+      <el-form label-width="92px">
+        <el-form-item label="接收人">
+          <el-tag type="primary" effect="light">{{ swapForm.to_person }}</el-tag>
+        </el-form-item>
+        <el-form-item label="对方班次">
+          <span class="muted">{{ swapForm.clickedLabel }}</span>
+        </el-form-item>
+        <el-form-item label="换班方式">
+          <el-radio-group v-model="swapForm.bidirectional">
+            <el-radio :label="true">双向对调（交换班次）</el-radio>
+            <el-radio :label="false">顶班（对方顶我的班）</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="我的班次">
+          <el-select v-model="swapForm.from_assignment_id" placeholder="选择我要交换/托管的班次" style="width: 100%">
+            <el-option v-for="o in mySwapOptions" :key="o.id" :label="o.label" :value="o.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="swapForm.note" type="textarea" :rows="2" placeholder="可选，说明换班原因" />
+        </el-form-item>
+      </el-form>
+      <div class="dlg-actions">
+        <el-button type="primary" :loading="swapSubmitting" @click="submitSwap">发送申请</el-button>
+        <el-button @click="swapDialog = false">取消</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../components/CrudTable.vue'
 import EditDialog from '../../components/EditDialog.vue'
@@ -323,6 +391,7 @@ import {
   deleteSchedulingAssignment,
   getSchedulingGrid, getMyToday, generateScheduling,
   getSchedulingConfig, updateSchedulingConfig, setSchedulingCell, batchSchedulingCells,
+  getMySchedule, requestSwap, listSwaps, confirmSwap, rejectSwap, cancelSwap,
 } from '../../api/scheduling'
 import { listActiveUsers } from '../../api/users'
 
@@ -832,6 +901,82 @@ async function submitBatch() {
   finally { batchSaving.value = false }
 }
 
+// ---------------- 换班 ----------------
+const meName = computed(() => auth.user?.full_name || auth.user?.username)
+
+// 发起换班弹窗
+const swapDialog = ref(false)
+const swapSubmitting = ref(false)
+const swapForm = reactive({
+  to_person: '', to_assignment_id: null, from_assignment_id: null,
+  note: '', bidirectional: true, clickedLabel: '',
+})
+const mySwapOptions = ref([])
+
+function openSwap(row, d, person, assignId) {
+  if (!person || person === '—') return
+  if (person === meName.value) { ElMessage.info('不能与自己换班'); return }
+  swapForm.to_person = person
+  swapForm.to_assignment_id = assignId || null
+  swapForm.from_assignment_id = null
+  swapForm.note = ''
+  swapForm.bidirectional = true
+  swapForm.clickedLabel = `${d} ${row.name}`
+  swapDialog.value = true
+  loadMySwapOptions()
+}
+async function loadMySwapOptions() {
+  try {
+    const data = await getMySchedule({ range: 'month' })
+    const today = localDate(new Date())
+    mySwapOptions.value = (data || [])
+      .filter((x) => x.date >= today)
+      .map((x) => ({
+        id: x.id,
+        label: `${x.date} ${x.post_name || x.status}${x.is_early ? ' 早班' : ''}${x.is_continuous ? ' 连班' : ''}`,
+      }))
+  } catch (e) { mySwapOptions.value = [] }
+}
+async function submitSwap() {
+  if (!swapForm.from_assignment_id) { ElMessage.warning('请选择你的班次'); return }
+  swapSubmitting.value = true
+  try {
+    await requestSwap({
+      from_assignment_id: swapForm.from_assignment_id,
+      to_person: swapForm.to_person,
+      to_assignment_id: swapForm.bidirectional ? swapForm.to_assignment_id : null,
+      note: swapForm.note,
+    })
+    ElMessage.success('换班申请已发送，等待对方确认')
+    swapDialog.value = false
+    if (activeTab.value === 'myswap') loadMySwaps()
+  } catch (e) { ElMessage.error(e?.response?.data?.detail || '发起失败') }
+  finally { swapSubmitting.value = false }
+}
+
+// 我的换班列表
+const swapListRole = ref('pending_in')
+const mySwaps = ref([])
+function swapStatusType(s) {
+  return { '待确认': 'warning', '已确认': 'success', '已拒绝': 'danger', '已取消': 'info' }[s] || 'info'
+}
+async function loadMySwaps() {
+  try { mySwaps.value = (await listSwaps({ role: swapListRole.value })) || [] }
+  catch (e) { mySwaps.value = [] }
+}
+async function confirmSwapReq(row) {
+  try { await confirmSwap(row.id); ElMessage.success('已确认换班，班表已更新'); loadMySwaps(); loadGrid() }
+  catch (e) { ElMessage.error(e?.response?.data?.detail || '确认失败') }
+}
+async function rejectSwapReq(row) {
+  try { await rejectSwap(row.id); ElMessage.success('已拒绝'); loadMySwaps() }
+  catch (e) { ElMessage.error('拒绝失败') }
+}
+async function cancelSwapReq(row) {
+  try { await cancelSwap(row.id); ElMessage.success('已取消'); loadMySwaps() }
+  catch (e) { ElMessage.error('取消失败') }
+}
+
 // ---------------- 初始化 ----------------
 onMounted(() => {
   checkMobile()
@@ -846,6 +991,9 @@ onMounted(() => {
   onMonthChange()
 })
 onBeforeUnmount(() => { window.removeEventListener('resize', checkMobile) })
+
+// 进入「我的换班」标签页时自动加载列表
+watch(activeTab, (t) => { if (t === 'myswap') loadMySwaps() })
 
 async function loadConfigSummary() {
   try {
@@ -868,6 +1016,7 @@ async function loadConfigSummary() {
 .tag-sub { margin-left: 4px; opacity: 0.8; font-size: 12px; }
 .sched-tabs { background: #fff; padding: 8px 12px; border-radius: 8px; }
 .grid-ctrl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.swap-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 8px; font-size: 12px; color: #666; }
 .legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
 .grid-wrap { overflow-x: auto; }
@@ -875,6 +1024,8 @@ async function loadConfigSummary() {
 .cell { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 38px; justify-content: center; cursor: pointer; }
 .cell:hover { background: #f5f7fa; }
 .person { font-size: 13px; white-space: nowrap; }
+.clickable-person { cursor: pointer; border-bottom: 1px dashed transparent; }
+.clickable-person:hover { color: #1a365d; border-bottom-color: #1a365d; }
 .person-chip { display: inline-block; font-size: 12px; margin: 1px 2px; padding: 1px 5px; background: #eef3fb; border-radius: 3px; white-space: nowrap; }
 .mini-tag { font-size: 11px; line-height: 1; padding: 1px 4px; border-radius: 3px; }
 .mini-tag.early { background: #fdf6ec; color: #e6a23c; }

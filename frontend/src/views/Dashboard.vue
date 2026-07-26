@@ -27,37 +27,17 @@
       </el-col>
     </el-row>
 
-    <AppCard title="业务台账概览" class="mt">
-      <div class="mini-stats">
-        <div class="mini" @click="go('/qc')">
-          <span class="mini-num">{{ stats.qc }}</span>
-          <span class="mini-label">质控记录</span>
-        </div>
-        <div class="mini" @click="go('/reagents')">
-          <span class="mini-num">{{ stats.reagents }}</span>
-          <span class="mini-label">试剂台账</span>
-        </div>
-        <div class="mini" @click="go('/training')">
-          <span class="mini-num">{{ stats.training }}</span>
-          <span class="mini-label">培训记录</span>
-        </div>
-        <div class="mini" @click="go('/verification')">
-          <span class="mini-num">{{ stats.verification }}</span>
-          <span class="mini-label">性能验证</span>
-        </div>
-        <div class="mini" @click="go('/iso15189')">
-          <span class="mini-num">{{ stats.nc }}</span>
-          <span class="mini-label">不符合项</span>
-        </div>
-      </div>
-    </AppCard>
-
     <AppCard title="今日我的岗位" class="mt">
       <template #header-extra>
+        <el-radio-group v-model="rangeMode" size="small" @change="loadMySchedule">
+          <el-radio-button label="week">本周</el-radio-button>
+          <el-radio-button label="fortnight">近两周</el-radio-button>
+          <el-radio-button label="month">本月</el-radio-button>
+        </el-radio-group>
         <el-button size="small" @click="loadMyShifts">刷新</el-button>
       </template>
-      <el-empty v-if="!myShifts.length" description="今日无排班记录" :image-size="60" />
-      <div v-else class="my-shifts">
+
+      <div v-if="myShifts.length" class="my-shifts">
         <el-tag
           v-for="m in myShifts"
           :key="m.post_id"
@@ -72,6 +52,35 @@
         </el-tag>
         <el-button class="shift-more" size="small" text type="primary" @click="go('/scheduling')">查看完整排班表</el-button>
       </div>
+      <el-divider v-if="myShifts.length && mySchedule.length" />
+
+      <el-empty v-if="!mySchedule.length" description="该范围内暂无排班记录" :image-size="60" />
+      <el-table v-else :data="mySchedule" size="small" style="width: 100%">
+        <el-table-column prop="date" label="日期" width="120" />
+        <el-table-column label="星期" width="80">
+          <template #default="{ row }">{{ weekdayLabel(row.weekday) }}</template>
+        </el-table-column>
+        <el-table-column label="岗位 / 状态" min-width="150">
+          <template #default="{ row }">
+            <span v-if="row.post_name">{{ row.post_name }}</span>
+            <span v-else class="muted">{{ row.status }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="班次类型" width="110">
+          <template #default="{ row }">
+            <el-tag v-if="row.is_early" size="small" type="warning">早班</el-tag>
+            <el-tag v-else-if="row.is_continuous" size="small" type="danger">连班</el-tag>
+            <span v-else-if="row.status && row.status !== '在岗'" class="muted">{{ row.status }}</span>
+            <span v-else class="muted">白班</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="换班" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.is_locked" size="small" type="info">已换班</el-tag>
+            <span v-else class="muted">—</span>
+          </template>
+        </el-table-column>
+      </el-table>
     </AppCard>
 
     <AppCard title="提醒事项" class="mt">
@@ -122,7 +131,7 @@ import { listReagents } from '../api/reagents'
 import { listTraining } from '../api/training'
 import { listVerification } from '../api/verification'
 import { listNC } from '../api/nonconformity'
-import { getMyToday } from '../api/scheduling'
+import { getMyToday, getMySchedule } from '../api/scheduling'
 
 const router = useRouter()
 const stats = ref({
@@ -131,6 +140,8 @@ const stats = ref({
 })
 const notices = ref([])
 const myShifts = ref([])
+const mySchedule = ref([])
+const rangeMode = ref('week')  // week / fortnight / month
 const showAll = ref(false)  // false=仅未读（默认隐藏已读），true=显示全部
 const hasRead = computed(() => notices.value.some(n => n.is_read))
 
@@ -138,6 +149,11 @@ function levelType(level) {
   if (level === 'danger') return 'danger'
   if (level === 'warning') return 'warning'
   return 'info'
+}
+
+const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+function weekdayLabel(w) {
+  return WEEKDAYS[w] ?? ''
 }
 
 function go(path) {
@@ -201,6 +217,14 @@ async function loadMyShifts() {
   }
 }
 
+async function loadMySchedule() {
+  try {
+    mySchedule.value = await getMySchedule({ range: rangeMode.value })
+  } catch (e) {
+    mySchedule.value = []
+  }
+}
+
 async function onRead(row) {
   await markRead(row.id)
   // 默认「仅未读」视图下，已读后该项应隐藏，重新拉取列表
@@ -229,6 +253,7 @@ onMounted(() => {
   loadStats()
   loadNotices()
   loadMyShifts()
+  loadMySchedule()
 })
 </script>
 
@@ -305,5 +330,9 @@ onMounted(() => {
   margin-left: 4px;
   opacity: 0.8;
   font-size: 12px;
+}
+.muted {
+  color: #999;
+  font-size: 13px;
 }
 </style>
