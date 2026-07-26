@@ -1,8 +1,10 @@
 """试剂管理：试剂目录/库存/盘库/订购/接收/月消耗 API"""
 
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
+from collections import defaultdict
 
 from io import BytesIO
 
@@ -1139,6 +1141,28 @@ def _enrich_test_item_reagents(rows):
     return out
 
 
+def _extract_instrument_base_model(name: str, model: str = "") -> str:
+    """从仪器 name/model 中提取「总型号」，用于合并同型号多台仪器的耗材关联。
+
+    规则（按优先级）：
+    1. name 首部字母数字词根：'DXI800 1号机' → 'DXI800'；'AU58-1' → 'AU58'
+    2. model 中提取核心型号：'贝克曼DXI800 1' → 'DXI800'
+    3. 兜底返回原 name
+    """
+    if not name:
+        return (model or "").strip()
+    # 取 name 开头的字母数字组合（允许连字符/空格分隔的多段）
+    m = re.match(r'^([A-Za-z0-9]+(?:[- ][A-Za-z0-9]+)*)', name.strip())
+    if m and len(m.group(1)) >= 3:
+        return m.group(1)
+    # 从 model 提取
+    if model:
+        m2 = re.search(r'([A-Za-z]{2,}[\d]*[A-Za-z]*)', model)
+        if m2 and len(m2.group(1)) >= 3:
+            return m2.group(1)
+    return name.strip()
+
+
 def _enrich_instrument_reagents(rows):
     out = []
     for r in rows:
@@ -1350,7 +1374,12 @@ def list_instrument_reagents(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    base = db.query(InstrumentReagent)
+    # 基础查询：JOIN Instrument 以访问 status / name / model
+    base = (
+        db.query(InstrumentReagent)
+        .join(Instrument, Instrument.id == InstrumentReagent.instrument_id)
+        .filter(Instrument.status != "停用")          # ① 停用仪器不显示
+    )
     if instrument_id:
         base = base.filter(InstrumentReagent.instrument_id == instrument_id)
     if reagent_id:
@@ -1360,14 +1389,50 @@ def list_instrument_reagents(
     if q.strip():
         kw = f"%{q.strip()}%"
         base = base.join(ReagentItem, ReagentItem.id == InstrumentReagent.reagent_item_id).filter(
-            or_(InstrumentReagent.instrument_id.in_(
-                [i.id for i in db.query(Instrument).filter(Instrument.name.like(kw)).all()]),
-                ReagentItem.name.like(kw))
+            or_(Instrument.name.like(kw), ReagentItem.name.like(kw))
         )
-    total = base.count()
-    rows = base.order_by(InstrumentReagent.id).offset((page - 1) * page_size).limit(page_size).all()
-    return {"total": total, "page": page, "page_size": page_size,
-            "items": _enrich_instrument_reagents(rows)}
+
+    # ② 按总型号分组合并（同型号多台仪器的耗材去重后合并为一行）
+    all_rows = base.order_by(InstrumentReagent.id).all()
+    # 分组：(base_model, reagent_item_id) → [rows...]
+    grouped: dict[tuple[str, int], list] = defaultdict(list)
+    for r in all_rows:
+        ins = r.instrument
+        bm = _extract_instrument_base_model(ins.name or "", ins.model or "")
+        grouped[(bm, r.reagent_item_id)].append(r)
+
+    # 展平为列表，每行 = (总型号, 耗材) 的合并行
+    items = []
+    for (base_model, _rid), grp in grouped.items():
+        r0 = grp[0]
+        ins0 = r0.instrument
+        ri0 = r0.reagent_item
+        # 合并的仪器名列表（用于展示"DXI800 (1号机/2号机/急诊/唐筛)"）
+        merged_names = sorted({
+            f"{ins.name}" for ins_grp in grp
+            if (ins := ins_grp.instrument) and ins.name
+        })
+        items.append({
+            "id": r0.id,
+            "instrument_id": r0.instrument_id,
+            "reagent_item_id": r0.reagent_item_id,
+            "role": r0.role,
+            "auto_matched": r0.auto_matched,
+            "remark": r0.remark,
+            "instrument_name": base_model,           # ③ 显示总型号而非单台
+            "instrument_model": "",                  # 总型号不需要再显示 model
+            "merged_instruments": merged_names,      # ④ 合并的子仪器名列表
+            "source_count": len(grp),                # 来自几台仪器
+            "reagent_name": ri0.name if ri0 else "",
+            "reagent_type": ri0.type if ri0 else "",
+            "reagent_library": ri0.library if ri0 else "",
+        })
+
+    total = len(items)
+    # 服务端分页
+    start = (page - 1) * page_size
+    paged = items[start:start + page_size]
+    return {"total": total, "page": page, "page_size": page_size, "items": paged}
 
 
 @router.post("/associations/instruments", response_model=InstrumentReagentRead)

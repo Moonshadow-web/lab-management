@@ -66,9 +66,13 @@
         </div>
         <el-table v-loading="instLoading" :data="instItems" border stripe height="calc(100vh - 340px)" empty-text="暂无关联">
           <el-table-column type="index" width="50" label="#" />
-          <el-table-column label="仪器" min-width="200" show-overflow-tooltip>
+          <el-table-column label="仪器（总型号）" min-width="220" show-overflow-tooltip>
             <template #default="{ row }">
-              <span>{{ row.instrument_name }}<template v-if="row.instrument_model">（{{ row.instrument_model }}）</template></span>
+              <strong>{{ row.instrument_name }}</strong>
+              <el-tag v-if="row.source_count > 1" size="small" type="info" style="margin-left:6px">{{ row.source_count }}台</el-tag>
+              <el-tooltip v-if="row.merged_instruments?.length > 1" :content="row.merged_instruments.join('、')" placement="top">
+                <span style="color:var(--el-text-color-secondary);font-size:12px;margin-left:4px;cursor:help">({{ row.merged_instruments.join('、') }})</span>
+              </el-tooltip>
             </template>
           </el-table-column>
           <el-table-column prop="reagent_name" label="耗材" min-width="220" show-overflow-tooltip />
