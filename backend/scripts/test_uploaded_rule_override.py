@@ -129,4 +129,11 @@ assert _parse_rule_cell("（1-3S）")[0] == "1-3s"   # 括号包裹
 assert _parse_rule_cell("失控1-3S")[0] == "1-3s"   # 前缀中文
 print("PASS 用例J 变体解析: 10-X→10-x, 1－3S→1-3s, 13S→1-3s, （1-3S）→1-3s, 失控1-3S→1-3s")
 
+print("\n=== 用例K：4-1s（连续4次同侧）上传规则解析不崩溃，判失控 ===")
+lv = lvl("1", [1.0, 1.0, 1.0, 1.0, 1.0], rules=["", "", "", "4-1S", ""], rule_col=True)
+res = aggregate_project([lv])
+a = res["1"]
+assert a["ooc"].get(3) == "4-1s", a["ooc"]
+print("PASS 用例K 4-1s →", a["ooc"])
+
 print("\nALL PASS ✅")

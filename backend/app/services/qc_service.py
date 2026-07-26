@@ -321,7 +321,7 @@ def _join(existing: str, rule: str) -> str:
 _OOC_RULES = {"1-3s", "2-2s", "R-4s", "10-x", "4-1s"}
 _WARN_RULES = {"1-2s"}
 # 严重度（越大越严重），用于同单元格多规则时取最严重者、并决定显示顺序
-_RULE_SEVERITY = {"1-2s": 0, "10-x": 1, "R-4s": 2, "2-2s": 3, "1-3s": 4}
+_RULE_SEVERITY = {"1-2s": 0, "10-x": 1, "R-4s": 2, "4-1s": 2, "2-2s": 3, "1-3s": 4}
 
 
 def _normalize_rule_token(tok: str) -> str | None:
@@ -392,7 +392,8 @@ def _resolve_uploaded_rules(parsed: list[str]) -> tuple[str, str]:
     ooc_rules = [r for r in parsed if r in _OOC_RULES]
     warn_rules = [r for r in parsed if r in _WARN_RULES]
     if ooc_rules:
-        ordered = sorted(set(ooc_rules), key=lambda x: -_RULE_SEVERITY[x])
+        # 防御性：严重度字典若漏项也不崩溃（未知规则排到最后，仍保留在结果串中）
+        ordered = sorted(set(ooc_rules), key=lambda x: -_RULE_SEVERITY.get(x, -1))
         return "ooc", ";".join(ordered)
     if warn_rules:
         return "warning", "1-2s"
