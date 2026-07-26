@@ -10,6 +10,30 @@ recover-table 等) 已移除，收敛攻击面。
 import os
 import shutil
 import sqlite3
+import traceback
+from datetime import datetime, timezone
+
+# 最近未捕获异常环缓冲（main.py 全局异常处理器写入），仅 admin 可查看。
+# 用于 CloudBase 等无 stdout 日志环境临时定位 500 根因。
+_LAST_ERRORS: list[dict] = []
+_MAX_LAST_ERRORS = 10
+
+
+def capture_exception(exc: BaseException, request_path: str = "") -> None:
+    """被 main.py 全局异常处理器调用，记录最近的非 HTTP 异常。"""
+    try:
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    except Exception:  # noqa: BLE001
+        tb = str(exc)
+    _LAST_ERRORS.append({
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "path": request_path,
+        "type": type(exc).__name__,
+        "message": str(exc),
+        "traceback": tb,
+    })
+    if len(_LAST_ERRORS) > _MAX_LAST_ERRORS:
+        _LAST_ERRORS.pop(0)
 
 _DB_PATH = "/app/data/app.db"
 # CFS 持久卷 /app/data 与本机 /tmp 是不同设备，临时文件放在同设备内，
@@ -107,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "qc-ruleparser-fix2-2026-07-26"
+_BUILD_MARK = "reagent-usage-sort-delete-showinactive-2026-07-26"
 
 
 def get_build_mark() -> str:
@@ -174,3 +198,9 @@ def diag_db():
         from fastapi import HTTPException as HE
         raise HE(status_code=404, detail="数据库文件不存在")
     return FileResponse(_DB_PATH, filename="app.db", media_type="application/octet-stream")
+
+
+@router.get("/last-errors")
+def diag_last_errors():
+    """返回最近捕获的未处理异常（仅管理员，用于无日志环境排障）。"""
+    return {"errors": list(_LAST_ERRORS), "count": len(_LAST_ERRORS)}
