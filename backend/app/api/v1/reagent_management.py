@@ -920,15 +920,44 @@ def _core_name(s: str) -> str:
     return _norm_match(s)
 
 
-def _best_test_item_match(rn: str, test_norms):
-    """在 test_norms[(id, tn, tn_core, aliases)] 中为归一化试剂名 rn 找最佳匹配项。
-    返回 (best_test_item_id, best_score)。core 词（去括号/罗马数字）可显著提升召回。"""
+# 试剂名尾部通用后缀——提取「试剂核心词」时逐级剥离，露出真正的测定对象
+_REAGENT_SUFFIXES = ["测定试剂盒", "检测试剂盒", "试剂盒", "校准品", "质控品",
+                     "质控血清", "测定", "检测", "试剂"]
+
+
+def _reagent_core(s: str) -> str:
+    """提取试剂「核心词」：去方法括号 + 逐级剥离尾部通用后缀（测定试剂盒/校准品…）。
+    例：「D-二聚体测定试剂盒（免疫比浊法）」→ d二聚体，可命中项目「血浆D-二聚体」；
+    「铁测定试剂盒」→ 铁，可命中项目「铁」。解决项目名带前缀/后缀导致漏匹配的问题。"""
+    s = _re.sub(r"\([^)]*\)", "", str(s or ""))
+    s = _re.sub(r"（[^）]*）", "", s)
+    changed = True
+    while changed:
+        changed = False
+        for suf in _REAGENT_SUFFIXES:
+            if s.endswith(suf) and len(s) > len(suf):
+                s = s[: -len(suf)]
+                changed = True
+                break
+    return _norm_match(s)
+
+
+def _best_test_item_match(rn: str, rc: str, test_norms):
+    """在 test_norms[(id, tn, tn_core, aliases)] 中为试剂找最佳匹配项目。
+    rn=试剂名归一化，rc=试剂核心词。双向包含均计分；试剂核心与项目名完全相等（如 铁/锌）给通过阈值。
+    返回 (best_test_item_id, best_score)。"""
     best, best_score = None, 0
     for tid, tn, tn_core, tals in test_norms:
         for cand in ([tn, tn_core] + tals):
             if not cand or cand in GENERIC_CLASS_TOKENS:
                 continue
-            score = len(cand) if cand in rn else (len(rn) if (rn and rn in cand) else 0)
+            score = 0
+            if cand in rn or cand in rc:
+                score = len(cand)
+            elif rn in cand or (rc and rc in cand):
+                score = len(rc) if (rc and rc in cand) else len(rn)
+            if rc and cand == rc:
+                score = max(score, 2)
             if score > best_score:
                 best_score, best = score, tid
     return best, best_score
@@ -963,7 +992,8 @@ def auto_match_associations(
         if r.type == "耗材":
             continue
         rn = _norm_match(r.name)
-        best, best_score = _best_test_item_match(rn, test_norms)
+        rc = _reagent_core(r.name)
+        best, best_score = _best_test_item_match(rn, rc, test_norms)
         if best and best_score >= 2:
             if not db.query(TestItemReagent).filter_by(test_item_id=best, reagent_item_id=r.id).first():
                 db.add(TestItemReagent(
@@ -1130,7 +1160,8 @@ def association_suggestions(
             if r.id in linked_test_ids:
                 continue
             rn = _norm_match(r.name)
-            best, best_score = _best_test_item_match(rn, test_norms)
+            rc = _reagent_core(r.name)
+            best, best_score = _best_test_item_match(rn, rc, test_norms)
             ti = next((t for t in tests if t.id == best), None)
             if best and best_score >= 2:
                 test_item_suggestions.append({
