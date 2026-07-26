@@ -1141,33 +1141,42 @@ def _enrich_test_item_reagents(rows):
     return out
 
 
+INSTRUMENT_FAMILY_MAP = {
+    "AU5800": "AU58",              # AU5800 属于 AU58 家族
+    "TOP700A": "TOP700",           # TOP700 系列（A/B/C）合并
+    "TOP700B": "TOP700",
+    "TOP700C": "TOP700",
+    "免疫分析仪": "罗氏Cobas6000",  # 罗氏 e601/e602 均属 Cobas6000
+    "DXA5000": None,               # 无耗材，不显示
+}
+
+
 def _extract_instrument_base_model(name: str, model: str = "") -> str:
     """从仪器 name/model 中提取「总型号」，用于合并同型号多台仪器的耗材关联。
 
-    规则（按优先级）：
-    1. name 首部纯字母数字段（遇空格/中文即停）：'DXI800 1号机' → 'DXI800'；'AU58-1' → 'AU58-1' → 'AU58'
-    2. 去掉尾部实例编号（如 '-1', '-2'）：'AU58-1' → 'AU58'；'DXI800' 不变
-    3. model 中提取核心型号：'贝克曼DXI800 1' → 'DXI800'
-    4. 兜底返回原 name
+    优先级：① 精确家族映射表 → ② 正则提取（遇空格/中文即停，去尾部编号）
+            → ③ model 提取核心型号 → ④ 兜底返回原 name
     """
     if not name:
         return (model or "").strip()
-    cleaned = name.strip()
-    # 只取开头的字母+数字+连字符组合（遇到空格/中文字符即停）
-    m = re.match(r'^([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)', cleaned)
+    raw = name.strip()
+    # ① 精确家族映射优先
+    if raw in INSTRUMENT_FAMILY_MAP:
+        return INSTRUMENT_FAMILY_MAP[raw]
+    # ② 正则提取总型号（遇空格/中文即停，去尾部实例编号）
+    m = re.match(r'^([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)', raw)
     if m:
         base = m.group(1)
-        # 去掉尾部实例编号（如 AU58-1 → AU58）
-        base = re.sub(r'-\d+$', '', base)
-        # 纯数字无效；至少 2 字符
+        base = re.sub(r'-\d+$', '', base)   # AU58-1 → AU58
         if not base.isdigit() and len(base) >= 2:
-            return base
-    # 从 model 提取核心型号
+            # 提取出的 base 可能也在家族映射中（如 AU5800 已在上一步处理）
+            return INSTRUMENT_FAMILY_MAP.get(base, base)
+    # ③ 从 model 提取核心型号
     if model:
         m2 = re.search(r'([A-Za-z]{2,}\d*[A-Za-z]*)', model)
         if m2 and len(m2.group(1)) >= 2:
-            return m2.group(1)
-    return cleaned
+            return INSTRUMENT_FAMILY_MAP.get(m2.group(1), m2.group(1))
+    return raw
 
 
 def _enrich_instrument_reagents(rows):
@@ -1406,6 +1415,8 @@ def list_instrument_reagents(
     for r in all_rows:
         ins = r.instrument
         bm = _extract_instrument_base_model(ins.name or "", ins.model or "")
+        if not bm:          # 家族映射为 None（如 DXA5000 无耗材）不显示
+            continue
         grouped[(bm, r.reagent_item_id)].append(r)
 
     # 展平为列表，每行 = (总型号, 耗材) 的合并行
