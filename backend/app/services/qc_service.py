@@ -92,12 +92,49 @@ _LIS_ITEM_ALIASES = {
     "ldl": "低密度脂蛋白胆固醇",
     "高密脂蛋白": "高密度脂蛋白胆固醇",
     "hdl": "高密度脂蛋白胆固醇",
+    # 凝血（LIS 常见标签 → test_items.name；取自线上 test_items 实际 name/别名）
+    # 仅做「原名 → 规范名」单向桥接；规范名需与 test_items.name 完全一致，才能精确命中项目。
+    "pt": "凝血酶原时间",
+    "pt%": "凝血酶原时间",
+    "inr": "凝血酶原时间",
+    "inrratio": "凝血酶原时间",
+    "aptt": "活化部分凝血活酶时间",
+    "tt": "凝血酶时间",
+    "fib": "纤维蛋白原",
+    "fdp": "纤维蛋白（原）降解产物",
+    "pc": "血浆蛋白C活性",
+    "蛋白c": "血浆蛋白C活性",
+    "atiii": "抗凝血酶III",
+    "抗凝血酶iii": "抗凝血酶III",
+    "sct": "狼疮抗凝物SCT试验",
+    "sct标准化比值": "狼疮抗凝物SCT试验",
+    "drvvt": "狼疮抗凝物DRVVT试验",
+    "d-dimer": "血浆D-二聚体",
+    "d二聚体": "血浆D-二聚体",
 }
 
 
 def _canon_item_name(name: str) -> str:
     """把 LIS 常用简称/缩写桥接为系统规范名；无映射则返回原名。"""
     return _LIS_ITEM_ALIASES.get(_norm(name), name)
+
+
+def _token_match(word_norm: str, qnorm: str) -> bool:
+    """别名词与查询词的「安全」匹配：精确相等，或带词边界的子串。
+
+    避免 "pt" 命中 "GPT"（gpt 含 pt 但非独立词）这类缩写截胡：
+    仅当查询词在别名词内且前后均为非字母数字边界（或端点）时才算命中。
+    """
+    if not qnorm or not word_norm:
+        return False
+    if word_norm == qnorm:
+        return True
+    if qnorm in word_norm:
+        i = word_norm.index(qnorm)
+        before_ok = (i == 0) or (not word_norm[i - 1].isalnum())
+        after_ok = (i + len(qnorm) == len(word_norm)) or (not word_norm[i + len(qnorm)].isalnum())
+        return before_ok and after_ok
+    return False
 
 
 def find_test_item_by_name(db: Session, name: str, instrument: str = "") -> TestItem | None:
@@ -107,22 +144,27 @@ def find_test_item_by_name(db: Session, name: str, instrument: str = "") -> Test
     以利用「仪器档案的检验项目」来对应质控项目——同名项目跨仪器时定位更精准，
     取到的规范名/别名也更贴近该仪器实际使用的项目叫法。
 
-    匹配顺序：先按原名匹配；未命中再按 LIS 别名规范名（_canon_item_name）匹配，
-    以打通「直胆红素→直接胆红素」「GGT→γ-谷氨酰基转移酶」等简称/缩写。
+    匹配顺序（均先做「本仪器名下」再「全局兜底」）：
+      0) LIS 别名/缩写桥接表（_LIS_ITEM_ALIASES）精确命中规范名——可避免 "PT" 被
+         "GPT" 子串截胡，也能把无对应别名的 "PT% / INR RATIO / SCT标准化比值" 桥接到正确项目；
+      1) 原名（精确名 + 名称子串 + 带词边界的别名词子串）；
+      2) 规范名兜底。
     """
     if not name:
         return None
     inst_norm = _norm(instrument or "")
     rows = db.query(TestItem).all()
+    qnorm0 = _norm(name)
+    canon = _LIS_ITEM_ALIASES.get(qnorm0)
 
     def _matches(r: TestItem, qnorm: str, qraw: str) -> bool:
         rn = _norm(r.name)
-        if rn == qnorm:
+        if rn == qnorm:                      # 精确名称
             return True
-        if qnorm in rn or rn in qnorm:
+        if qnorm in rn or rn in qnorm:       # 名称子串（中文全名，风险低）
             return True
         for w in _alias_words(r.aliases or ""):
-            if w == qnorm or qnorm in w or w in qnorm:
+            if _token_match(w, qnorm):       # 别名词：精确 / 带词边界子串
                 return True
         for seg in re.split(r"[\s+]", qraw.strip()):
             sn = _norm(seg)
@@ -130,29 +172,53 @@ def find_test_item_by_name(db: Session, name: str, instrument: str = "") -> Test
                 return True
         return False
 
-    def _try(qname: str) -> TestItem | None:
-        qnorm = _norm(qname)
-        # 优先：本仪器（含 instrument_group）名下的项目
+    def _exact(r: TestItem, qnorm: str, qraw: str = "") -> bool:
+        """仅精确匹配名称或某个别名词（用于别名桥接的规范名定位）。"""
+        if _norm(r.name) == qnorm:
+            return True
+        return any(w == qnorm for w in _alias_words(r.aliases or ""))
+
+    def _scan(qname: str, qnorm: str, pred) -> TestItem | None:
+        """按 pred 扫描：先本仪器名下，再全局兜底。"""
         if inst_norm:
             for r in rows:
                 ri = _norm(r.instrument or "")
                 rg = _norm(r.instrument_group or "")
                 if (ri and (ri == inst_norm or inst_norm in ri or ri in inst_norm)) or \
                    (rg and (rg == inst_norm or inst_norm in rg or rg in inst_norm)):
-                    if _matches(r, qnorm, qname):
+                    if pred(r, qnorm, qname):
                         return r
-        # 兜底：全局匹配
         for r in rows:
-            if _matches(r, qnorm, qname):
+            if pred(r, qnorm, qname):
                 return r
         return None
 
+    def _try(qname: str, exact: bool = False) -> TestItem | None:
+        qnorm = _norm(qname)
+        if exact:
+            return _scan(qname, qnorm, _exact)
+        # 精确优先：名称/别名词完全相等者必先于模糊子串命中，
+        # 避免「白蛋白」前缀截胡「白蛋白（A）」之类的同根项。
+        hit = _scan(qname, qnorm, _exact)
+        if hit:
+            return hit
+        return _scan(qname, qnorm, _matches)
+
+    # 0) 别名/缩写桥接表：用规范名做「精确」定位，优先级最高
+    if canon and canon != name:
+        hit = _try(canon, exact=True)
+        if hit:
+            return hit
+    # 1) 原名
     hit = _try(name)
-    if hit is None:
-        canon = _canon_item_name(name)
-        if canon != name:
-            hit = _try(canon)
-    return hit
+    if hit:
+        return hit
+    # 2) 规范名兜底
+    if canon and canon != name:
+        hit = _try(canon)
+        if hit:
+            return hit
+    return None
 
 
 def _paren_code(name: str) -> str:
@@ -294,13 +360,18 @@ def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None) -
     # Step 1: QualityRequirement 表查询
     if db is not None:
         try:
-            qr_goal = _lookup_qr_goal(db, test_item, aliases)
-            if qr_goal:
-                return qr_goal
-            # 再试 LIS 别名规范名（如 直胆红素→直接胆红素、GGT→γ-谷氨酰基转移酶）
             canon = _canon_item_name(test_item)
-            if canon != test_item:
-                qr_goal = _lookup_qr_goal(db, canon, aliases)
+            # canon（规范名）优先于原始 LIS 缩写：缩写可能被别的项目「截胡」
+            # （如 "PT" 会被「甲状旁腺激素(PTH)」的括号代码 PT 子串命中）。
+            cands = [canon, test_item] if canon != test_item else [test_item]
+            # 优先返回非默认（非 10%）结果
+            for nm in cands:
+                qr_goal = _lookup_qr_goal(db, nm, aliases)
+                if qr_goal and qr_goal != "10%":
+                    return qr_goal
+            # 兜底：若候选都只能得到默认 10%（确有项目目标即为 10%），取首个有值者
+            for nm in cands:
+                qr_goal = _lookup_qr_goal(db, nm, aliases)
                 if qr_goal:
                     return qr_goal
         except Exception:

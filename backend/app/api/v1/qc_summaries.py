@@ -494,6 +494,8 @@ def upload_qc_summary(
                 "target_sd": _to_float(get("target_sd")) or 0.0,
                 "instrument_no": inst_no,
                 "test_item_aliases": matched.aliases if matched else "",
+                # 解析到的规范项目名（优先用 test_items 规范名，便于月结报告展示/质量目标命中）
+                "resolved_test_item": matched.name if matched else ti_name,
             }
         block_keys.add((instrument_id if sel_inst else None, inst, d.year, d.month))
 
@@ -554,7 +556,8 @@ def upload_qc_summary(
             quality_goal = lookup_quality_goal(test_item, spec.get("test_item_aliases", ""), db)
             summ, is_new = _write_summary_level(
                 db,
-                year=year, month=month, test_item=test_item, lot_no=lot_no,
+                year=year, month=month,
+                test_item=spec.get("resolved_test_item", test_item), lot_no=lot_no,
                 level=level, instrument=instrument_p, instrument_id=inst_id_p,
                 instrument_no=spec["instrument_no"], unit=spec["unit"],
                 quality_goal=quality_goal,
