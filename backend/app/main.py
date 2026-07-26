@@ -140,6 +140,37 @@ def _ensure_missing_columns():
                 logger.info("自动补列 %s.%s (%s)", table.name, col.name, ddl)
             except Exception as e:  # noqa: BLE001
                 logger.warning("自动补列失败(忽略) %s.%s: %s", table.name, col.name, e)
+    # 2026-07-26 显性兜底：qc_monthly_summaries.rule_column_present 与
+    # qc_daily_values.uploaded_rule 是质控上传规则覆盖功能新增的列。若上一轮部署
+    # 因镜像推送中断(broken pipe)未能完整迁移，非空的线上表会缺列 → 上传 500
+    # (Unknown column)。此处用与模型一致的 CREATE 语句再次尝试 ADD（幂等，已存在则忽略）。
+    _QC_EXTRA_COLUMNS = {
+        "qc_monthly_summaries": [
+            "rule_column_present TINYINT(1) NOT NULL DEFAULT 0",
+        ],
+        "qc_daily_values": [
+            "uploaded_rule VARCHAR(200) NOT NULL DEFAULT ''",
+        ],
+    }
+    try:
+        cur = {t.name: {c["name"] for c in inspector.get_columns(t.name)}
+               for t in Base.metadata.tables.values()
+               if inspector.has_table(t.name)}
+    except Exception:  # noqa: BLE001
+        cur = {}
+    for tname, cols in _QC_EXTRA_COLUMNS.items():
+        for coldef in cols:
+            colname = coldef.split(" ", 1)[0]
+            if cur.get(tname) is not None and colname in cur[tname]:
+                continue
+            try:
+                with engine.begin() as conn:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE `{tname}` ADD COLUMN {coldef}"
+                    )
+                logger.info("QC 兜底补列 %s.%s", tname, colname)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("QC 兜底补列失败(忽略) %s.%s: %s", tname, colname, e)
 
 
 def _migrate_schema():
