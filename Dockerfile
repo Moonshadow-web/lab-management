@@ -4,6 +4,8 @@ WORKDIR /build
 COPY frontend/package*.json ./
 RUN npm ci --production=false
 COPY frontend/ ./
+# 强制清掉任何构建缓存/旧产物，确保每次部署都重新构建前端（避免 CloudBase 构建缓存复用旧 dist）
+RUN rm -rf dist node_modules/.vite .vite 2>/dev/null || true
 RUN npm run build
 
 # ====== Stage 2: 运行后端 + 托管前端 ======
