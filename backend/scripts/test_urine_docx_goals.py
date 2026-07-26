@@ -100,7 +100,8 @@ for item, (unit, goal) in docx.items():
 
 print("\n=== 血清同名项目不应被污染 ===")
 SERUM = {"肌酐": "4.0%", "尿素": "3.0%", "钠": "1.5%", "钾": "2.5%",
-         "氯": "1.5%", "钙": "2.0%", "尿酸": "4.5%", "总蛋白": "2.0%"}
+         "氯": "1.5%", "钙": "2.0%", "尿酸": "4.5%", "总蛋白": "2.0%",
+         "磷": "4.0%", "总钙": "2.0%"}
 for item, exp in SERUM.items():
     got = qc.lookup_quality_goal(item, "", db, level="水平1")
     flag = "OK " if got == exp else "FAIL"
