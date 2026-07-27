@@ -25,7 +25,7 @@ from ...schemas import (
     QCMonthlyReportRead,
     QCMonthlyReportUpdate,
 )
-from ...services.qc_service import aggregate_project, lookup_quality_goal, draft_report, find_test_item_by_name, _parse_rule_cell, QC_GOAL_EXACT_OVERRIDES
+from ...services.qc_service import aggregate_project, lookup_quality_goal, draft_report, find_test_item_by_name, _parse_rule_cell, _canon_item_name, QC_GOAL_EXACT_OVERRIDES
 
 
 def _ph_relative_goal(target_mean: float) -> str:
@@ -531,7 +531,7 @@ def upload_qc_summary(
                 "instrument_no": inst_no,
                 "test_item_aliases": matched.aliases if matched else "",
                 # 解析到的规范项目名（优先用 test_items 规范名，便于月结报告展示/质量目标命中）
-                "resolved_test_item": matched.name if matched else ti_name,
+                "resolved_test_item": _canon_item_name(matched.name) if matched else _canon_item_name(ti_name),
             }
         block_keys.add((instrument_id if sel_inst else None, inst, d.year, d.month))
 
