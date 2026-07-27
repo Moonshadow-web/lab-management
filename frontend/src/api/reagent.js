@@ -83,6 +83,10 @@ export function getReagentOrder(id) {
   return request.get(`/api/v1/reagent/orders/${id}`)
 }
 
+export function getNextOrderNo() {
+  return request.get('/api/v1/reagent/orders/_next-no')
+}
+
 export function createReagentOrder(data) {
   return request.post('/api/v1/reagent/orders', data)
 }
@@ -91,8 +95,8 @@ export function updateReagentOrder(id, data) {
   return request.put(`/api/v1/reagent/orders/${id}`, data)
 }
 
-export function deleteReagentOrder(id) {
-  return request.delete(`/api/v1/reagent/orders/${id}`)
+export function confirmReagentOrder(id) {
+  return request.post(`/api/v1/reagent/orders/${id}/confirm`)
 }
 
 export function exportOrderForm(id) {

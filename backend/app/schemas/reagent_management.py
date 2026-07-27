@@ -202,11 +202,16 @@ class ReagentOrderBase(BaseModel):
 
 
 class ReagentOrderCreate(ReagentOrderBase):
+    order_no: Optional[str] = ""  # 留空则由后端按「日期+顺序」自动生成（如 2026072701）
     items: list[ReagentOrderItemCreate] = []
 
 
 class ReagentOrderRead(ReagentOrderBase):
     id: int
+    created_by: Optional[str] = ""
+    is_confirmed: bool = False
+    confirmed_at: Optional[datetime] = None
+    confirmed_by: Optional[str] = ""
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     items: list[ReagentOrderItemRead] = []

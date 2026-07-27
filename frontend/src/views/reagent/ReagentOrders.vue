@@ -31,12 +31,13 @@
       </el-table-column>
       <el-table-column prop="operator" label="操作人" width="120" />
       <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
-      <el-table-column label="操作" width="200" fixed="right" v-if="canWrite">
+      <el-table-column prop="created_by" label="创建人" width="100" />
+      <el-table-column label="操作" width="230" fixed="right" v-if="canWrite">
         <template #default="{ row }">
           <el-button size="small" link type="primary" @click="onExport(row)">导出</el-button>
           <el-button size="small" link type="primary" @click="onPrint(row)">打印</el-button>
-          <el-button size="small" link type="primary" @click="onEdit(row)">编辑</el-button>
-          <el-button size="small" link type="danger" @click="onDelete(row)">删除</el-button>
+          <el-button v-if="canEditRow(row)" size="small" link type="primary" @click="onEdit(row)">编辑</el-button>
+          <el-button v-if="!row.is_confirmed" size="small" link type="success" @click="onConfirm(row)">确认</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -128,8 +129,9 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import {
-  listReagentOrders, createReagentOrder, updateReagentOrder, deleteReagentOrder,
+  listReagentOrders, createReagentOrder, updateReagentOrder,
   exportOrderForm, getReagentTemplate, listAllReagentItems,
+  getNextOrderNo, confirmReagentOrder,
 } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
 import { useReagentStore } from '../../store/reagent'
@@ -139,7 +141,12 @@ import LibraryTabs from '../../components/reagent/LibraryTabs.vue'
 
 const auth = useAuthStore()
 const reagentStore = useReagentStore()
-const canWrite = computed(() => auth.canWrite('reagents'))
+const canWrite = computed(() => auth.canWrite('reagent-orders'))
+// 编辑权限：管理员/试剂管理员可改任意；试剂配送仅能改自己创建的；已确认的不可改（后端再兜底）
+function canEditRow(row) {
+  if (auth.isAdmin) return true
+  return !!(row.created_by && row.created_by === auth.user?.username)
+}
 const orders = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
 const dialogVisible = ref(false), editingId = ref(null), submitting = ref(false)
 const dialogSearch = ref('')
@@ -212,10 +219,12 @@ async function loadTemplate() {
   for (const it of allItems()) if (quantities[it.item_id] == null) quantities[it.item_id] = 0
 }
 
-function onNewOrder() {
+async function onNewOrder() {
   dialogSearch.value = ''
   categoryFilter.value = ''
-  orderForm.value = { order_no: 'ORD-' + new Date().toISOString().slice(0,7) + '-001', order_date: new Date().toISOString().slice(0,10), order_type: '月初订购', remark: '' }
+  let nextNo = ''
+  try { const r = await getNextOrderNo(); nextNo = r.order_no || '' } catch (_) {}
+  orderForm.value = { order_no: nextNo, order_date: new Date().toISOString().slice(0,10), order_type: '月初订购', remark: '' }
   editingId.value = null
   for (const k in quantities) delete quantities[k]
   dialogVisible.value = true
@@ -248,9 +257,12 @@ async function onSubmit() {
   } catch (e) { ElMessage.error('保存失败：' + errText(e)) } finally { submitting.value = false }
 }
 
-async function onDelete(row) {
-  await ElMessageBox.confirm(`确认删除订单「${row.order_no}」？`, '提示', { type: 'warning' })
-  await deleteReagentOrder(row.id); ElMessage.success('已删除'); refresh()
+async function onConfirm(row) {
+  try {
+    await ElMessageBox.confirm(`确认提交订购单「${row.order_no}」？提交后将不可再修改。`, '确认订购单', { type: 'warning' })
+    await confirmReagentOrder(row.id)
+    ElMessage.success('已确认提交'); refresh()
+  } catch (e) { if (e !== 'cancel') ElMessage.error('确认失败：' + errText(e)) }
 }
 
 function onExport(row) {

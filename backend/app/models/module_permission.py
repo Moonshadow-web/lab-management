@@ -59,6 +59,8 @@ DEFAULT_MODULE_PERMISSIONS = {
     "reagents_delete":     ["admin", "reagent_manager"],
     # 到货接收：试剂管理员可全权；试剂配送角色仅能新建/修改自己创建的记录（后端按 created_by 收口），且不能删除
     "reagent-receivings":  ["admin", "reagent_manager", "reagent_delivery"],
+    # 订购管理：同上，试剂配送仅能新建/修改自己创建的订购单，且不能删除
+    "reagent-orders":      ["admin", "reagent_manager", "reagent_delivery"],
     "training":            ["admin", "training_manager"],
     "training_delete":     ["admin", "training_manager"],
     "verification":        ["admin", "specialty_leader"],
@@ -85,6 +87,7 @@ ALL_MODULES = [
     ("interlab-edit",       "室间比对（编辑既有）"),
     ("reagents",            "试剂管理"),
     ("reagent-receivings",  "到货接收"),
+    ("reagent-orders",      "订购管理"),
     ("training",            "继教培训"),
     ("verification",        "性能验证"),
     ("iso15189",            "15189专项"),

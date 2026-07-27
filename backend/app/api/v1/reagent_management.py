@@ -469,23 +469,47 @@ def create_inventory_check(
 # 4. 订购
 # =============================================================================
 
+def _gen_order_no(db: Session) -> str:
+    """生成订购单号：日期(YYYYMMDD) + 当日顺序号(2位)，如 2026072701。"""
+    today = date.today()
+    prefix = today.strftime("%Y%m%d")
+    cnt = db.query(ReagentOrder).filter(ReagentOrder.order_no.like(f"{prefix}%")).count()
+    seq = cnt + 1
+    candidate = f"{prefix}{seq:02d}"
+    # 极端并发兜底：若碰撞则顺延
+    while db.query(ReagentOrder).filter(ReagentOrder.order_no == candidate).first():
+        seq += 1
+        candidate = f"{prefix}{seq:02d}"
+    return candidate
+
+
 @router.get("/orders", response_model=dict)
 def list_orders(
     library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     base = db.query(ReagentOrder)
     if library:
         base = base.filter(ReagentOrder.library == library)
+    # 试剂配送：仅看自己建的
+    roles = set((user.roles or "").split(",")) | {user.role}
+    if "reagent_delivery" in roles and "admin" not in roles and "reagent_manager" not in roles:
+        base = base.filter(ReagentOrder.created_by == user.username)
     total = base.count()
     rows = base.order_by(ReagentOrder.order_date.desc()).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size,
             "items": [ReagentOrderRead.model_validate(r) for r in rows]}
+
+
+@router.get("/orders/_next-no")
+def next_order_no(db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """返回建议的下一个订购单号（日期+顺序）。"""
+    return {"order_no": _gen_order_no(db)}
 
 
 @router.get("/orders/{order_id}", response_model=ReagentOrderRead)
@@ -499,12 +523,17 @@ def get_order(order_id: int, db: Session = Depends(get_db), _=Depends(get_curren
 @router.post("/orders", response_model=ReagentOrderRead)
 def create_order(
     data: ReagentOrderCreate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
 ):
+    order_no = data.order_no or _gen_order_no(db)
+    # 唯一性兜底（极端并发下若用户提供或生成值已存在则重生成）
+    while db.query(ReagentOrder).filter(ReagentOrder.order_no == order_no).first():
+        order_no = _gen_order_no(db)
     order = ReagentOrder(
-        library=data.library or "", order_no=data.order_no, order_date=data.order_date,
+        library=data.library or "", order_no=order_no, order_date=data.order_date,
         order_type=data.order_type, status="草稿",
         operator=user.full_name or user.username, remark=data.remark,
+        created_by=user.username,
     )
     db.add(order)
     db.flush()
@@ -518,11 +547,19 @@ def create_order(
 @router.put("/orders/{order_id}", response_model=ReagentOrderRead)
 def update_order(
     order_id: int, data: ReagentOrderCreate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
 ):
     order = db.query(ReagentOrder).get(order_id)
     if not order:
         raise HTTPException(404, "订购单未找到")
+    # 已确认提交不可改（防库存脱节）
+    if order.is_confirmed:
+        raise HTTPException(403, "该订购单已确认提交，不可再修改")
+    # 试剂配送仅能改自己建的
+    roles = set((user.roles or "").split(",")) | {user.role}
+    if "reagent_delivery" in roles and "admin" not in roles and "reagent_manager" not in roles:
+        if order.created_by and order.created_by != user.username:
+            raise HTTPException(403, "只能修改自己创建的订购单")
     order.library = data.library or ""
     order.order_date = data.order_date
     order.order_type = data.order_type
@@ -538,17 +575,24 @@ def update_order(
     return order
 
 
-@router.delete("/orders/{order_id}")
-def delete_order(
+@router.post("/orders/{order_id}/confirm", response_model=ReagentOrderRead)
+def confirm_order(
     order_id: int, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
 ):
+    """确认提交订购单：锁定不可再改（不影响库存，仅作状态/权限控制）。"""
     order = db.query(ReagentOrder).get(order_id)
     if not order:
         raise HTTPException(404, "订购单未找到")
-    db.delete(order)
+    if order.is_confirmed:
+        raise HTTPException(400, "该订购单已确认提交")
+    order.is_confirmed = True
+    order.confirmed_at = datetime.utcnow()
+    order.confirmed_by = user.full_name or user.username
+    order.status = "已提交"
     db.commit()
-    return {"ok": True}
+    db.refresh(order)
+    return order
 
 
 @router.get("/orders/{order_id}/export-form")

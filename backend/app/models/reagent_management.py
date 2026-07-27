@@ -156,6 +156,10 @@ class ReagentOrder(Base):
     status: Mapped[str] = mapped_column(String(20), default="草稿")
     operator: Mapped[str] = mapped_column(String(100), default="")
     remark: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(100), default="")  # 创建人(用户名)
+    is_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否已确认提交
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 确认时间
+    confirmed_by: Mapped[str] = mapped_column(String(100), default="")  # 确认人(用户名)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

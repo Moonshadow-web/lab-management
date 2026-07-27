@@ -179,6 +179,7 @@
             <el-option label="组长 leader" value="leader" />
             <el-option label="职工 member" value="member" />
             <el-option label="技术支持 technical_support" value="technical_support" />
+            <el-option label="试剂配送 reagent_delivery" value="reagent_delivery" />
           </el-select>
         </el-form-item>
         <el-form-item label="角色">
@@ -209,6 +210,7 @@
             <el-option label="组长 leader" value="leader" />
             <el-option label="职工 member" value="member" />
             <el-option label="技术支持 technical_support" value="technical_support" />
+            <el-option label="试剂配送 reagent_delivery" value="reagent_delivery" />
           </el-select>
         </el-form-item>
         <el-form-item label="角色">
@@ -298,6 +300,7 @@ const ROLE_LABELS = {
   specialty_leader: '专业组长', qc_manager: '质控管理员', reagent_manager: '试剂管理员',
   training_manager: '继教管理员', biosafety_officer: '生物安全员', it_manager: '信息管理员',
   technical_support: '技术支持',
+  reagent_delivery: '试剂配送',
   staff: '职工',
 }
 
