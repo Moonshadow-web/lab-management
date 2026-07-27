@@ -46,7 +46,12 @@ QC_GOAL_EXACT_OVERRIDES: dict[str, str] = {
 
 def _norm(s: str) -> str:
     """归一化字符串：去除空格、统一括号，用于中文匹配。"""
-    return (s or "").strip().replace("（", "(").replace("）", ")").replace("　", " ").replace(" ", "").lower()
+    s = (s or "").strip().replace("（", "(").replace("）", ")").replace("　", " ").replace(" ", "").lower()
+    # 去掉 LIS 自动/自动质控 前缀（仅当去掉后还有内容才剥离，避免空串）
+    for p in ("(自动质控)", "(自动)"):
+        if s.startswith(p) and len(s) > len(p):
+            s = s[len(p):]
+    return s
 
 
 def _load_goals() -> dict:
@@ -131,9 +136,18 @@ _LIS_ITEM_ALIASES = {
     "apo-b": "载脂蛋白B",
     "apo-a": "载脂蛋白A",
     "碱磷酶": "碱性磷酸酶",
-    "抗链-o": "抗链球菌素O",
+    "抗链-o": "抗链球菌溶血素 O",
     "λ轻链测定": "λ轻链（血清）",
     "κ轻链测定": "κ轻链（血清）",
+    # 2026-07-27 免疫项目（去掉(自动)/(自动质控)前缀后映射）
+    "tpab": "梅毒特异性抗体",
+    "hcv": "丙型肝炎病毒抗体",
+    "hbsag": "乙型肝炎病毒表面抗原",
+    "hiv": "人类免疫缺陷病毒抗原及抗体",
+    "ct": "降钙素",
+    "il-6": "白介素-6",
+    # 2026-07-27 血脂类
+    "sdldl-c": "小而密低密度脂蛋白胆固醇",
 }
 
 
