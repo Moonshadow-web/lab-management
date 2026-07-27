@@ -18,6 +18,7 @@ from ..models.instrument import CalibrationRecord, Instrument
 from ..models.notification import Notification
 from ..models.scheduling import SchedulingAssignment, SchedulingPost
 from ..models.reminder import NotifyRecipient, ReminderRule, ReminderSendLog
+from ..models.scheduling import SchedulingAssignment, SchedulingConfig, SchedulingPost
 from ..services.email_service import send_email
 from ..services.serverchan_service import send_serverchan
 
@@ -42,11 +43,13 @@ DEFAULT_RULES = [
         "category": "shift_early", "label": "早班提醒", "ref_kind": "shift",
         "enabled": True, "lead_days": 1, "escalate_days_left": "1",
         "scope_kind": "all", "scope_values": "",
+        "shift_send_prev_day": True, "shift_send_same_day": False,
     },
     {
         "category": "shift_continuous", "label": "连班提醒", "ref_kind": "shift",
         "enabled": True, "lead_days": 1, "escalate_days_left": "1",
         "scope_kind": "all", "scope_values": "",
+        "shift_send_prev_day": True, "shift_send_same_day": True,
     },
 ]
 
@@ -105,13 +108,20 @@ def get_serverchan_recipients(db: Session):
 
 
 def _shift_milestone(rule: ReminderRule, days_left: int):
-    """早/连班专属：返回当前时点对应的字符串里程碑（去重用）；非早/连班返回 None。"""
+    """早/连班专属：返回当前时点对应的字符串里程碑（去重用）；非早/连班返回 None。
+
+    受规则开关门控：
+    - 早班：仅「前一天」(days_left==1) 发送，需 shift_send_prev_day=True。
+    - 连班：「前一天」(days_left==1) 需 shift_send_prev_day；「当天」(days_left==0) 需 shift_send_same_day。
+    """
     if rule.category == "shift_early":
-        return "1_early" if days_left == 1 else None
+        if days_left == 1 and rule.shift_send_prev_day:
+            return "1_early"
+        return None
     if rule.category == "shift_continuous":
-        if days_left == 1:
+        if days_left == 1 and rule.shift_send_prev_day:
             return "1_cont"
-        if days_left == 0:
+        if days_left == 0 and rule.shift_send_same_day:
             return "0_cont"
     return None
 
@@ -139,13 +149,20 @@ def _record_send(db: Session, rule: ReminderRule, it: dict, now: datetime):
 
 def _milestones(rule: ReminderRule):
     # 早班/连班走专属精确时点（不在通用 08:00 任务里发，改由 11:30 任务触发）：
-    # - 早班：仅「前一天」(days_left==1) 的 11:30 发一次，里程碑记 '1_early'。
-    # - 连班：「前一天」(days_left==1) 与「当天」(days_left==0) 各 11:30 发一次，里程碑记 '1_cont' / '0_cont'。
+    # - 早班：仅「前一天」(days_left==1) 的 11:30 发一次，里程碑记 '1_early'（需 shift_send_prev_day）。
+    # - 连班：「前一天」(days_left==1) 与「当天」(days_left==0) 各 11:30 发一次，
+    #   里程碑记 '1_cont' / '0_cont'（分别受 shift_send_prev_day / shift_send_same_day 门控）。
+    # 仅返回「当前规则允许发送」的里程碑，避免关闭当天推送后仍把 0_cont 当作待发。
     # 用字符串里程碑，避免与一般数字里程碑(如 EQA lead_days)混淆，也便于按"前一天/当天"分别去重。
     if rule.category == "shift_early":
-        return ["1_early"]
+        return ["1_early"] if rule.shift_send_prev_day else []
     if rule.category == "shift_continuous":
-        return ["1_cont", "0_cont"]
+        ms = []
+        if rule.shift_send_prev_day:
+            ms.append("1_cont")
+        if rule.shift_send_same_day:
+            ms.append("0_cont")
+        return ms
     ms = {rule.lead_days}
     for x in (rule.escalate_days_left or "").split(","):
         x = x.strip()
@@ -206,25 +223,34 @@ def _fetch_items(db: Session, rule: ReminderRule, today: date):
             })
     elif rule.ref_kind == "shift":
         # 早班/连班提醒：按类别精确筛选触发时点（由 11:30 定时任务调用）。
-        # - 早班：仅「前一天」(days_left==1) 上岗的早班，每人一次。
-        # - 连班：「前一天」(days_left==1) 与「当天」(days_left==0) 各一次。
+        # - 早班：仅「前一天」(days_left==1) 上岗的早班，每人一次（需 shift_send_prev_day）。
+        # - 连班：「前一天」(days_left==1) 与「当天」(days_left==0) 各一次（分别受两个开关门控）。
+        # 排除 SchedulingConfig.early_continuous_excluded 中的人（这些人不上早/连班，也不收提醒）。
         target_early = rule.category == "shift_early"
         target_cont = rule.category == "shift_continuous"
+        cfg = db.query(SchedulingConfig).filter(SchedulingConfig.id == 1).first()
+        ec_excluded = set((cfg.early_continuous_excluded or []) if cfg else [])
         for a in db.query(SchedulingAssignment).filter(
             SchedulingAssignment.is_early == target_early,
             SchedulingAssignment.is_continuous == target_cont,
             SchedulingAssignment.person != "",
         ).all():
+            if a.person and a.person in ec_excluded:
+                continue
             d = _parse_date(a.date)
             if not d:
                 continue
             days_left = (d - today).days
             if target_early:
-                if days_left != 1:
-                    continue  # 早班只在前一天 11:30 发
+                if not rule.shift_send_prev_day or days_left != 1:
+                    continue  # 早班仅前一天 11:30 发（开关关闭则跳过）
             else:  # 连班
+                if days_left == 1 and not rule.shift_send_prev_day:
+                    continue
+                if days_left == 0 and not rule.shift_send_same_day:
+                    continue
                 if days_left not in (1, 0):
-                    continue  # 连班在前一天、当天各 11:30 发
+                    continue
             post = db.get(SchedulingPost, a.post_id)
             post_name = post.name if post else "岗位"
             kind = "早班" if target_early else "连班"

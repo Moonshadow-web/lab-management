@@ -36,14 +36,18 @@ class ReminderRule(Base):
     __tablename__ = "reminder_rules"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    category: Mapped[str] = mapped_column(String(40), index=True, default="")  # 唯一键：eqa_biochem_coag / eqa_immuno / calibration
+    category: Mapped[str] = mapped_column(String(40), index=True, default="")  # 唯一键：eqa_biochem_coag / eqa_immuno / calibration / shift_early / shift_continuous
     label: Mapped[str] = mapped_column(String(100), default="")       # 展示名
-    ref_kind: Mapped[str] = mapped_column(String(20), default="eqa")  # eqa / calibration
+    ref_kind: Mapped[str] = mapped_column(String(20), default="eqa")  # eqa / calibration / shift
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     lead_days: Mapped[int] = mapped_column(Integer, default=14)
     escalate_days_left: Mapped[str] = mapped_column(String(60), default="7")  # 如 "14,7"
     scope_kind: Mapped[str] = mapped_column(String(20), default="group")      # group / all
     scope_values: Mapped[str] = mapped_column(String(200), default="")        # csv：生化,凝血
+    # 早/连班专属：是否在「前一天 11:30」发送、是否在「当天 11:30」发送（默认都开启）。
+    # 仅 ref_kind=shift 的规则使用；非班次规则忽略。
+    shift_send_prev_day: Mapped[bool] = mapped_column(Boolean, default=True)   # 前一天 11:30
+    shift_send_same_day: Mapped[bool] = mapped_column(Boolean, default=True)  # 当天 11:30
     note: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

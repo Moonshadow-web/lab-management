@@ -91,7 +91,8 @@ def ensure_scheduling_defaults(db):
     cfg = db.get(SchedulingConfig, 1)
     if not cfg:
         db.add(SchedulingConfig(id=1, excluded_people=list(DEFAULT_EXCLUDED_PEOPLE),
-                                default_window_days=14, early_continuous_window_days=30))
+                                default_window_days=14, early_continuous_window_days=30,
+                                early_continuous_excluded=["杨静", "王春馨"]))
         db.commit()
 
 logger = logging.getLogger("reminder")

@@ -742,6 +742,7 @@ class SchedulingConfigBase(BaseModel):
     excluded_people: list[str] = []      # 不参与任何排班的人员
     default_window_days: int = 14        # 常规排班生成窗口
     early_continuous_window_days: int = 30  # 早班/连班可提前排的天数
+    early_continuous_excluded: list[str] = []  # 不参与早班/连班的人员
     notes: str = ""
 
 

@@ -175,5 +175,7 @@ class SchedulingConfig(Base):
     excluded_people: Mapped[list] = mapped_column(JSON, default=list)  # 不参与任何排班的人员（full_name 列表）
     default_window_days: Mapped[int] = mapped_column(Integer, default=14)  # 常规排班生成窗口（1-2周）
     early_continuous_window_days: Mapped[int] = mapped_column(Integer, default=30)  # 早班/连班可提前排的天数
+    # 不参与「早班/连班」的人员（full_name 列表）：这些人仍正常排白班，只是不排早班/连班、也不收早/连班提醒。
+    early_continuous_excluded: Mapped[list] = mapped_column(JSON, default=list)
     notes: Mapped[str] = mapped_column(String(500), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

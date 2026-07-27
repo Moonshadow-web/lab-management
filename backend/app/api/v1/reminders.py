@@ -101,12 +101,14 @@ def wx_test_send(rid: int, db: Session = Depends(get_db), _: User = Depends(requ
 class RuleIn(BaseModel):
     category: str = ""
     label: str
-    ref_kind: str = "eqa"          # eqa / calibration
+    ref_kind: str = "eqa"          # eqa / calibration / shift
     enabled: bool = True
     lead_days: int = 14
     escalate_days_left: str = "7"
     scope_kind: str = "group"       # group / all
     scope_values: str = ""
+    shift_send_prev_day: bool = True    # 早/连班：前一天 11:30
+    shift_send_same_day: bool = True    # 早/连班：当天 11:30
     note: str = ""
 
 
@@ -118,6 +120,8 @@ class RuleUpdate(BaseModel):
     escalate_days_left: Optional[str] = None
     scope_kind: Optional[str] = None
     scope_values: Optional[str] = None
+    shift_send_prev_day: Optional[bool] = None
+    shift_send_same_day: Optional[bool] = None
     note: Optional[str] = None
 
 

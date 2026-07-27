@@ -224,6 +224,8 @@
           <span>常规生成：<b>{{ genDays }}</b> 天</span>
           <el-divider direction="vertical" />
           <span>早/连班可提前：<b>{{ earlyContDays }}</b> 天</span>
+          <el-divider direction="vertical" />
+          <span>不参与早/连班：<b>{{ configEcExcludedText || '（无）' }}</b></span>
           <el-button size="small" type="primary" @click="openConfig">配置</el-button>
         </div>
       </el-tab-pane>
@@ -461,22 +463,27 @@ const genDays = ref(30)
 const earlyContDays = ref(30)
 const configExcluded = ref([])
 const configExcludedText = computed(() => (configExcluded.value || []).join('、') || '')
-const configForm = reactive({ excluded_people: '', default_window_days: 14, early_continuous_window_days: 30 })
+const configEcExcluded = ref([])
+const configEcExcludedText = computed(() => (configEcExcluded.value || []).join('、') || '')
+const configForm = reactive({ excluded_people: '', default_window_days: 14, early_continuous_window_days: 30, early_continuous_excluded: '' })
 const configFields = [
   { prop: 'excluded_people', label: '不参与排班人员', type: 'textarea', placeholder: '逗号或换行分隔，如 王学晶,李东,管理员' },
   { prop: 'default_window_days', label: '常规生成天数', type: 'number' },
   { prop: 'early_continuous_window_days', label: '早班/连班可提前天数', type: 'number' },
+  { prop: 'early_continuous_excluded', label: '不参与早班/连班人员', type: 'textarea', placeholder: '逗号或换行分隔，如 杨静,王春馨（这些人正常排白班，但不排早班/连班、也不收早/连班提醒）' },
 ]
 async function openConfig() {
   try {
     const cfg = await getSchedulingConfig()
     configExcluded.value = cfg.excluded_people || []
+    configEcExcluded.value = cfg.early_continuous_excluded || []
     genDays.value = cfg.default_window_days || 14
     earlyContDays.value = cfg.early_continuous_window_days || 30
     Object.assign(configForm, {
       excluded_people: (cfg.excluded_people || []).join('\n'),
       default_window_days: cfg.default_window_days || 14,
       early_continuous_window_days: cfg.early_continuous_window_days || 30,
+      early_continuous_excluded: (cfg.early_continuous_excluded || []).join('\n'),
     })
     configDialog.value = true
   } catch (e) { ElMessage.error('读取配置失败') }
@@ -488,9 +495,11 @@ async function saveConfig() {
       excluded_people: parsePeople(configForm.excluded_people),
       default_window_days: configForm.default_window_days || 14,
       early_continuous_window_days: configForm.early_continuous_window_days || 30,
+      early_continuous_excluded: parsePeople(configForm.early_continuous_excluded),
     }
     const cfg = await updateSchedulingConfig(payload)
     configExcluded.value = cfg.excluded_people || []
+    configEcExcluded.value = cfg.early_continuous_excluded || []
     genDays.value = cfg.default_window_days || 14
     earlyContDays.value = cfg.early_continuous_window_days || 30
     ElMessage.success('已保存')
@@ -1026,6 +1035,7 @@ async function loadConfigSummary() {
   try {
     const cfg = await getSchedulingConfig()
     configExcluded.value = cfg.excluded_people || []
+    configEcExcluded.value = cfg.early_continuous_excluded || []
     genDays.value = cfg.default_window_days || 14
     earlyContDays.value = cfg.early_continuous_window_days || 30
   } catch (e) {}

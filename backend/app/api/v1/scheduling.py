@@ -248,9 +248,12 @@ def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
     # 早班 / 连班：作为独立的无岗位状态行生成（对齐用户 Excel 版式）。
     # 流水线规则：每人连上 2 天早班 → 退下连上 2 天连班；下一人在其 早班 期间顶上。
     # 故 early_seq[i]=roster[(i//2)%n]，连班=早班序列整体后移 2 天（当天早班与连班必不同人）。
-    # 自动排除当天休息/病假/开会/行政/质控/夜班/发热的人。
-    if people_pool and len(people_pool) >= 2:
-        roster = list(people_pool)
+    # 自动排除当天休息/病假/开会/行政/质控/夜班/发热的人；以及「不参与早班/连班」名单中的人
+    # （这些人仍正常排白班，只是不排早班/连班）。
+    ec_excluded = set(config.early_continuous_excluded or [])
+    shift_pool = [p for p in people_pool if p not in ec_excluded]
+    if shift_pool and len(shift_pool) >= 2:
+        roster = list(shift_pool)
         workdays = [cur for cur in _daterange(start, end) if cur.weekday() < 5]
         early_seq = [roster[(i // 2) % len(roster)] for i in range(len(workdays))]
         cont_seq = [roster[((i - 2) // 2) % len(roster)] for i in range(len(workdays))]
@@ -300,10 +303,10 @@ def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
         SchedulingAssignment.is_locked == False,  # 换班锁定的行受保护，保留不被覆盖
     ).delete(synchronize_session=False)
     db.add_all(assignments)
-    if people_pool and len(people_pool) >= 2:
+    if shift_pool and len(shift_pool) >= 2:
         db.add_all(early_assigns)
     db.commit()
-    return len(assignments) + (len(early_assigns) if (people_pool and len(people_pool) >= 2) else 0)
+    return len(assignments) + (len(early_assigns) if (shift_pool and len(shift_pool) >= 2) else 0)
 
 
 @router.post("/generate")
@@ -344,6 +347,7 @@ def put_config(payload: SchedulingConfigRead, db: Session = Depends(get_db),
     cfg.excluded_people = payload.excluded_people or []
     cfg.default_window_days = payload.default_window_days or 14
     cfg.early_continuous_window_days = payload.early_continuous_window_days or 30
+    cfg.early_continuous_excluded = payload.early_continuous_excluded or []
     cfg.notes = payload.notes or ""
     db.commit()
     db.refresh(cfg)

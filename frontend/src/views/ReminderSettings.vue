@@ -72,6 +72,15 @@
             </el-table-column>
             <el-table-column prop="lead_days" label="提前天数" width="90" />
             <el-table-column prop="escalate_days_left" label="升级里程碑" width="110" />
+            <el-table-column label="早/连班提醒时机" min-width="170">
+              <template #default="{ row }">
+                <template v-if="row.ref_kind === 'shift'">
+                  <el-tag size="small" :type="row.shift_send_prev_day ? 'primary' : 'info'" class="ec-tag">前一天 11:30</el-tag>
+                  <el-tag size="small" :type="row.shift_send_same_day ? 'primary' : 'info'" class="ec-tag">当天 11:30</el-tag>
+                </template>
+                <span v-else style="font-size: 12px; color: #999">—</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="scope_values" label="范围" min-width="120" />
             <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
@@ -183,6 +192,17 @@
         <el-form-item label="升级里程碑">
           <el-input v-model="ruleForm.escalate_days_left" placeholder="如 14,7（剩余天数降到这些值时再发）" />
         </el-form-item>
+        <template v-if="ruleForm.ref_kind === 'shift'">
+          <el-divider content-position="left">早/连班提醒时机（11:30 推送）</el-divider>
+          <el-form-item label="前一天 11:30">
+            <el-switch v-model="ruleForm.shift_send_prev_day" />
+            <div style="font-size:12px;color:#999;margin-top:4px">早班固定开启；连班建议开启（提前一天提醒准备）。</div>
+          </el-form-item>
+          <el-form-item label="当天 11:30">
+            <el-switch v-model="ruleForm.shift_send_same_day" />
+            <div style="font-size:12px;color:#999;margin-top:4px">连班当天上岗前再提醒一次；早班无需开启。</div>
+          </el-form-item>
+        </template>
         <el-form-item label="范围字段">
           <el-select v-model="ruleForm.scope_kind" style="width: 100%">
             <el-option label="按专业组 group" value="group" />
@@ -241,7 +261,7 @@ const testWxLoading = ref(false)
 
 const showRule = ref(false)
 const editingRule = ref(null)
-const ruleForm = ref({ label: '', ref_kind: 'eqa', enabled: true, lead_days: 14, escalate_days_left: '7', scope_kind: 'group', scope_values: '', note: '' })
+const ruleForm = ref({ label: '', ref_kind: 'eqa', enabled: true, lead_days: 14, escalate_days_left: '7', scope_kind: 'group', scope_values: '', shift_send_prev_day: true, shift_send_same_day: true, note: '' })
 
 async function loadAll() {
   loadingR.value = true; loadingRule.value = true
@@ -320,7 +340,7 @@ async function onTestWx() {
 // 提醒类型
 function onAddRule() {
   editingRule.value = null
-  ruleForm.value = { label: '', ref_kind: 'eqa', enabled: true, lead_days: 14, escalate_days_left: '7', scope_kind: 'group', scope_values: '', note: '' }
+  ruleForm.value = { label: '', ref_kind: 'eqa', enabled: true, lead_days: 14, escalate_days_left: '7', scope_kind: 'group', scope_values: '', shift_send_prev_day: true, shift_send_same_day: true, note: '' }
   showRule.value = true
 }
 function onEditRule(row) {
@@ -389,4 +409,5 @@ onMounted(loadAll)
 
 <style scoped>
 .card-header { display: flex; justify-content: space-between; align-items: center; }
+.ec-tag { margin: 2px 4px 2px 0; }
 </style>
