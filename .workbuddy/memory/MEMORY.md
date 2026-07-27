@@ -53,8 +53,18 @@
 - **每次改模型/解析/关键逻辑提交，必须同步改 `diag._BUILD_MARK`**（如 qc-ruleparser-fix2-2026-07-26）；部署后务必 `curl` 内网 `http://lab-management-282724-9-1408547492.sh.run.tcloudbase.com/api/v1/_diag/build` 核对标记是否更新 —— 标记旧=部署没生效/流量未切，**绝不能用"任务被清理"代替"确认成功"**。
 - 公网域名 `lab-management.tcloudbaseapp.com` 常被 CDN 418 拦截；内网 host 直连才可靠。
 - broken pipe 等推送中断=需重试整轮部署，否则线上代码与模型/列不一致→500。
+- **前端产物必须强提交进 git 才能上线（关键 gotcha）**：`Dockerfile` 直接 `COPY frontend/dist ./frontend/dist`，**云端不重构建前端**；而 `frontend/dist/` 在 `.gitignore` 中 → 若只 `git add` 前端源码，dist 不会被纳入，部署后线上仍是旧前端。修法：本地 `node_modules/vite/bin/vite.js build` → `git add -f frontend/dist` → 提交推送 → 部署。核对前端是否上线：探测内网静态资源（如 `/assets/Dashboard-<hash>.js` 返回 200，旧 hash 返回 404），比轮询 build 标记更准。
+- **多 AI 并发改 origin/main + 改 `diag._BUILD_MARK` 会互相覆盖**：某 AI 提交可能把标记改成自己的值并顶掉别人的推送。应对：部署前 `git fetch` 核对真实远端，确认自己的提交在 tip；若被覆盖，重设 `_BUILD_MARK` 为本轮值、强提交 dist、再 deploy（CLI 提示有并发任务时输 Y 取消并部署最新）。
 
 ## ⚠️ 重要更正：所谓「卡死的灰度发布」并不存在（2026-07-26 用户澄清）
 - **过去我曾误判存在「卡死的灰度发布 / 状态异常无法发布」阻塞流量切换**。用户明确澄清：**这个问题实际上不存在**。CLI 的 `promote`/`rollback`/`setTraffic` 报错（如「状态异常，无法发布」「不存在灰度中的版本」）并不代表真的卡死，可能是我对 CLI 行为/部署状态理解有误。
 - **正确做法**：当部署疑似「未生效/流量未切」时，**不要自己下「灰度卡死」的结论**，也**不要据此让用户去控制台手动取消灰度**。应**直接问用户**，并**等用户去 Cloud 控制台查看真实部署情况**（版本/流量/构建状态）后，根据用户的反馈再判断。
 - 唯一可靠的「部署是否生效」判据仍是：`curl` 内网 `/api/v1/_diag/build` 看 `_BUILD_MARK` 是否更新。若标记没变，先和用户确认真实情况，再决定下一步，而非假定灰度机制故障。
+
+## 试剂配送角色（reagent_delivery，2026-07-27 新增）
+- 角色定位：仅「到货接收」界面有权限；只能新建/修改**自己创建**的收货单；**不能删除**、不能改他人记录；**看不到工作台**。
+- 落地方式（非新增数值级别字段，沿用现有 roles 逗号串+模块权限表）：
+  - `module_permission.py` 新增模块 `reagent-receivings`（默认 admin/reagent_manager/reagent_delivery）；`reagents` 模块仍仅 admin/reagent_manager，故试剂配送拿不到试剂管理其余页。
+  - `security.py ROLE_LABELS`、`users.py ROLE_OPTIONS`、`module_permission.py ALL_ROLES/ALL_MODULES` 均加「试剂配送/reagent_delivery」。
+  - 前端 `auth.js`：`canAccessMenu` 对 `reagent_delivery` 同 `technical_support` 严格按授权收口；`AppLayout.vue` 加独立「到货接收」菜单(moduleKey reagent-receivings) 并隐藏工作台；`router` 阻断试剂配送访问 `/dashboard`。
+- 到货接收已改为**确认后才入库**：`create_receiving` 不再写 ReagentStock；`POST /receivings/{id}/confirm` 才累加库存并记 is_confirmed/confirmed_by/confirmed_at；旧记录(is_confirmed NULL)迁移时回填=1（已入库视为已确认）。`Receiving.created_by` 记创建人，用于「仅改自己」收口。

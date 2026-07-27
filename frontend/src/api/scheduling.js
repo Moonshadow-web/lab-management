@@ -18,6 +18,9 @@ export function deleteSchedulingPost(id) {
 export function listSchedulingPlans(params) {
   return request.get('/api/v1/scheduling/plans', { params })
 }
+export function getDefaultPlan() {
+  return request.get('/api/v1/scheduling/default-plan')
+}
 export function createSchedulingPlan(data) {
   return request.post('/api/v1/scheduling/plans', data)
 }

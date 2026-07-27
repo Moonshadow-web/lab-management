@@ -29,9 +29,6 @@
       <!-- 月视图排班表 -->
       <el-tab-pane label="月视图排班表" name="month">
         <div class="grid-ctrl">
-          <el-select v-model="selPlan" placeholder="选择计划" style="width: 200px" @change="onPlanChange">
-            <el-option v-for="p in planOptions" :key="p.id" :label="p.name" :value="p.id" />
-          </el-select>
           <el-date-picker v-model="monthValue" type="month" value-format="YYYY-MM" placeholder="选择月份" style="width: 160px" @change="onMonthChange" />
           <el-select v-model="genDays" style="width: 120px" title="生成天数">
             <el-option v-for="d in [7,14,30]" :key="d" :label="`生成${d}天`" :value="d" />
@@ -179,13 +176,6 @@
                 <el-date-picker v-model="batchForm.end" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
               </el-form-item>
             </el-col>
-            <el-col :span="8">
-              <el-form-item label="当前计划">
-                <el-select v-model="selPlan" placeholder="选择计划" style="width: 100%" @change="onPlanChange">
-                  <el-option v-for="p in planOptions" :key="p.id" :label="p.name" :value="p.id" />
-                </el-select>
-              </el-form-item>
-            </el-col>
           </el-row>
           <el-form-item label="人员">
             <el-input v-model="batchForm.people" type="textarea" :rows="4" placeholder="每行一个姓名，如 张三 / 李四" />
@@ -224,29 +214,7 @@
         />
       </el-tab-pane>
 
-      <!-- 排班计划（仅组长/管理员） -->
-      <el-tab-pane v-if="isManager" label="排班计划" name="plans">
-        <CrudTable
-          ref="planCrud"
-          :columns="planColumns"
-          :fetch="fetchPlans"
-          search-placeholder="搜索计划..."
-          :show-add="auth.canWrite('scheduling')"
-          :can-write="auth.canWrite('scheduling')"
-          @add="onAddPlan"
-          @edit="onEditPlan"
-          @delete="onDeletePlan"
-        />
-        <EditDialog
-          v-model="planDialog"
-          :title="planEditingId ? '编辑计划' : '新增计划'"
-          :form="planForm"
-          :fields="planFields"
-          :rules="planRules"
-          :submitting="submitting"
-          @submit="onSubmitPlan"
-        />
-      </el-tab-pane>
+      <!-- 排班计划管理已弱化：所有排班自动归属默认计划「主班表」，月视图自动取，无需手动选/管理计划 -->
 
       <!-- 设置（仅组长/管理员） -->
       <el-tab-pane v-if="isManager" label="设置" name="config">
@@ -435,7 +403,7 @@ import UserSelect from '../../components/UserSelect.vue'
 import { useAuthStore } from '../../store/auth'
 import {
   listSchedulingPosts, createSchedulingPost, updateSchedulingPost, deleteSchedulingPost,
-  listSchedulingPlans, createSchedulingPlan, updateSchedulingPlan, deleteSchedulingPlan,
+  getDefaultPlan,
   deleteSchedulingAssignment,
   getSchedulingGrid, getMyToday, generateScheduling,
   getSchedulingConfig, updateSchedulingConfig, setSchedulingCell, batchSchedulingCells,
@@ -489,7 +457,7 @@ async function loadMyToday() {
 // ---------------- 配置 ----------------
 const configDialog = ref(false)
 const configSaving = ref(false)
-const genDays = ref(14)
+const genDays = ref(30)
 const earlyContDays = ref(30)
 const configExcluded = ref([])
 const configExcludedText = computed(() => (configExcluded.value || []).join('、') || '')
@@ -602,56 +570,13 @@ async function onDeletePost(row) {
   loadPostsAll()
 }
 
-// ---------------- 排班计划 ----------------
-const planCrud = ref(null)
-const planDialog = ref(false)
-const planEditingId = ref(null)
-const planColumns = [
-  { prop: 'name', label: '计划名称', minWidth: 160 },
-  { prop: 'start_date', label: '开始', width: 120 },
-  { prop: 'end_date', label: '结束', width: 120 },
-  { prop: 'fever_day_person', label: '发热白班固定人', width: 120 },
-  { prop: 'notes', label: '备注', minWidth: 160 },
-]
+// 排班计划已弱化：所有排班自动归属默认计划「主班表」，月视图自动取，无需手动选/管理计划
 const userOptions = ref([])
-const planFields = computed(() => [
-  { prop: 'name', label: '计划名称' },
-  { prop: 'start_date', label: '开始日期', type: 'date' },
-  { prop: 'end_date', label: '结束日期', type: 'date' },
-  { prop: 'fever_day_person', label: '发热白班固定人', type: 'select', options: [{ label: '（无）', value: '' }, ...userOptions.value.map((u) => ({ label: u.full_name || u.username, value: u.full_name || u.username }))] },
-  { prop: 'notes', label: '备注', type: 'textarea' },
-])
-const planRules = { name: [{ required: true, message: '请填写计划名称', trigger: 'blur' }] }
-const emptyPlan = () => ({ name: '', start_date: '', end_date: '', fever_day_person: '', notes: '' })
-const planForm = reactive(emptyPlan())
-function fetchPlans(params) { return listSchedulingPlans(params) }
-function onAddPlan() { Object.assign(planForm, emptyPlan()); planEditingId.value = null; planDialog.value = true }
-function onEditPlan(row) { Object.assign(planForm, emptyPlan(), row); planEditingId.value = row.id; planDialog.value = true }
-async function onSubmitPlan() {
-  submitting.value = true
-  try {
-    if (planEditingId.value) await updateSchedulingPlan(planEditingId.value, { ...planForm })
-    else await createSchedulingPlan({ ...planForm })
-    ElMessage.success('已保存')
-    planDialog.value = false
-    planCrud.value?.refresh()
-    loadPlanOptions()
-  } catch (e) { ElMessage.error('保存失败') }
-  finally { submitting.value = false }
-}
-async function onDeletePlan(row) {
-  await ElMessageBox.confirm(`确认删除计划「${row.name}」？`, '提示', { type: 'warning' })
-  await deleteSchedulingPlan(row.id)
-  ElMessage.success('已删除')
-  planCrud.value?.refresh()
-  loadPlanOptions()
-}
 
 // ---------------- 月视图 ----------------
 const activeTab = ref('month')
 const isMobile = ref(false)
 function checkMobile() { isMobile.value = window.innerWidth < 768 }
-const planOptions = ref([])
 const postsAll = ref([])
 const selPlan = ref(null)
 const monthValue = ref('')
@@ -679,16 +604,12 @@ async function loadPostsAll() {
   try { const res = await listSchedulingPosts({ page: 1, page_size: 100 }); postsAll.value = res.items || [] }
   catch (e) { postsAll.value = [] }
 }
-async function loadPlanOptions() {
+async function loadDefaultPlan() {
   try {
-    const res = await listSchedulingPlans({ page: 1, page_size: 100 })
-    planOptions.value = res.items || []
-    if (!selPlan.value && planOptions.value.length) selPlan.value = planOptions.value[0].id
-  } catch (e) { planOptions.value = [] }
-}
-function onPlanChange(id) {
-  const p = planOptions.value.find((x) => x.id === id)
-  if (p && !monthValue.value) { gridStart.value = p.start_date; gridEnd.value = p.end_date }
+    const p = await getDefaultPlan()
+    selPlan.value = p.id
+    if (!monthValue.value) { gridStart.value = p.start_date; gridEnd.value = p.end_date }
+  } catch (e) { selPlan.value = null; ElMessage.error('加载默认排班计划失败') }
 }
 function onMonthChange() {
   if (!monthValue.value) return
@@ -698,7 +619,7 @@ function onMonthChange() {
   loadGrid()
 }
 async function loadGrid() {
-  if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
+  if (!selPlan.value) { ElMessage.warning('默认排班计划未就绪'); return }
   if (!gridStart.value || !gridEnd.value) return
   gridLoading.value = true
   try {
@@ -712,7 +633,7 @@ async function loadGrid() {
   finally { gridLoading.value = false }
 }
 async function onGenerate() {
-  if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
+  if (!selPlan.value) { ElMessage.warning('默认排班计划未就绪'); return }
   if (!gridStart.value || !gridEnd.value) { ElMessage.warning('请先选择月份'); return }
   generating.value = true
   try {
@@ -851,7 +772,7 @@ function _postNameToId() {
   return map
 }
 async function loadMatrix() {
-  if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
+  if (!selPlan.value) { ElMessage.warning('默认排班计划未就绪'); return }
   if (!matrixMonth.value) { ElMessage.warning('请选择月份'); return }
   matrixLoading.value = true
   try {
@@ -888,7 +809,7 @@ async function loadMatrix() {
   finally { matrixLoading.value = false }
 }
 async function saveMatrix() {
-  if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
+  if (!selPlan.value) { ElMessage.warning('默认排班计划未就绪'); return }
   if (!matrixLoaded.value) { ElMessage.warning('请先加载矩阵'); return }
   matrixSaving.value = true
   try {
@@ -918,7 +839,7 @@ async function saveMatrix() {
 }
 
 async function submitBatch() {
-  if (!selPlan.value) { ElMessage.warning('请先选择排班计划'); return }
+  if (!selPlan.value) { ElMessage.warning('默认排班计划未就绪'); return }
   const people = parsePeople(batchForm.people)
   if (!people.length) { ElMessage.warning('请至少填写一名人员'); return }
   if (!batchForm.start || !batchForm.end) { ElMessage.warning('请选择起止日期'); return }
@@ -1073,14 +994,15 @@ async function cancelRestReq(row) {
 }
 
 // ---------------- 初始化 ----------------
-onMounted(() => {
+onMounted(async () => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
   loadMyToday()
-  loadPlanOptions()
-  loadPostsAll()
   loadConfigSummary()
   listActiveUsers().then((us) => { userOptions.value = us || [] }).catch(() => {})
+  loadPostsAll()
+  // 加载默认排班计划后，再初始化月份并首次查询网格
+  await loadDefaultPlan()
   const now = new Date()
   monthValue.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`
   onMonthChange()

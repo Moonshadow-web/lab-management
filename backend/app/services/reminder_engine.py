@@ -104,6 +104,18 @@ def get_serverchan_recipients(db: Session):
     )
 
 
+def _shift_milestone(rule: ReminderRule, days_left: int):
+    """早/连班专属：返回当前时点对应的字符串里程碑（去重用）；非早/连班返回 None。"""
+    if rule.category == "shift_early":
+        return "1_early" if days_left == 1 else None
+    if rule.category == "shift_continuous":
+        if days_left == 1:
+            return "1_cont"
+        if days_left == 0:
+            return "0_cont"
+    return None
+
+
 def _record_send(db: Session, rule: ReminderRule, it: dict, now: datetime):
     """标记某 (rule, ref) 当前里程碑已发送（去重用），幂等；邮件/微信共用。"""
     lg = db.query(ReminderSendLog).filter_by(
@@ -112,15 +124,28 @@ def _record_send(db: Session, rule: ReminderRule, it: dict, now: datetime):
     if not lg:
         lg = ReminderSendLog(rule_id=rule.id, ref_type=it["ref_type"], ref_id=it["ref_id"])
         db.add(lg)
-    due_ms = [m for m in _milestones(rule) if m >= it["days_left"]]
-    prev = set(int(x) for x in (lg.sent_milestones or "").split(",") if x.strip().isdigit())
-    lg.sent_milestones = ",".join(str(m) for m in sorted(prev | set(due_ms)))
+    # 早/连班用字符串里程碑（如 1_early / 0_cont），其余用整数里程碑。
+    sm = _shift_milestone(rule, it["days_left"])
+    if sm is not None:
+        due_ms = [sm]
+    else:
+        due_ms = [m for m in _milestones(rule) if isinstance(m, int) and m >= it["days_left"]]
+    prev = set(x for x in (lg.sent_milestones or "").split(",") if x.strip())
+    lg.sent_milestones = ",".join(sorted(prev | set(str(m) for m in due_ms)))
     lg.last_sent_at = now
     lg.send_count = (lg.send_count or 0) + 1
     lg.resolved = False
 
 
 def _milestones(rule: ReminderRule):
+    # 早班/连班走专属精确时点（不在通用 08:00 任务里发，改由 11:30 任务触发）：
+    # - 早班：仅「前一天」(days_left==1) 的 11:30 发一次，里程碑记 '1_early'。
+    # - 连班：「前一天」(days_left==1) 与「当天」(days_left==0) 各 11:30 发一次，里程碑记 '1_cont' / '0_cont'。
+    # 用字符串里程碑，避免与一般数字里程碑(如 EQA lead_days)混淆，也便于按"前一天/当天"分别去重。
+    if rule.category == "shift_early":
+        return ["1_early"]
+    if rule.category == "shift_continuous":
+        return ["1_cont", "0_cont"]
     ms = {rule.lead_days}
     for x in (rule.escalate_days_left or "").split(","):
         x = x.strip()
@@ -180,7 +205,9 @@ def _fetch_items(db: Session, rule: ReminderRule, today: date):
                 "title": f"{inst.name}{model_txt}校准提醒", "message": msg, "due_date": rec.next_due_date,
             })
     elif rule.ref_kind == "shift":
-        # 早班/连班提醒：仅提醒「明天」(days_left==1) 的早班/连班，每人每天一次。
+        # 早班/连班提醒：按类别精确筛选触发时点（由 11:30 定时任务调用）。
+        # - 早班：仅「前一天」(days_left==1) 上岗的早班，每人一次。
+        # - 连班：「前一天」(days_left==1) 与「当天」(days_left==0) 各一次。
         target_early = rule.category == "shift_early"
         target_cont = rule.category == "shift_continuous"
         for a in db.query(SchedulingAssignment).filter(
@@ -192,8 +219,12 @@ def _fetch_items(db: Session, rule: ReminderRule, today: date):
             if not d:
                 continue
             days_left = (d - today).days
-            if days_left > rule.lead_days or days_left < 0:
-                continue  # 只看将来的班（过去的班不提醒）
+            if target_early:
+                if days_left != 1:
+                    continue  # 早班只在前一天 11:30 发
+            else:  # 连班
+                if days_left not in (1, 0):
+                    continue  # 连班在前一天、当天各 11:30 发
             post = db.get(SchedulingPost, a.post_id)
             post_name = post.name if post else "岗位"
             kind = "早班" if target_early else "连班"
@@ -301,9 +332,13 @@ def _sync_notifications(db: Session, notif_active, active_keys):
             db.delete(n)
 
 
-def run_reminders(db: Session, as_of: Optional[date] = None, dry_run: bool = False) -> dict:
+def run_reminders(db: Session, as_of: Optional[date] = None, dry_run: bool = False,
+                  only_categories: Optional[tuple] = None,
+                  exclude_categories: Optional[tuple] = None) -> dict:
     """评估所有启用规则，生成站内提醒并按接收人聚合发邮件。
 
+    only_categories / exclude_categories：限定本次只处理/排除某些 category（用于拆分定时任务：
+    08:00 跑通用提醒，11:30 跑早/连班提醒）。
     dry_run=True 时只返回计划发送的内容，不实际发信、不写发送记录。
     返回统计 dict；dry_run 时附带 planned 列表。
     """
@@ -316,6 +351,10 @@ def run_reminders(db: Session, as_of: Optional[date] = None, dry_run: bool = Fal
     except Exception:
         pass
     rules = db.query(ReminderRule).filter(ReminderRule.enabled == True).all()  # noqa: E712
+    if only_categories:
+        rules = [r for r in rules if r.category in only_categories]
+    elif exclude_categories:
+        rules = [r for r in rules if r.category not in exclude_categories]
     email_recipients = get_email_recipients(db)
     sc_recipients = get_serverchan_recipients(db)
     deliveries = {}            # email -> [item dict]
@@ -348,15 +387,23 @@ def run_reminders(db: Session, as_of: Optional[date] = None, dry_run: bool = Fal
             log = db.query(ReminderSendLog).filter_by(
                 rule_id=rule.id, ref_type=ref_type, ref_id=ref_id
             ).first()
-            sent = set(
-                int(x) for x in (log.sent_milestones or "").split(",") if x.strip().isdigit()
-            ) if log else set()
-            due_ms = [m for m in ms if m >= days_left]
-            new_ms = [m for m in due_ms if m not in sent]
-            overdue = days_left < 0
-            should_send = bool(new_ms) or (
-                overdue and log and log.last_sent_at and (now - log.last_sent_at).days >= 7
-            )
+            # 早/连班走字符串里程碑（如 1_early / 0_cont），其余走整数里程碑。
+            sm = _shift_milestone(rule, days_left)
+            if sm is not None:
+                due_ms = [sm]
+                sent = set((log.sent_milestones or "").split(",")) if log else set()
+                new_ms = [m for m in due_ms if m not in sent]
+                should_send = bool(new_ms)
+            else:
+                sent = set(
+                    int(x) for x in (log.sent_milestones or "").split(",") if x.strip().isdigit()
+                ) if log else set()
+                due_ms = [m for m in ms if isinstance(m, int) and m >= days_left]
+                new_ms = [m for m in due_ms if m not in sent]
+                overdue = days_left < 0
+                should_send = bool(new_ms) or (
+                    overdue and log and log.last_sent_at and (now - log.last_sent_at).days >= 7
+                )
             # 路由：仅发给订阅了该 rule.category 的接收人（rule_categories 为空 = 不接收任何）
             matched = [
                 r for r in email_recipients

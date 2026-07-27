@@ -12,7 +12,10 @@
 
 自定义端点单独挂在 router（prefix=/scheduling），不与 assignments 的 /{item_id} 冲突。
 """
+import logging
 from datetime import date, datetime, timedelta
+
+logger_swap = logging.getLogger("scheduling_swap")
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -46,6 +49,9 @@ from ...models.scheduling import (
 )
 from ...models.user import User
 from ...models.notification import Notification
+from ...models.reminder import NotifyRecipient
+from ...services.serverchan_service import send_serverchan
+from ...core.config import SYSTEM_NAME, FRONTEND_ORIGIN
 from ...schemas import (
     SchedulingPostCreate,
     SchedulingPostRead,
@@ -518,6 +524,18 @@ def batch_set(req: SchedulingBatchRequest, db: Session = Depends(get_db),
     return {"ok": True, "upserted": upserted}
 
 
+@router.get("/default-plan")
+def default_plan(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """返回默认排班计划（弱化 plan 概念用）：优先名「主班表」，否则取最小 id。前端月视图据此自动选计划。"""
+    plan = db.query(SchedulingPlan).filter(SchedulingPlan.name == "主班表").first()
+    if not plan:
+        plan = db.query(SchedulingPlan).order_by(SchedulingPlan.id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="尚未配置任何排班计划")
+    return {"id": plan.id, "name": plan.name, "start_date": plan.start_date, "end_date": plan.end_date,
+            "fever_day_person": plan.fever_day_person or ""}
+
+
 @router.get("/grid")
 def grid(plan_id: int = Query(...), start: str | None = None, end: str | None = None,
          db: Session = Depends(get_db), user: User = Depends(get_current_user)):
@@ -703,6 +721,33 @@ def request_swap(req: SchedulingSwapRequestCreate, db: Session = Depends(get_db)
         message=f"{me} 希望与您{'对调班次' if not is_top else '顶班'}。备注：{req.note or '无'}",
         due_date=fa.date, level="info", recipient_user_id=to_user.id,
     ))
+    # 微信(ServerChan)推送对方：按对方 full_name 在「提醒接收人」表找同名且启用 serverchan 通道、已填 SendKey 的记录。
+    # 推送失败仅记日志，不影响申请创建。
+    try:
+        rec = (
+            db.query(NotifyRecipient)
+            .filter(NotifyRecipient.name == req.to_person,
+                    NotifyRecipient.enabled == True,  # noqa: E712
+                    NotifyRecipient.wx_uid != "",
+                    (NotifyRecipient.channels.like("%serverchan%")
+                     | NotifyRecipient.channels.like("%wxpusher%")))
+            .first()
+        )
+        if rec and rec.wx_uid:
+            desp = (
+                f"**{me}** 向您发起了换班申请（{'双向对调班次' if not is_top else '请顶班'}）。\n\n"
+                f"- 班次日期：{fa.date}\n"
+                f"- 备注：{req.note or '无'}\n\n"
+                f"请登录系统「排班 → 我的换班」确认或拒绝：\n"
+                f"{FRONTEND_ORIGIN}/scheduling?tab=myswap"
+            )
+            res = send_serverchan(
+                title=f"【{SYSTEM_NAME}】换班申请提醒：{me} 请求与您换班",
+                desp=desp, sendkey=rec.wx_uid,
+            )
+            logger_swap.info("换班微信推送 %s -> %s: %s", me, req.to_person, res)
+    except Exception as e:  # noqa: BLE001
+        logger_swap.warning("换班微信推送失败(不影响申请): %s", e)
     db.commit()
     db.refresh(swap)
     return swap

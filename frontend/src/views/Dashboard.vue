@@ -35,7 +35,7 @@
           <el-radio-button label="month">本月</el-radio-button>
         </el-radio-group>
         <el-button size="small" @click="loadMyShifts">刷新</el-button>
-        <el-button size="small" type="primary" plain @click="go('/scheduling?tab=swap')">换班申请</el-button>
+        <el-button size="small" type="primary" plain @click="go('/scheduling?tab=month')">换班申请</el-button>
         <el-button size="small" type="warning" plain @click="go('/scheduling?tab=rest')">休息申请</el-button>
       </template>
 
