@@ -21,6 +21,7 @@ const FALLBACK_MODULE_WRITE_ROLES = {
   'interlab-edit': ['admin', 'qc_manager'],
   'reagents': ['admin', 'reagent_manager'],
   'reagents_delete': ['admin', 'reagent_manager'],
+  'reagent-receivings': ['admin', 'reagent_manager', 'reagent_delivery'],
   'training': ['admin', 'training_manager'],
   'training_delete': ['admin', 'training_manager'],
   'verification': ['admin', 'specialty_leader'],
@@ -128,10 +129,11 @@ export const useAuthStore = defineStore('auth', {
       return this.myRoles.some(r => required.includes(r))
     },
     // 菜单/页签是否可见。
-    // 规则：仅 technical_support 严格按授权收口（未授权模块一律不显示）；
+    // 规则：technical_support 与 reagent_delivery 严格按授权收口（未授权模块一律不显示）；
     // 其余角色维持原行为（全部可见），不做全站 RBAC 改造以免误伤。
     canAccessMenu(moduleKey) {
-      if (!this.isTechnicalSupport) return true
+      const strict = this.isTechnicalSupport || this.myRoles.includes('reagent_delivery')
+      if (!strict) return true
       if (this.isAdmin) return true
       try {
         const permStore = usePermissionStore()

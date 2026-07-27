@@ -27,7 +27,7 @@ const routes = [
       { path: 'reagent/stock', name: 'reagent-stock', component: () => import('../views/reagent/ReagentStock.vue'), meta: { title: '实时库存', moduleKey: 'reagents' } },
       { path: 'reagent/inventory', name: 'reagent-inventory', component: () => import('../views/reagent/InventoryCheck.vue'), meta: { title: '盘库管理', moduleKey: 'reagents' } },
       { path: 'reagent/orders', name: 'reagent-orders', component: () => import('../views/reagent/ReagentOrders.vue'), meta: { title: '订购管理', moduleKey: 'reagents' } },
-      { path: 'reagent/receivings', name: 'reagent-receivings', component: () => import('../views/reagent/ReagentReceivings.vue'), meta: { title: '到货接收', moduleKey: 'reagents' } },
+      { path: 'reagent/receivings', name: 'reagent-receivings', component: () => import('../views/reagent/ReagentReceivings.vue'), meta: { title: '到货接收', moduleKey: 'reagent-receivings' } },
       { path: 'reagent/consumption', name: 'reagent-consumption', component: () => import('../views/reagent/ReagentConsumption.vue'), meta: { title: '月消耗', moduleKey: 'reagents' } },
       { path: 'reagent/associations', name: 'reagent-associations', component: () => import('../views/reagent/ReagentAssociations.vue'), meta: { title: '项目与仪器关联', moduleKey: 'reagents' } },
       { path: 'training', name: 'training', component: () => import('../views/training/TrainingList.vue'), meta: { title: '继教培训', moduleKey: 'training' } },
@@ -71,6 +71,9 @@ router.beforeEach((to, from, next) => {
     } else {
       next('/dashboard')
     }
+  } else if (to.path === '/dashboard' && auth.myRoles.includes('reagent_delivery') && !(auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin'))) {
+    // 试剂配送角色不显示工作台，重定向到其唯一权限页
+    next('/reagent/receivings')
   } else {
     next()
   }

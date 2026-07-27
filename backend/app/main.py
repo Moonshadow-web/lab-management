@@ -25,8 +25,11 @@ from .services.notification_service import refresh_calibration_notifications, re
 from .services.reminder_engine import ensure_reminder_defaults, run_reminders
 from .services.comparison_report import ensure_comparison_defaults
 from .models.scheduling import (
-    SchedulingPost, SchedulingConfig, POST_GROUP_DAY, POST_GROUP_NIGHT, POST_GROUP_SPECIAL,
+    SchedulingPost, SchedulingPlan, SchedulingConfig, POST_GROUP_DAY, POST_GROUP_NIGHT, POST_GROUP_SPECIAL,
 )
+
+# 默认排班计划名（所有排班数据自动归属该计划，前端月视图不再要求手动选计划）。
+DEFAULT_SCHEDULING_PLAN_NAME = "主班表"
 
 
 # 生免组标准岗位（表为空时灌入，幂等）。顺序即展示顺序。
@@ -73,6 +76,16 @@ def ensure_scheduling_defaults(db):
         p.order = order
         p.preferred_people = preferred
         p.is_fever_day = is_fever
+    db.commit()
+    # 默认排班计划（弱化 plan 概念：所有排班数据归属该计划，前端月视图自动取，无需手动选）。
+    # 起止覆盖全时段，fever_day_person 留空（发热白班固定人改在「批量录入」指定）。
+    plan = db.query(SchedulingPlan).filter(SchedulingPlan.name == DEFAULT_SCHEDULING_PLAN_NAME).first()
+    if not plan:
+        plan = SchedulingPlan(name=DEFAULT_SCHEDULING_PLAN_NAME)
+        db.add(plan)
+    plan.start_date = "2000-01-01"
+    plan.end_date = "2099-12-31"
+    plan.fever_day_person = plan.fever_day_person or ""
     db.commit()
     # 排班配置（单行 id=1）
     cfg = db.get(SchedulingConfig, 1)
@@ -221,6 +234,19 @@ def _ensure_missing_columns():
                 logger.info("修正 scheduling_assignments.post_id 为可空")
         except Exception as e:  # noqa: BLE001
             logger.warning("修正 scheduling_assignments.post_id 可空失败(忽略): %s", e)
+
+    # 2026-07-27 到货接收改版：新增 is_confirmed/created_by/confirmed_at/confirmed_by 四列。
+    # 旧记录(改版前创建)在创建时已直接写入实时库存，应视为「已确认」，避免确认时重复加库存。
+    # 本回填幂等：is_confirmed 一旦非 NULL 即不再变化。仅 MySQL 执行（SQLite 本地开发库无此表结构差异问题）。
+    if engine.dialect.name == "mysql":
+        try:
+            with engine.begin() as conn:
+                conn.exec_driver_sql(
+                    "UPDATE reagent_receivings SET is_confirmed=1 WHERE is_confirmed IS NULL"
+                )
+            logger.info("到货接收 is_confirmed 回填完成（旧记录视为已确认）")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("到货接收 is_confirmed 回填失败(忽略): %s", e)
 
 
 def _migrate_schema():
@@ -465,17 +491,34 @@ def _migrate_schema():
 
 
 async def _reminder_scheduler():
-    """每日 08:00 自动评估规则并发送提醒（依赖 minNum>=1 的常驻实例）。"""
+    """定时提醒调度：
+    - 每日 08:00：评估并发送「非早/连班」类提醒（EQA/校准等）。
+    - 每日 11:30：仅评估并发送早班/连班提醒（早班=前一天11:30；连班=前一天11:30 + 当天11:30）。
+    早/连班提醒不进工作台（仅邮件/微信），且需在工作时间中点（11:30）提醒更及时。
+    """
+    SHIFT_CATS = ("shift_early", "shift_continuous")
     while True:
         try:
             now = datetime.now()
-            target = now.replace(hour=8, minute=0, second=0, microsecond=0)
-            if target <= now:
-                target += timedelta(days=1)
-            await asyncio.sleep((target - now).total_seconds())
-            with SessionLocal() as db:
-                run_reminders(db)
-            logger.info("reminder scheduler run at %s", datetime.now())
+            # 计算到下一个 08:00（通用）与下一个 11:30（早/连班）的睡眠时长，取较小者，避免漏跑任一时点。
+            t0800 = now.replace(hour=8, minute=0, second=0, microsecond=0)
+            t1130 = now.replace(hour=11, minute=30, second=0, microsecond=0)
+            if t0800 <= now:
+                t0800 += timedelta(days=1)
+            if t1130 <= now:
+                t1130 += timedelta(days=1)
+            sleep_gen = (t0800 - now).total_seconds()
+            sleep_shift = (t1130 - now).total_seconds()
+            if sleep_gen <= sleep_shift:
+                await asyncio.sleep(sleep_gen)
+                with SessionLocal() as db:
+                    run_reminders(db, exclude_categories=SHIFT_CATS)
+                logger.info("reminder(general) scheduler run at %s", datetime.now())
+            else:
+                await asyncio.sleep(sleep_shift)
+                with SessionLocal() as db:
+                    run_reminders(db, only_categories=SHIFT_CATS)
+                logger.info("reminder(shift) scheduler run at %s", datetime.now())
         except Exception as e:  # noqa: BLE001
             logger.error("reminder scheduler error: %s", e)
 

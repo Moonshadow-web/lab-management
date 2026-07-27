@@ -112,6 +112,14 @@ export function createReagentReceiving(data) {
   return request.post('/api/v1/reagent/receivings', data)
 }
 
+export function updateReagentReceiving(id, data) {
+  return request.put(`/api/v1/reagent/receivings/${id}`, data)
+}
+
+export function confirmReagentReceiving(id) {
+  return request.post(`/api/v1/reagent/receivings/${id}/confirm`)
+}
+
 // ── 月消耗 ──
 export function listReagentConsumption(params) {
   return request.get('/api/v1/reagent/consumption', { params })

@@ -18,6 +18,7 @@ ROLE_OPTIONS = [
     {"code": "specialty_leader", "label": "专业组长"},
     {"code": "qc_manager", "label": "质控管理员"},
     {"code": "reagent_manager", "label": "试剂管理员"},
+    {"code": "reagent_delivery", "label": "试剂配送"},
     {"code": "training_manager", "label": "继教管理员"},
     {"code": "biosafety_officer", "label": "生物安全员"},
     {"code": "it_manager", "label": "信息管理员"},

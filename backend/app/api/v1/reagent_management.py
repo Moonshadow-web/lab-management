@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from ...core.crud_base import paginate
 from ...core.database import get_db
-from ...core.security import get_current_user, require_roles
+from ...core.security import get_current_user, require_roles, user_roles_list
 from ...models.reagent_management import (
     ReagentItem, ReagentStock, InventoryCheck, InventoryCheckItem,
     ReagentOrder, ReagentOrderItem, Receiving, ReceivingItem, ReagentConsumption,
@@ -617,10 +617,11 @@ def export_order_form(
 @router.get("/receivings", response_model=dict)
 def list_receivings(
     library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫），按收货明细试剂归属过滤"),
+    confirmed: Optional[bool] = Query(None, description="筛选确认状态：true=已确认, false=待确认"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     base = db.query(Receiving)
     if library:
@@ -628,6 +629,13 @@ def list_receivings(
         recv_ids = [r[0] for r in db.query(ReceivingItem.receiving_id).filter(
             ReceivingItem.item_id.in_(lib_item_ids)).distinct().all()]
         base = base.filter(Receiving.id.in_(recv_ids))
+    if confirmed is not None:
+        base = base.filter(Receiving.is_confirmed == confirmed)
+    # 试剂配送角色：仅能看自己创建的记录
+    owned = set(user_roles_list(user))
+    is_delivery_only = ("reagent_delivery" in owned) and ("admin" not in owned) and ("reagent_manager" not in owned)
+    if is_delivery_only:
+        base = base.filter(Receiving.created_by == user.username)
     total = base.count()
     rows = base.order_by(Receiving.receipt_date.desc()).offset(
         (page - 1) * page_size
@@ -647,12 +655,13 @@ def get_receiving(receiving_id: int, db: Session = Depends(get_db), _=Depends(ge
 @router.post("/receivings", response_model=ReceivingRead)
 def create_receiving(
     data: ReceivingCreate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
 ):
     rec = Receiving(
         receipt_no=data.receipt_no, receipt_date=data.receipt_date,
         order_id=data.order_id, delivery_person=data.delivery_person,
-        receiver=data.receiver or user.full_name or user.username, remark=data.remark,
+        receiver=data.receiver or user.full_name or user.username,
+        remark=data.remark, created_by=user.username, is_confirmed=False,
     )
     db.add(rec)
     db.flush()
@@ -661,7 +670,26 @@ def create_receiving(
             receiving_id=rec.id, item_id=it.item_id, batch_no=it.batch_no,
             expiry_date=it.expiry_date, quantity=it.quantity, remark=it.remark,
         ))
-        # 库存增加
+    # 注意：新建时**不**直接入库存，待「确认接收」后才写入实时库存（避免未确认单据污染库存）
+    db.commit()
+    db.refresh(rec)
+    return rec
+
+
+@router.post("/receivings/{receiving_id}/confirm", response_model=ReceivingRead)
+def confirm_receiving(
+    receiving_id: int, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
+):
+    """确认接收：写入实时库存，并记录确认人/确认时间。重复确认不会重复加库存。"""
+    r = db.query(Receiving).get(receiving_id)
+    if not r:
+        raise HTTPException(404, "收货记录未找到")
+    if r.is_confirmed:
+        raise HTTPException(400, "该收货单已确认接收，无需重复确认")
+    # 接收人默认取当前登录人员（若创建时未指定）
+    r.receiver = r.receiver or (user.full_name or user.username)
+    for it in r.items:
         stock = db.query(ReagentStock).filter(
             ReagentStock.item_id == it.item_id,
             ReagentStock.batch_no == it.batch_no,
@@ -674,9 +702,49 @@ def create_receiving(
                 item_id=it.item_id, batch_no=it.batch_no,
                 expiry_date=it.expiry_date, quantity=it.quantity,
             ))
+    r.is_confirmed = True
+    r.confirmed_at = datetime.utcnow()
+    r.confirmed_by = user.username
     db.commit()
-    db.refresh(rec)
-    return rec
+    db.refresh(r)
+    return r
+
+
+@router.put("/receivings/{receiving_id}", response_model=ReceivingRead)
+def update_receiving(
+    receiving_id: int, data: ReceivingCreate, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
+):
+    """编辑收货单。规则：
+    - 已确认接收的单据不可再修改（避免与已入库库存脱节）。
+    - 试剂配送角色只能修改自己创建的单据（created_by == 当前用户）。
+    """
+    r = db.query(Receiving).get(receiving_id)
+    if not r:
+        raise HTTPException(404, "收货记录未找到")
+    owned = set(user_roles_list(user))
+    is_restricted = ("reagent_delivery" in owned) and ("admin" not in owned) and ("reagent_manager" not in owned)
+    if is_restricted and r.created_by != user.username:
+        raise HTTPException(403, "只能修改自己创建的收货记录")
+    if r.is_confirmed:
+        raise HTTPException(400, "已确认接收，不能修改")
+    r.receipt_date = data.receipt_date
+    r.order_id = data.order_id
+    r.delivery_person = data.delivery_person
+    r.receiver = data.receiver or r.receiver
+    r.remark = data.remark
+    # 替换明细
+    for it in r.items:
+        db.delete(it)
+    db.flush()
+    for it in data.items:
+        db.add(ReceivingItem(
+            receiving_id=r.id, item_id=it.item_id, batch_no=it.batch_no,
+            expiry_date=it.expiry_date, quantity=it.quantity, remark=it.remark,
+        ))
+    db.commit()
+    db.refresh(r)
+    return r
 
 
 # =============================================================================

@@ -104,6 +104,7 @@ ROLE_LABELS = {
     "specialty_leader": "专业组长",
     "qc_manager": "质控管理员",
     "reagent_manager": "试剂管理员",
+    "reagent_delivery": "试剂配送",
     "training_manager": "继教管理员",
     "biosafety_officer": "生物安全员",
     "it_manager": "信息管理员",

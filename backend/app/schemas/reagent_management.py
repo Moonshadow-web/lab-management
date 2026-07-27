@@ -252,6 +252,10 @@ class ReceivingCreate(ReceivingBase):
 class ReceivingRead(ReceivingBase):
     id: int
     created_at: Optional[datetime] = None
+    created_by: str = ""
+    is_confirmed: bool = False
+    confirmed_at: Optional[datetime] = None
+    confirmed_by: str = ""
     items: list[ReceivingItemRead] = []
 
     class Config:

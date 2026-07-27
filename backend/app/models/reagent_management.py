@@ -195,6 +195,10 @@ class Receiving(Base):
     delivery_person: Mapped[str] = mapped_column(String(100), default="")
     receiver: Mapped[str] = mapped_column(String(100), nullable=False)
     remark: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(100), default="")  # 创建人(用户名)
+    is_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否已确认接收
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 确认时间
+    confirmed_by: Mapped[str] = mapped_column(String(100), default="")  # 确认人(用户名)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     items: Mapped[list["ReceivingItem"]] = relationship(

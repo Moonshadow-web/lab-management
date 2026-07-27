@@ -87,10 +87,11 @@ const menus = computed(() => {
       { path: '/reagent/stock', title: '实时库存' },
       { path: '/reagent/inventory', title: '盘库管理' },
       { path: '/reagent/orders', title: '订购管理' },
-      { path: '/reagent/receivings', title: '到货接收' },
       { path: '/reagent/consumption', title: '月消耗' },
       { path: '/reagent/associations', title: '项目与仪器关联' },
     ] },
+    // 到货接收作为独立菜单：试剂配送角色（仅此页有权限）也能看到，且不与试剂管理父菜单耦合
+    { path: '/reagent/receivings', title: '到货接收', icon: 'Box', moduleKey: 'reagent-receivings' },
     { path: '/training', title: '继教培训', icon: 'Reading', moduleKey: 'training' },
     { path: '/verification', title: '性能验证', icon: 'DataAnalysis', moduleKey: 'verification' },
     { path: '/scheduling', title: '排班管理', icon: 'Calendar', moduleKey: 'scheduling' },
@@ -98,7 +99,12 @@ const menus = computed(() => {
   ]
   // 按权限过滤：technical_support 仅显示其被授权的模块；其余角色维持原样（全部可见）
   const visible = all.filter((m) => {
-    if (m.path === '/dashboard') return true
+    if (m.path === '/dashboard') {
+      // 试剂配送角色不显示工作台
+      const isReagentDelivery = auth.myRoles.includes('reagent_delivery')
+      const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')
+      return !(isReagentDelivery && !isAdmin)
+    }
     if (m.moduleKeys) return auth.canAccessAnyMenu(m.moduleKeys)
     return auth.canAccessMenu(m.moduleKey)
   })
