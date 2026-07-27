@@ -754,6 +754,37 @@ def confirm_receiving(
     return r
 
 
+@router.delete("/receivings/{receiving_id}")
+def delete_receiving(
+    receiving_id: int, db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+):
+    """管理员删除收货单（含库存回退）。仅 admin 可调用，用于清理测试数据/误操作。"""
+    r = db.query(Receiving).get(receiving_id)
+    if not r:
+        raise HTTPException(404, "收货记录未找到")
+    # 若已确认，回退库存
+    if r.is_confirmed:
+        for it in r.items:
+            stock = db.query(ReagentStock).filter(
+                ReagentStock.item_id == it.item_id,
+                ReagentStock.batch_no == (it.batch_no or ""),
+            ).first()
+            if stock:
+                stock.quantity -= it.quantity
+                if stock.quantity <= 0:
+                    db.delete(stock)
+                else:
+                    stock.last_updated = datetime.utcnow()
+    # 删除收货细项
+    for it in r.items:
+        db.delete(it)
+    # 删除收货主记录
+    db.delete(r)
+    db.commit()
+    return {"ok": True, "message": f"收货单 {r.receipt_no} 已删除，库存已回退"}
+
+
 @router.put("/receivings/{receiving_id}", response_model=ReceivingRead)
 def update_receiving(
     receiving_id: int, data: ReceivingCreate, db: Session = Depends(get_db),
