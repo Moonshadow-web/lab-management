@@ -66,6 +66,7 @@ from ...schemas import (
     SchedulingGenerateRequest,
     SchedulingCellRequest,
     SchedulingBatchRequest,
+    SchedulingMergePlansRequest,
     MyScheduleItem,
     SchedulingSwapRequestCreate,
     SchedulingSwapRequestRead,
@@ -333,6 +334,30 @@ def generate(req: SchedulingGenerateRequest, db: Session = Depends(get_db),
         raise HTTPException(status_code=400, detail="缺少结束日期（计划未设起止且请求未提供）")
     count = generate_assignments(db, plan, people, start, end, config)
     return {"ok": True, "generated": count}
+
+
+@router.post("/merge-plans")
+def merge_plans(req: SchedulingMergePlansRequest, db: Session = Depends(get_db),
+                user: User = Depends(require_roles("admin"))):
+    """一次性运维：把 source 计划下的全部分配行 plan_id 改写到 target，不动行数据，source 计划保留。
+
+    用于排班计划弱化后，把历史计划(如 2026-7 / 2026-8)的数据归并到默认「主班表」，
+    使其在月视图直接可见。重复调用幂等（已归属 target 的行不会被重复处理）。
+    """
+    target = db.get(SchedulingPlan, req.target_plan_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="目标排班计划不存在")
+    sources = [s for s in req.source_plan_ids if s != req.target_plan_id]
+    if not sources:
+        raise HTTPException(status_code=400, detail="没有可归并的源计划")
+    n = (
+        db.query(SchedulingAssignment)
+        .filter(SchedulingAssignment.plan_id.in_(sources))
+        .update({SchedulingAssignment.plan_id: req.target_plan_id},
+                synchronize_session=False)
+    )
+    db.commit()
+    return {"ok": True, "migrated": n, "sources": sources, "target": req.target_plan_id}
 
 
 @router.get("/config", response_model=SchedulingConfigRead)

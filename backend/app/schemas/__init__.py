@@ -796,3 +796,14 @@ class SchedulingBatchRequest(BaseModel):
     prune_keys: list[list[str]] = []  # [[date, status], ...] 状态行裁剪
     prune_post_keys: list[list[str]] = []  # [[date, str(post_id)], ...] 岗位行(夜班/发热)裁剪
 
+
+class SchedulingMergePlansRequest(BaseModel):
+    """一次性数据归并：将 source_plan_ids 下的所有排班分配迁移到 target_plan_id。
+
+    仅用于排班计划弱化后，把历史计划(如 2026-7 / 2026-8)的数据归并到默认
+    「主班表」，使其在月视图直接可见。不动任何行数据，仅改写 plan_id；
+    source 计划本身保留、不被删除。需管理员权限（一次性运维操作）。
+    """
+    source_plan_ids: list[int]
+    target_plan_id: int
+
