@@ -22,7 +22,7 @@ const FALLBACK_MODULE_WRITE_ROLES = {
   'reagents': ['admin', 'reagent_manager'],
   'reagents_delete': ['admin', 'reagent_manager'],
   'reagent-receivings': ['admin', 'reagent_manager', 'reagent_delivery'],
-  'reagent-orders': ['admin', 'reagent_manager', 'reagent_delivery'],
+  'reagent-orders': ['admin', 'reagent_manager'],
   'training': ['admin', 'training_manager'],
   'training_delete': ['admin', 'training_manager'],
   'verification': ['admin', 'specialty_leader'],

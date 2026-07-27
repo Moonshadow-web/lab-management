@@ -71,9 +71,18 @@ router.beforeEach((to, from, next) => {
     } else {
       next('/dashboard')
     }
-  } else if (to.path === '/dashboard' && auth.myRoles.includes('reagent_delivery') && !(auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin'))) {
-    // 试剂配送角色不显示工作台，重定向到其唯一权限页
-    next('/reagent/receivings')
+  } else if (to.path === '/dashboard') {
+    // 试剂配送 / 技术支持 角色不显示工作台
+    const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')
+    if (isAdmin) {
+      next()
+    } else if (auth.myRoles.includes('reagent_delivery')) {
+      next('/reagent/receivings')
+    } else if (auth.isTechnicalSupport) {
+      next('/qc')
+    } else {
+      next()
+    }
   } else {
     next()
   }

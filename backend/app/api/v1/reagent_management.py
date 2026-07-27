@@ -523,7 +523,7 @@ def get_order(order_id: int, db: Session = Depends(get_db), _=Depends(get_curren
 @router.post("/orders", response_model=ReagentOrderRead)
 def create_order(
     data: ReagentOrderCreate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     order_no = data.order_no or _gen_order_no(db)
     # 唯一性兜底（极端并发下若用户提供或生成值已存在则重生成）
@@ -547,7 +547,7 @@ def create_order(
 @router.put("/orders/{order_id}", response_model=ReagentOrderRead)
 def update_order(
     order_id: int, data: ReagentOrderCreate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     order = db.query(ReagentOrder).get(order_id)
     if not order:
@@ -578,7 +578,7 @@ def update_order(
 @router.post("/orders/{order_id}/confirm", response_model=ReagentOrderRead)
 def confirm_order(
     order_id: int, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     """确认提交订购单：锁定不可再改（不影响库存，仅作状态/权限控制）。"""
     order = db.query(ReagentOrder).get(order_id)

@@ -101,10 +101,11 @@ const menus = computed(() => {
   // 按权限过滤：technical_support 仅显示其被授权的模块；其余角色维持原样（全部可见）
   const visible = all.filter((m) => {
     if (m.path === '/dashboard') {
-      // 试剂配送角色不显示工作台
+      // 试剂配送 / 技术支持 角色不显示工作台
       const isReagentDelivery = auth.myRoles.includes('reagent_delivery')
+      const isTechSupport = auth.isTechnicalSupport
       const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')
-      return !(isReagentDelivery && !isAdmin)
+      return !((isReagentDelivery || isTechSupport) && !isAdmin)
     }
     if (m.moduleKeys) return auth.canAccessAnyMenu(m.moduleKeys)
     return auth.canAccessMenu(m.moduleKey)
