@@ -280,12 +280,14 @@ BJHR_ITEMS: list[dict[str, Any]] = [
     {"category": "58", "item_name": "脑钠肽(BNP)",       "cv": "10.0%", "tea": "±30%", "unit": "ng/L"},
     {"category": "59", "item_name": "N末端前脑钠肽(NT-ProBNP)", "cv": "10.0%", "tea": "±30%", "unit": "ng/L"},
     {"category": "60", "item_name": "糖化白蛋白(GA)",     "cv": "6.7%", "tea": "±20%", "unit": "%"},
-    # 白蛋白（A）：用户指定单位 g/dl、质量目标同糖化白蛋白（GA）
+    # 白蛋白（A）：糖化白蛋白(GA) 的配套试剂测试项目（测总白蛋白），但本身不是糖化白蛋白；质量目标同 GA = 6.7%。
+    # LIS 上传名为半角括号「白蛋白(A)」，故同时登记半角/全角两种写法，确保精确匹配不被血清「白蛋白」串扰。
     {"category": "60", "item_name": "白蛋白（A）",        "cv": "6.7%", "tea": "±20%", "unit": "g/dl"},
+    {"category": "60", "item_name": "白蛋白(A)",         "cv": "6.7%", "tea": "±20%"},
     {"category": "61", "item_name": "视黄醇结合蛋白(RBP)","cv": "8.3%", "tea": "±25%", "unit": "mg/L"},
     {"category": "62", "item_name": "α-L-岩藻糖苷酶(AFU)","cv": "10.0%", "tea": "±30%", "unit": "U/L"},
     {"category": "63", "item_name": "糖化血红蛋白A1c(HbA1c)","cv": "2.0%", "tea": "±6%", "unit": "%"},
-    {"category": "64", "item_name": "pH",                "cv": "0.02", "tea": "±0.04"},
+    {"category": "64", "item_name": "pH",                "cv": "0.02/靶值", "tea": "±0.04"},
     {"category": "64", "item_name": "PO2",               "cv": "5.0%",  "tea": "±10mmHg 或 ±10%(取大者)", "unit": "mmHg"},
     {"category": "64", "item_name": "PCO2",              "cv": "4.0%",  "tea": "±5mmHg 或 ±8%(取大者)", "unit": "mmHg"},
     {"category": "64", "item_name": "K+(血气)",          "cv": "2.5%",  "tea": "±6%", "unit": "mmol/L"},
@@ -738,7 +740,7 @@ BLOODGAS_DOCX_ITEMS: list[dict[str, Any]] = [
     {"item_name": "K+",                    "cv": "2.0%"},
     {"item_name": "Na+",                   "cv": "1.3%"},
     {"item_name": "PCO2",                  "cv": "2.7%"},
-    {"item_name": "pH",                    "cv": "2%"},     # 靶值*0.02 = 相对 2%
+    {"item_name": "pH",                    "cv": "0.02/靶值"},  # 0.02/靶值（逐水平按靶值算相对值，由后端 _ph_relative_goal 计算）
     {"item_name": "PO2",                   "cv": "4.2%"},
     {"item_name": "tHb",                   "cv": "2.0%"},
     {"item_name": "乳酸",                   "cv": "6.7%"},

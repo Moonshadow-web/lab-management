@@ -25,7 +25,19 @@ from ...schemas import (
     QCMonthlyReportRead,
     QCMonthlyReportUpdate,
 )
-from ...services.qc_service import aggregate_project, lookup_quality_goal, draft_report, find_test_item_by_name, _parse_rule_cell
+from ...services.qc_service import aggregate_project, lookup_quality_goal, draft_report, find_test_item_by_name, _parse_rule_cell, QC_GOAL_EXACT_OVERRIDES
+
+
+def _ph_relative_goal(target_mean: float) -> str:
+    """pH(血气) 质量目标 = 0.02 / 靶值（相对允许误差），按该水平靶值逐行计算。
+
+    例：靶值 7.40 → 0.02/7.40*100 ≈ 0.27%。仅用于「质量目标」列展示，
+    Westgard 失控判定仍用 LIS 上传的 target_sd。靶值为 0 时退回空串（交由查表兜底）。
+    """
+    if not target_mean:
+        return ""
+    return f"{0.02 / target_mean * 100:.2f}%"
+
 
 # 单位纠正映射：月结项目名(=LIS 上传的 test_item 原文) -> 正确单位。
 # 用于覆盖 LIS 文件里错误的「单位」列（如定性免疫项目被错填成 IU/mL / ng/L / 空）。
@@ -582,6 +594,12 @@ def upload_qc_summary(
                 spec.get("test_item_aliases", ""),
                 db, level=level,
             )
+            # pH(血气)：质量目标 = 0.02 / 靶值（逐水平按靶值算相对值），覆盖查表静态值
+            if (test_item == "pH" or spec.get("resolved_test_item") in ("pH", "pH（血气）")) and tm:
+                quality_goal = _ph_relative_goal(tm)
+            # 精确名覆盖（白蛋白(A) 等，避免被血清同名项串扰）
+            elif test_item in QC_GOAL_EXACT_OVERRIDES:
+                quality_goal = QC_GOAL_EXACT_OVERRIDES[test_item]
             summ, is_new = _write_summary_level(
                 db,
                 year=year, month=month,
@@ -646,7 +664,13 @@ def backfill_quality_goals(db: Session = Depends(get_db), user: User = Depends(g
     for s in rows:
         matched = find_test_item_by_name(db, s.test_item, instrument=s.instrument) if s.test_item else None
         aliases = matched.aliases if matched else ""
-        goal = lookup_quality_goal(s.test_item, aliases, db, level=s.level)
+        # pH(血气)：质量目标 = 0.02 / 靶值（逐水平按靶值算相对值），覆盖查表静态值
+        if s.test_item in ("pH", "pH（血气）") and s.target_mean:
+            goal = _ph_relative_goal(s.target_mean)
+        elif s.test_item in QC_GOAL_EXACT_OVERRIDES:
+            goal = QC_GOAL_EXACT_OVERRIDES[s.test_item]
+        else:
+            goal = lookup_quality_goal(s.test_item, aliases, db, level=s.level)
         if goal and goal != (s.quality_goal or ""):
             old = s.quality_goal
             s.quality_goal = goal

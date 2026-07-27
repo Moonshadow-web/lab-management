@@ -72,8 +72,9 @@ class DB:
 
 db = DB()
 
-# pH docx 目标列为空，按用户要求 = 靶值*0.02 = 相对 2%
-EXPECT_OVERRIDE = {"pH": "2%"}
+# pH docx 目标列为空，按用户要求 = 0.02/靶值（逐水平相对值）；查表返回标记串，
+# 实际「质量目标」列由后端 _ph_relative_goal 按靶值计算（见 test_ph_albumin_goals.py）
+EXPECT_OVERRIDE = {"pH": "0.02/靶值"}
 
 ok = True
 print("=== 血气 docx 目标核对（LIS 原名）===")

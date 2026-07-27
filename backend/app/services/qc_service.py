@@ -30,6 +30,17 @@ from ..models.quality_requirement import QualityRequirement
 _QUALITY_GOALS_PATH = Path(__file__).resolve().parent.parent / "data" / "qc_quality_goals.json"
 _goals_cache: dict | None = None
 
+# 精确名覆盖：少数项目的 LIS 原名会被模糊解析「截胡」到同名血清项（如半角「白蛋白(A)」
+# 被解析成血清「白蛋白」2.5%，但它是糖化白蛋白 GA 的配套试剂，目标应为 6.7%；pH 的
+# 实际「质量目标」按 0.02/靶值 逐水平计算，查表仅保留标记串）。这些项按原始 LIS 名
+# 精确命中、优先于任何模糊匹配返回，避免被串扰。
+QC_GOAL_EXACT_OVERRIDES: dict[str, str] = {
+    "pH": "0.02/靶值",
+    "pH（血气）": "0.02/靶值",
+    "白蛋白(A)": "6.7%",
+    "白蛋白（A）": "6.7%",
+}
+
 
 def _norm(s: str) -> str:
     """归一化字符串：去除空格、统一括号，用于中文匹配。"""
@@ -417,6 +428,9 @@ def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None, l
     """
     if not test_item:
         return ""
+    # 精确名覆盖优先（见 QC_GOAL_EXACT_OVERRIDES 说明）
+    if test_item in QC_GOAL_EXACT_OVERRIDES:
+        return QC_GOAL_EXACT_OVERRIDES[test_item]
 
     # Step 1: QualityRequirement 表查询
     if db is not None:

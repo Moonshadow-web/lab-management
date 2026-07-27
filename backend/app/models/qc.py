@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Float, Text, ForeignKey, Integer
+from sqlalchemy import DateTime, String, Float, Text, ForeignKey, Integer, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.database import Base
@@ -67,6 +67,11 @@ class QCMonthlySummary(Base):
     pdf_filename: Mapped[str] = mapped_column(String(500), default="")  # 质控图原始文件名
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 月结列表主要按 (年, 月, 仪器) 过滤，复合索引加速 list 查询（前端月结「统计」按钮触发）。
+    __table_args__ = (
+        Index("ix_qc_monthly_summaries_ym_inst", "year", "month", "instrument_id"),
+    )
 
 
 class QCDailyValue(Base):
