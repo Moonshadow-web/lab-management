@@ -405,6 +405,9 @@ BJHR_ITEMS: list[dict[str, Any]] = [
     # 核酸（定性/定量）
     {"category": "167","item_name": "乙型肝炎病毒核酸(HBV DNA)定量检测","tea": "±3SD 或±0.4(阳性)", "unit": "IU/mL"},
     {"category": "169","item_name": "丙型肝炎病毒核酸(HCV RNA)定量检测","tea": "±3SD 或±0.4(阳性)", "unit": "IU/mL"},
+    # 2026-07-27 用户指定质量目标（WST403 无对应条目，按用户要求取值）
+    {"category": "100", "item_name": "OxLDL", "cv": "6%"},
+    {"category": "100", "item_name": "CER",   "cv": "8%"},
 ]
 
 
