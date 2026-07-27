@@ -70,7 +70,6 @@ def set_module_roles(
     payload: RolesPayload,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    request = None,  # 留位，方便 write_audit
 ):
     """替换指定模块的角色白名单。
 
@@ -96,8 +95,8 @@ def set_module_roles(
     for r in payload.roles:
         db.add(ModulePermission(module_key=module_key, role_code=r, updated_by=user.username))
     db.commit()
-    write_audit(db, user, "update", "module_permissions", module_key,
-                f"roles={payload.roles}", getattr(request, "client", None).host if request else None)
+    write_audit(db, user, "update", "module_permissions", 0,
+                f"module={module_key}; roles={payload.roles}", None)
     return {"ok": True, "module_key": module_key, "roles": payload.roles}
 
 
