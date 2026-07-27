@@ -1,30 +1,5 @@
 <template>
   <div class="page">
-    <!-- 今日我的岗位 -->
-    <el-card class="block">
-      <template #header>
-        <div class="card-head">
-          <span>今日我的岗位（{{ todayStr }}）</span>
-          <el-button size="small" @click="loadMyToday">刷新</el-button>
-        </div>
-      </template>
-      <el-empty v-if="!myToday.length" description="今日无排班记录" :image-size="60" />
-      <div v-else class="my-today">
-        <el-tag
-          v-for="m in myToday"
-          :key="m.id || m.post_id"
-          :type="m.group === 'night' ? 'danger' : (m.group === 'special' ? 'warning' : 'primary')"
-          effect="light"
-          class="mt-chip"
-        >
-          {{ m.post_name }}
-          <template v-if="m.is_early"><span class="tag-sub">早班</span></template>
-          <template v-if="m.is_continuous"><span class="tag-sub">连班</span></template>
-          <span v-if="m.status && m.status !== '在岗'" class="tag-sub">{{ m.status }}</span>
-        </el-tag>
-      </div>
-    </el-card>
-
     <el-tabs v-model="activeTab" class="sched-tabs">
       <!-- 月视图排班表 -->
       <el-tab-pane label="月视图排班表" name="month">
@@ -61,13 +36,13 @@
               <template #default="{ row }">
                 <div class="cell" :class="cellClass(row, d)" @click="openCellEditor(row, d)">
                   <template v-if="row.kind === 'post'">
-                    <span class="person clickable-person" @click.stop="openSwap(row, d, postCell(row, d).person, postCell(row, d).id)">{{ postCell(row, d).person || '—' }}</span>
+                    <span class="person clickable-person" @click.stop="onPersonClick(row, d, postCell(row, d).person, postCell(row, d).id)">{{ postCell(row, d).person || '—' }}</span>
                     <span v-if="postCell(row, d).is_early" class="mini-tag early">早</span>
                     <span v-if="postCell(row, d).is_continuous" class="mini-tag cont">连</span>
                     <span v-if="postCell(row, d).status && postCell(row, d).status !== '在岗'" class="mini-tag st">{{ postCell(row, d).status }}</span>
                   </template>
                   <template v-else>
-                    <span v-for="p in statusCell(row, d).persons" :key="p.id" class="person-chip clickable-person" @click.stop="openSwap(row, d, p.person, p.id)">{{ p.person }}</span>
+                    <span v-for="p in statusCell(row, d).persons" :key="p.id" class="person-chip clickable-person" @click.stop="onPersonClick(row, d, p.person, p.id)">{{ p.person }}</span>
                     <span v-if="!statusCell(row, d).persons.length" class="muted">—</span>
                   </template>
                 </div>
@@ -84,13 +59,13 @@
               <span class="dr-name">{{ row.name }}</span>
               <span class="dr-val">
                 <template v-if="row.kind === 'post'">
-                  <span class="clickable-person" @click.stop="openSwap(row, d, postCell(row, d).person, postCell(row, d).id)">{{ postCell(row, d).person || '—' }}</span>
+                  <span class="clickable-person" @click.stop="onPersonClick(row, d, postCell(row, d).person, postCell(row, d).id)">{{ postCell(row, d).person || '—' }}</span>
                   <template v-if="postCell(row, d).is_early"> 早</template>
                   <template v-if="postCell(row, d).is_continuous"> 连</template>
                   <template v-if="postCell(row, d).status && postCell(row, d).status !== '在岗'"> ·{{ postCell(row, d).status }}</template>
                 </template>
                 <template v-else>
-                  <span v-for="p in statusCell(row, d).persons" :key="p.id" class="clickable-person" @click.stop="openSwap(row, d, p.person, p.id)">{{ p.person }}</span><template v-if="!statusCell(row, d).persons.length">—</template>
+                  <span v-for="p in statusCell(row, d).persons" :key="p.id" class="clickable-person" @click.stop="onPersonClick(row, d, p.person, p.id)">{{ p.person }}</span><template v-if="!statusCell(row, d).persons.length">—</template>
                 </template>
               </span>
             </div>
@@ -392,6 +367,21 @@
         <el-button @click="swapDialog = false">取消</el-button>
       </div>
     </el-dialog>
+
+    <!-- 组长/管理员：点人名后的操作选择 -->
+    <el-dialog v-model="actionDialog" title="对该人员排班的操作" width="420px">
+      <div class="action-target">
+        操作对象：<el-tag type="primary" effect="light">{{ actionTarget.person || '—' }}</el-tag>
+        <span class="muted">（{{ actionTarget.label }}）</span>
+      </div>
+      <div class="dlg-actions dlg-actions--col">
+        <el-button type="primary" :disabled="!actionTarget.person || actionTarget.person === meName" @click="actionToSwap">发起换班</el-button>
+        <el-button type="warning" :disabled="!actionTarget.row" @click="actionToEdit">修改岗位 / 人员</el-button>
+      </div>
+      <template #footer>
+        <el-button @click="actionDialog = false">取消</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -407,7 +397,7 @@ import {
   listSchedulingPosts, createSchedulingPost, updateSchedulingPost, deleteSchedulingPost,
   getDefaultPlan,
   deleteSchedulingAssignment,
-  getSchedulingGrid, getMyToday, generateScheduling,
+  getSchedulingGrid, generateScheduling,
   getSchedulingConfig, updateSchedulingConfig, setSchedulingCell, batchSchedulingCells,
   getMySchedule, requestSwap, listSwaps, confirmSwap, rejectSwap, cancelSwap,
   requestRest, listRestRequests, cancelRest,
@@ -420,7 +410,6 @@ const route = useRoute()
 const isManager = computed(() => auth.canWrite('scheduling'))
 function pad(n) { return String(n).padStart(2, '0') }
 function localDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
-const todayStr = localDate(new Date())
 
 const STATUS_CLASS = {
   '病假': 'c-sick', '质控': 'c-qc', '开会': 'c-meeting', '休息': 'c-rest',
@@ -448,12 +437,6 @@ const BATCH_TYPES = [
 
 function parsePeople(text) {
   return (text || '').split(/[\n,，]+/).map((s) => s.trim()).filter(Boolean)
-}
-
-// ---------------- 我的今日 ----------------
-const myToday = ref([])
-async function loadMyToday() {
-  try { myToday.value = await getMyToday() } catch (e) { myToday.value = [] }
 }
 
 // ---------------- 配置 ----------------
@@ -908,6 +891,30 @@ function openSwap(row, d, person, assignId) {
   swapDialog.value = true
   loadMySwapOptions()
 }
+
+// 点人名：组长/管理员先选「发起换班」或「修改岗位/人员」；普通成员直接发起换班
+const actionDialog = ref(false)
+const actionTarget = reactive({ row: null, date: '', person: '', assignId: null, label: '' })
+function onPersonClick(row, d, person, assignId) {
+  if (!person || person === '—') return
+  if (!isManager.value) { openSwap(row, d, person, assignId); return }
+  actionTarget.row = row
+  actionTarget.date = d
+  actionTarget.person = person
+  actionTarget.assignId = assignId || null
+  actionTarget.label = `${d} ${row.name}`
+  actionDialog.value = true
+}
+function actionToSwap() {
+  const { row, date, person, assignId } = actionTarget
+  actionDialog.value = false
+  openSwap(row, date, person, assignId)
+}
+function actionToEdit() {
+  const { row, date } = actionTarget
+  actionDialog.value = false
+  openCellEditor(row, date)   // 已内置 isManager 守卫
+}
 async function loadMySwapOptions() {
   try {
     const data = await getMySchedule({ range: 'month' })
@@ -1006,7 +1013,6 @@ async function cancelRestReq(row) {
 onMounted(async () => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
-  loadMyToday()
   loadConfigSummary()
   listActiveUsers().then((us) => { userOptions.value = us || [] }).catch(() => {})
   loadPostsAll()
@@ -1044,13 +1050,8 @@ async function loadConfigSummary() {
 
 <style scoped>
 .page { display: flex; flex-direction: column; gap: 16px; }
-.block { margin: 0; }
-.card-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .tip { margin: 10px 0; }
 .cfg-summary { font-size: 14px; color: #555; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-.my-today { display: flex; flex-wrap: wrap; gap: 8px; }
-.mt-chip { font-size: 14px; padding: 6px 10px; }
-.tag-sub { margin-left: 4px; opacity: 0.8; font-size: 12px; }
 .sched-tabs { background: #fff; padding: 8px 12px; border-radius: 8px; }
 .grid-ctrl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .swap-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -1079,6 +1080,9 @@ async function loadConfigSummary() {
 .hint { font-size: 12px; color: #999; margin-left: 6px; }
 .tip-text { font-size: 12px; color: #999; margin-left: 10px; }
 .dlg-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+.action-target { font-size: 14px; margin-bottom: 8px; }
+.dlg-actions--col { flex-direction: column; align-items: stretch; }
+.dlg-actions--col .el-button { margin: 4px 0; }
 .persons-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 28px; }
 .person-tag { font-size: 13px; }
 .pn-note { opacity: 0.7; font-size: 11px; }
