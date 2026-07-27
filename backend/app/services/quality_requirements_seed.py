@@ -408,6 +408,8 @@ BJHR_ITEMS: list[dict[str, Any]] = [
     # 2026-07-27 用户指定质量目标（WST403 无对应条目，按用户要求取值）
     {"category": "100", "item_name": "OxLDL", "cv": "6%"},
     {"category": "100", "item_name": "CER",   "cv": "8%"},
+    # 2026-07-28 用户指定质量目标
+    {"category": "100", "item_name": "P2PSA", "cv": "7.5%"},
 ]
 
 
