@@ -249,6 +249,38 @@ def _ensure_missing_columns():
         except Exception as e:  # noqa: BLE001
             logger.warning("到货接收 is_confirmed 回填失败(忽略): %s", e)
 
+    # 2026-07-28 一次性清理：删除测试收货单 RCV-2026-07-327(id=1) 及其库存副作用。
+    # 幂等：记录不存在时 SQL 无操作，不会报错。
+    if engine.dialect.name == "mysql":
+        try:
+            with engine.begin() as conn:
+                # 若已确认，先回退库存
+                conn.exec_driver_sql("""
+                    UPDATE reagent_stocks s
+                    INNER JOIN reagent_receiving_items ri ON ri.item_id = s.item_id AND ri.batch_no = s.batch_no
+                    INNER JOIN reagent_receivings r ON r.id = ri.receiving_id
+                    SET s.quantity = GREATEST(s.quantity - ri.quantity, 0),
+                        s.last_updated = NOW()
+                    WHERE r.id = 1 AND r.receipt_no = 'RCV-2026-07-327' AND r.is_confirmed = 1
+                """)
+                # 删数量归零的库存行
+                conn.exec_driver_sql(
+                    "DELETE FROM reagent_stocks WHERE quantity <= 0"
+                )
+                # 删收货细项
+                conn.exec_driver_sql(
+                    "DELETE FROM reagent_receiving_items WHERE receiving_id = 1"
+                )
+                # 删收货主记录
+                result = conn.exec_driver_sql(
+                    "DELETE FROM reagent_receivings WHERE id = 1 AND receipt_no = 'RCV-2026-07-327'"
+                )
+                rowcount = result.rowcount if hasattr(result, 'rowcount') else -1
+            if rowcount > 0:
+                logger.info("已清理测试收货单 RCV-2026-07-327 (id=1) 及关联数据")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("清理测试收货单失败(忽略): %s", e)
+
 
 def _migrate_schema():
     """为已存在的表补齐新增列（create_all 不会 ALTER 旧表）。
