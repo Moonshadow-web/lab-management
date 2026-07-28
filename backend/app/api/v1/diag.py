@@ -131,15 +131,19 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "docs-backfill-batch-2026-07-29"
+_BUILD_MARK = "docs-mysql-vars-diag-2026-07-29"
 
 
 def get_build_mark() -> str:
     return _BUILD_MARK
 
 
-from fastapi import APIRouter, HTTPException  # noqa: E402
+from fastapi import APIRouter, HTTPException, Depends  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
+from ...core.database import get_db  # noqa: E402
+from ...core.security import get_current_user, require_roles  # noqa: E402
+from ...models.user import User  # noqa: E402
 
 router = APIRouter(prefix="/_diag", tags=["diag"])
 
@@ -204,3 +208,25 @@ def diag_db():
 def diag_last_errors():
     """返回最近捕获的未处理异常（仅管理员，用于无日志环境排障）。"""
     return {"errors": list(_LAST_ERRORS), "count": len(_LAST_ERRORS)}
+
+
+@router.get("/mysql-vars")
+def diag_mysql_vars(db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))):
+    """临时诊断：返回与 BLOB 写入相关的 MySQL 会话/全局变量（排查 2013 断连）。"""
+    from sqlalchemy import text
+    out = {}
+    for v in ["max_allowed_packet", "wait_timeout", "interactive_timeout",
+              "net_write_timeout", "net_read_timeout", "connect_timeout"]:
+        try:
+            r = db.execute(text(f"SHOW VARIABLES LIKE '{v}'")).fetchone()
+            out[v] = r[1] if r else None
+        except Exception as e:  # noqa: BLE001
+            out[v] = f"err:{e}"
+    try:
+        r = db.execute(text("SELECT COUNT(*) FROM documents WHERE data IS NOT NULL")).fetchone()
+        out["documents_with_data"] = r[0] if r else None
+        r = db.execute(text("SELECT COUNT(*) FROM document_versions WHERE data IS NOT NULL")).fetchone()
+        out["versions_with_data"] = r[0] if r else None
+    except Exception as e:  # noqa: BLE001
+        out["count_err"] = str(e)[:200]
+    return out
