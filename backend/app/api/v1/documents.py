@@ -197,7 +197,11 @@ def list_documents(
     params = dict(request.query_params)
     query = db.query(Document)
     if q:
-        query = query.filter(Document.title.ilike(f"%{q}%") | Document.original_filename.ilike(f"%{q}%"))
+        query = query.filter(
+            Document.title.ilike(f"%{q}%")
+            | Document.original_filename.ilike(f"%{q}%")
+            | Document.doc_number.ilike(f"%{q}%")
+        )
     cat = params.get("category")
     if cat:
         query = query.filter(Document.category == cat)

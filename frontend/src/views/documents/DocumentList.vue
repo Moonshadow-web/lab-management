@@ -397,26 +397,45 @@ async function onPreview(row) {
     return
   }
   const ext = (row.file_path.split('.').pop() || '').toLowerCase()
-  // PDF：浏览器内置阅读器可直接渲染
-  if (ext === 'pdf') {
-    try {
-      const blob = await fetchDocumentBlob(row.id, 'preview')
-      previewBlob(blob)
-    } catch (e) {
-      ElMessage.error('文件不存在或预览失败')
-    }
+  // 先取文件内容，用文件头判断真实格式：文件名/扩展名可能与真实格式不符
+  // （如旧版 Word .doc 被命名为 .docx；旧版 Excel .xls 被命名为 .xlsx）
+  let blob
+  try {
+    blob = await fetchDocumentBlob(row.id, 'preview')
+  } catch (e) {
+    ElMessage.error('文件不存在或预览失败')
     return
   }
-  // docx：前端 mammoth 转换为 HTML，在浏览器内显示（不再调用 Word/WPS）
-  if (ext === 'docx') {
+  const buf0 = await blob.arrayBuffer()
+  const head = new Uint8Array(buf0.slice(0, 4))
+  const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46 // %PDF
+  const isZip = head[0] === 0x50 && head[1] === 0x4B // PK -> OOXML(docx/xlsx)
+  const isOle = head[0] === 0xD0 && head[1] === 0xCF && head[2] === 0x11 && head[3] === 0xE0 // OLE2 旧版 .doc/.xls
+
+  // PDF：浏览器内置阅读器
+  if (ext === 'pdf' || isPdf) {
+    previewBlob(blob)
+    return
+  }
+  // OLE2 旧版格式：浏览器无法在线预览，按扩展名给出明确提示（不再误进 mammoth/JSZip 报晦涩错）
+  if (isOle) {
+    const isExcel = ext === 'xls' || ext === 'xlsx'
+    previewOpen.value = true
+    previewTitle.value = row.title || '预览'
+    previewing.value = false
+    previewHtml.value = isExcel
+      ? '<p style="color:#e6a23c">该 .xls 为旧版二进制格式，浏览器无法在线预览，请下载后查看。</p>'
+      : '<p style="color:#e6a23c">该文件为<b>旧版 Word（.doc）格式</b>，浏览器无法在线预览。请点击「下载」后用 Word / WPS 打开；或在 Word 中「另存为 → Word 文档 (*.docx)」后重新上传，即可在线预览。</p>'
+    return
+  }
+  // docx：mammoth 转 HTML（仅当确为 OOXML zip 时）
+  if (ext === 'docx' && isZip) {
     previewOpen.value = true
     previewTitle.value = row.title || '预览'
     previewHtml.value = ''
     previewing.value = true
     try {
-      const blob = await fetchDocumentBlob(row.id, 'preview')
-      const arrayBuffer = await blob.arrayBuffer()
-      const res = await mammoth.convertToHtml({ arrayBuffer })
+      const res = await mammoth.convertToHtml({ arrayBuffer: buf0 })
       previewHtml.value = res.value || '<p style="color:#909399">（文档内容为空）</p>'
     } catch (e) {
       console.error(e)
@@ -426,49 +445,35 @@ async function onPreview(row) {
     }
     return
   }
-  // xlsx/xls：前端用 exceljs 读 arrayBuffer 转 HTML 表格渲染（与 docx 一致），避免二进制被当文本打开乱码
-  if (ext === 'xlsx' || ext === 'xls') {
+  // xlsx/xls：exceljs 转表格（仅当确为 OOXML zip 时）
+  if ((ext === 'xlsx' || ext === 'xls') && isZip) {
     previewOpen.value = true
     previewTitle.value = row.title || '预览'
     previewHtml.value = ''
     previewing.value = true
     try {
-      const blob = await fetchDocumentBlob(row.id, 'preview')
-      const buf = await blob.arrayBuffer()
-      const head = new Uint8Array(buf.slice(0, 4))
-      const isZip = head[0] === 0x50 && head[1] === 0x4B // PK -> xlsx
-      const isOle = head[0] === 0xD0 && head[1] === 0xCF && head[2] === 0x11 && head[3] === 0xE0 // 真 .xls(BIFF)
+      const mod = await import('exceljs')
+      const ExcelJS = mod.default || mod
+      const wb = new ExcelJS.Workbook()
+      await wb.xlsx.load(buf0)
       let html = ''
-      if (isZip) {
-        const mod = await import('exceljs')
-        const ExcelJS = mod.default || mod
-        const wb = new ExcelJS.Workbook()
-        await wb.xlsx.load(buf)
-        wb.eachSheet((sheet) => {
-          html += '<h3 style="margin:8px 0">' + (sheet.name || '') + '</h3>'
-          html += '<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;font-size:13px">'
-          sheet.eachRow((r, ri) => {
-            html += '<tr>'
-            r.eachCell({ includeEmpty: true }, (cell) => {
-              const tag = ri === 1 ? 'th' : 'td'
-              let v = cell.value
-              if (v == null) v = ''
-              else if (typeof v === 'object') v = v.text != null ? v.text : (v.result != null ? v.result : '')
-              v = String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-              html += '<' + tag + '>' + v + '</' + tag + '>'
-            })
-            html += '</tr>'
+      wb.eachSheet((sheet) => {
+        html += '<h3 style="margin:8px 0">' + (sheet.name || '') + '</h3>'
+        html += '<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;font-size:13px">'
+        sheet.eachRow((r, ri) => {
+          html += '<tr>'
+          r.eachCell({ includeEmpty: true }, (cell) => {
+            const tag = ri === 1 ? 'th' : 'td'
+            let v = cell.value
+            if (v == null) v = ''
+            else if (typeof v === 'object') v = v.text != null ? v.text : (v.result != null ? v.result : '')
+            v = String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            html += '<' + tag + '>' + v + '</' + tag + '>'
           })
-          html += '</table><br/>'
+          html += '</tr>'
         })
-      } else if (!isOle) {
-        // 非 OLE 的 .xls：多为 GBK 编码 Tab 文本（爱康 LIS 式），按 gbk 解码渲染
-        let text
-        try { text = new TextDecoder('gbk').decode(buf) } catch (e) { text = new TextDecoder('utf-8').decode(buf) }
-        html = '<pre style="white-space:pre-wrap;word-break:break-all;font-size:13px">' + text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>'
-      } else {
-        html = '<p style="color:#e6a23c">该 .xls 为旧版二进制格式，浏览器无法在线预览，请下载后查看。</p>'
-      }
+        html += '</table><br/>'
+      })
       previewHtml.value = html || '<p style="color:#909399">（文档内容为空）</p>'
     } catch (e) {
       console.error(e)
@@ -478,13 +483,8 @@ async function onPreview(row) {
     }
     return
   }
-  // 其他（含老 .doc）：回退，由系统用 Word/WPS 打开
-  try {
-    const blob = await fetchDocumentBlob(row.id, 'preview')
-    previewBlob(blob)
-  } catch (e) {
-    ElMessage.error('文件不存在或预览失败')
-  }
+  // 其他（扩展名与真实格式不符且非上述情况）：回退，由系统用 Word/WPS 打开
+  previewBlob(blob)
 }
 async function onDownload(row) {
   try {
