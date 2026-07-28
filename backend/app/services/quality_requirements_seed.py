@@ -272,6 +272,7 @@ BJHR_ITEMS: list[dict[str, Any]] = [
     {"category": "50", "item_name": "胆汁酸(BA)",        "cv": "8.3%", "tea": "±25%", "unit": "μmol/L"},
     {"category": "51", "item_name": "肌酸激酶-MB 同工酶活性(CK-MB)", "cv": "10.0%", "tea": "±25%", "unit": "U/L"},
     {"category": "52", "item_name": "肌酸激酶-MB 同工酶质量(CK-MBmass)", "cv": "10.0%", "tea": "±30%", "unit": "μg/L"},
+    {"category": "51", "item_name": "肌酸激酶同工酶", "cv": "10.0%", "tea": "±25%"},  # LIS 别名 CK-MB/CKMB 桥接落点
     {"category": "53", "item_name": "肌红蛋白(Myo)",     "cv": "10.0%", "tea": "±30%", "unit": "μg/L"},
     {"category": "54", "item_name": "肌钙蛋白I(TnI)",    "cv": "10.0%", "tea": "±30%", "unit": "μg/L"},
     {"category": "55", "item_name": "肌钙蛋白T(TnT)",    "cv": "10.0%", "tea": "±30%", "unit": "μg/L"},
