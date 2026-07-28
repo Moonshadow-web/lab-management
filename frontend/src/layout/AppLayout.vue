@@ -82,17 +82,16 @@ const menus = computed(() => {
     { path: '/instruments', title: '仪器档案', icon: 'Cpu', moduleKey: 'instruments' },
     // 质控管理是聚合菜单：含 月结/质评/仪器间比对/室间比对/累靶 多个权限模块，任一可见即显示
     { path: '/qc', title: '质控管理', icon: 'DataLine', moduleKeys: ['qc-monthly', 'eqa', 'comparison', 'interlab', 'qc-target'] },
-    { path: '/reagent', title: '试剂管理', icon: 'ShoppingCart', moduleKey: 'reagents', children: [
+    { path: '/reagent', title: '试剂管理', icon: 'ShoppingCart', moduleKeys: ['reagents', 'reagent-orders'], children: [
       { path: '/reagent/items', title: '试剂目录' },
       { path: '/reagent/stock', title: '实时库存' },
       { path: '/reagent/inventory', title: '盘库管理' },
+      { path: '/reagent/orders', title: '订购管理' },
       { path: '/reagent/consumption', title: '月消耗' },
       { path: '/reagent/associations', title: '项目与仪器关联' },
     ] },
     // 到货接收作为独立菜单：试剂配送角色（仅此页有权限）也能看到，且不与试剂管理父菜单耦合
     { path: '/reagent/receivings', title: '到货接收', icon: 'Box', moduleKey: 'reagent-receivings' },
-    // 订购管理独立菜单：试剂配送角色亦可见（仅能新建/改自己单），与试剂管理父菜单解耦
-    { path: '/reagent/orders', title: '订购管理', icon: 'ShoppingCart', moduleKey: 'reagent-orders' },
     { path: '/training', title: '继教培训', icon: 'Reading', moduleKey: 'training' },
     { path: '/verification', title: '性能验证', icon: 'DataAnalysis', moduleKey: 'verification' },
     { path: '/scheduling', title: '排班管理', icon: 'Calendar', moduleKey: 'scheduling' },

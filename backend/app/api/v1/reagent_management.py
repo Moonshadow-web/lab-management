@@ -45,7 +45,7 @@ router = APIRouter(prefix="/reagent", tags=["reagent-management"])
 
 @router.get("/items", response_model=dict)
 def list_reagent_items(
-    q: str = Query("", description="搜索（名称/品牌/材料编码）"),
+    q: str = Query("", description="搜索（名称/品牌/材料编码/项目名/项目别名）"),
     type: Optional[str] = Query(None, description="类型筛选"),
     category: Optional[str] = Query(None, description="类别筛选"),
     library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
@@ -58,9 +58,18 @@ def list_reagent_items(
     base = db.query(ReagentItem)
     if q.strip():
         kw = f"%{q.strip()}%"
+        # 通过关联表匹配项目名/项目别名（如 alt → 丙氨酸氨基转移酶）
+        matched_reagent_ids = db.query(TestItemReagent.reagent_item_id).join(
+            TestItem, TestItem.id == TestItemReagent.test_item_id
+        ).filter(
+            or_(TestItem.name.like(kw), TestItem.aliases.like(kw))
+        ).distinct().subquery()
         base = base.filter(
-            or_(ReagentItem.name.like(kw), ReagentItem.brand.like(kw),
-                ReagentItem.material_code.like(kw), ReagentItem.spec.like(kw))
+            or_(
+                ReagentItem.name.like(kw), ReagentItem.brand.like(kw),
+                ReagentItem.material_code.like(kw), ReagentItem.spec.like(kw),
+                ReagentItem.id.in_(matched_reagent_ids),
+            )
         )
     if type:
         base = base.filter(ReagentItem.type == type)
