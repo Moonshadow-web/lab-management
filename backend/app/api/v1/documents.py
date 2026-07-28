@@ -4,7 +4,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import case, func
+from sqlalchemy import case, func, text
 import re
 
 from ...core.crud_base import paginate, write_audit
@@ -425,6 +425,13 @@ def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(
     分批小事务提交，规避 wait_timeout / 大 BLOB 单包超时（2013 Lost connection）。
     """
     try:
+        # net_write_timeout 已由 engine connect 事件全局放宽（CloudBase 默认 60s 易 2013）；
+        # 此处再补一次，双保险。
+        try:
+            db.execute(text("SET SESSION net_write_timeout=28800"))
+            db.execute(text("SET SESSION net_read_timeout=28800"))
+        except Exception:  # noqa: BLE001
+            pass
         doc_done = 0
         doc_skipped = 0
         ver_done = 0
