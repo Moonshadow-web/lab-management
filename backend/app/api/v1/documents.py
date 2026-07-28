@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import case, func, text
+from sqlalchemy.orm import defer
 import re
 
 from ...core.crud_base import paginate, write_audit
@@ -196,7 +197,7 @@ def list_documents(
     user: User = Depends(get_current_user),
 ):
     params = dict(request.query_params)
-    query = db.query(Document)
+    query = db.query(Document).options(defer(Document.data))  # 列表不加载二进制字节（JSON 序列化会 UnicodeDecodeError）
     if q:
         query = query.filter(
             Document.title.ilike(f"%{q}%")
@@ -219,13 +220,13 @@ def list_documents(
 
 @router.get("/{doc_id}", response_model=DocumentRead)
 def get_document(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    d = db.get(Document, doc_id)
+    d = db.query(Document).options(defer(Document.data)).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
     return d
 
 
-@router.patch("/{doc_id}", response_model=DocumentRead)
+@router.patch("/{doc_id}", response_model=DocumentRead, response_model_exclude={"data"})
 def update_document(
     doc_id: int,
     payload: DocumentUpdate,
@@ -251,7 +252,7 @@ def update_document(
     return d
 
 
-@router.post("/upload", response_model=DocumentRead, status_code=201)
+@router.post("/upload", response_model=DocumentRead, response_model_exclude={"data"}, status_code=201)
 def upload_document(
     file: UploadFile = File(...),
     title: str = Form(""),
@@ -296,7 +297,7 @@ def upload_document(
     return d
 
 
-@router.post("/{doc_id}/new-version", response_model=DocumentRead)
+@router.post("/{doc_id}/new-version", response_model=DocumentRead, response_model_exclude={"data"})
 def new_version(
     doc_id: int,
     file: UploadFile = File(...),
@@ -332,10 +333,11 @@ def new_version(
     return d
 
 
-@router.get("/{doc_id}/versions", response_model=list[DocumentVersionRead])
+@router.get("/{doc_id}/versions", response_model=list[DocumentVersionRead], response_model_exclude={"data"})
 def list_versions(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return (
         db.query(DocumentVersion)
+        .options(defer(DocumentVersion.data))
         .filter(DocumentVersion.document_id == doc_id)
         .order_by(DocumentVersion.id.desc())
         .all()
@@ -343,8 +345,13 @@ def list_versions(doc_id: int, db: Session = Depends(get_db), user: User = Depen
 
 
 def _content_disposition(disposition: str, filename: str) -> str:
-    """生成带 RFC5987 UTF-8 文件名的内容处置头（中文名安全）。"""
-    return f'{disposition}; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}'
+    """生成带 RFC5987 UTF-8 文件名的内容处置头（中文名安全）。
+    
+    旧版 filename="..." 仅支持 ASCII，非 ASCII 回退为 "download"；
+    真实文件名通过 RFC 5987 filename*=UTF-8''... 传递。
+    """
+    ascii_name = filename.encode("ascii", "ignore").decode("ascii") or "download"
+    return f'{disposition}; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(filename)}'
 
 
 @router.get("/{doc_id}/download")
