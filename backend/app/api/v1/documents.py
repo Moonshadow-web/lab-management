@@ -8,7 +8,7 @@ from sqlalchemy import case, func, text
 import re
 
 from ...core.crud_base import paginate, write_audit
-from ...core.database import get_db
+from ...core.database import SessionLocal, get_db
 from ...core.security import get_current_user, require_roles
 from ...core.storage import storage
 from ...core.docmeta import parse_doc_metadata
@@ -436,43 +436,54 @@ def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(
         doc_skipped = 0
         ver_done = 0
         ver_skipped = 0
-        BATCH = 5
+        ver_failed = []
 
-        docs = db.query(Document).all()
-        for i, d in enumerate(docs, 1):
-            if d.data is None and d.file_path:
-                p = storage.get_path(d.file_path)
-                if p.exists():
-                    try:
-                        d.data = p.read_bytes()
-                        doc_done += 1
-                    except Exception:  # noqa: BLE001
+        # 每条记录用独立新连接 + 单条提交：规避 CloudBase 代理 60s 硬超时导致的
+        # 整批 2013 断连；单条失败仅跳过该记录，不影响其余。
+        doc_ids = [d.id for d in db.query(Document.id).all()]
+        for did in doc_ids:
+            sd = SessionLocal()
+            try:
+                d = sd.get(Document, did)
+                if d and d.data is None and d.file_path:
+                    p = storage.get_path(d.file_path)
+                    if p.exists():
+                        try:
+                            d.data = p.read_bytes()
+                            sd.commit()
+                            doc_done += 1
+                        except Exception:  # noqa: BLE001
+                            sd.rollback()
+                            doc_skipped += 1
+                    else:
                         doc_skipped += 1
                 else:
                     doc_skipped += 1
-            else:
-                doc_skipped += 1
-            if i % BATCH == 0:
-                db.commit()
-        db.commit()
+            finally:
+                sd.close()
 
-        vers = db.query(DocumentVersion).all()
-        for i, v in enumerate(vers, 1):
-            if v.data is None and v.file_path:
-                p = storage.get_path(v.file_path)
-                if p.exists():
-                    try:
-                        v.data = p.read_bytes()
-                        ver_done += 1
-                    except Exception:  # noqa: BLE001
+        ver_ids = [v.id for v in db.query(DocumentVersion.id).all()]
+        for vid in ver_ids:
+            sd = SessionLocal()
+            try:
+                v = sd.get(DocumentVersion, vid)
+                if v and v.data is None and v.file_path:
+                    p = storage.get_path(v.file_path)
+                    if p.exists():
+                        try:
+                            v.data = p.read_bytes()
+                            sd.commit()
+                            ver_done += 1
+                        except Exception:  # noqa: BLE001
+                            sd.rollback()
+                            ver_failed.append(vid)
+                            ver_skipped += 1
+                    else:
                         ver_skipped += 1
                 else:
                     ver_skipped += 1
-            else:
-                ver_skipped += 1
-            if i % BATCH == 0:
-                db.commit()
-        db.commit()
+            finally:
+                sd.close()
 
         return {
             "ok": True,
@@ -480,6 +491,7 @@ def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(
             "documents_skipped": doc_skipped,
             "versions_written": ver_done,
             "versions_skipped": ver_skipped,
+            "versions_failed": ver_failed[:50],
         }
     except Exception as e:  # noqa: BLE001
         try:
