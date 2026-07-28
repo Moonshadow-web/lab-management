@@ -423,50 +423,54 @@ def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(
     把当前仍在磁盘上的文件固化进 DB，从此与容器生命周期解耦。幂等：已写过的不重复写。
     磁盘已丢失的文件（data 保持 NULL）需用户重新上传。
     """
-    doc_done = 0
-    doc_skipped = 0
-    ver_done = 0
-    ver_skipped = 0
+    try:
+        doc_done = 0
+        doc_skipped = 0
+        ver_done = 0
+        ver_skipped = 0
 
-    docs = db.query(Document).all()
-    for d in docs:
-        if d.data is None and d.file_path:
-            p = storage.get_path(d.file_path)
-            if p.exists():
-                try:
-                    d.data = p.read_bytes()
-                    doc_done += 1
-                except Exception:  # noqa: BLE001
+        docs = db.query(Document).all()
+        for d in docs:
+            if d.data is None and d.file_path:
+                p = storage.get_path(d.file_path)
+                if p.exists():
+                    try:
+                        d.data = p.read_bytes()
+                        doc_done += 1
+                    except Exception:  # noqa: BLE001
+                        doc_skipped += 1
+                else:
                     doc_skipped += 1
             else:
                 doc_skipped += 1
-        else:
-            doc_skipped += 1
-    db.commit()
+        db.commit()
 
-    vers = db.query(DocumentVersion).all()
-    for v in vers:
-        if v.data is None and v.file_path:
-            p = storage.get_path(v.file_path)
-            if p.exists():
-                try:
-                    v.data = p.read_bytes()
-                    ver_done += 1
-                except Exception:  # noqa: BLE001
+        vers = db.query(DocumentVersion).all()
+        for v in vers:
+            if v.data is None and v.file_path:
+                p = storage.get_path(v.file_path)
+                if p.exists():
+                    try:
+                        v.data = p.read_bytes()
+                        ver_done += 1
+                    except Exception:  # noqa: BLE001
+                        ver_skipped += 1
+                else:
                     ver_skipped += 1
             else:
                 ver_skipped += 1
-        else:
-            ver_skipped += 1
-    db.commit()
+        db.commit()
 
-    return {
-        "ok": True,
-        "documents_written": doc_done,
-        "documents_skipped": doc_skipped,
-        "versions_written": ver_done,
-        "versions_skipped": ver_skipped,
-    }
+        return {
+            "ok": True,
+            "documents_written": doc_done,
+            "documents_skipped": doc_skipped,
+            "versions_written": ver_done,
+            "versions_skipped": ver_skipped,
+        }
+    except Exception as e:  # noqa: BLE001
+        db.rollback()
+        return {"ok": False, "error": str(e)[:500]}
 
 
 @router.delete("/{doc_id}")
