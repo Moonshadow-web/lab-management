@@ -422,15 +422,17 @@ def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(
     用于「文档字节从本地盘迁移到数据库」的过渡：部署新代码（已加 data 列）后调用一次，
     把当前仍在磁盘上的文件固化进 DB，从此与容器生命周期解耦。幂等：已写过的不重复写。
     磁盘已丢失的文件（data 保持 NULL）需用户重新上传。
+    分批小事务提交，规避 wait_timeout / 大 BLOB 单包超时（2013 Lost connection）。
     """
     try:
         doc_done = 0
         doc_skipped = 0
         ver_done = 0
         ver_skipped = 0
+        BATCH = 5
 
         docs = db.query(Document).all()
-        for d in docs:
+        for i, d in enumerate(docs, 1):
             if d.data is None and d.file_path:
                 p = storage.get_path(d.file_path)
                 if p.exists():
@@ -443,10 +445,12 @@ def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(
                     doc_skipped += 1
             else:
                 doc_skipped += 1
+            if i % BATCH == 0:
+                db.commit()
         db.commit()
 
         vers = db.query(DocumentVersion).all()
-        for v in vers:
+        for i, v in enumerate(vers, 1):
             if v.data is None and v.file_path:
                 p = storage.get_path(v.file_path)
                 if p.exists():
@@ -459,6 +463,8 @@ def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(
                     ver_skipped += 1
             else:
                 ver_skipped += 1
+            if i % BATCH == 0:
+                db.commit()
         db.commit()
 
         return {
@@ -469,7 +475,10 @@ def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(
             "versions_skipped": ver_skipped,
         }
     except Exception as e:  # noqa: BLE001
-        db.rollback()
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
         return {"ok": False, "error": str(e)[:500]}
 
 
