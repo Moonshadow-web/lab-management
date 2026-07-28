@@ -1,7 +1,8 @@
 from datetime import datetime
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import case, func
 import re
@@ -267,6 +268,7 @@ def upload_document(
     if not content:
         raise HTTPException(status_code=400, detail="文件内容为空")
     rel = storage.save("docs", file.filename or title or "file", content)
+    # 字节同时入库（MySQL LONGBLOB），与容器生命周期解耦，部署不丢文件；磁盘仅兜底
     # 解析文件头元数据（.docx 解析表头；.doc 用文件名兜底提取编号）
     meta = parse_doc_metadata(str(storage.get_path(rel)), title or file.filename or "", category)
     version = "1.0"
@@ -275,6 +277,7 @@ def upload_document(
         category=category,
         version=version,
         file_path=rel,
+        data=content,
         original_filename=file.filename or "",
         uploader=user.full_name or user.username,
         status=status,
@@ -316,9 +319,10 @@ def new_version(
         new_ver = f"{d.version}.1"
     d.version = new_ver
     d.file_path = rel
+    d.data = content
     d.original_filename = file.filename or d.original_filename
     d.updated_at = datetime.utcnow()
-    dv = DocumentVersion(document_id=d.id, version=new_ver, file_path=rel, uploader=user.full_name or user.username, note=note)
+    dv = DocumentVersion(document_id=d.id, version=new_ver, file_path=rel, data=content, uploader=user.full_name or user.username, note=note)
     _apply_meta(dv, meta)
     db.add(dv)
     db.commit()
@@ -338,10 +342,27 @@ def list_versions(doc_id: int, db: Session = Depends(get_db), user: User = Depen
     )
 
 
+def _content_disposition(disposition: str, filename: str) -> str:
+    """生成带 RFC5987 UTF-8 文件名的内容处置头（中文名安全）。"""
+    return f'{disposition}; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}'
+
+
 @router.get("/{doc_id}/download")
 def download(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     d = db.get(Document, doc_id)
-    if not d or not d.file_path:
+    if not d:
+        raise HTTPException(status_code=404, detail="未找到文件")
+    # 优先从 MySQL LONGBLOB 读字节（与容器生命周期解耦，部署不丢）
+    if d.data:
+        fname = d.original_filename or f"doc-{doc_id}"
+        return Response(
+            d.data, media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": _content_disposition("attachment", fname),
+                "Cache-Control": "no-store",
+            },
+        )
+    if not d.file_path:
         raise HTTPException(status_code=404, detail="未找到文件")
     p = storage.get_path(d.file_path)
     if not p.exists():
@@ -355,7 +376,26 @@ def download(doc_id: int, db: Session = Depends(get_db), user: User = Depends(ge
 @router.get("/{doc_id}/preview")
 def preview(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     d = db.get(Document, doc_id)
-    if not d or not d.file_path:
+    if not d:
+        raise HTTPException(status_code=404, detail="未找到文件")
+    # 优先从 MySQL LONGBLOB 读字节
+    if d.data:
+        fname = d.original_filename or f"doc-{doc_id}"
+        src = d.file_path or fname
+        suffix = src.rsplit(".", 1)[-1].lower() if "." in src else ""
+        media = {
+            "pdf": "application/pdf",
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "xls": "application/vnd.ms-excel",
+        }.get(suffix)
+        return Response(
+            d.data, media_type=media,
+            headers={
+                "Content-Disposition": _content_disposition("inline", fname),
+                "Cache-Control": "no-store",
+            },
+        )
+    if not d.file_path:
         raise HTTPException(status_code=404, detail="未找到文件")
     p = storage.get_path(d.file_path)
     if not p.exists():
@@ -373,6 +413,60 @@ def preview(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get
         p, media_type=media, filename=d.original_filename or p.name,
         headers={"Cache-Control": "no-store"},
     )
+
+
+@router.post("/_backfill_data_from_disk")
+def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))):
+    """一次性迁移：把磁盘上现存的文件字节读入 MySQL LONGBLOB（data 列）。
+
+    用于「文档字节从本地盘迁移到数据库」的过渡：部署新代码（已加 data 列）后调用一次，
+    把当前仍在磁盘上的文件固化进 DB，从此与容器生命周期解耦。幂等：已写过的不重复写。
+    磁盘已丢失的文件（data 保持 NULL）需用户重新上传。
+    """
+    doc_done = 0
+    doc_skipped = 0
+    ver_done = 0
+    ver_skipped = 0
+
+    docs = db.query(Document).all()
+    for d in docs:
+        if d.data is None and d.file_path:
+            p = storage.get_path(d.file_path)
+            if p.exists():
+                try:
+                    d.data = p.read_bytes()
+                    doc_done += 1
+                except Exception:  # noqa: BLE001
+                    doc_skipped += 1
+            else:
+                doc_skipped += 1
+        else:
+            doc_skipped += 1
+    db.commit()
+
+    vers = db.query(DocumentVersion).all()
+    for v in vers:
+        if v.data is None and v.file_path:
+            p = storage.get_path(v.file_path)
+            if p.exists():
+                try:
+                    v.data = p.read_bytes()
+                    ver_done += 1
+                except Exception:  # noqa: BLE001
+                    ver_skipped += 1
+            else:
+                ver_skipped += 1
+        else:
+            ver_skipped += 1
+    db.commit()
+
+    return {
+        "ok": True,
+        "documents_written": doc_done,
+        "documents_skipped": doc_skipped,
+        "versions_written": ver_done,
+        "versions_skipped": ver_skipped,
+    }
 
 
 @router.delete("/{doc_id}")

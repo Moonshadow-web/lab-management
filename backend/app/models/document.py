@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.database import Base
@@ -36,6 +36,8 @@ class Document(Base):
     effective_date: Mapped[str] = mapped_column(String(50), default="")  # 实施/生效日期
     meta_raw: Mapped[str] = mapped_column(Text, default="")  # 原始头表（审计用）
     parent_id: Mapped[int] = mapped_column(Integer, nullable=True)  # 版本链
+    # 文件字节（MySQL LONGBLOB，避免容器重建丢文件；与 ComparisonAttachment 一致）
+    data: Mapped[bytes | None] = mapped_column(LargeBinary(16 * 1024 * 1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -57,4 +59,6 @@ class DocumentVersion(Base):
     reviewer: Mapped[str] = mapped_column(String(100), default="")
     approver: Mapped[str] = mapped_column(String(100), default="")
     meta_raw: Mapped[str] = mapped_column(Text, default="")
+    # 该版本文件字节（MySQL LONGBLOB，避免容器重建丢文件）
+    data: Mapped[bytes | None] = mapped_column(LargeBinary(16 * 1024 * 1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
