@@ -2,7 +2,6 @@
   <div class="staff-education">
     <div class="se-header">
       <h2>人员继教管理</h2>
-      <el-tag type="info" effect="plain">制度依据：MHZYY-SM-SOP-005 生化免疫组人员管理作业指导书</el-tag>
     </div>
 
     <el-tabs v-model="active" class="se-tabs">

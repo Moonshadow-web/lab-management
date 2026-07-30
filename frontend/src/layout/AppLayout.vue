@@ -92,7 +92,7 @@ const menus = computed(() => {
     ] },
     // 到货接收作为独立菜单：试剂配送角色（仅此页有权限）也能看到，且不与试剂管理父菜单耦合
     { path: '/reagent/receivings', title: '到货接收', icon: 'Box', moduleKey: 'reagent-receivings' },
-    { path: '/training', title: '继教培训', icon: 'Reading', moduleKey: 'training' },
+    { path: '/training', title: '人员继教管理', icon: 'Reading', moduleKey: 'training' },
     { path: '/verification', title: '性能验证', icon: 'DataAnalysis', moduleKey: 'verification' },
     { path: '/scheduling', title: '排班管理', icon: 'Calendar', moduleKey: 'scheduling' },
     { path: '/iso15189', title: '15189专项', icon: 'Stamp', moduleKey: 'iso15189' },
