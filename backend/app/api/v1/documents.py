@@ -2,7 +2,7 @@ from datetime import datetime
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import case, func, text
 from sqlalchemy.orm import defer
@@ -12,6 +12,7 @@ from ...core.crud_base import paginate, write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
 from ...core.storage import storage
+from ...core.cos_storage import cos_storage
 from ...core.docmeta import parse_doc_metadata
 from ...models.document import Document, DocumentVersion, DOC_CATEGORIES
 from ...models.file_change_log import FileChangeLog
@@ -269,7 +270,13 @@ def upload_document(
     if not content:
         raise HTTPException(status_code=400, detail="文件内容为空")
     rel = storage.save("docs", file.filename or title or "file", content)
-    # 字节同时入库（MySQL LONGBLOB），与容器生命周期解耦，部署不丢文件；磁盘仅兜底
+    # 文件字节存 COS 云存储（不占 DB 内存），cloud_key 落库；磁盘仅兜底
+    cloud_key = None
+    if cos_storage.ready:
+        try:
+            cloud_key = cos_storage.save("documents", file.filename or title or "file", content)
+        except Exception as e:
+            pass  # COS 失败不阻塞上传，仍走磁盘 + LONGBLOB 兜底
     # 解析文件头元数据（.docx 解析表头；.doc 用文件名兜底提取编号）
     meta = parse_doc_metadata(str(storage.get_path(rel)), title or file.filename or "", category)
     version = "1.0"
@@ -278,7 +285,8 @@ def upload_document(
         category=category,
         version=version,
         file_path=rel,
-        data=content,
+        cloud_key=cloud_key,
+        data=content if not cloud_key else None,  # COS 成功后不再存 BLOB
         original_filename=file.filename or "",
         uploader=user.full_name or user.username,
         status=status,
@@ -310,6 +318,13 @@ def new_version(
         raise HTTPException(status_code=404, detail="未找到文件")
     content = file.file.read()
     rel = storage.save("docs", file.filename or d.title, content)
+    # COS 上传
+    cloud_key = None
+    if cos_storage.ready:
+        try:
+            cloud_key = cos_storage.save("documents", file.filename or d.title or "file", content)
+        except Exception:
+            pass
     # 解析新文件头元数据，覆盖文档当前元数据（空白字段保留旧值）
     meta = parse_doc_metadata(str(storage.get_path(rel)), d.title or d.original_filename or "", d.category)
     _apply_meta(d, meta)
@@ -320,10 +335,13 @@ def new_version(
         new_ver = f"{d.version}.1"
     d.version = new_ver
     d.file_path = rel
-    d.data = content
+    d.cloud_key = cloud_key
+    d.data = content if not cloud_key else None
     d.original_filename = file.filename or d.original_filename
     d.updated_at = datetime.utcnow()
-    dv = DocumentVersion(document_id=d.id, version=new_ver, file_path=rel, data=content, uploader=user.full_name or user.username, note=note)
+    dv = DocumentVersion(document_id=d.id, version=new_ver, file_path=rel,
+                         cloud_key=cloud_key, data=content if not cloud_key else None,
+                         uploader=user.full_name or user.username, note=note)
     _apply_meta(dv, meta)
     db.add(dv)
     db.commit()
@@ -354,29 +372,47 @@ def _content_disposition(disposition: str, filename: str) -> str:
     return f'{disposition}; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(filename)}'
 
 
+def _get_file_bytes(d) -> bytes | None:
+    """从 COS → MySQL BLOB → 磁盘  顺序获取文件字节。"""
+    # 1) COS 云存储
+    if d.cloud_key and cos_storage.ready:
+        content = cos_storage.get_bytes(d.cloud_key)
+        if content:
+            return content
+    # 2) 遗留 MySQL LONGBLOB
+    if d.data:
+        return d.data
+    # 3) 本地磁盘兜底
+    if d.file_path:
+        p = storage.get_path(d.file_path)
+        if p.exists():
+            return p.read_bytes()
+    return None
+
+
 @router.get("/{doc_id}/download")
 def download(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     d = db.get(Document, doc_id)
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
-    # 优先从 MySQL LONGBLOB 读字节（与容器生命周期解耦，部署不丢）
-    if d.data:
-        fname = d.original_filename or f"doc-{doc_id}"
-        return Response(
-            d.data, media_type="application/octet-stream",
-            headers={
-                "Content-Disposition": _content_disposition("attachment", fname),
-                "Cache-Control": "no-store",
-            },
-        )
-    if not d.file_path:
-        raise HTTPException(status_code=404, detail="未找到文件")
-    p = storage.get_path(d.file_path)
-    if not p.exists():
+    fname = d.original_filename or f"doc-{doc_id}"
+
+    # COS 有文件 → 重定向到临时签名 URL（不经过服务器转发，省带宽）
+    if d.cloud_key and cos_storage.ready:
+        cos_url = cos_storage.url(d.cloud_key, fname)
+        if cos_url:
+            return RedirectResponse(url=cos_url, status_code=302)
+
+    # 否则读取字节
+    content = _get_file_bytes(d)
+    if not content:
         raise HTTPException(status_code=404, detail="文件不存在")
-    return FileResponse(
-        p, filename=d.original_filename or p.name,
-        headers={"Cache-Control": "no-store"},
+    return Response(
+        content, media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": _content_disposition("attachment", fname),
+            "Cache-Control": "no-store",
+        },
     )
 
 
@@ -385,40 +421,24 @@ def preview(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get
     d = db.get(Document, doc_id)
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
-    # 优先从 MySQL LONGBLOB 读字节
-    if d.data:
-        fname = d.original_filename or f"doc-{doc_id}"
-        src = d.file_path or fname
-        suffix = src.rsplit(".", 1)[-1].lower() if "." in src else ""
-        media = {
-            "pdf": "application/pdf",
-            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "xls": "application/vnd.ms-excel",
-        }.get(suffix)
-        return Response(
-            d.data, media_type=media,
-            headers={
-                "Content-Disposition": _content_disposition("inline", fname),
-                "Cache-Control": "no-store",
-            },
-        )
-    if not d.file_path:
-        raise HTTPException(status_code=404, detail="未找到文件")
-    p = storage.get_path(d.file_path)
-    if not p.exists():
+    fname = d.original_filename or f"doc-{doc_id}"
+    content = _get_file_bytes(d)
+    if not content:
         raise HTTPException(status_code=404, detail="文件不存在")
-    suffix = p.suffix.lower()
-    if suffix == ".pdf":
-        media = "application/pdf"
-    elif suffix == ".xlsx":
-        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    elif suffix == ".xls":
-        media = "application/vnd.ms-excel"
-    else:
-        media = None
-    return FileResponse(
-        p, media_type=media, filename=d.original_filename or p.name,
-        headers={"Cache-Control": "no-store"},
+
+    src = d.file_path or fname
+    suffix = src.rsplit(".", 1)[-1].lower() if "." in src else ""
+    media = {
+        "pdf": "application/pdf",
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "xls": "application/vnd.ms-excel",
+    }.get(suffix)
+    return Response(
+        content, media_type=media,
+        headers={
+            "Content-Disposition": _content_disposition("inline", fname),
+            "Cache-Control": "no-store",
+        },
     )
 
 
@@ -494,6 +514,68 @@ def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(
         try:
             db.rollback()
         except Exception:  # noqa: BLE001
+            pass
+        return {"ok": False, "error": str(e)[:500]}
+
+
+@router.post("/_migrate_to_cos")
+def migrate_to_cos(db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))):
+    """把 MySQL LONGBLOB（data 列）中的文件字节迁移到 COS 云存储。
+
+    成功后：cloud_key 记 COS 对象键，data 置 NULL（释放 DB 内存）。
+    已迁移的不重复。分批小事务，单条失败跳过不影响其余。
+    """
+    if not cos_storage.ready:
+        raise HTTPException(status_code=400, detail="COS 云存储未配置，请先设置环境变量")
+    try:
+        doc_migrated = 0
+        doc_skipped = 0
+        doc_failed = 0
+        ver_migrated = 0
+        ver_skipped = 0
+        ver_failed = 0
+
+        docs = db.query(Document).filter(Document.data.isnot(None), Document.cloud_key.is_(None)).all()
+        for d in docs:
+            try:
+                key = cos_storage.save("documents", d.original_filename or f"doc-{d.id}", d.data)
+                d.cloud_key = key
+                d.data = None
+                db.commit()
+                doc_migrated += 1
+            except Exception:
+                db.rollback()
+                doc_failed += 1
+        for d in db.query(Document).filter(Document.cloud_key.isnot(None)).all():
+            doc_skipped += 1
+
+        vers = db.query(DocumentVersion).filter(DocumentVersion.data.isnot(None), DocumentVersion.cloud_key.is_(None)).all()
+        for v in vers:
+            try:
+                key = cos_storage.save("document_versions", f"v{v.id}", v.data)
+                v.cloud_key = key
+                v.data = None
+                db.commit()
+                ver_migrated += 1
+            except Exception:
+                db.rollback()
+                ver_failed += 1
+        for v in db.query(DocumentVersion).filter(DocumentVersion.cloud_key.isnot(None)).all():
+            ver_skipped += 1
+
+        return {
+            "ok": True,
+            "documents_migrated": doc_migrated,
+            "documents_already_in_cos": doc_skipped,
+            "documents_failed": doc_failed,
+            "versions_migrated": ver_migrated,
+            "versions_already_in_cos": ver_skipped,
+            "versions_failed": ver_failed,
+        }
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
             pass
         return {"ok": False, "error": str(e)[:500]}
 

@@ -48,3 +48,11 @@ SYSTEM_NAME = os.getenv("SYSTEM_NAME", "检验科生免组实验室管理系统"
 # 微信推送（ServerChan / 方糖）：个人微信免企业资质。SendKey 直接存于接收人记录(wx_uid 字段)，
 # 无需环境变量/控制台配置。用法：登录 sctapi.ftqq.com 用微信扫码关注「方糖」公众号 → 复制 SendKey
 # 填入接收人 → 渠道勾选含 serverchan。官方文档：https://sct.ftqq.com/
+
+# ── COS 云存储（腾讯云对象存储）──
+COS_SECRET_ID = os.getenv("COS_SECRET_ID", "")
+COS_SECRET_KEY = os.getenv("COS_SECRET_KEY", "")
+COS_BUCKET = os.getenv("COS_BUCKET", "636c-cloud1-0gjhamv53ff2298d-1408547492")
+COS_REGION = os.getenv("COS_REGION", "ap-shanghai")
+# COS 临时签名 URL 有效期（秒）
+COS_URL_EXPIRES = int(os.getenv("COS_URL_EXPIRES", "3600"))

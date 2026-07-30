@@ -38,6 +38,8 @@ class Document(Base):
     parent_id: Mapped[int] = mapped_column(Integer, nullable=True)  # 版本链
     # 文件字节（MySQL LONGBLOB，避免容器重建丢文件；与 ComparisonAttachment 一致）
     data: Mapped[bytes | None] = mapped_column(LargeBinary(16 * 1024 * 1024), nullable=True)
+    # COS 云存储对象键（替代 data 列，根治 DB 内存告警）
+    cloud_key: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -61,4 +63,6 @@ class DocumentVersion(Base):
     meta_raw: Mapped[str] = mapped_column(Text, default="")
     # 该版本文件字节（MySQL LONGBLOB，避免容器重建丢文件）
     data: Mapped[bytes | None] = mapped_column(LargeBinary(16 * 1024 * 1024), nullable=True)
+    # COS 云存储对象键
+    cloud_key: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
