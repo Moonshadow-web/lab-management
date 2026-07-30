@@ -325,12 +325,12 @@ def force_recalc_goals(db: Session = Depends(get_db), user: User = Depends(requi
     from sqlalchemy import text as _tx
     from ...services.qc_service import _lookup_qr_goal
 
-    rows = db.execute(_tx("SELECT id, test_item, aliases, level, quality_goal FROM qc_monthly_summaries")).fetchall()
+    rows = db.execute(_tx("SELECT id, test_item, level, quality_goal FROM qc_monthly_summaries")).fetchall()
     updated = 0
     samples = []
     for row in rows:
-        tid, test_item, aliases, level, old_goal = row[0], row[1], row[2], row[3], row[4]
-        new_goal = _lookup_qr_goal(db, test_item, aliases or "", level)
+        tid, test_item, level, old_goal = row[0], row[1], row[2], row[3]
+        new_goal = _lookup_qr_goal(db, test_item, "", level)
         if new_goal and new_goal != old_goal:
             db.execute(_tx("UPDATE qc_monthly_summaries SET quality_goal = :g WHERE id = :i"),
                        {"g": new_goal, "i": tid})
