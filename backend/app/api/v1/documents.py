@@ -537,8 +537,10 @@ def migrate_to_cos(db: Session = Depends(get_db), user: User = Depends(require_r
         doc_errs = []
         ver_errs = []
 
-        docs = db.query(Document).filter(Document.data.isnot(None), Document.cloud_key.is_(None)).all()
-        for d in docs:
+        # 分批 yield 处理 documents（一次性 all() 会撑爆内存）
+        BATCH = 20
+        doc_q = db.query(Document).filter(Document.data.isnot(None), Document.cloud_key.is_(None))
+        for d in doc_q.yield_per(BATCH):
             try:
                 key = cos_storage.save("documents", d.original_filename or f"doc-{d.id}", d.data)
                 d.cloud_key = key
@@ -547,14 +549,15 @@ def migrate_to_cos(db: Session = Depends(get_db), user: User = Depends(require_r
                 doc_migrated += 1
             except Exception as e:
                 db.rollback()
+                db.refresh(d)  # 重新 attach，避免后续循环 stale
                 doc_failed += 1
-                if len(doc_errs) < 3:
+                if len(doc_errs) < 5:
                     doc_errs.append(f"doc#{d.id}: {type(e).__name__}: {str(e)[:200]}")
-        for d in db.query(Document).filter(Document.cloud_key.isnot(None)).all():
-            doc_skipped += 1
+        doc_skipped = db.query(Document).filter(Document.cloud_key.isnot(None)).count()
 
-        vers = db.query(DocumentVersion).filter(DocumentVersion.data.isnot(None), DocumentVersion.cloud_key.is_(None)).all()
-        for v in vers:
+        # 分批 yield 处理 versions
+        ver_q = db.query(DocumentVersion).filter(DocumentVersion.data.isnot(None), DocumentVersion.cloud_key.is_(None))
+        for v in ver_q.yield_per(BATCH):
             try:
                 key = cos_storage.save("document_versions", f"v{v.id}", v.data)
                 v.cloud_key = key
@@ -563,11 +566,11 @@ def migrate_to_cos(db: Session = Depends(get_db), user: User = Depends(require_r
                 ver_migrated += 1
             except Exception as e:
                 db.rollback()
+                db.refresh(v)
                 ver_failed += 1
-                if len(ver_errs) < 3:
+                if len(ver_errs) < 5:
                     ver_errs.append(f"ver#{v.id}: {type(e).__name__}: {str(e)[:200]}")
-        for v in db.query(DocumentVersion).filter(DocumentVersion.cloud_key.isnot(None)).all():
-            ver_skipped += 1
+        ver_skipped = db.query(DocumentVersion).filter(DocumentVersion.cloud_key.isnot(None)).count()
 
         return {
             "ok": True,
