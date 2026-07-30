@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "backfill-aliases-2026-07-31"
+_BUILD_MARK = "backfill-aliases-v2-2026-07-31"
 
 
 def get_build_mark() -> str:
@@ -268,6 +268,7 @@ def backfill_test_item_aliases(db: Session = Depends(get_db), user: User = Depen
     from importlib import import_module
     import importlib.util
     import os as _os
+    from sqlalchemy import text
 
     # 加载脚本中的 ALIAS_PATCHES 字典
     script_path = _os.path.join(
