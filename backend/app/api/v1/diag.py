@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "backfill-aliases-v2-2026-07-31"
+_BUILD_MARK = "fix-aliases-mismatch-2026-07-31"
 
 
 def get_build_mark() -> str:
@@ -304,6 +304,19 @@ def backfill_test_item_aliases(db: Session = Depends(get_db), user: User = Depen
             report["errors"].append(f"id={tid}: {type(e).__name__}: {str(e)[:100]}")
 
     return {"ok": True, **report}
+
+
+@router.post("/fix-aliases")
+def fix_aliases(payload: dict, db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))):
+    """直接按 ID 修正 test_items.aliases。 payload = {\"items\": [{\"id\": 9, \"aliases\": \"...\"}]}"""
+    from sqlalchemy import text as _tx
+    updated = 0
+    for item in payload.get("items", []):
+        tid, aliases = item["id"], item["aliases"]
+        db.execute(_tx("UPDATE test_items SET aliases = :a WHERE id = :i"), {"a": aliases, "i": tid})
+        db.commit()
+        updated += 1
+    return {"ok": True, "updated": updated}
 
 
 @router.post("/migrate-attachments-to-cos")
