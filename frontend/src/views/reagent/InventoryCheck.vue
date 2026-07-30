@@ -313,7 +313,8 @@ async function onView(row) {
 function onPrintView() {
   let h = '<table><thead><tr><th>名称</th><th>规格</th><th>批号</th><th>效期</th><th class="num">余量</th></tr></thead><tbody>'
   for (const it of viewItems.value) {
-    h += `<tr><td>${it._name || it.item_id}</td><td>${it._spec || ''}</td><td>${it.batch_no || ''}</td><td>${it.expiry_date || ''}</td><td class="num">${it.recorded_quantity}</td></tr>`
+    const qty = (it.recorded_quantity === null || it.recorded_quantity === undefined) ? '-' : it.recorded_quantity
+    h += `<tr><td>${it._name || it.item_id}</td><td>${it._spec || ''}</td><td>${it.batch_no || ''}</td><td>${it.expiry_date || ''}</td><td class="num">${qty}</td></tr>`
   }
   h += '</tbody></table>'
   printHtml(`盘库表（${viewLibrary.value}）`,
