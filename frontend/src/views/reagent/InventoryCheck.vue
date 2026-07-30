@@ -132,7 +132,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Printer } from '@element-plus/icons-vue'
 import { listInventoryChecks, getInventoryCheck, createInventoryCheck, deleteInventoryCheck, getReagentTemplate, listAllReagentItems } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
