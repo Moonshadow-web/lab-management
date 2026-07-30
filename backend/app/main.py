@@ -236,6 +236,26 @@ def _ensure_missing_columns():
         except Exception as e:  # noqa: BLE001
             logger.warning("修正 scheduling_assignments.post_id 可空失败(忽略): %s", e)
 
+    # 2026-07-31 修正：人员继续教育(personnel_edu_exp)的 train_date 存放完整起止区间
+    # （如 '2019.11.19-2019.11.23'，21 字符），原 VARCHAR(20) 会触发 MySQL
+    # "Data too long" 导致写入 500。扩宽为 VARCHAR(40)。幂等（仅当当前长度 < 40 时改）。
+    if engine.dialect.name == "mysql":
+        try:
+            with engine.connect() as c:
+                row = c.exec_driver_sql(
+                    "SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='personnel_edu_exp' "
+                    "AND COLUMN_NAME='train_date'"
+                ).fetchone()
+            if row is not None and int(row[0]) < 40:
+                with engine.begin() as conn:
+                    conn.exec_driver_sql(
+                        "ALTER TABLE personnel_edu_exp MODIFY train_date VARCHAR(40) NOT NULL DEFAULT ''"
+                    )
+                logger.info("修正 personnel_edu_exp.train_date 为 VARCHAR(40)")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("修正 personnel_edu_exp.train_date 失败(忽略): %s", e)
+
     # 2026-07-27 到货接收改版：新增 is_confirmed/created_by/confirmed_at/confirmed_by 四列。
     # 旧记录(改版前创建)在创建时已直接写入实时库存，应视为「已确认」，避免确认时重复加库存。
     # 本回填幂等：is_confirmed 一旦非 NULL 即不再变化。仅 MySQL 执行（SQLite 本地开发库无此表结构差异问题）。

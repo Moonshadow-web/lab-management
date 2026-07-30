@@ -121,7 +121,7 @@ class PersonnelEduExp(Base):
     person_id: Mapped[int] = mapped_column(ForeignKey("personnel_master.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(300), default="")  # 培训项目
     organizer: Mapped[str] = mapped_column(String(200), default="")  # 组织方
-    train_date: Mapped[str] = mapped_column(String(20), default="")  # 日期
+    train_date: Mapped[str] = mapped_column(String(40), default="")  # 日期（完整起止区间，可能 >20 字符）
     hours: Mapped[str] = mapped_column(String(20), default="")  # 学时
     credits: Mapped[str] = mapped_column(String(20), default="")  # 学分
     cert_no: Mapped[str] = mapped_column(String(100), default="")  # 证书编号
