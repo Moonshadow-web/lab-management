@@ -16,6 +16,7 @@ from ...models.interlab import InterlabPlan, InterlabItem, InterlabLevel, Interl
 from ...models.instrument import Instrument
 from ...models.user import User
 from ...services.attachment_compress import optimize_image_bytes
+from ...core.cos_storage import cos_storage
 from ...schemas.interlab import(
     InterlabPlanCreate, InterlabPlanUpdate, InterlabPlanRead,
     InterlabResultsPayload, InterlabResultsRead,
@@ -431,13 +432,21 @@ async def upload_interlab_attachments(
         ft = _classify_ext(ext)
         if ft == "image":
             content = optimize_image_bytes(content, ext)
+        # COS 上传
+        cloud_key = None
+        if cos_storage.ready:
+            try:
+                cloud_key = cos_storage.save("interlab_attachments", f.filename or safe, content)
+            except Exception:
+                pass
         a = InterlabAttachment(
             plan_id=pid,
             file_type=ft,
             original_name=f.filename,
             stored_name=safe,
             rel_path="",
-            data=content,
+            cloud_key=cloud_key,
+            data=content if not cloud_key else None,
             size_bytes=len(content),
             uploaded_by=user.username,
         )
@@ -467,6 +476,31 @@ def get_interlab_attachment(aid: int, inline: bool = True, db: Session = Depends
     a = db.get(InterlabAttachment, aid)
     if not a:
         raise HTTPException(404, "附件不存在")
+
+    # COS 优先
+    if a.cloud_key and cos_storage.ready:
+        if not inline:
+            cos_url = cos_storage.url(a.cloud_key, a.original_name)
+            if cos_url:
+                from fastapi.responses import RedirectResponse
+                return RedirectResponse(url=cos_url, status_code=302)
+        content = cos_storage.get_bytes(a.cloud_key)
+        if content:
+            media = "application/octet-stream"
+            if a.file_type == "image":
+                ext = os.path.splitext(a.stored_name)[1].lstrip(".").lower() or "jpeg"
+                media = f"image/{ext}"
+                if media == "image/jpg":
+                    media = "image/jpeg"
+            elif a.file_type == "pdf":
+                media = "application/pdf"
+            disp = "inline" if inline else "attachment"
+            return Response(
+                content, media_type=media,
+                headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'},
+            )
+
+    # 回退：MySQL BLOB
     if not a.data:
         raise HTTPException(404, "文件已丢失")
     media = "application/octet-stream"

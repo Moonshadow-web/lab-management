@@ -99,6 +99,7 @@ class InterlabAttachment(Base):
     stored_name: Mapped[str] = mapped_column(String(300), default="")  # 实际存储文件名（避免冲突）
     rel_path: Mapped[str] = mapped_column(String(500), default="")  # 相对 DATA_DIR 的路径（兼容旧记录，新记录留空）
     data: Mapped[bytes | None] = mapped_column(LargeBinary(16 * 1024 * 1024), nullable=True)  # 文件字节（持久化于 MySQL LONGBLOB，避免容器重建丢文件）
+    cloud_key: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)  # COS 对象键
     size_bytes: Mapped[int] = mapped_column(Integer, default=0)
     uploaded_by: Mapped[str] = mapped_column(String(100), default="")
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

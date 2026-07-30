@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "reagent-hide-zero-inv-2026-07-30"
+_BUILD_MARK = "attach-cos-migrate-2026-07-30"
 
 
 def get_build_mark() -> str:
@@ -143,6 +143,7 @@ from fastapi.responses import FileResponse  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from ...core.database import get_db  # noqa: E402
 from ...core.security import get_current_user, require_roles  # noqa: E402
+from ...core.cos_storage import cos_storage  # noqa: E402
 from ...models.user import User  # noqa: E402
 
 router = APIRouter(prefix="/_diag", tags=["diag"])
@@ -250,3 +251,35 @@ def diag_mysql_vars(db: Session = Depends(get_db), user: User = Depends(require_
     except Exception as e:  # noqa: BLE001
         out["count_err"] = str(e)[:200]
     return out
+
+
+@router.post("/migrate-attachments-to-cos")
+def migrate_attachments_to_cos(db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))):
+    """把 comparison_attachments + interlab_attachments 的 data BLOB 迁移到 COS。"""
+    if not cos_storage.ready:
+        raise HTTPException(400, detail="COS 未配置")
+
+    from ...models.comparison import ComparisonAttachment
+    from ...models.interlab import InterlabAttachment
+
+    report = {"comp": {"migrated": 0, "failed": 0, "errors": []},
+              "interlab": {"migrated": 0, "failed": 0, "errors": []}}
+
+    BATCH = 20
+    for cls, label in [(ComparisonAttachment, "comp"), (InterlabAttachment, "interlab")]:
+        q = db.query(cls).filter(cls.data.isnot(None), cls.cloud_key.is_(None))
+        for obj in q.yield_per(BATCH):
+            try:
+                key = cos_storage.save(cls.__tablename__, obj.original_name or f"att-{obj.id}", obj.data)
+                obj.cloud_key = key
+                obj.data = None
+                db.commit()
+                report[label]["migrated"] += 1
+            except Exception as e:
+                db.rollback()
+                db.refresh(obj)
+                report[label]["failed"] += 1
+                if len(report[label]["errors"]) < 3:
+                    report[label]["errors"].append(f"id#{obj.id}: {type(e).__name__}: {str(e)[:150]}")
+
+    return {"ok": True, **report}
