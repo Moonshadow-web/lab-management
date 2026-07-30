@@ -47,6 +47,8 @@ QC_GOAL_EXACT_OVERRIDES: dict[str, str] = {
     "肌酸激酶同工酶CKMB": "10%",
     "CK-MB": "10%",
     "CKMB": "10%",
+    "ck-mb": "10%",
+    "ckmb": "10%",
 }
 
 
