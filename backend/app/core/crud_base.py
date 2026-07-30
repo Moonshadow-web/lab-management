@@ -41,7 +41,7 @@ def make_router(
     ReadSchema: type[BaseModel],
     CreateSchema: type[BaseModel],
     UpdateSchema: type[BaseModel],
-    search_fields: list[str],
+    search_fields: list[str] | None = None,
     filter_fields: list[str] | None = None,
     order_by: list | None = None,
     prefix: str = "",
