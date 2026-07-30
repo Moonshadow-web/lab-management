@@ -8,6 +8,7 @@ from . import (
     documents,
     eqa,
     eqa_associations,
+    education,
     instruments,
     instrument_families,
     nonconformity,
@@ -62,6 +63,8 @@ api_router.include_router(scheduling.posts_router)
 api_router.include_router(scheduling.plans_router)
 api_router.include_router(scheduling.assignments_router)
 api_router.include_router(scheduling.router)
+api_router.include_router(education.router)
+api_router.include_router(education.attach_router)
 
 # 将 test-items 的静态路由 /stats、/export 移到参数路由 /{item_id} 之前，
 # 避免具体路径被通用参数路由吞掉（如 GET /test-items/stats 误命中 /{item_id}）。

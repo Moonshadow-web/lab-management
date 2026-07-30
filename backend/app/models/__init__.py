@@ -28,6 +28,14 @@ from .reagent_management import (
 )
 from .module_permission import ModulePermission, DEFAULT_MODULE_PERMISSIONS, ALL_MODULES, ALL_ROLES
 from .scheduling import SchedulingPost, SchedulingPlan, SchedulingAssignment, SchedulingConfig, SchedulingSwapRequest, SchedulingRestRequest
+from .education import (
+    PersonnelMaster, PersonnelEducation, PersonnelWorkExp, PersonnelCert, PersonnelReward, PersonnelEduExp,
+    NewEmployeeTrain, NewEmployeeCertAuth,
+    CompetencyAssessment, PersonnelComparison,
+    TrainingPlan, TrainingSession,
+    InternshipMentor, InternshipScore,
+    EducationAttachment,
+)
 
 __all__ = [
     "User",
@@ -74,4 +82,10 @@ __all__ = [
     "ReagentConsumption", "TestItemReagent", "InstrumentReagent",
     "SchedulingPost", "SchedulingPlan", "SchedulingAssignment", "SchedulingConfig",
     "SchedulingRestRequest",
+    "PersonnelMaster", "PersonnelEducation", "PersonnelWorkExp", "PersonnelCert", "PersonnelReward", "PersonnelEduExp",
+    "NewEmployeeTrain", "NewEmployeeCertAuth",
+    "CompetencyAssessment", "PersonnelComparison",
+    "TrainingPlan", "TrainingSession",
+    "InternshipMentor", "InternshipScore",
+    "EducationAttachment",
 ]

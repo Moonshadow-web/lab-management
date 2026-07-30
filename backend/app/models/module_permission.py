@@ -88,7 +88,7 @@ ALL_MODULES = [
     ("reagents",            "试剂管理"),
     ("reagent-receivings",  "到货接收"),
     ("reagent-orders",      "订购管理"),
-    ("training",            "继教培训"),
+    ("training",            "人员继教管理"),
     ("verification",        "性能验证"),
     ("iso15189",            "15189专项"),
     ("quality-requirements","项目质量要求"),

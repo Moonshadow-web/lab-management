@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Callable
 
@@ -47,6 +48,7 @@ def make_router(
     after_write: Callable | None = None,
     write_roles: tuple[str, ...] | None = None,
     delete_roles: tuple[str, ...] | None = None,
+    json_fields: list[str] | None = None,
 ):
     """通用 CRUD 路由工厂：分页/搜索、get、create、update、delete，并统一写审计日志。
 
@@ -56,7 +58,11 @@ def make_router(
     - 删（delete）：需要 delete_roles 中的任一角色；admin 自动通过
       未设 delete_roles 时回退到 write_roles
     - write_roles=None 时不做角色限制（向后兼容，仅要求登录）
+
+    json_fields：声明为 Text 但 API 层用 list/dict 表达的列名；create/update 时
+    自动 json.dumps 序列化（ensure_ascii=False），读回时由 schema 反序列化。
     """
+    _json_fields = set(json_fields or [])
     # 写权限依赖：有 write_roles 则校验角色，否则仅要求登录
     WriteDep = require_roles(*write_roles) if write_roles else get_current_user
     # 删除权限：独立配置；未设则沿用 write_roles
@@ -122,6 +128,9 @@ def make_router(
         user: User = Depends(WriteDep),
     ):
         data = item.model_dump()
+        for f in _json_fields:
+            if f in data and data[f] is not None and not isinstance(data[f], str):
+                data[f] = json.dumps(data[f], ensure_ascii=False)
         obj = Model(**data)
         db.add(obj)
         db.commit()
@@ -144,6 +153,8 @@ def make_router(
             raise HTTPException(status_code=404, detail="未找到记录")
         changes = item.model_dump(exclude_unset=True)
         for k, v in changes.items():
+            if k in _json_fields and v is not None and not isinstance(v, str):
+                v = json.dumps(v, ensure_ascii=False)
             setattr(obj, k, v)
         if hasattr(obj, "updated_at"):
             obj.updated_at = datetime.utcnow()
