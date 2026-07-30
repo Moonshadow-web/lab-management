@@ -296,7 +296,8 @@ async function onView(row) {
   try {
     const r = await getInventoryCheck(row.id)
     if (Object.keys(nameMap.value).length === 0) {
-      const all = await listAllReagentItems({ library: row.library || reagentStore.library })
+      // 加载全库名称映射（含停用项），避免因责任库不同导致跨库盘库解析不到名称而回退成 (id=…)
+      const all = await listAllReagentItems()
       for (const it of all) nameMap.value[it.id] = it
     }
     viewItems.value = (r.items || []).map(i => ({

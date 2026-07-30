@@ -237,7 +237,7 @@ def get_inventory_check(check_id: int, db: Session = Depends(get_db), _=Depends(
 @router.delete("/inventory-checks/{check_id}", response_model=dict)
 def delete_inventory_check(
     check_id: int, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
 ):
     """删除整次盘库记录（级联删除其细项）。"""
     check = db.query(InventoryCheck).get(check_id)
@@ -429,7 +429,7 @@ def get_reagent_template(
 @router.post("/inventory-checks", response_model=InventoryCheckRead)
 def create_inventory_check(
     data: InventoryCheckCreate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
 ):
     check = InventoryCheck(
         library=data.library or "",
@@ -869,7 +869,7 @@ def list_consumption(
 def calculate_consumption(
     year_month: str = Query(..., description="YYYY-MM"),
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
 ):
     """盘库后触发：对所有 reagent_items 计算月消耗。
 
