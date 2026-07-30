@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "docs-jsonable-fix-2026-07-27"
+_BUILD_MARK = "docs-blob-size-diag-2026-07-30"
 
 
 def get_build_mark() -> str:
@@ -227,6 +227,12 @@ def diag_mysql_vars(db: Session = Depends(get_db), user: User = Depends(require_
         out["documents_with_data"] = r[0] if r else None
         r = db.execute(text("SELECT COUNT(*) FROM document_versions WHERE data IS NOT NULL")).fetchone()
         out["versions_with_data"] = r[0] if r else None
+        # 估算 BLOB 总大小（用于排查内存告警）
+        r = db.execute(text("SELECT SUM(LENGTH(data)) FROM documents WHERE data IS NOT NULL")).fetchone()
+        out["documents_data_mb"] = round(r[0] / (1024 * 1024), 2) if r and r[0] else 0
+        r = db.execute(text("SELECT SUM(LENGTH(data)) FROM document_versions WHERE data IS NOT NULL")).fetchone()
+        out["versions_data_mb"] = round(r[0] / (1024 * 1024), 2) if r and r[0] else 0
+        out["total_blob_mb"] = round(out["documents_data_mb"] + out["versions_data_mb"], 2)
     except Exception as e:  # noqa: BLE001
         out["count_err"] = str(e)[:200]
     return out
