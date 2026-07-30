@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "reagent-delete-elmsgbox-fix-2026-07-31"
+_BUILD_MARK = "backfill-aliases-2026-07-31"
 
 
 def get_build_mark() -> str:
@@ -258,6 +258,51 @@ def diag_mysql_vars(db: Session = Depends(get_db), user: User = Depends(require_
     except Exception as e:  # noqa: BLE001
         out["count_err"] = str(e)[:200]
     return out
+
+
+@router.post("/backfill-aliases")
+def backfill_test_item_aliases(db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))):
+    """批量回填 test_items.aliases（SQLite→MySQL 迁移后丢失的别名）。
+
+    从 backend/scripts/backfill_test_item_aliases.py 的 ALIAS_PATCHES 读取映射。"""
+    from importlib import import_module
+    import importlib.util
+    import os as _os
+
+    # 加载脚本中的 ALIAS_PATCHES 字典
+    script_path = _os.path.join(
+        _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__)))),
+        "scripts", "backfill_test_item_aliases.py",
+    )
+    spec = importlib.util.spec_from_file_location("backfill_aliases", script_path)
+    if not spec or not spec.loader:
+        raise HTTPException(500, "无法加载脚本")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    patches = mod.ALIAS_PATCHES
+
+    report = {"updated": 0, "skipped": 0, "errors": []}
+    for tid, new_aliases in sorted(patches.items()):
+        try:
+            row = db.execute(text("SELECT name, aliases FROM test_items WHERE id = :id"), {"id": tid}).fetchone()
+            if not row:
+                report["errors"].append(f"id={tid}: not found")
+                continue
+            name, current = row[0], row[1] or ""
+            existing = set(a.strip() for a in current.replace("，", ",").split(",") if a.strip())
+            to_add = [a for a in new_aliases if a not in existing]
+            if not to_add:
+                report["skipped"] += 1
+                continue
+            merged = current.rstrip(", ") + ", " + ", ".join(to_add)
+            db.execute(text("UPDATE test_items SET aliases = :aliases WHERE id = :id"), {"id": tid, "aliases": merged})
+            db.commit()
+            report["updated"] += 1
+        except Exception as e:
+            db.rollback()
+            report["errors"].append(f"id={tid}: {type(e).__name__}: {str(e)[:100]}")
+
+    return {"ok": True, **report}
 
 
 @router.post("/migrate-attachments-to-cos")
