@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "ckmb-norm-override-2026-07-31"
+_BUILD_MARK = "force-recalc-goals-2026-07-31"
 
 
 def get_build_mark() -> str:
@@ -317,6 +317,28 @@ def fix_aliases(payload: dict, db: Session = Depends(get_db), user: User = Depen
         db.commit()
         updated += 1
     return {"ok": True, "updated": updated}
+
+
+@router.post("/force-recalc-goals")
+def force_recalc_goals(db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))):
+    """强制重算所有质控月结行的 quality_goal（覆盖已有值，不限空值）。"""
+    from sqlalchemy import text as _tx
+    from ...services.qc_service import _lookup_qr_goal
+
+    rows = db.execute(_tx("SELECT id, test_item, aliases, level, quality_goal FROM qc_monthly_summaries")).fetchall()
+    updated = 0
+    samples = []
+    for row in rows:
+        tid, test_item, aliases, level, old_goal = row[0], row[1], row[2], row[3], row[4]
+        new_goal = _lookup_qr_goal(db, test_item, aliases or "", level)
+        if new_goal and new_goal != old_goal:
+            db.execute(_tx("UPDATE qc_monthly_summaries SET quality_goal = :g WHERE id = :i"),
+                       {"g": new_goal, "i": tid})
+            db.commit()
+            updated += 1
+            if len(samples) < 10:
+                samples.append({"test_item": test_item, "level": level, "old": old_goal or "", "goal": new_goal})
+    return {"ok": True, "updated": updated, "total": len(rows), "samples": samples}
 
 
 @router.post("/migrate-attachments-to-cos")
