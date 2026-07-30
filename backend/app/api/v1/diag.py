@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "cos-cl-str-2026-07-30"
+_BUILD_MARK = "buf-pool-diag-2026-07-30"
 
 
 def get_build_mark() -> str:
@@ -216,12 +216,26 @@ def diag_mysql_vars(db: Session = Depends(get_db), user: User = Depends(require_
     from sqlalchemy import text
     out = {}
     for v in ["max_allowed_packet", "wait_timeout", "interactive_timeout",
-              "net_write_timeout", "net_read_timeout", "connect_timeout"]:
+              "net_write_timeout", "net_read_timeout", "connect_timeout",
+              "innodb_buffer_pool_size", "version"]:
         try:
             r = db.execute(text(f"SHOW VARIABLES LIKE '{v}'")).fetchone()
             out[v] = r[1] if r else None
         except Exception as e:  # noqa: BLE001
             out[v] = f"err:{e}"
+    # InnoDB buffer pool 实时状态
+    for q in ["SHOW STATUS LIKE 'Innodb_buffer_pool_pages_total'",
+              "SHOW STATUS LIKE 'Innodb_buffer_pool_pages_free'",
+              "SHOW STATUS LIKE 'Innodb_buffer_pool_pages_data'",
+              "SHOW STATUS LIKE 'Innodb_buffer_pool_pages_dirty'",
+              "SHOW STATUS LIKE 'Innodb_buffer_pool_read_requests'",
+              "SHOW STATUS LIKE 'Innodb_buffer_pool_reads'"]:
+        try:
+            r = db.execute(text(q)).fetchone()
+            key = q.split("LIKE '")[1].rstrip("'")
+            out[key] = r[1] if r else None
+        except Exception as e:  # noqa: BLE001
+            pass
     try:
         r = db.execute(text("SELECT COUNT(*) FROM documents WHERE data IS NOT NULL")).fetchone()
         out["documents_with_data"] = r[0] if r else None
