@@ -534,6 +534,8 @@ def migrate_to_cos(db: Session = Depends(get_db), user: User = Depends(require_r
         ver_migrated = 0
         ver_skipped = 0
         ver_failed = 0
+        doc_errs = []
+        ver_errs = []
 
         docs = db.query(Document).filter(Document.data.isnot(None), Document.cloud_key.is_(None)).all()
         for d in docs:
@@ -543,9 +545,11 @@ def migrate_to_cos(db: Session = Depends(get_db), user: User = Depends(require_r
                 d.data = None
                 db.commit()
                 doc_migrated += 1
-            except Exception:
+            except Exception as e:
                 db.rollback()
                 doc_failed += 1
+                if len(doc_errs) < 3:
+                    doc_errs.append(f"doc#{d.id}: {type(e).__name__}: {str(e)[:200]}")
         for d in db.query(Document).filter(Document.cloud_key.isnot(None)).all():
             doc_skipped += 1
 
@@ -557,9 +561,11 @@ def migrate_to_cos(db: Session = Depends(get_db), user: User = Depends(require_r
                 v.data = None
                 db.commit()
                 ver_migrated += 1
-            except Exception:
+            except Exception as e:
                 db.rollback()
                 ver_failed += 1
+                if len(ver_errs) < 3:
+                    ver_errs.append(f"ver#{v.id}: {type(e).__name__}: {str(e)[:200]}")
         for v in db.query(DocumentVersion).filter(DocumentVersion.cloud_key.isnot(None)).all():
             ver_skipped += 1
 
@@ -571,6 +577,7 @@ def migrate_to_cos(db: Session = Depends(get_db), user: User = Depends(require_r
             "versions_migrated": ver_migrated,
             "versions_already_in_cos": ver_skipped,
             "versions_failed": ver_failed,
+            "sample_errors": doc_errs + ver_errs,
         }
     except Exception as e:
         try:
