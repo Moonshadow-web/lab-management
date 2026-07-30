@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "attach-cos-migrate-2026-07-30"
+_BUILD_MARK = "attach-diag-verify-2026-07-30"
 
 
 def get_build_mark() -> str:
@@ -248,6 +248,13 @@ def diag_mysql_vars(db: Session = Depends(get_db), user: User = Depends(require_
         r = db.execute(text("SELECT SUM(LENGTH(data)) FROM document_versions WHERE data IS NOT NULL")).fetchone()
         out["versions_data_mb"] = round(r[0] / (1024 * 1024), 2) if r and r[0] else 0
         out["total_blob_mb"] = round(out["documents_data_mb"] + out["versions_data_mb"], 2)
+        # 附件表
+        for tbl, label in [("comparison_attachments", "comp_attach"), ("interlab_attachments", "interlab_attach")]:
+            r = db.execute(text(f"SELECT COUNT(*), SUM(LENGTH(data)) FROM {tbl} WHERE data IS NOT NULL")).fetchone()
+            out[f"{label}_cnt"] = r[0] or 0
+            out[f"{label}_mb"] = round((r[1] or 0) / (1024 * 1024), 2)
+            r = db.execute(text(f"SELECT COUNT(*) FROM {tbl} WHERE cloud_key IS NOT NULL")).fetchone()
+            out[f"{label}_cos"] = r[0] or 0
     except Exception as e:  # noqa: BLE001
         out["count_err"] = str(e)[:200]
     return out
