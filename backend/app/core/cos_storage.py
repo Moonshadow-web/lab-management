@@ -72,7 +72,8 @@ class CosStorageBackend:
             Bucket=self._bucket,
             Key=key,
             Body=io.BytesIO(content),
-            ContentLength=len(content),
+            # SDK 要求 header 必须是 str/bytes（不是 int）
+            ContentLength=str(len(content)),
         )
         logger.info("COS uploaded key=%s size=%d", key, len(content))
         return key
