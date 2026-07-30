@@ -472,8 +472,12 @@ def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None, l
     if not test_item:
         return ""
     # 精确名覆盖优先（见 QC_GOAL_EXACT_OVERRIDES 说明）
+    # 同时用归一化名检查（去掉(自动质控)等前缀）
     if test_item in QC_GOAL_EXACT_OVERRIDES:
         return QC_GOAL_EXACT_OVERRIDES[test_item]
+    nitem = _norm(test_item)
+    if nitem in QC_GOAL_EXACT_OVERRIDES:
+        return QC_GOAL_EXACT_OVERRIDES[nitem]
 
     # Step 1: QualityRequirement 表查询
     if db is not None:
