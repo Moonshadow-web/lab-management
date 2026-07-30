@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "reagent-print-nullfix-2026-07-30"
+_BUILD_MARK = "reagent-hide-zero-inv-2026-07-30"
 
 
 def get_build_mark() -> str:

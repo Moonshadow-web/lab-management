@@ -300,11 +300,14 @@ async function onView(row) {
       const all = await listAllReagentItems()
       for (const it of all) nameMap.value[it.id] = it
     }
-    viewItems.value = (r.items || []).map(i => ({
-      ...i,
-      _name: nameMap.value[i.item_id]?.name || '',
-      _spec: nameMap.value[i.item_id]?.spec || '',
-    }))
+    // 只展示实际盘点过且有余量的条目；数量为 0 / 空 视为“未盘”，详情与打印均不显示
+    viewItems.value = (r.items || [])
+      .filter(i => (i.recorded_quantity ?? 0) > 0)
+      .map(i => ({
+        ...i,
+        _name: nameMap.value[i.item_id]?.name || '',
+        _spec: nameMap.value[i.item_id]?.spec || '',
+      }))
     viewLibrary.value = row.library || reagentStore.library
     viewVisible.value = true
   } catch (e) { ElMessage.error('加载详情失败：' + errText(e)) }
