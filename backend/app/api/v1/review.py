@@ -198,21 +198,31 @@ def upsert_my_record(
     campaign_id: int,
     body: dict = {},
     submit: bool = False,
+    reviewer_id: int | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """按人 upsert A-027「文件评审记录」。submit=True 时标记已提交。"""
+    """按人 upsert A-027「文件评审记录」。submit=True 时标记已提交。
+
+    - 默认按当前登录用户写入（本人填自己的）。
+    - 管理员可传 reviewer_id 代填他人（如成员忘记提交时管理员补录）。
+    """
+    target = user
+    if reviewer_id and _is_admin(user):
+        t = db.get(User, reviewer_id)
+        if t:
+            target = t
     data = body.get("record_json", body) if isinstance(body, dict) else {}
     if not isinstance(data, dict):
         data = {}
     js = json.dumps(data, ensure_ascii=False)
     rec = (
         db.query(ReviewRecord)
-        .filter(ReviewRecord.campaign_id == campaign_id, ReviewRecord.reviewer_id == user.id)
+        .filter(ReviewRecord.campaign_id == campaign_id, ReviewRecord.reviewer_id == target.id)
         .first()
     )
     if not rec:
-        rec = ReviewRecord(campaign_id=campaign_id, reviewer_id=user.id, reviewer=user.full_name or user.username)
+        rec = ReviewRecord(campaign_id=campaign_id, reviewer_id=target.id, reviewer=target.full_name or target.username)
         db.add(rec)
     rec.record_json = js
     rec.status = "已提交" if submit else "已填写"
