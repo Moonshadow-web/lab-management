@@ -38,10 +38,8 @@
           <th style="width:36px">序号</th>
           <th style="width:90px">培训类别</th>
           <th>培训内容</th>
-          <th style="width:80px">培训老师</th>
-          <th style="width:96px">培训方式</th>
-          <th style="width:96px">考核方式</th>
-          <th style="width:70px">考核成绩</th>
+          <th style="width:110px">培训方式</th>
+          <th style="width:110px">考核方式</th>
         </tr>
       </thead>
       <tbody>
@@ -49,12 +47,10 @@
           <td>{{ i + 1 }}</td>
           <td>{{ it.category }}</td>
           <td class="left">{{ it.content }}</td>
-          <td>{{ it.teacher }}</td>
           <td>{{ join(it.method) }}</td>
           <td>{{ join(it.exam_method) }}</td>
-          <td>{{ it.score }}</td>
         </tr>
-        <tr v-if="!planItems.length"><td colspan="7" class="left">（无培训计划）</td></tr>
+        <tr v-if="!planItems.length"><td colspan="5" class="left">（无培训计划）</td></tr>
       </tbody>
     </table>
 
@@ -114,11 +110,15 @@ function join(v) {
 
 @media print {
   @page { size: A4; margin: 12mm; }
-  body * { visibility: hidden !important; }
-  .print-root, .print-root * { visibility: visible !important; }
+  /* print-root 已通过 Teleport 挂载到 body，直接隐藏其它 body 子元素即可，
+     避免 visibility 叠加 + position:absolute 导致多页内容被裁掉。 */
+  body > *:not(.print-root) { display: none !important; }
   .print-root {
     display: block !important;
-    position: absolute; left: 0; top: 0; width: 100%;
+    position: static !important;
+    width: 100% !important;
+    visibility: visible !important;
   }
+  .print-root .ptable.plan tr { page-break-inside: avoid; }
 }
 </style>

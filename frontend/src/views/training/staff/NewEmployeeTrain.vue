@@ -87,10 +87,7 @@
           <el-table-column label="培训内容" min-width="240">
             <template #default="{ row }"><el-input v-model="row.content" size="small" /></template>
           </el-table-column>
-          <el-table-column label="培训老师" width="110">
-            <template #default="{ row }"><el-input v-model="row.teacher" size="small" /></template>
-          </el-table-column>
-          <el-table-column label="培训方式" width="190">
+          <el-table-column label="培训方式" width="220">
             <template #default="{ row }">
               <el-select v-model="row.method" multiple collapse-tags collapse-tags-tooltip size="small" placeholder="讲解/PPT/文件" style="width:100%">
                 <el-option label="讲解" value="讲解" />
@@ -108,9 +105,6 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="考核成绩" width="110">
-            <template #default="{ row }"><el-input v-model="row.score" size="small" placeholder=">80合格" /></template>
-          </el-table-column>
           <el-table-column label="" width="50" align="center">
             <template #default="{ row }"><el-button link type="danger" :icon="Delete" @click="removePlanItem(row)" /></template>
           </el-table-column>
@@ -122,7 +116,9 @@
       </template>
     </el-dialog>
 
-    <NewEmployeeTrainPrint v-if="printData" :data="printData" />
+    <Teleport to="body">
+      <NewEmployeeTrainPrint v-if="printData" :data="printData" />
+    </Teleport>
   </div>
 </template>
 
@@ -151,9 +147,9 @@ const columns = [
 const visible = ref(false)
 const printData = ref(null)
 
-// 培训方式 / 考核方式在 BG-SM-PX-005 中默认全部划√，作为每行默认值
-const DEFAULT_METHODS = ['讲解', 'PPT', '文件']
-const DEFAULT_EXAM_METHODS = ['试卷', '问答', '实操']
+// 新增空行时的默认培训/考核方式（可改）
+const DEFAULT_METHODS = ['讲解']
+const DEFAULT_EXAM_METHODS = ['问答']
 
 function blank() {
   return {
@@ -166,48 +162,47 @@ function blank() {
     plan_items: defaultOutline(), status: '进行中', remark: '',
   }
 }
+
+// BG-SM-PX-005 原表默认划√项，逐行与纸质表格一致
 function defaultOutline() {
-  const items = [
-    ['生物安全', '生免室生物安全风险点告知', '金子铮'],
-    ['生物安全', '溢撒标本的处理', '金子铮'],
-    ['情况简介', '生免室的布局、人员结构、工作岗位、设置情况、所开展的检验项目等', '杨静'],
-    ['情况简介', '急诊岗位职责', '杨静'],
-    ['急诊岗', '急诊标本的接收和处理', '急诊岗人员'],
-    ['急诊岗', '血气分析仪及血氨分析仪的操作使用流程', '急诊岗人员'],
-    ['急诊岗', '急诊AU5800、DXI800、TOP C及E411的操作使用流程', '急诊岗人员'],
-    ['急诊岗', '生化检验项目组合及临床意义', '急诊岗人员'],
-    ['急诊岗', '临床危急值报告及样本拒收制度', '急诊岗人员'],
-    ['病房岗', '标本处理前，中，后的流程', '病房岗人员'],
-    ['病房岗', '日立7600仪器日常使用及维护', '病房岗人员'],
-    ['病房岗', '生化室室内质控规则及失控处理流程', '病房岗人员'],
-    ['病房岗', '了解试剂性能及携带污染等理论', '病房岗人员'],
-    ['病房岗', '深入学习5800仪器生化项目的检测原理及反应曲线', '病房岗人员'],
-    ['门诊岗', 'AU5822仪器及流水线使用', '门诊岗人员'],
-    ['门诊岗', '生化检测项目的复检规则', '门诊岗人员'],
-    ['门诊岗', '生化项目报告单发放', '门诊岗人员'],
-    ['门诊岗', '参与室间质评及仪器比对', '朱春阳'],
-    ['凝血岗', 'TOP系列凝血流水线的使用', '凝血岗人员'],
-    ['凝血岗', '凝血相关试剂的配制及更换', '凝血岗人员'],
-    ['凝血岗', '凝血常规项目的质量控制、检测原理', '凝血岗人员'],
-    ['凝血岗', '凝血报告的注意事项及临床意义', '凝血岗人员'],
-    ['凝血岗', 'APTT纠正试验的操作流程及结果判读', '凝血岗人员'],
-    ['凝血岗', 'TOP血凝仪凝血曲线的解读及凝血项目复检规则', '凝血岗人员'],
-    ['凝血岗', '出凝血疾病的实验室诊断步骤', '凝血岗人员'],
-    ['电泳岗', '糖化血红蛋白仪器操作及理论', '电泳岗人员'],
-    ['电泳岗', '免疫固定电泳技术', '电泳岗人员'],
-    ['免疫手工岗', 'ELISA检测的原理，TECAN仪器的操作流程，注意事项及结果分析', '免疫手工岗人员'],
-    ['免疫手工岗', 'AIDS初筛实验及报告方法，可疑样本的外送流程', '免疫手工岗人员'],
-    ['免疫手工岗', 'TRUST的检测原理及操作', '免疫手工岗人员'],
-    ['免疫手工岗', '免疫室化学发光法的检测项目及检测原理', '免疫手工岗人员'],
-    ['免疫仪器岗', '罗氏E601、迈瑞CL6000i、贝克曼I800的使用、质控及定标流程，及各仪器的维护保养', '免疫仪器岗人员'],
-    ['免疫仪器岗', '感染类项目（乙肝五项、甲肝抗体、丙肝抗体、戊肝抗体、艾滋抗体、梅毒抗体）、内分泌激素、肿瘤标志物的临床意义及复检规则', '免疫仪器岗人员'],
-    ['免疫杂项岗', '肾早期损伤项目、高血压组项、结核γ干扰素释放实验的检测原理及临床意义', '免疫杂项岗人员'],
-    ['免疫杂项岗', '安图A2000的检测原理、使用及仪器维护', '免疫杂项岗人员'],
-    ['免疫杂项岗', '了解唐氏筛查的检测意义', '免疫杂项岗人员'],
+  return [
+    { category: '生物安全', content: '生免室生物安全风险点告知', method: ['讲解'], exam_method: ['问答'] },
+    { category: '生物安全', content: '溢撒标本的处理', method: ['讲解'], exam_method: ['实操'] },
+    { category: '情况简介', content: '生免室的布局、人员结构、工作岗位、设置情况、所开展的检验项目等', method: ['讲解'], exam_method: ['问答'] },
+    { category: '情况简介', content: '急诊岗位职责', method: ['讲解'], exam_method: ['问答'] },
+    { category: '急诊岗', content: '急诊标本的接收和处理', method: ['讲解'], exam_method: ['实操'] },
+    { category: '急诊岗', content: '血气分析仪及血氨分析仪的操作使用流程', method: ['讲解'], exam_method: ['实操'] },
+    { category: '急诊岗', content: '急诊 AU5800、DXI800、TOP C 及 E411 的操作使用流程', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '急诊岗', content: '生化检验项目组合及临床意义', method: ['讲解', 'PPT'], exam_method: ['问答', '实操'] },
+    { category: '急诊岗', content: '临床危急值报告及样本拒收制度', method: ['讲解', 'PPT'], exam_method: ['实操'] },
+    { category: '病房岗', content: '标本处理前，中，后的流程', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '病房岗', content: '日立 7600 仪器日常使用及维护', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '病房岗', content: '生化室室内质控规则及失控处理流程', method: ['讲解', 'PPT'], exam_method: ['问答', '实操'] },
+    { category: '门诊岗', content: '了解试剂性能及携带污染等理论', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '门诊岗', content: '深入学习 5800 仪器生化项目的检测原理及反应曲线', method: ['讲解', 'PPT'], exam_method: ['实操'] },
+    { category: '门诊岗', content: 'AU5822 仪器及流水线使用', method: ['讲解'], exam_method: ['实操'] },
+    { category: '门诊岗', content: '生化检测项目的复检规则', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
+    { category: '门诊岗', content: '生化项目报告单发放', method: ['讲解'], exam_method: ['试卷', '问答'] },
+    { category: '门诊岗', content: '参与室间质评及仪器比对', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '凝血岗', content: 'TOP 系列凝血流水线的使用', method: ['讲解'], exam_method: ['实操'] },
+    { category: '凝血岗', content: '凝血相关试剂的配制及更换', method: ['讲解'], exam_method: ['实操'] },
+    { category: '凝血岗', content: '凝血常规项目的质量控制、检测原理', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
+    { category: '凝血岗', content: '凝血报告的注意事项及临床意义', method: ['讲解'], exam_method: ['问答'] },
+    { category: '凝血岗', content: 'APTT 纠正试验的操作流程及结果判读', method: ['讲解'], exam_method: ['问答'] },
+    { category: '凝血岗', content: 'TOP 血凝仪凝血曲线的解读及凝血项目复检规则', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
+    { category: '电泳岗', content: '出凝血疾病的实验室诊断步骤', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '电泳岗', content: '糖化血红蛋白仪器操作及理论', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '电泳岗', content: '免疫固定电泳技术', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '免疫手工岗', content: 'ELISA 检测的原理，TECAN 仪器的操作流程，注意事项及结果分析', method: ['讲解'], exam_method: ['试卷', '问答', '实操'] },
+    { category: '免疫手工岗', content: 'AIDS 初筛实验及报告方法，可疑样本的外送流程', method: ['讲解', '文件'], exam_method: ['问答', '实操'] },
+    { category: '免疫手工岗', content: 'TRUST 的检测原理及操作', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '免疫仪器岗', content: '免疫室化学发光法的检测项目及检测原理', method: ['讲解'], exam_method: ['试卷', '问答'] },
+    { category: '免疫仪器岗', content: '罗氏 E601、迈瑞 CL6000i、贝克曼 I800 的使用、质控及定标流程，及各仪器的维护保养', method: ['讲解', 'PPT'], exam_method: ['实操'] },
+    { category: '免疫仪器岗', content: '感染类项目（乙肝五项、甲肝抗体、丙肝抗体、戊肝抗体、艾滋抗体、梅毒抗体）、内分泌激素（胰岛素、C 肽、HCG、孕酮、雌二醇、雌三醇）及肿瘤标志物（甲胎蛋白、前列腺特异性抗原）的临床意义及复检规则', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
+    { category: '免疫杂项岗', content: '肾早期损伤项目、高血压组项、结核γ干扰素释放实验的检测原理及临床意义', method: ['讲解'], exam_method: ['试卷', '问答'] },
+    { category: '免疫杂项岗', content: '安图 A2000 的检测原理、使用及仪器维护', method: ['讲解'], exam_method: ['实操'] },
+    { category: '免疫杂项岗', content: '了解唐氏筛查的检测意义', method: ['讲解'], exam_method: ['问答', '实操'] },
   ]
-  return items.map(([category, content, teacher]) => ({
-    category, content, teacher, method: [...DEFAULT_METHODS], exam_method: [...DEFAULT_EXAM_METHODS], score: '',
-  }))
 }
 
 // 把后端可能返回的字符串/列表统一成数组，防止 [..."字符串"] 把长字符串拆成单字符
@@ -225,10 +220,8 @@ function normalizeRecord(full) {
     plan_items: items.map((r) => ({
       category: r.category || '',
       content: r.content || '',
-      teacher: r.teacher || '',
       method: toMethodArray(r.method),
       exam_method: toMethodArray(r.exam_method),
-      score: r.score ?? '',
     })),
   }
 }
@@ -243,7 +236,7 @@ async function openForm(row) {
   visible.value = true
 }
 function addPlanItem() {
-  form.value.plan_items.push({ category: '', content: '', teacher: '', method: [...DEFAULT_METHODS], exam_method: [...DEFAULT_EXAM_METHODS], score: '' })
+  form.value.plan_items.push({ category: '', content: '', method: [...DEFAULT_METHODS], exam_method: [...DEFAULT_EXAM_METHODS] })
 }
 function removePlanItem(r) { form.value.plan_items = form.value.plan_items.filter((x) => x !== r) }
 
