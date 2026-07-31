@@ -2,7 +2,7 @@ from datetime import datetime
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import case, func, text
 from sqlalchemy.orm import defer
@@ -397,15 +397,18 @@ def download(doc_id: int, db: Session = Depends(get_db), user: User = Depends(ge
         raise HTTPException(status_code=404, detail="未找到文件")
     fname = d.original_filename or f"doc-{doc_id}"
 
-    # COS/BLOB/磁盘 → 经服务器返回（302 重定向到 COS 域名有浏览器 CORS 问题）
+    # COS/BLOB/磁盘 → 经服务器返回
     content = _get_file_bytes(d)
     if not content:
         raise HTTPException(status_code=404, detail="文件不存在")
-    return Response(
-        content, media_type="application/octet-stream",
+    from io import BytesIO
+    return StreamingResponse(
+        BytesIO(content),
+        media_type="application/octet-stream",
         headers={
             "Content-Disposition": _content_disposition("attachment", fname),
             "Cache-Control": "no-store",
+            "Content-Length": str(len(content)),
         },
     )
 
