@@ -80,6 +80,11 @@ export function getInstrumentDocuments(id) {
   return request.get(`/api/v1/instruments/${id}/documents`)
 }
 
+// 反向索引：仪器 → 对应 SOP 文件（仪器作业指导书，按编号自动匹配）
+export function getInstrumentSopDocuments(id) {
+  return request.get(`/api/v1/instruments/${id}/sop-documents`)
+}
+
 // ---- 总型号 ↔ 仪器 关联管理 ----
 export function listInstrumentFamilies() {
   return request.get('/api/v1/instrument-families')

@@ -139,14 +139,26 @@
         </div>
       </div>
 
+      <el-divider>对应 SOP 文件（仪器作业指导书）</el-divider>
+      <div v-loading="sopLoading">
+        <el-table v-if="sopDocs.length" :data="sopDocs" border stripe size="small">
+          <el-table-column prop="doc_number" label="编号" width="200" show-overflow-tooltip />
+          <el-table-column prop="title" label="标题" min-width="220" show-overflow-tooltip />
+          <el-table-column label="操作" width="130" align="center">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="previewDoc(row)">预览</el-button>
+              <el-button link type="primary" size="small" @click="downloadDoc(row)">下载</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-else description="暂未匹配到对应的 SOP 文件" :image-size="80" />
+      </div>
+
       <el-divider>操作 / 保养记录（关联本仪器的记录表格）</el-divider>
       <div v-loading="docsLoading">
         <el-table v-if="linkedDocs.length" :data="linkedDocs" border stripe size="small">
           <el-table-column prop="doc_number" label="编号" width="130" show-overflow-tooltip />
           <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-          <el-table-column prop="version" label="版本" width="70" align="center">
-            <template #default="{ row }">{{ row.version || '—' }}</template>
-          </el-table-column>
           <el-table-column label="操作" width="130" align="center">
             <template #default="{ row }">
               <el-button link type="primary" size="small" @click="previewDoc(row)">预览</el-button>
@@ -231,7 +243,7 @@ import {
   uploadCalibrationReport, downloadCalibrationReport, deleteCalibrationReport, getCalibrationsStatus,
   uploadInstrumentArchive, getInstrumentArchiveInfo, downloadInstrumentArchive,
   deleteInstrumentArchive, getArchivesStatus, importArchivesFolder,
-  getInstrumentTestItems, getInstrumentDocuments,
+  getInstrumentTestItems, getInstrumentDocuments, getInstrumentSopDocuments,
 } from '../../api/instruments'
 import { fetchDocumentBlob, downloadBlob, previewBlob } from '../../api/documents'
 import { useAuthStore } from '../../store/auth'
@@ -560,6 +572,10 @@ const linkedLoading = ref(false)
 const linkedDocs = ref([])
 const docsLoading = ref(false)
 
+// 反向索引：本仪器对应的 SOP 文件（仪器作业指导书，按编号自动匹配）
+const sopDocs = ref([])
+const sopLoading = ref(false)
+
 async function loadArchiveInfo(id) {
   try {
     archiveInfo.value = await getInstrumentArchiveInfo(id)
@@ -587,12 +603,23 @@ async function loadLinkedDocs(id) {
     docsLoading.value = false
   }
 }
+async function loadSopDocs(id) {
+  sopLoading.value = true
+  try {
+    sopDocs.value = await getInstrumentSopDocuments(id)
+  } catch (e) {
+    sopDocs.value = []
+  } finally {
+    sopLoading.value = false
+  }
+}
 async function openArchive(row) {
   archiveRow.value = row
   archiveDrawer.value = true
   await loadArchiveInfo(row.id)
   await loadLinkedTestItems(row.id)
   await loadLinkedDocs(row.id)
+  await loadSopDocs(row.id)
 }
 // 操作/保养记录：预览（docx 用 mammoth 内嵌显示；pdf 走浏览器；其他回退）
 async function previewDoc(row) {

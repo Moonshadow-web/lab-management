@@ -131,6 +131,65 @@ def instrument_documents(
     ]
 
 
+@router.get("/{instrument_id}/sop-documents")
+def instrument_sop_documents(
+    instrument_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """返回该仪器对应的 SOP 文件（仪器作业指导书）。
+
+    匹配规则：取仪器 dept_no（如 MHZYY-JYK-SM-1005），在末段数字前插入
+    「-SOP-」得到 SOP 编号（MHZYY-JYK-SM-SOP-1005），再模糊匹配 documents 表的
+    doc_number 字段。同一编号只保留最新版本（按 id 倒序取首条）。
+    返回字段不含版本号，供仪器档案页直接展示预览/下载。
+    """
+    inst = db.get(Instrument, instrument_id)
+    if not inst:
+        raise HTTPException(status_code=404, detail="未找到仪器")
+
+    dept_no = (inst.dept_no or "").strip()
+    if not dept_no:
+        return []
+
+    # 在末段数字前插入 -SOP-：MHZYY-JYK-SM-1005 → MHZYY-JYK-SM-SOP-1005
+    m = re.match(r"^(.*?)(\d+)$", dept_no)
+    if m:
+        sop_prefix = m.group(1) + "SOP-" + m.group(2)
+    else:
+        # 无纯数字尾段，直接追加 -SOP
+        sop_prefix = dept_no + "-SOP"
+
+    # 模糊匹配：doc_number 以该前缀开头（兼容带后缀的情况）
+    all_docs = (
+        db.query(Document)
+        .filter(Document.doc_number.like(f"{sop_prefix}%"))
+        .filter(Document.status == "生效")
+        .order_by(Document.id.desc())
+        .all()
+    )
+
+    # 按 doc_number 分组，每组只保留最新一条（已按 id desc 排序，首条即最新）
+    seen = set()
+    latest = []
+    for d in all_docs:
+        key = d.doc_number or ""
+        if key not in seen:
+            seen.add(key)
+            latest.append(d)
+
+    return [
+        {
+            "id": d.id,
+            "doc_number": d.doc_number or "",
+            "title": d.title or "",
+            "category": d.category or "",
+            "original_filename": d.original_filename or "",
+        }
+        for d in latest
+    ]
+
+
 @router.get("/{instrument_id}/calibrations", response_model=list[CalibrationRecordRead])
 def list_calibrations(
     instrument_id: int,
