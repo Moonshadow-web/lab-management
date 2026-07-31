@@ -297,8 +297,18 @@ def _compute_associations(db: Session, category: Optional[str] = None,
         if rec["match_score"] in ("", "none"):
             rec["match_score"] = "manual"
 
-    # 数据库人工关联（用户通过界面动态添加，持久化在 eqa_manual_associations 表）
+    # 数据库人工关联 —— 替换自动匹配（不合并），覆盖子串错配
     db_manual = db.query(EqaManualAssociation).filter(EqaManualAssociation.active == True).all()
+    manual_ids = set(ma.test_item_id for ma in db_manual)
+    for tid in list(manual_ids):
+        rec = assoc_map.get(tid)
+        if not rec:
+            continue
+        # 清空自动匹配，只保留手动指定
+        rec["wjw_tokens"] = []
+        rec["bj_tokens"] = []
+        rec["has_wjw"] = False
+        rec["has_bj"] = False
     for ma in db_manual:
         rec = assoc_map.get(ma.test_item_id)
         if not rec:
