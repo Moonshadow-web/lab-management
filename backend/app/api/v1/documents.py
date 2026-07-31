@@ -397,13 +397,7 @@ def download(doc_id: int, db: Session = Depends(get_db), user: User = Depends(ge
         raise HTTPException(status_code=404, detail="未找到文件")
     fname = d.original_filename or f"doc-{doc_id}"
 
-    # COS 有文件 → 重定向到临时签名 URL（不经过服务器转发，省带宽）
-    if d.cloud_key and cos_storage.ready:
-        cos_url = cos_storage.url(d.cloud_key, fname)
-        if cos_url:
-            return RedirectResponse(url=cos_url, status_code=302)
-
-    # 否则读取字节
+    # COS/BLOB/磁盘 → 经服务器返回（302 重定向到 COS 域名有浏览器 CORS 问题）
     content = _get_file_bytes(d)
     if not content:
         raise HTTPException(status_code=404, detail="文件不存在")
