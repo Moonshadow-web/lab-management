@@ -51,8 +51,13 @@ export function myRecord(campaign_id) {
 export function upsertMyRecord(campaign_id, record_json, submit) {
   return request.post(`${BASE}/my-record`, { record_json }, { params: { campaign_id, submit: submit ? 'true' : 'false' } })
 }
-export function receiveRevision(aid) {
-  return request.post(`${BASE}/assignments/${aid}/receive`)
+export function receiveRevision(aid, formData) {
+  return request.post(`${BASE}/assignments/${aid}/receive`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+export function reviewerStats(cid) {
+  return request.get(`${BASE}/campaigns/${cid}/stats-by-reviewer`)
 }
 export function reviewSummary(cid) {
   return request.get(`${BASE}/campaigns/${cid}/summary`)

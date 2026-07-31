@@ -13,7 +13,17 @@
     <!-- 管理员：全部分配与接收 -->
     <template v-if="auth.canWrite('iso15189')">
       <el-divider content-position="left">分配与接收（管理员）</el-divider>
-      <el-table :data="assignments" border size="small" v-loading="loading">
+      <div class="reviewer-filter-bar">
+        <el-select v-model="reviewerFilter" placeholder="按审核人筛选" clearable style="width:180px" @change="loadStats">
+          <el-option v-for="opt in reviewerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+        </el-select>
+        <div class="progress-chips">
+          <el-tag v-for="s in progressStats" :key="s.reviewer" size="small" type="info">
+            {{ s.reviewer }}：共{{ s.total }} / 已提交{{ s.submitted }} / 已接收{{ s.received }} / A-027已交{{ s.a027_submitted ? '是' : '否' }}
+          </el-tag>
+        </div>
+      </div>
+      <el-table :data="filteredAssignments" border size="small" v-loading="loading">
         <el-table-column prop="document_id" label="文档" min-width="220">
           <template #default="{ row }">{{ docTitle(row.document_id) }} <el-tag type="info" size="small">{{ docCat(row.document_id) }}</el-tag></template>
         </el-table-column>
@@ -27,7 +37,7 @@
         <el-table-column prop="document_new_version" label="生成版本" width="100" />
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" :disabled="!row.revised_cloud_key" @click="receive(row)">接收生成版本</el-button>
+            <el-button size="small" :disabled="!row.revised_cloud_key" type="primary" @click="openReceive(row)">接收生成版本</el-button>
             <el-button size="small" text @click="viewAssignRecord(row)">记录</el-button>
           </template>
         </el-table-column>
@@ -113,7 +123,11 @@
       <el-form :model="recordForm" label-width="110px" size="small">
         <el-row :gutter="12">
           <el-col :span="12"><el-form-item label="专业组"><el-input v-model="recordForm.review_group" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="评审时间"><el-input v-model="recordForm.review_date" placeholder="如 2026-08" /></el-form-item></el-col>
+          <el-col :span="12">
+            <el-form-item label="评审日期">
+              <el-date-picker v-model="recordForm.review_date" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width:100%" />
+            </el-form-item>
+          </el-col>
         </el-row>
         <el-form-item label="评审组成员">
           <el-input v-model="recordForm.review_members" type="textarea" :rows="2" readonly placeholder="本活动全部被分配成员" />
@@ -123,8 +137,16 @@
           <el-col :span="12"><el-form-item label="审批人"><el-input v-model="recordForm.approver" placeholder="默认 金子铮" /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="记录日期"><el-input v-model="recordForm.record_date" placeholder="YYYY-MM-DD" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="批准日期"><el-input v-model="recordForm.approve_date" placeholder="YYYY-MM-DD" /></el-form-item></el-col>
+          <el-col :span="12">
+            <el-form-item label="记录日期">
+              <el-date-picker v-model="recordForm.record_date" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="批准日期">
+              <el-date-picker v-model="recordForm.approve_date" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width:100%" />
+            </el-form-item>
+          </el-col>
         </el-row>
         <el-divider content-position="left">评审文件（本人被分配范围）</el-divider>
         <el-table :data="recordForm.files" border size="small">
@@ -152,6 +174,63 @@
         <el-button @click="recordVisible = false">关闭</el-button>
         <el-button @click="saveRecord(false)">保存</el-button>
         <el-button type="primary" @click="saveRecord(true)">提交</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 接收前审阅弹窗 -->
+    <el-dialog v-model="receiveVisible" title="审阅修订并生成新版本" width="620px" top="5vh">
+      <el-form :model="receiveForm" label-width="120px" size="small">
+        <el-form-item label="文档">{{ receiveForm.doc_title }}</el-form-item>
+        <el-form-item label="成员修订文件">
+          <div v-if="receiveForm.revised_filename">
+            {{ receiveForm.revised_filename }}
+            <el-button size="small" text type="primary" @click="previewRevision">下载/预览修订版</el-button>
+          </div>
+          <span v-else class="text-muted">无修订文件</span>
+        </el-form-item>
+        <el-form-item label="接受所有修订">
+          <el-switch v-model="receiveForm.accept_revisions" active-text="是" inactive-text="否" />
+          <div class="form-tip">成员上传的是「修订模式」文档时，勾选此项可在生成版本前自动接受全部修订。</div>
+        </el-form-item>
+        <el-form-item label="或上传终稿">
+          <el-upload
+            :auto-upload="false" :limit="1"
+            :on-change="(f) => { receiveForm.final_file = f.raw }"
+            :on-remove="() => { receiveForm.final_file = null }"
+          >
+            <el-button size="small">选择文件</el-button>
+          </el-upload>
+          <div class="form-tip">如管理员已在外部审阅并定稿，可直接上传终稿覆盖成员修订版。</div>
+        </el-form-item>
+        <el-divider content-position="left">生成版本信息</el-divider>
+        <el-row :gutter="12">
+          <el-col :span="12"><el-form-item label="版本号"><el-input v-model="receiveForm.new_version" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="修订号"><el-input v-model="receiveForm.revision_no" /></el-form-item></el-col>
+        </el-row>
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="审核日期">
+              <el-date-picker v-model="receiveForm.audit_date" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12"><el-form-item label="批准者"><el-input v-model="receiveForm.approver" placeholder="默认保留原文档批准者" /></el-form-item></el-col>
+        </el-row>
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="批准日期">
+              <el-date-picker v-model="receiveForm.approve_date" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="实施日期">
+              <el-date-picker v-model="receiveForm.effective_date" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width:100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="receiveVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitReceive">确认接收并生成 {{ receiveForm.new_version }}</el-button>
       </template>
     </el-dialog>
 
@@ -197,7 +276,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 import {
   listCampaigns, createCampaign, listAssignments, assignBatch, myAssignments,
-  uploadRevision, downloadRevisionBlob, submitReview, receiveRevision, reviewSummary,
+  uploadRevision, downloadRevisionBlob, submitReview, receiveRevision, reviewerStats, reviewSummary,
   downloadDocumentBlob, myRecord, upsertMyRecord,
 } from '../../api/review'
 import { useAuthStore } from '../../store/auth'
@@ -232,6 +311,26 @@ const myRecordStatus = ref('')
 const summaryVisible = ref(false)
 const summaryData = ref([])
 
+// 管理员：按人筛选 + 进度
+const reviewerFilter = ref('')
+const progressStats = ref([])
+
+// 接收生成版本审阅弹窗
+const receiveVisible = ref(false)
+const receiveForm = reactive({
+  assignment_id: null,
+  doc_title: '',
+  revised_filename: '',
+  accept_revisions: true,
+  new_version: '2.0',
+  revision_no: '0',
+  audit_date: '',
+  approve_date: '2026-09-01',
+  effective_date: '2026-09-01',
+  approver: '',
+  final_file: null,
+})
+
 // 仅允许三类 SOP 参与文件评审（范围：通用SOP / 项目SOP / 仪器SOP）
 const ALLOWED_CATS = ['通用SOP', '项目SOP', '仪器SOP']
 const reviewDocs = computed(() =>
@@ -243,6 +342,16 @@ const reviewDocsFiltered = computed(() => {
   const k = assignSearch.value.trim()
   if (!k) return reviewDocs.value
   return reviewDocs.value.filter((d) => (d.title || '').includes(k))
+})
+
+const reviewerOptions = computed(() => {
+  const names = new Set(assignments.value.map(a => a.reviewer).filter(Boolean))
+  return [{ label: '全部审核人', value: '' }, ...Array.from(names).map(n => ({ label: n, value: n }))]
+})
+
+const filteredAssignments = computed(() => {
+  if (!reviewerFilter.value) return assignments.value
+  return assignments.value.filter(a => a.reviewer === reviewerFilter.value)
 })
 
 function statusType(s) {
@@ -293,6 +402,7 @@ async function loadAll() {
     const r = await listAssignments({ campaign_id: campaignId.value, page_size: 500 })
     assignments.value = r.items || []
   } finally { loading.value = false }
+  await loadStats()
   await loadMy()
 }
 async function loadMy() {
@@ -363,11 +473,53 @@ async function submitAssign() {
   assignVisible.value = false
   await loadAll()
 }
-async function receive(row) {
-  await ElMessageBox.confirm(`确认接收「${docTitle(row.document_id)}」的修订并生成新版本？`, '提示', { type: 'warning' })
-  const r = await receiveRevision(row.id)
+function openReceive(row) {
+  const a = assignments.value.find(x => x.id === row.id) || row
+  Object.assign(receiveForm, {
+    assignment_id: a.id,
+    doc_title: docTitle(a.document_id),
+    revised_filename: a.revised_filename || '',
+    accept_revisions: true,
+    new_version: '2.0',
+    revision_no: '0',
+    audit_date: a.submitted_at ? a.submitted_at.slice(0, 10) : '',
+    approve_date: '2026-09-01',
+    effective_date: '2026-09-01',
+    approver: '',
+    final_file: null,
+  })
+  receiveVisible.value = true
+}
+async function previewRevision() {
+  const row = assignments.value.find(a => a.id === receiveForm.assignment_id)
+  if (!row) return
+  const blob = await downloadRevisionBlob(row.id)
+  triggerDownload(blob, row.revised_filename || `revised-${row.id}`)
+}
+async function submitReceive() {
+  const row = assignments.value.find(a => a.id === receiveForm.assignment_id)
+  if (!row) return
+  const fd = new FormData()
+  fd.append('new_version', receiveForm.new_version)
+  fd.append('revision_no', receiveForm.revision_no)
+  fd.append('audit_date', receiveForm.audit_date || '')
+  fd.append('approve_date', receiveForm.approve_date)
+  fd.append('effective_date', receiveForm.effective_date)
+  fd.append('accept_revisions', receiveForm.accept_revisions ? 'true' : 'false')
+  fd.append('approver', receiveForm.approver || '')
+  if (receiveForm.final_file) {
+    fd.append('file', receiveForm.final_file)
+  }
+  const r = await receiveRevision(row.id, fd)
   ElMessage.success(`已生成新版本 ${r.new_version}`)
+  receiveVisible.value = false
   await loadAll()
+}
+async function loadStats() {
+  if (!campaignId.value) return
+  try {
+    progressStats.value = await reviewerStats(campaignId.value)
+  } catch (e) { progressStats.value = [] }
 }
 async function downloadDoc(docId) {
   const blob = await downloadDocumentBlob(docId)
@@ -454,4 +606,8 @@ onMounted(async () => {
 .my-record-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .assign-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .sel-count { color: #888; font-size: 13px; }
+.reviewer-filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.progress-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.form-tip { color: #909399; font-size: 12px; line-height: 1.4; margin-top: 4px; }
+.text-muted { color: #909399; }
 </style>

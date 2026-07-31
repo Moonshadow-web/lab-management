@@ -11,13 +11,14 @@ from datetime import datetime
 from io import BytesIO
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ...core.cos_storage import cos_storage
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
+from ...core.docx_utils import accept_all_track_changes, is_docx, update_docx_header_table
 from ...core.security import get_current_user, require_roles
 from ...core.storage import storage
 from ...models.document import Document, DocumentVersion
@@ -304,47 +305,151 @@ def submit_review(
 @review_router.post("/review/assignments/{aid}/receive")
 def receive_revision(
     aid: int,
+    file: UploadFile | None = File(None),
+    new_version: str = Form("2.0"),
+    revision_no: str = Form("0"),
+    audit_date: str = Form(""),
+    approve_date: str = Form("2026-09-01"),
+    effective_date: str = Form("2026-09-01"),
+    accept_revisions: bool = Form(False),
+    approver: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(*WRITE_ROLES)),
 ):
-    """管理员接收成员修订，并据此为该文档生成新版本（复用 documents 版本逻辑）。"""
+    """管理员审阅后接收修订，生成文档新版本。
+
+    - file: 管理员如上传终稿，则优先用该文件；否则用成员上传的 revised_cloud_key。
+    - accept_revisions=True 时，对 docx 执行「接受所有修订」。
+    - 同步更新文件管理详情与 docx 首页表头：版本号/修订号/审核日期/审核人/批准日期/实施日期。
+    """
     a = db.get(ReviewAssignment, aid)
     if not a:
         raise HTTPException(404, "未找到分配项")
-    if not a.revised_cloud_key:
-        raise HTTPException(400, "成员尚未上传修订文件")
-    content = cos_storage.get_bytes(a.revised_cloud_key)
-    if not content:
-        raise HTTPException(400, "修订文件读取失败")
     d = db.get(Document, a.document_id)
     if not d:
         raise HTTPException(404, "关联文档不存在")
-    try:
-        maj, minor = str(d.version).split(".")
-        new_ver = f"{maj}.{int(minor) + 1}"
-    except Exception:
-        new_ver = f"{d.version}.1"
-    fname = a.revised_filename or d.title or "doc"
+
+    # 取终稿字节（管理员上传 > 成员修订）
+    if file is not None:
+        content = file.file.read()
+        fname = file.filename or a.revised_filename or d.title or "doc"
+    else:
+        if not a.revised_cloud_key:
+            raise HTTPException(400, "成员尚未上传修订文件，请上传终稿")
+        content = cos_storage.get_bytes(a.revised_cloud_key)
+        if not content:
+            raise HTTPException(400, "修订文件读取失败")
+        fname = a.revised_filename or d.title or "doc"
+    if not content:
+        raise HTTPException(400, "文件内容为空")
+
+    # 审核日期默认取成员提交日期
+    if not audit_date:
+        if a.submitted_at:
+            audit_date = a.submitted_at.strftime("%Y-%m-%d")
+        else:
+            audit_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # 批准者：优先用户指定，其次保留原文档批准者，缺省 王学晶
+    final_approver = approver or d.approver or "王学晶"
+    final_reviewer = a.reviewer or d.reviewer or ""
+
+    # docx 处理：接受修订 + 改写表头
+    if is_docx(content):
+        if accept_revisions:
+            try:
+                content = accept_all_track_changes(content)
+            except Exception:
+                # 接受修订失败不影响后续保存，仅记录警告
+                pass
+        try:
+            updates = {
+                "版本号": str(new_version),
+                "修订号": str(revision_no),
+                "审核日期": audit_date,
+                "审核者": final_reviewer,
+                "批准日期": approve_date,
+                "实施日期": effective_date,
+            }
+            # 若表头是 "批准者" 而非 "批准日期"，把批准日期仍按关键词处理；
+            # 但 "批准者" 不应被覆盖，只在单元格含 "批准日期" 时改值。
+            content = update_docx_header_table(content, updates)
+        except Exception:
+            pass
+
     key = cos_storage.save("documents", fname, content)
     rel = storage.save("docs", fname, content)
-    d.version = new_ver
+
+    # 更新文件管理详情
+    d.version = new_version
+    d.doc_version = new_version
+    d.revision = revision_no
+    d.audit_date = audit_date
+    d.reviewer = final_reviewer
+    d.approve_date = approve_date
+    d.effective_date = effective_date
+    d.approver = final_approver
     d.file_path = rel
     d.cloud_key = key
     d.data = None
     d.original_filename = fname
     d.updated_at = datetime.utcnow()
+
     dv = DocumentVersion(
-        document_id=d.id, version=new_ver, file_path=rel, cloud_key=key,
+        document_id=d.id, version=new_version, file_path=rel, cloud_key=key,
         data=None, uploader=user.full_name or user.username,
         note=f"内审文件评审接收（分配项#{a.id}）",
     )
+    # 版本记录也同步元数据，便于追溯
+    dv.doc_version = new_version
+    dv.revision = revision_no
+    dv.reviewer = final_reviewer
+    dv.approver = final_approver
     db.add(dv)
+
     a.status = "管理员已接收"
-    a.document_new_version = new_ver
+    a.document_new_version = new_version
     a.admin_received_at = datetime.utcnow()
     db.commit()
-    write_audit(db, user, "update", "documents", d.id, {"version": new_ver, "source": "review"})
-    return {"ok": True, "id": aid, "document_id": d.id, "new_version": new_ver, "status": a.status}
+    write_audit(db, user, "update", "documents", d.id, {
+        "version": new_version, "revision": revision_no, "source": "review"
+    })
+    return {"ok": True, "id": aid, "document_id": d.id, "new_version": new_version, "status": a.status}
+
+
+@review_router.get("/review/campaigns/{cid}/stats-by-reviewer")
+def stats_by_reviewer(
+    cid: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*WRITE_ROLES)),
+):
+    """按审核人统计当前活动的分配/提交/接收进度。"""
+    assigns = db.query(ReviewAssignment).filter(ReviewAssignment.campaign_id == cid).all()
+    stats: dict[str, dict] = {}
+    for a in assigns:
+        name = a.reviewer or "未分配"
+        if name not in stats:
+            stats[name] = {
+                "reviewer": name,
+                "reviewer_id": a.reviewer_id,
+                "total": 0,
+                "submitted": 0,
+                "received": 0,
+                "finished": 0,
+            }
+        stats[name]["total"] += 1
+        if a.status == "已提交":
+            stats[name]["submitted"] += 1
+        elif a.status == "管理员已接收":
+            stats[name]["received"] += 1
+        elif a.status == "已完成":
+            stats[name]["finished"] += 1
+    # 合并 A-027 提交状态（每人一份）
+    records = db.query(ReviewRecord).filter(ReviewRecord.campaign_id == cid).all()
+    rec_submitted = {r.reviewer_id for r in records if r.status == "已提交"}
+    for s in stats.values():
+        s["a027_submitted"] = s.get("reviewer_id") in rec_submitted
+    return list(stats.values())
 
 
 @review_router.get("/review/campaigns/{cid}/summary")
