@@ -60,3 +60,16 @@ class EqaSummary(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # 报告生成时间
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class EqaManualAssociation(Base):
+    """人工指定的项目与 EQA 关联（覆盖自动匹配）。"""
+
+    __tablename__ = "eqa_manual_associations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    test_item_id: Mapped[int] = mapped_column(index=True)
+    org: Mapped[str] = mapped_column(String(20), default="")
+    token: Mapped[str] = mapped_column(String(200), default="")
+    active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

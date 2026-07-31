@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...core.security import get_current_user
 from ...models.eqa import EqaPlan
+from ...models.eqa import EqaManualAssociation
 from ...models.quality_requirement import QualityRequirement
 from ...models.test_item import TestItem
 
@@ -296,6 +297,23 @@ def _compute_associations(db: Session, category: Optional[str] = None,
         if rec["match_score"] in ("", "none"):
             rec["match_score"] = "manual"
 
+    # 数据库人工关联（用户通过界面动态添加，持久化在 eqa_manual_associations 表）
+    db_manual = db.query(EqaManualAssociation).filter(EqaManualAssociation.active == True).all()
+    for ma in db_manual:
+        rec = assoc_map.get(ma.test_item_id)
+        if not rec:
+            continue
+        if ma.org == "卫健委":
+            if ma.token not in rec["wjw_tokens"]:
+                rec["wjw_tokens"].append(ma.token)
+            rec["has_wjw"] = True
+        elif ma.org == "北京市":
+            if ma.token not in rec["bj_tokens"]:
+                rec["bj_tokens"].append(ma.token)
+            rec["has_bj"] = True
+        rec["has_eqa"] = True
+        rec["match_score"] = "manual"
+
     results = []
     for rec in assoc_map.values():
         rec["has_eqa"] = rec["has_wjw"] or rec["has_bj"]
@@ -407,3 +425,52 @@ def check_wjw_standard_gap(
                 "wjw_tokens": item.wjw_tokens,
             })
     return {"total_wjw": total_wjw, "gap_count": len(gap), "gap": gap}
+
+
+# ---------------------------------------------------------------------------
+# 人工关联 CRUD
+# ---------------------------------------------------------------------------
+from pydantic import BaseModel as _BM
+
+class ManualAssocIn(_BM):
+    test_item_id: int
+    org: str = ""   # 卫健委 / 北京市
+    token: str = ""  # 展示标签
+
+@router.get("/manual", summary="查看所有人工关联")
+def list_manual(db: Session = Depends(get_db), _=Depends(get_current_user)):
+    rows = db.query(EqaManualAssociation).filter(EqaManualAssociation.active == True).all()
+    return [{"id": r.id, "test_item_id": r.test_item_id, "org": r.org, "token": r.token} for r in rows]
+
+@router.post("/manual", status_code=201, summary="添加人工关联")
+def add_manual(body: ManualAssocIn, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    ma = EqaManualAssociation(test_item_id=body.test_item_id, org=body.org, token=body.token)
+    db.add(ma)
+    db.commit()
+    db.refresh(ma)
+    # 同步更新 test_items.has_eqa 缓存
+    _reset_item_eqa_cache(db)
+    return {"ok": True, "id": ma.id}
+
+@router.delete("/manual/{ma_id}", summary="删除人工关联")
+def delete_manual(ma_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    ma = db.get(EqaManualAssociation, ma_id)
+    if not ma:
+        from fastapi import HTTPException
+        raise HTTPException(404, "关联不存在")
+    ma.active = False  # 软删除
+    db.commit()
+    _reset_item_eqa_cache(db)
+    return {"ok": True}
+
+
+def _reset_item_eqa_cache(db: Session):
+    """重新计算所有 test_items 的 has_eqa/has_wjw/has_bj 缓存。"""
+    assoc = {r["id"]: r for r in _compute_associations(db)}
+    for tid, rec in assoc.items():
+        db.query(TestItem).filter(TestItem.id == tid).update({
+            "has_eqa": rec.get("has_eqa", False),
+            "has_wjw": rec.get("has_wjw", False),
+            "has_bj": rec.get("has_bj", False),
+        })
+    db.commit()
