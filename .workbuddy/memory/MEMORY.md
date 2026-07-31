@@ -42,3 +42,9 @@
 - **子表全量录入(2026-07-31)**：`scripts/import_personnel_full.py` 解析教育/工作/证书/奖惩/继教 5 段——续行三型(日期碎片/名称换行/明细换行)、`至`/`至今` 优先拆分起止区间、学位尾提取；线上 API 录入 + 指纹幂等去重，**共 90 条**(education 28/work_exp 21/cert 22/reward 9/edu_exp 10)。已线上核验。
 - **train_date bugfix(2026-07-31)**：edu_exp.train_date VARCHAR(20)→40（张婵媛长区间日期 21 字符写入 500），启动期 ALTER 迁移；_BUILD_MARK=edu-exp-train-date-widen-2026-07-31（曾被另一 AI 的 force-recalc-goals 部署顶掉，重推重部署后生效）。
 - 部署踩坑(2026-07-30)：schemas/education 漏 import field_validator(NameError) + crud_base make_router search_fields 必填改默认 None(TypeError) → 两启动崩溃；`import app.main` 抓出。
+
+## 已知坑（Pydantic / 通用 CRUD）
+- **json_fields 经 ORM 对象读取会整列丢失**：`ReadSchema.model_validate(ORM对象)` 在 pydantic from_attributes 模式下，对 Text 列的 JSON 字符串**不触发 `mode="before"` 校验器的 `json.loads`**（实测返回 `[]`/`{}`，但 `json.loads` 裸字符串正常、普通类对象 `model_validate` 正常）。凡用 `make_router(json_fields=[...])` 的模块（新员工培训 plan_items/detail_json、能力评估 scores_json 等）读取均中招。
+  - **正确做法**：`crud_base.py` 已用 `_serialize(obj)`（ORM→dict + 手动 `json.loads`）+ `_to_read(obj)`（`ReadSchema.model_validate(dict)`）绕过；list/get/create/update 全部走 `_to_read`。新增 json_fields 模块时无需再改，但**勿删 `_to_read`**。
+- **API 路径带 router 自带前缀**：auth=`/api/v1/auth/login`、education 各资源=`/api/v1/education/...`（如 new-employee-trains），不是 `/api/v1/login` / `/api/v1/new-employee-trains`。排查 404/405 先 curl `/openapi.json` 核对真实路径（勿被 SPA fallback 的 404/405 误导）。
+- **内网部署生效慢**：tcb deploy 提交后，内网 curl `/api/v1/_diag/build` 往往要 ~5 分钟才翻到新 `_BUILD_MARK`（容器构建+滚动发布），勿提前判定失败。
