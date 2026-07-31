@@ -150,6 +150,7 @@ const columns = [
   { prop: 'name', label: '员工姓名', width: 110 },
   { prop: 'employee_category', label: '员工类别', width: 140 },
   { prop: 'train_major', label: '培训专业', width: 100 },
+  { prop: 'group_join_date', label: '入组时间', width: 110 },
   { prop: 'exam_result', label: '考核结果', width: 100 },
   { prop: 'exam_responsible', label: '考核负责人', width: 120 },
   { prop: 'status', label: '状态', width: 90 },
