@@ -43,7 +43,13 @@ export function downloadRevisionBlob(aid) {
   return request.get(`${BASE}/assignments/${aid}/download-revision`, { responseType: 'blob' })
 }
 export function submitReview(aid, record) {
-  return request.post(`${BASE}/assignments/${aid}/submit`, record)
+  return request.post(`${BASE}/assignments/${aid}/submit`, record || {})
+}
+export function myRecord(campaign_id) {
+  return request.get(`${BASE}/my-record`, { params: { campaign_id } })
+}
+export function upsertMyRecord(campaign_id, record_json, submit) {
+  return request.post(`${BASE}/my-record`, { record_json }, { params: { campaign_id, submit: submit ? 'true' : 'false' } })
 }
 export function receiveRevision(aid) {
   return request.post(`${BASE}/assignments/${aid}/receive`)

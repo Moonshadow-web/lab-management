@@ -64,6 +64,30 @@ class ReviewAssignmentRead(ReviewAssignmentBase):
     updated_at: datetime | None = None
 
 
+class ReviewRecordBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    campaign_id: int = 0
+    reviewer_id: Optional[int] = None
+    reviewer: str = ""
+    status: str = "待提交"
+    record_json: dict = {}
+
+
+class ReviewRecordCreate(ReviewRecordBase):
+    pass
+
+
+class ReviewRecordUpdate(ReviewRecordBase):
+    pass
+
+
+class ReviewRecordRead(ReviewRecordBase):
+    id: int
+    submitted_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 # ===================== 二、自查（条款内审） =====================
 class AuditClauseBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)

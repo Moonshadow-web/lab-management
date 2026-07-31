@@ -1,10 +1,10 @@
-"""文件评审子模块 API：活动管理 + 分配 + 成员修订提交 + 管理员接收生成新版本 + 汇总。
+"""文件评审子模块 API：活动管理 + 分配 + 成员修订提交 + 管理员接收生成新版本 + 按人 A-027 记录。
 
 流程：
-  管理员建活动 → 选在用文档分配给成员（指定 reviewer）→
-  成员下载文档、本地修订（改审核人署名）→ 上传修订文件 + 填写 A-027 记录表 → 提交 →
-  管理员「接收并生成新版本」→ 调用 documents 的版本逻辑更新文件版本 →
-  汇总导出全部 A-027。
+  管理员建活动 → 选在用文档（仅 通用SOP/项目SOP/仪器SOP）分配给成员（可视化批量，可指定单人/多人自动均分）→
+  成员下载文档、本地修订（改审核人署名）→ 上传修订文件 →
+  每人填写一份 A-027「文件评审记录」（评审组成员=全部被分配人、评审文件=本人分配范围、记录人=本人、审批人默认金子铮）→ 提交 →
+  管理员「接收并生成新版本」→ 调用 documents 的版本逻辑更新文件版本。
 """
 import json
 from datetime import datetime
@@ -21,7 +21,7 @@ from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
 from ...core.storage import storage
 from ...models.document import Document, DocumentVersion
-from ...models.iso15189 import ReviewAssignment, ReviewCampaign
+from ...models.iso15189 import ReviewAssignment, ReviewCampaign, ReviewRecord
 from ...models.user import User
 from ...schemas import (
     ReviewAssignmentCreate,
@@ -30,12 +30,17 @@ from ...schemas import (
     ReviewCampaignCreate,
     ReviewCampaignRead,
     ReviewCampaignUpdate,
+    ReviewRecordCreate,
+    ReviewRecordRead,
+    ReviewRecordUpdate,
 )
+from ...models.iso15189 import REVIEW_DOC_CATEGORIES
 
 WRITE_ROLES = (
     "admin", "quality_manager", "qc_manager", "training_manager",
     "reagent_manager", "it_manager", "specialty_leader",
 )
+DEFAULT_APPROVER = "金子铮"
 
 
 def _is_admin(user: User) -> bool:
@@ -71,8 +76,17 @@ assignment_router = make_router(
     prefix="/review/assignments",
     write_roles=WRITE_ROLES,
 )
+record_router = make_router(
+    ReviewRecord, ReviewRecordRead, ReviewRecordCreate, ReviewRecordUpdate,
+    search_fields=["reviewer", "status"],
+    filter_fields=["campaign_id", "reviewer_id", "status"],
+    json_fields=["record_json"],
+    prefix="/review/records",
+    write_roles=WRITE_ROLES,
+)
 review_router.include_router(campaign_router)
 review_router.include_router(assignment_router)
+review_router.include_router(record_router)
 
 
 @review_router.post("/review/campaigns/{cid}/assign-batch")
@@ -82,22 +96,35 @@ def assign_batch(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(*WRITE_ROLES)),
 ):
-    """批量把文档分配给审核人。items: [{document_id, reviewer, reviewer_id}]。"""
+    """批量把文档分配给审核人。items: [{document_id, reviewer, reviewer_id}]。
+
+    - 同一 (campaign, document, reviewer) 已存在则跳过，避免重复分配。
+    - reviewer_id 为空时按 reviewer 名字去重。
+    """
+    existing = {
+        (a.document_id, a.reviewer_id, a.reviewer)
+        for a in db.query(ReviewAssignment).filter(ReviewAssignment.campaign_id == cid).all()
+    }
     created = []
     for it in items:
         doc_id = it.get("document_id")
         if not doc_id:
             continue
+        rid = it.get("reviewer_id")
+        rname = it.get("reviewer", "") or ""
+        if (int(doc_id), rid, rname) in existing:
+            continue
         a = ReviewAssignment(
             campaign_id=cid,
             document_id=int(doc_id),
-            reviewer=it.get("reviewer", "") or "",
-            reviewer_id=it.get("reviewer_id"),
+            reviewer=rname,
+            reviewer_id=rid,
             status="待评审",
         )
         db.add(a)
         db.flush()
         created.append(a.id)
+        existing.add((int(doc_id), rid, rname))
     db.commit()
     write_audit(db, user, "create", "review_assignments", cid, {"count": len(created)})
     return {"ok": True, "created": created}
@@ -114,6 +141,85 @@ def my_assignments(
         q = q.filter(ReviewAssignment.campaign_id == campaign_id)
     items = q.order_by(ReviewAssignment.id.desc()).all()
     return [_to_read(a) for a in items]
+
+
+@review_router.get("/review/my-record")
+def get_my_record(
+    campaign_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """取本人本活动的 A-027「文件评审记录」；自动填充评审组成员/本人评审文件/记录人/审批人默认金子铮。"""
+    rec = (
+        db.query(ReviewRecord)
+        .filter(ReviewRecord.campaign_id == campaign_id, ReviewRecord.reviewer_id == user.id)
+        .first()
+    )
+    assigns = db.query(ReviewAssignment).filter(ReviewAssignment.campaign_id == campaign_id).all()
+    members = []
+    for a in assigns:
+        if a.reviewer and a.reviewer not in members:
+            members.append(a.reviewer)
+    my_files = []
+    for a in assigns:
+        if a.reviewer_id == user.id:
+            d = db.get(Document, a.document_id)
+            if d:
+                my_files.append({
+                    "document_id": a.document_id,
+                    "title": d.title or "",
+                    "doc_number": getattr(d, "doc_number", "") or "",
+                    "version": str(getattr(d, "version", "") or ""),
+                })
+    existing = {}
+    if rec and rec.record_json:
+        try:
+            existing = json.loads(rec.record_json)
+        except Exception:
+            existing = {}
+    return {
+        "id": rec.id if rec else None,
+        "status": rec.status if rec else "待提交",
+        "review_group": existing.get("review_group") or "生免组",
+        "review_date": existing.get("review_date") or "",
+        "review_members": existing.get("review_members") or "、".join(members),
+        "recorder": existing.get("recorder") or (user.full_name or user.username),
+        "approver": existing.get("approver") or DEFAULT_APPROVER,
+        "record_date": existing.get("record_date") or "",
+        "approve_date": existing.get("approve_date") or "",
+        "problems": existing.get("problems") or "",
+        "files": existing.get("files") or my_files,
+        "submitted_at": rec.submitted_at.isoformat() if rec and rec.submitted_at else None,
+    }
+
+
+@review_router.post("/review/my-record")
+def upsert_my_record(
+    campaign_id: int,
+    body: dict = {},
+    submit: bool = False,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """按人 upsert A-027「文件评审记录」。submit=True 时标记已提交。"""
+    data = body.get("record_json", body) if isinstance(body, dict) else {}
+    if not isinstance(data, dict):
+        data = {}
+    js = json.dumps(data, ensure_ascii=False)
+    rec = (
+        db.query(ReviewRecord)
+        .filter(ReviewRecord.campaign_id == campaign_id, ReviewRecord.reviewer_id == user.id)
+        .first()
+    )
+    if not rec:
+        rec = ReviewRecord(campaign_id=campaign_id, reviewer_id=user.id, reviewer=user.full_name or user.username)
+        db.add(rec)
+    rec.record_json = js
+    rec.status = "已提交" if submit else "已填写"
+    if submit:
+        rec.submitted_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True, "id": rec.id, "status": rec.status}
 
 
 @review_router.post("/review/assignments/{aid}/upload-revision")
@@ -170,17 +276,15 @@ def download_revision(
 @review_router.post("/review/assignments/{aid}/submit")
 def submit_review(
     aid: int,
-    record_json: dict = {},
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    """成员提交其修订（仅标记该分配项已提交，A-027 另由 /review/my-record 提交）。"""
     a = db.get(ReviewAssignment, aid)
     if not a:
         raise HTTPException(404, "未找到分配项")
     if a.reviewer_id and a.reviewer_id != user.id and not _is_admin(user):
         raise HTTPException(403, "仅被分配人或管理员可提交")
-    if record_json:
-        a.record_json = json.dumps(record_json, ensure_ascii=False)
     a.status = "已提交"
     a.submitted_at = datetime.utcnow()
     db.commit()
@@ -239,25 +343,41 @@ def review_summary(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    items = db.query(ReviewAssignment).filter(ReviewAssignment.campaign_id == cid).all()
+    """按人汇总 A-027「文件评审记录」（每人一份），并附其被分配文件的接收情况。"""
+    recs = db.query(ReviewRecord).filter(ReviewRecord.campaign_id == cid).all()
     out = []
-    for a in items:
-        d = db.get(Document, a.document_id)
-        rec = {}
-        if a.record_json:
+    for r in recs:
+        data = {}
+        if r.record_json:
             try:
-                rec = json.loads(a.record_json)
+                data = json.loads(r.record_json)
             except Exception:
-                rec = {}
+                data = {}
+        assigns = (
+            db.query(ReviewAssignment)
+            .filter(ReviewAssignment.campaign_id == cid, ReviewAssignment.reviewer_id == r.reviewer_id)
+            .all()
+        )
+        assign_files = []
+        for a in assigns:
+            d = db.get(Document, a.document_id)
+            assign_files.append({
+                "document_id": a.document_id,
+                "title": d.title if d else "",
+                "status": a.status,
+                "new_version": a.document_new_version,
+            })
         out.append({
-            "assignment_id": a.id,
-            "document_id": a.document_id,
-            "document_title": d.title if d else "",
-            "reviewer": a.reviewer,
-            "status": a.status,
-            "record": rec,
-            "document_new_version": a.document_new_version,
-            "submitted_at": a.submitted_at.isoformat() if a.submitted_at else None,
-            "admin_received_at": a.admin_received_at.isoformat() if a.admin_received_at else None,
+            "reviewer": r.reviewer,
+            "status": r.status,
+            "review_members": data.get("review_members", ""),
+            "review_files": data.get("files", []),
+            "problems": data.get("problems", ""),
+            "recorder": data.get("recorder", ""),
+            "approver": data.get("approver", ""),
+            "record_date": data.get("record_date", ""),
+            "approve_date": data.get("approve_date", ""),
+            "assign_files": assign_files,
+            "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
         })
     return out

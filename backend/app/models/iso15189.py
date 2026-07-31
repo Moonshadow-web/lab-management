@@ -20,6 +20,9 @@ from ..core.database import Base
 
 # ===================== 一、文件评审 =====================
 REVIEW_ASSIGNMENT_STATUS = ["待评审", "已提交", "管理员已接收", "已完成"]
+REVIEW_RECORD_STATUS = ["待提交", "已填写", "已提交"]
+# 文件评审范围：仅这三类 SOP 参与评审（不含 项目说明书 / 记录表格）
+REVIEW_DOC_CATEGORIES = ["通用SOP", "项目SOP", "仪器SOP"]
 
 
 class ReviewCampaign(Base):
@@ -62,6 +65,32 @@ class ReviewAssignment(Base):
     # 管理员接收后，为该文档生成的新版本号（来自 documents 的 new-version）
     document_new_version: Mapped[str] = mapped_column(String(20), default="")
     note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class ReviewRecord(Base):
+    """文件评审记录（A-027）：每人每活动一份，覆盖其被分配的全部文件。
+
+    record_json 结构：
+      review_group(专业组), review_date(评审时间, 如 2026-08),
+      review_members(评审组成员，全部被分配人，逗号分隔),
+      recorder(记录人=本人), approver(审批人, 默认 金子铮),
+      record_date, approve_date,
+      problems(主要存在问题),
+      files([{document_id, title, doc_number, version, comment(评审意见), conclusion(评审结论)}])
+    """
+    __tablename__ = "review_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("review_campaigns.id"), index=True)
+    reviewer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reviewer: Mapped[str] = mapped_column(String(100), default="")  # 记录人 full_name
+    status: Mapped[str] = mapped_column(String(20), default="待提交", index=True)
+    record_json: Mapped[str] = mapped_column(Text, default="")
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
