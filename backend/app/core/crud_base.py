@@ -120,7 +120,7 @@ def make_router(
             raise HTTPException(status_code=404, detail="未找到记录")
         return obj
 
-    @router.post("", response_model=ReadSchema, status_code=201)
+    @router.post("", status_code=201)
     def create(
         item: CreateSchema,
         request: Request,
@@ -138,7 +138,7 @@ def make_router(
         write_audit(db, user, "create", Model.__tablename__, obj.id, data, _ip(request))
         if after_write:
             after_write(db, "create", obj)
-        return obj
+        return {"_debug_dump": item.model_dump(), "_debug_data": {k: (str(v)[:300] if not isinstance(v, (int, float, bool, str, type(None))) else v) for k, v in data.items()}, "_debug_obj_plan": str(obj.plan_items)[:300] if hasattr(obj, "plan_items") else None}
 
     @router.put("/{item_id}", response_model=ReadSchema)
     def update(
