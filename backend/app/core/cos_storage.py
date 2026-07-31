@@ -84,8 +84,8 @@ class CosStorageBackend:
             return None
         try:
             resp = self._client.get_object(Bucket=self._bucket, Key=key)
-            # get_object 返回 dict，Body 是 StreamingBody
-            return resp["Body"].get_raw_stream().read()
+            # Body 是 StreamingBody，直接用 .read() 获取全部字节
+            return resp["Body"].read()
         except CosServiceError as e:
             if e.get_status_code() == 404:
                 return None
