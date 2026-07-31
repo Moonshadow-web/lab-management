@@ -466,11 +466,11 @@ def delete_manual(ma_id: int, db: Session = Depends(get_db), _=Depends(get_curre
 
 def _reset_item_eqa_cache(db: Session):
     """重新计算所有 test_items 的 has_eqa/has_wjw/has_bj 缓存。"""
-    assoc = {r["id"]: r for r in _compute_associations(db)}
-    for tid, rec in assoc.items():
-        db.query(TestItem).filter(TestItem.id == tid).update({
-            "has_eqa": rec.get("has_eqa", False),
-            "has_wjw": rec.get("has_wjw", False),
-            "has_bj": rec.get("has_bj", False),
+    assoc_items = _compute_associations(db)
+    for r in assoc_items:
+        db.query(TestItem).filter(TestItem.id == r.id).update({
+            "has_eqa": r.has_eqa,
+            "has_wjw": r.has_wjw,
+            "has_bj": r.has_bj,
         })
     db.commit()
