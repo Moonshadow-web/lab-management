@@ -83,20 +83,14 @@ class CosStorageBackend:
         if not self._ready:
             return None
         try:
-            resp = self._client.get_object(Bucket=self._bucket, Key=key)
-            fp = resp["Body"].get_raw_stream()
-            # 分块读取全量，避免某些 SDK 版本 read() 截断
-            chunks = []
-            while True:
-                chunk = fp.read(8192)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-            return b"".join(chunks)
-        except CosServiceError as e:
-            if e.get_status_code() == 404:
+            import urllib.request
+            cos_url = self.url(key)
+            if not cos_url:
                 return None
-            logger.error("COS get_bytes error: %s", e)
+            with urllib.request.urlopen(cos_url, timeout=30) as resp:
+                return resp.read()
+        except Exception as e:
+            logger.error("COS get_bytes via URL error: %s", e)
             return None
         except CosClientError as e:
             logger.error("COS client error: %s", e)
