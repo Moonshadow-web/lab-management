@@ -44,19 +44,17 @@
     <!-- 详情：5 张子表 + 照片 -->
     <el-drawer v-model="detailVisible" :title="current?.name + ' · 人员档案详情'" size="70%">
       <template v-if="current">
-        <div class="photo-row">
-          <span class="photo-label">照片：</span>
-          <img v-if="photoUrl" :src="photoUrl" class="photo-img" alt="照片" />
-          <span v-else class="photo-none">未上传</span>
+        <div class="cert-row">
+          <span class="cert-label">证书材料：</span>
           <EducationAttachmentList
             owner-type="personnel"
             :owner-id="current.id"
-            kind="photo"
-            label="照片"
-            accept=".jpg,.jpeg,.png"
+            kind="certificate"
+            label="证书材料"
+            accept=".jpg,.jpeg,.png,.pdf"
             :can-write="canWrite"
-            @uploaded="onPhotoChange"
-            ref="photoRef"
+            @uploaded="onCertChange"
+            ref="certRef"
           />
         </div>
 
@@ -108,13 +106,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../../components/CrudTable.vue'
 import EducationAttachmentList from '../EducationAttachmentList.vue'
 import ChildTable from './PersonnelChildTable.vue'
-import { listPersonnel, createPersonnel, updatePersonnel, deletePersonnel, getPersonnel, eduAttachmentUrl } from '../../../api/education'
+import { listPersonnel, createPersonnel, updatePersonnel, deletePersonnel, getPersonnel } from '../../../api/education'
 import { useAuthStore } from '../../../store/auth'
 
 const auth = useAuthStore()
 const canWrite = computed(() => auth.canWrite('training'))
 const tableRef = ref(null)
-const photoRef = ref(null)
+const certRef = ref(null)
 
 const columns = [
   { prop: 'name', label: '姓名', width: 100 },
@@ -159,30 +157,17 @@ async function onDelete(row) {
 const detailVisible = ref(false)
 const current = ref(null)
 const childTab = ref('edu')
-const photoUrl = ref('')
 async function openDetail(row) {
   const res = await getPersonnel(row.id)
   current.value = res
-  await refreshPhoto()
   detailVisible.value = true
 }
-async function refreshPhoto() {
-  // 取最近一张 photo 附件
-  photoUrl.value = ''
-  try {
-    const r = await import('../../../api/education').then((m) => m.listEduAttachments('personnel', current.value.id, 'photo'))
-    const list = r.items || []
-    if (list.length) photoUrl.value = eduAttachmentUrl(list[0].id, true)
-  } catch (e) {}
-}
-function onPhotoChange() { refreshPhoto() }
+function onCertChange() { certRef.value?.refresh() }
 
 function fetch(params) { return listPersonnel(params) }
 </script>
 
 <style scoped>
-.photo-row { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
-.photo-label { font-weight: 600; }
-.photo-img { width: 90px; height: 120px; object-fit: cover; border: 1px solid #ddd; }
-.photo-none { color: #999; }
+.cert-row { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.cert-label { font-weight: 600; }
 </style>
