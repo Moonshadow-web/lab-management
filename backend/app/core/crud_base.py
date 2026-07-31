@@ -111,16 +111,44 @@ def make_router(
                 query = query.order_by(*order_by)
             else:
                 query = query.order_by(Model.id.desc())
-        return paginate(query, page, page_size)
+        res = paginate(query, page, page_size)
+        # 关键：ORM 对象经 Pydantic from_attributes 校验时，Text 列里的 JSON 字符串
+        # 不会被 mode="before" 校验器正确反序列化（实测 model_validate(orm_obj) 会丢字段）。
+        # 因此先把 ORM 对象转成普通 dict 并手动 json.loads，再校验 dict（稳定可靠）。
+        res["items"] = [_to_read(o) for o in res["items"]]
+        return res
+
+    def _json_default(f: str):
+        ann = ReadSchema.model_fields.get(f)
+        ann = ann.annotation if ann else None
+        return [] if (hasattr(ann, "__origin__") and ann.__origin__ in (list, set)) or str(ann).startswith("list") else {}
+
+    def _serialize(obj):
+        cols = [c.name for c in obj.__table__.columns]
+        d = {c: getattr(obj, c) for c in cols}
+        for f in _json_fields:
+            if f in d and isinstance(d[f], str):
+                s = d[f].strip()
+                if not s:
+                    d[f] = _json_default(f)
+                else:
+                    try:
+                        d[f] = json.loads(s)
+                    except Exception:
+                        d[f] = _json_default(f)
+        return d
+
+    def _to_read(obj):
+        return ReadSchema.model_validate(_serialize(obj))
 
     @router.get("/{item_id}", response_model=ReadSchema)
     def get_item(item_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
         obj = db.get(Model, item_id)
         if not obj:
             raise HTTPException(status_code=404, detail="未找到记录")
-        return obj
+        return _to_read(obj)
 
-    @router.post("", status_code=201)
+    @router.post("", response_model=ReadSchema, status_code=201)
     def create(
         item: CreateSchema,
         request: Request,
@@ -138,22 +166,7 @@ def make_router(
         write_audit(db, user, "create", Model.__tablename__, obj.id, data, _ip(request))
         if after_write:
             after_write(db, "create", obj)
-        _dbg = {"id": obj.id, "_debug_dump": item.model_dump(), "_debug_data": {k: (str(v)[:300] if not isinstance(v, (int, float, bool, str, type(None))) else v) for k, v in data.items()}}
-        try:
-            _rs = ReadSchema.model_validate(obj)
-            _dbg["_dbg_readschema_plan"] = _rs.plan_items
-            _dbg["_dbg_readschema_scores"] = _rs.scores_json
-        except Exception as e:
-            _dbg["_dbg_readschema_err"] = str(e)[:300]
-        for fld in ("plan_items", "scores_json", "detail_json", "items_json", "sample_nos", "results_json", "sign_in_header", "subjects_json"):
-            if hasattr(obj, fld):
-                raw = getattr(obj, fld)
-                try:
-                    loaded = json.loads(raw)
-                    _dbg["_dbg_" + fld] = {"repr": repr(raw)[:200], "load_ok": True, "loaded": str(loaded)[:200]}
-                except Exception as e:
-                    _dbg["_dbg_" + fld] = {"repr": repr(raw)[:200], "load_ok": False, "err": str(e)}
-        return _dbg
+        return _to_read(obj)
 
     @router.put("/{item_id}", response_model=ReadSchema)
     def update(
@@ -178,7 +191,7 @@ def make_router(
         write_audit(db, user, "update", Model.__tablename__, item_id, changes, _ip(request))
         if after_write:
             after_write(db, "update", obj)
-        return obj
+        return _to_read(obj)
 
     @router.delete("/{item_id}")
     def delete(
