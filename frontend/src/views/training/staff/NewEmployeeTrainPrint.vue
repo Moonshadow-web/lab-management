@@ -36,10 +36,12 @@
       <thead>
         <tr>
           <th style="width:36px">序号</th>
-          <th style="width:90px">培训类别</th>
+          <th style="width:78px">培训类别</th>
           <th>培训内容</th>
-          <th style="width:110px">培训方式</th>
-          <th style="width:110px">考核方式</th>
+          <th style="width:78px">培训老师</th>
+          <th style="width:100px">培训方式</th>
+          <th style="width:100px">考核方式</th>
+          <th style="width:100px">考核成绩</th>
         </tr>
       </thead>
       <tbody>
@@ -47,10 +49,12 @@
           <td>{{ i + 1 }}</td>
           <td>{{ it.category }}</td>
           <td class="left">{{ it.content }}</td>
+          <td>{{ it.teacher }}</td>
           <td>{{ join(it.method) }}</td>
           <td>{{ join(it.exam_method) }}</td>
+          <td>{{ it.score !== '' && it.score != null ? it.score + '（' + pScoreVerdict(it.score) + '）' : '—' }}</td>
         </tr>
-        <tr v-if="!planItems.length"><td colspan="5" class="left">（无培训计划）</td></tr>
+        <tr v-if="!planItems.length"><td colspan="7" class="left">（无培训计划）</td></tr>
       </tbody>
     </table>
 
@@ -73,6 +77,13 @@ function join(v) {
   if (Array.isArray(v)) return v.filter(Boolean).join('、')
   if (typeof v === 'string') return v
   return ''
+}
+// 考核成绩按 80 分自动判定合格与否
+function pScoreVerdict(v) {
+  if (v === '' || v === null || v === undefined) return ''
+  const n = typeof v === 'number' ? v : parseFloat(String(v).trim())
+  if (Number.isNaN(n)) return ''
+  return n >= 80 ? '合格' : '不合格'
 }
 </script>
 

@@ -84,10 +84,13 @@
           <el-table-column label="培训类别" width="120">
             <template #default="{ row }"><el-input v-model="row.category" size="small" /></template>
           </el-table-column>
-          <el-table-column label="培训内容" min-width="240">
+          <el-table-column label="培训内容" min-width="220">
             <template #default="{ row }"><el-input v-model="row.content" size="small" /></template>
           </el-table-column>
-          <el-table-column label="培训方式" width="220">
+          <el-table-column label="培训老师" width="110">
+            <template #default="{ row }"><el-input v-model="row.teacher" size="small" /></template>
+          </el-table-column>
+          <el-table-column label="培训方式" width="200">
             <template #default="{ row }">
               <el-select v-model="row.method" multiple collapse-tags collapse-tags-tooltip size="small" placeholder="讲解/PPT/文件" style="width:100%">
                 <el-option label="讲解" value="讲解" />
@@ -96,13 +99,21 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="考核方式" width="190">
+          <el-table-column label="考核方式" width="170">
             <template #default="{ row }">
               <el-select v-model="row.exam_method" multiple collapse-tags collapse-tags-tooltip size="small" placeholder="试卷/问答/实操" style="width:100%">
                 <el-option label="试卷" value="试卷" />
                 <el-option label="问答" value="问答" />
                 <el-option label="实操" value="实操" />
               </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="考核成绩" width="160">
+            <template #default="{ row }">
+              <div class="score-cell">
+                <el-input v-model="row.score" size="small" placeholder="分数" style="width:64px" />
+                <el-tag v-if="scoreVerdict(row.score)" :type="scoreVerdict(row.score) === '合格' ? 'success' : 'danger'" size="small">{{ scoreVerdict(row.score) }}</el-tag>
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="" width="50" align="center">
@@ -163,45 +174,45 @@ function blank() {
   }
 }
 
-// BG-SM-PX-005 原表默认划√项，逐行与纸质表格一致
+// BG-SM-PX-005 原表默认划√项 + 默认培训老师，逐行与纸质表格一致
 function defaultOutline() {
   return [
-    { category: '生物安全', content: '生免室生物安全风险点告知', method: ['讲解'], exam_method: ['问答'] },
-    { category: '生物安全', content: '溢撒标本的处理', method: ['讲解'], exam_method: ['实操'] },
-    { category: '情况简介', content: '生免室的布局、人员结构、工作岗位、设置情况、所开展的检验项目等', method: ['讲解'], exam_method: ['问答'] },
-    { category: '情况简介', content: '急诊岗位职责', method: ['讲解'], exam_method: ['问答'] },
-    { category: '急诊岗', content: '急诊标本的接收和处理', method: ['讲解'], exam_method: ['实操'] },
-    { category: '急诊岗', content: '血气分析仪及血氨分析仪的操作使用流程', method: ['讲解'], exam_method: ['实操'] },
-    { category: '急诊岗', content: '急诊 AU5800、DXI800、TOP C 及 E411 的操作使用流程', method: ['讲解'], exam_method: ['问答', '实操'] },
-    { category: '急诊岗', content: '生化检验项目组合及临床意义', method: ['讲解', 'PPT'], exam_method: ['问答', '实操'] },
-    { category: '急诊岗', content: '临床危急值报告及样本拒收制度', method: ['讲解', 'PPT'], exam_method: ['实操'] },
-    { category: '病房岗', content: '标本处理前，中，后的流程', method: ['讲解'], exam_method: ['问答', '实操'] },
-    { category: '病房岗', content: '日立 7600 仪器日常使用及维护', method: ['讲解'], exam_method: ['问答', '实操'] },
-    { category: '病房岗', content: '生化室室内质控规则及失控处理流程', method: ['讲解', 'PPT'], exam_method: ['问答', '实操'] },
-    { category: '门诊岗', content: '了解试剂性能及携带污染等理论', method: ['讲解'], exam_method: ['问答', '实操'] },
-    { category: '门诊岗', content: '深入学习 5800 仪器生化项目的检测原理及反应曲线', method: ['讲解', 'PPT'], exam_method: ['实操'] },
-    { category: '门诊岗', content: 'AU5822 仪器及流水线使用', method: ['讲解'], exam_method: ['实操'] },
-    { category: '门诊岗', content: '生化检测项目的复检规则', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
-    { category: '门诊岗', content: '生化项目报告单发放', method: ['讲解'], exam_method: ['试卷', '问答'] },
-    { category: '门诊岗', content: '参与室间质评及仪器比对', method: ['讲解'], exam_method: ['问答', '实操'] },
-    { category: '凝血岗', content: 'TOP 系列凝血流水线的使用', method: ['讲解'], exam_method: ['实操'] },
-    { category: '凝血岗', content: '凝血相关试剂的配制及更换', method: ['讲解'], exam_method: ['实操'] },
-    { category: '凝血岗', content: '凝血常规项目的质量控制、检测原理', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
-    { category: '凝血岗', content: '凝血报告的注意事项及临床意义', method: ['讲解'], exam_method: ['问答'] },
-    { category: '凝血岗', content: 'APTT 纠正试验的操作流程及结果判读', method: ['讲解'], exam_method: ['问答'] },
-    { category: '凝血岗', content: 'TOP 血凝仪凝血曲线的解读及凝血项目复检规则', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
-    { category: '电泳岗', content: '出凝血疾病的实验室诊断步骤', method: ['讲解'], exam_method: ['问答', '实操'] },
-    { category: '电泳岗', content: '糖化血红蛋白仪器操作及理论', method: ['讲解'], exam_method: ['问答', '实操'] },
-    { category: '电泳岗', content: '免疫固定电泳技术', method: ['讲解'], exam_method: ['问答', '实操'] },
-    { category: '免疫手工岗', content: 'ELISA 检测的原理，TECAN 仪器的操作流程，注意事项及结果分析', method: ['讲解'], exam_method: ['试卷', '问答', '实操'] },
-    { category: '免疫手工岗', content: 'AIDS 初筛实验及报告方法，可疑样本的外送流程', method: ['讲解', '文件'], exam_method: ['问答', '实操'] },
-    { category: '免疫手工岗', content: 'TRUST 的检测原理及操作', method: ['讲解'], exam_method: ['问答', '实操'] },
-    { category: '免疫仪器岗', content: '免疫室化学发光法的检测项目及检测原理', method: ['讲解'], exam_method: ['试卷', '问答'] },
-    { category: '免疫仪器岗', content: '罗氏 E601、迈瑞 CL6000i、贝克曼 I800 的使用、质控及定标流程，及各仪器的维护保养', method: ['讲解', 'PPT'], exam_method: ['实操'] },
-    { category: '免疫仪器岗', content: '感染类项目（乙肝五项、甲肝抗体、丙肝抗体、戊肝抗体、艾滋抗体、梅毒抗体）、内分泌激素（胰岛素、C 肽、HCG、孕酮、雌二醇、雌三醇）及肿瘤标志物（甲胎蛋白、前列腺特异性抗原）的临床意义及复检规则', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
-    { category: '免疫杂项岗', content: '肾早期损伤项目、高血压组项、结核γ干扰素释放实验的检测原理及临床意义', method: ['讲解'], exam_method: ['试卷', '问答'] },
-    { category: '免疫杂项岗', content: '安图 A2000 的检测原理、使用及仪器维护', method: ['讲解'], exam_method: ['实操'] },
-    { category: '免疫杂项岗', content: '了解唐氏筛查的检测意义', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '生物安全', content: '生免室生物安全风险点告知', teacher: '金子铮', method: ['讲解'], exam_method: ['问答'] },
+    { category: '生物安全', content: '溢撒标本的处理', teacher: '金子铮', method: ['讲解'], exam_method: ['实操'] },
+    { category: '情况简介', content: '生免室的布局、人员结构、工作岗位、设置情况、所开展的检验项目等', teacher: '杨静', method: ['讲解'], exam_method: ['问答'] },
+    { category: '情况简介', content: '急诊岗位职责', teacher: '杨静', method: ['讲解'], exam_method: ['问答'] },
+    { category: '急诊岗', content: '急诊标本的接收和处理', teacher: '急诊岗人员', method: ['讲解'], exam_method: ['实操'] },
+    { category: '急诊岗', content: '血气分析仪及血氨分析仪的操作使用流程', teacher: '急诊岗人员', method: ['讲解'], exam_method: ['实操'] },
+    { category: '急诊岗', content: '急诊 AU5800、DXI800、TOP C 及 E411 的操作使用流程', teacher: '急诊岗人员', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '急诊岗', content: '生化检验项目组合及临床意义', teacher: '急诊岗人员', method: ['讲解', 'PPT'], exam_method: ['问答', '实操'] },
+    { category: '急诊岗', content: '临床危急值报告及样本拒收制度', teacher: '急诊岗人员', method: ['讲解', 'PPT'], exam_method: ['实操'] },
+    { category: '病房岗', content: '标本处理前，中，后的流程', teacher: '病房岗人员', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '病房岗', content: '日立 7600 仪器日常使用及维护', teacher: '病房岗人员', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '病房岗', content: '生化室室内质控规则及失控处理流程', teacher: '病房岗人员', method: ['讲解', 'PPT'], exam_method: ['问答', '实操'] },
+    { category: '门诊岗', content: '了解试剂性能及携带污染等理论', teacher: '门诊岗人员', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '门诊岗', content: '深入学习 5800 仪器生化项目的检测原理及反应曲线', teacher: '门诊岗人员', method: ['讲解', 'PPT'], exam_method: ['实操'] },
+    { category: '门诊岗', content: 'AU5822 仪器及流水线使用', teacher: '门诊岗人员', method: ['讲解'], exam_method: ['实操'] },
+    { category: '门诊岗', content: '生化检测项目的复检规则', teacher: '门诊岗人员', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
+    { category: '门诊岗', content: '生化项目报告单发放', teacher: '门诊岗人员', method: ['讲解'], exam_method: ['试卷', '问答'] },
+    { category: '门诊岗', content: '参与室间质评及仪器比对', teacher: '朱春阳', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '凝血岗', content: 'TOP 系列凝血流水线的使用', teacher: '凝血岗人员', method: ['讲解'], exam_method: ['实操'] },
+    { category: '凝血岗', content: '凝血相关试剂的配制及更换', teacher: '凝血岗人员', method: ['讲解'], exam_method: ['实操'] },
+    { category: '凝血岗', content: '凝血常规项目的质量控制、检测原理', teacher: '凝血岗人员', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
+    { category: '凝血岗', content: '凝血报告的注意事项及临床意义', teacher: '凝血岗人员', method: ['讲解'], exam_method: ['问答'] },
+    { category: '凝血岗', content: 'APTT 纠正试验的操作流程及结果判读', teacher: '凝血岗人员', method: ['讲解'], exam_method: ['问答'] },
+    { category: '凝血岗', content: 'TOP 血凝仪凝血曲线的解读及凝血项目复检规则', teacher: '凝血岗人员', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
+    { category: '电泳岗', content: '出凝血疾病的实验室诊断步骤', teacher: '电泳岗人员', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '电泳岗', content: '糖化血红蛋白仪器操作及理论', teacher: '电泳岗人员', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '电泳岗', content: '免疫固定电泳技术', teacher: '电泳岗人员', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '免疫手工岗', content: 'ELISA 检测的原理，TECAN 仪器的操作流程，注意事项及结果分析', teacher: '免疫手工岗人员', method: ['讲解'], exam_method: ['试卷', '问答', '实操'] },
+    { category: '免疫手工岗', content: 'AIDS 初筛实验及报告方法，可疑样本的外送流程', teacher: '免疫手工岗人员', method: ['讲解', '文件'], exam_method: ['问答', '实操'] },
+    { category: '免疫手工岗', content: 'TRUST 的检测原理及操作', teacher: '免疫手工岗人员', method: ['讲解'], exam_method: ['问答', '实操'] },
+    { category: '免疫仪器岗', content: '免疫室化学发光法的检测项目及检测原理', teacher: '免疫仪器岗人员', method: ['讲解'], exam_method: ['试卷', '问答'] },
+    { category: '免疫仪器岗', content: '罗氏 E601、迈瑞 CL6000i、贝克曼 I800 的使用、质控及定标流程，及各仪器的维护保养', teacher: '免疫仪器岗人员', method: ['讲解', 'PPT'], exam_method: ['实操'] },
+    { category: '免疫仪器岗', content: '感染类项目（乙肝五项、甲肝抗体、丙肝抗体、戊肝抗体、艾滋抗体、梅毒抗体）、内分泌激素（胰岛素、C 肽、HCG、孕酮、雌二醇、雌三醇）及肿瘤标志物（甲胎蛋白、前列腺特异性抗原）的临床意义及复检规则', teacher: '免疫仪器岗人员', method: ['讲解', 'PPT'], exam_method: ['试卷', '问答'] },
+    { category: '免疫杂项岗', content: '肾早期损伤项目、高血压组项、结核γ干扰素释放实验的检测原理及临床意义', teacher: '免疫杂项岗人员', method: ['讲解'], exam_method: ['试卷', '问答'] },
+    { category: '免疫杂项岗', content: '安图 A2000 的检测原理、使用及仪器维护', teacher: '免疫杂项岗人员', method: ['讲解'], exam_method: ['实操'] },
+    { category: '免疫杂项岗', content: '了解唐氏筛查的检测意义', teacher: '免疫杂项岗人员', method: ['讲解'], exam_method: ['问答', '实操'] },
   ]
 }
 
@@ -212,6 +223,14 @@ function toMethodArray(v) {
   return []
 }
 
+// 考核成绩按 80 分自动判定合格与否：>=80 合格，<80 不合格，空/非数字不判定
+function scoreVerdict(v) {
+  if (v === '' || v === null || v === undefined) return ''
+  const n = typeof v === 'number' ? v : parseFloat(String(v).trim())
+  if (Number.isNaN(n)) return ''
+  return n >= 80 ? '合格' : '不合格'
+}
+
 // 编辑/打印时拉取完整记录，避免列表行 plan_items 为字符串导致的卡顿与空白
 function normalizeRecord(full) {
   const items = Array.isArray(full.plan_items) ? full.plan_items : []
@@ -220,8 +239,10 @@ function normalizeRecord(full) {
     plan_items: items.map((r) => ({
       category: r.category || '',
       content: r.content || '',
+      teacher: r.teacher || '',
       method: toMethodArray(r.method),
       exam_method: toMethodArray(r.exam_method),
+      score: r.score ?? '',
     })),
   }
 }
@@ -236,7 +257,7 @@ async function openForm(row) {
   visible.value = true
 }
 function addPlanItem() {
-  form.value.plan_items.push({ category: '', content: '', method: [...DEFAULT_METHODS], exam_method: [...DEFAULT_EXAM_METHODS] })
+  form.value.plan_items.push({ category: '', content: '', teacher: '', method: [...DEFAULT_METHODS], exam_method: [...DEFAULT_EXAM_METHODS], score: '' })
 }
 function removePlanItem(r) { form.value.plan_items = form.value.plan_items.filter((x) => x !== r) }
 
@@ -274,4 +295,5 @@ function fetch(params) { return listNewEmployee(params) }
 
 <style scoped>
 .plan-toolbar { margin-bottom: 8px; }
+.score-cell { display: flex; align-items: center; gap: 6px; }
 </style>
