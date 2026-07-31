@@ -66,6 +66,12 @@ api_router.include_router(scheduling.router)
 api_router.include_router(education.router)
 api_router.include_router(education.attach_router)
 
+# 15189 内审专项（文件评审 / 自查 / 科室内审）
+from . import review, self_inspection, corrective_action
+api_router.include_router(review.review_router)
+api_router.include_router(self_inspection.si_router)
+api_router.include_router(corrective_action.corrective_router)
+
 # 将 test-items 的静态路由 /stats、/export 移到参数路由 /{item_id} 之前，
 # 避免具体路径被通用参数路由吞掉（如 GET /test-items/stats 误命中 /{item_id}）。
 _static_test_item = [

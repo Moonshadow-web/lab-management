@@ -36,6 +36,11 @@ from .education import (
     InternshipMentor, InternshipScore,
     EducationAttachment,
 )
+from .iso15189 import (
+    ReviewCampaign, ReviewAssignment,
+    AuditClause, SelfInspectionCampaign, SelfInspectionAssignment, SelfInspectionRecord,
+    CorrectiveAction,
+)
 
 __all__ = [
     "User",
@@ -88,4 +93,7 @@ __all__ = [
     "TrainingPlan", "TrainingSession",
     "InternshipMentor", "InternshipScore",
     "EducationAttachment",
+    "ReviewCampaign", "ReviewAssignment",
+    "AuditClause", "SelfInspectionCampaign", "SelfInspectionAssignment",
+    "SelfInspectionRecord", "CorrectiveAction",
 ]

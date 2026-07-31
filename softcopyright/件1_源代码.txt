@@ -1,0 +1,3278 @@
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第1页 / 共60页（总源码3537行，取自原第1页）
+------------------------------------------------------
+
+======================================================================
+# 文件: api/v1/test_items.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\test_items.py)
+======================================================================
+
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
+from fastapi.responses import Response
+from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from io import BytesIO
+import io
+import openpyxl
+from collections import Counter
+
+from ...core.crud_base import make_router
+from ...models.test_item import TestItem
+from ...models.user import User
+from ...schemas import TestItemCreate, TestItemRead, TestItemUpdate
+from ...core.database import get_db
+from ...core.security import get_current_user
+from ...core.brand import extract_brand, resolve_brand
+
+router = make_router(
+    TestItem,
+    TestItemRead,
+    TestItemCreate,
+    TestItemUpdate,
+    search_fields=["code", "name", "aliases", "category", "method", "instrument", "instrument_group"],
+    filter_fields=["category", "brand", "specimen", "method", "instrument"],
+    prefix="/test-items",
+    write_roles=("admin",),
+)
+
+# 中文表头 -> 英文字段名（与导出模板一致，忽略表头尾部 * 号）
+_CN2EN = {
+    "项目编号": "code", "项目名称": "name", "别名": "aliases", "类别": "category",
+    "标本类型": "specimen", "方法学": "method", "单位": "unit", "参考范围": "reference",
+    "收费": "fee", "使用仪器": "instrument", "仪器组": "instrument_group",
+    "线性范围": "linear_range", "稀释倍数": "dilution_fold", "可报告范围": "reportable_range",
+    "稀释液": "diluent", "校准品": "calibrator", "溯源性": "traceability", "品牌": "brand",
+    "最近更新": "last_update", "溶血干扰": "interference_hemolysis",
+    "胆红素干扰": "interference_bilirubin", "脂血干扰": "interference_lipemia",
+}
+
+
+@router.post("/import")
+async def import_test_items(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """批量导入检验项目：按项目名称匹配，已存在则更新、不存在则新增。"""
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 文件")
+    try:
+        raw = await file.read()
+        wb = openpyxl.load_workbook(BytesIO(raw), data_only=True)
+        ws = wb.active
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第2页 / 共60页（总源码3537行，取自原第2页）
+------------------------------------------------------
+        grid = list(ws.iter_rows(values_only=True))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"读取文件失败：{e}")
+    if not grid:
+        raise HTTPException(status_code=400, detail="文件为空")
+
+    header = [str(c).strip().rstrip("*").strip() if c is not None else "" for c in grid[0]]
+    en_header = [_CN2EN.get(h, "") for h in header]
+
+    created = updated = skipped = 0
+    errors = []
+    for row in grid[1:]:
+        if row is None:
+            continue
+        if all(c is None or str(c).strip() == "" for c in row):
+            continue
+        payload = {}
+        for idx, en in enumerate(en_header):
+            if not en or idx >= len(row):
+                continue
+            val = row[idx]
+            payload[en] = "" if val is None else str(val).strip()
+        name = payload.get("name", "")
+        if not name:
+            skipped += 1
+            errors.append("存在缺项目名称的行，已跳过")
+            continue
+        existing = db.query(TestItem).filter(TestItem.name == name).first()
+        if existing:
+            changed = False
+            for k, v in payload.items():
+                if v != "" and getattr(existing, k) != v:
+                    setattr(existing, k, v)
+                    changed = True
+            if changed:
+                updated += 1
+            else:
+                skipped += 1
+        else:
+            db.add(TestItem(**payload))
+            created += 1
+        db.commit()
+    return {"created": created, "updated": updated, "skipped": skipped, "errors": errors[:20]}
+
+
+@router.get("/stats")
+async def test_items_stats(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第3页 / 共60页（总源码3537行，取自原第3页）
+------------------------------------------------------
+    """统计分类：按类别、按品牌、按仪器的计数，供前端概览展示。"""
+    rows = db.query(TestItem).all()
+    cat_counter = Counter(r.category or "未分类" for r in rows)
+    brand_counter = Counter(resolve_brand(r.calibrator, r.brand) or "未标识" for r in rows)
+    def _norm_inst(r):
+        v = (r.instrument or "").strip()
+        return "未设置" if v in ("", "/") else v
+    inst_counter = Counter(_norm_inst(r) for r in rows)
+    return {
+        "total": len(rows),
+        "category_counts": dict(cat_counter.most_common()),
+        "brand_counts": dict(brand_counter.most_common()),
+        "instrument_counts": dict(inst_counter.most_common()),
+    }
+
+
+@router.get("/export")
+async def export_test_items(
+    q: str = "",
+    category: str = "",
+    brand: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """导出项目汇总清单（Excel）：支持按关键词/类别/品牌筛选，按类别排序，并附分类统计。"""
+    query = db.query(TestItem)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            or_(
+                TestItem.name.ilike(like),
+                TestItem.code.ilike(like),
+                TestItem.aliases.ilike(like),
+                TestItem.method.ilike(like),
+                TestItem.instrument.ilike(like),
+                TestItem.instrument_group.ilike(like),
+            )
+        )
+    if category:
+        query = query.filter(TestItem.category == category)
+    if brand:
+        query = query.filter(or_(TestItem.brand == brand, TestItem.calibrator.ilike(f"%{brand}%")))
+    rows = query.order_by(TestItem.category, TestItem.name).all()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "项目汇总清单"
+    headers = [
+        "项目编号", "项目名称", "品牌", "类别", "标本类型", "方法学", "单位",
+        "参考范围", "线性范围", "可报告范围", "校准品", "溯源性", "使用仪器", "仪器组",
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第4页 / 共60页（总源码3537行，取自原第4页）
+------------------------------------------------------
+    ]
+    ws.append(headers)
+    for r in rows:
+        ws.append([
+            r.code, r.name, resolve_brand(r.calibrator, r.brand), r.category, r.specimen,
+            r.method, r.unit, r.reference, r.linear_range, r.reportable_range,
+            r.calibrator, r.traceability, r.instrument, r.instrument_group,
+        ])
+
+    # 分类统计 sheet
+    stat = wb.create_sheet("分类统计")
+    cat_counter = Counter(r.category or "未分类" for r in rows)
+    brand_counter = Counter(resolve_brand(r.calibrator, r.brand) or "未标识" for r in rows)
+    stat.append(["一、按类别统计", ""])
+    stat.append(["类别", "数量"])
+    for k, v in cat_counter.most_common():
+        stat.append([k, v])
+    stat.append([])
+    stat.append(["二、按品牌统计", ""])
+    stat.append(["品牌", "数量"])
+    for k, v in brand_counter.most_common():
+        stat.append([k, v])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=test_items_summary.xlsx",
+            "Cache-Control": "no-store",
+        },
+    )
+
+======================================================================
+# 文件: api/v1/instruments.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\instruments.py)
+======================================================================
+
+from fastapi import Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
+from pathlib import Path
+import os
+import re
+
+from sqlalchemy import case, func, or_
+from sqlalchemy.orm import Session
+
+from ...core.crud_base import make_router, write_audit
+from ...core.database import get_db
+from ...core.security import get_current_user
+from ...core.storage import storage
+from ...core.doc_convert import convert_doc_bytes_to_docx
+from ...models.instrument import CalibrationRecord, Instrument
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第5页 / 共60页（总源码3537行，取自原第5页）
+------------------------------------------------------
+from ...models.instrument_archive import InstrumentArchive
+from ...models.document import Document
+from ...models.document_instrument import DocumentInstrument
+from ...models.test_item import TestItem
+from ...models.user import User
+from ...core.instrument_link import (
+    build_family_map,
+    build_instrument_test_items_map,
+    resolve_family_instruments,
+)
+from ...schemas import (
+    CalibrationRecordCreate,
+    CalibrationRecordRead,
+    InstrumentCreate,
+    InstrumentRead,
+    InstrumentUpdate,
+    TestItemRead,
+)
+from ...services.notification_service import (
+    compute_calibration_alerts,
+    refresh_calibration_notifications,
+)
+
+# 仪器台账 CRUD（通用路由），校准记录在其上扩展
+# 排序：日常管理人(空值排最后) → 科室编号自然升序
+_instrument_order = [
+    case((or_(Instrument.daily_manager.is_(None), Instrument.daily_manager == ""), 1), else_=0),
+    # doc_number_sort 仅在 SQLite 存在，MySQL 用原生排序
+    Instrument.dept_no,
+]
+router = make_router(
+    Instrument,
+    InstrumentRead,
+    InstrumentCreate,
+    InstrumentUpdate,
+    search_fields=["name", "dept_no", "model", "manufacturer", "serial_no", "owner", "location"],
+    filter_fields=["status", "category"],
+    order_by=_instrument_order,
+    prefix="/instruments",
+    write_roles=("admin", "specialty_leader"),
+)
+
+
+@router.get("/family-map")
+def instrument_family_map(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """项目「使用仪器」总型号 → 对应仪器档案清单。
+
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第6页 / 共60页（总源码3537行，取自原第6页）
+------------------------------------------------------
+    返回 { 总型号: [ {id,name,model,dept_no,has_archive}, ... ] }，供项目查询页
+    渲染「关联仪器」芯片并跳转档案。一对多（如 罗氏 Cobas6000 → e601/e602/e411）。
+    """
+    # 遍历全部已登记的总型号 / 仪器组 token 家族（instrument_families 表），
+    # 不再局限于 test_items.instrument，从而支持「仪器组」精确关联。
+    return build_family_map(db)
+
+
+# 路由重排：/family-map 静态路由必须排在 /{id} 之前，否则会被参数路由吞掉
+_family_routes = [r for r in router.routes if getattr(r, "path", None) == "/family-map"]
+_other_routes = [r for r in router.routes if getattr(r, "path", None) != "/family-map"]
+router.routes = _family_routes + _other_routes
+
+
+@router.get("/{instrument_id}/test-items", response_model=list[TestItemRead])
+def instrument_test_items(
+    instrument_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """反向索引：返回引用了该仪器的项目列表（与项目查询页「关联仪器」芯片对称）。
+
+    项目通过 instrument_group 中的 token（如 AU58-1 / 急诊）或总型号 instrument
+    命中某个 family，进而关联到本仪器；此处把该关系反转，列出所有落在本仪器上的项目。
+    """
+    if not db.get(Instrument, instrument_id):
+        raise HTTPException(status_code=404, detail="未找到仪器")
+    m = build_instrument_test_items_map(db)
+    items = list(m.get(instrument_id, []))
+    items.sort(key=lambda x: (x.code or ""))
+    return items
+
+
+@router.get("/{instrument_id}/documents")
+def instrument_documents(
+    instrument_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """返回关联到该仪器的文档（如操作+保养记录），供仪器档案页反向展示。
+
+    关联关系存于 document_instruments 表（多对多）。默认排除「作废」文档，
+    按编号自然序返回精简字段。
+    """
+    if not db.get(Instrument, instrument_id):
+        raise HTTPException(status_code=404, detail="未找到仪器")
+    rows = (
+        db.query(Document)
+        .join(DocumentInstrument, DocumentInstrument.document_id == Document.id)
+        .filter(DocumentInstrument.instrument_id == instrument_id)
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第7页 / 共60页（总源码3537行，取自原第7页）
+------------------------------------------------------
+        .filter(Document.status != "作废")
+        .all()
+    )
+    rows.sort(key=lambda d: (d.doc_number or ""))
+    return [
+        {
+            "id": d.id,
+            "doc_number": d.doc_number or "",
+            "title": d.title or "",
+            "category": d.category or "",
+            "version": d.version or "",
+            "status": d.status or "",
+            "original_filename": d.original_filename or "",
+        }
+        for d in rows
+    ]
+
+
+@router.get("/{instrument_id}/calibrations", response_model=list[CalibrationRecordRead])
+def list_calibrations(
+    instrument_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return (
+        db.query(CalibrationRecord)
+        .filter(CalibrationRecord.instrument_id == instrument_id)
+        .order_by(CalibrationRecord.id.desc())
+        .all()
+    )
+
+
+@router.post("/{instrument_id}/calibrations", response_model=CalibrationRecordRead, status_code=201)
+def create_calibration(
+    instrument_id: int,
+    item: CalibrationRecordCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not db.get(Instrument, instrument_id):
+        raise HTTPException(status_code=404, detail="未找到仪器")
+    rec = CalibrationRecord(instrument_id=instrument_id, **item.model_dump(exclude={"instrument_id"}))
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    refresh_calibration_notifications(db)
+    write_audit(db, user, "create", "calibration_records", rec.id, item.model_dump(), request.client.host if request.client else None)
+    return rec
+
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第8页 / 共60页（总源码3537行，取自原第8页）
+------------------------------------------------------
+
+@router.delete("/{instrument_id}/calibrations/{rec_id}")
+def delete_calibration(
+    instrument_id: int,
+    rec_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    rec = db.get(CalibrationRecord, rec_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="未找到校准记录")
+    db.delete(rec)
+    db.commit()
+    refresh_calibration_notifications(db)
+    write_audit(db, user, "delete", "calibration_records", rec_id, "", request.client.host if request.client else None)
+    return {"ok": True}
+
+
+def _get_calibration(db: Session, instrument_id: int, rec_id: int):
+    rec = db.get(CalibrationRecord, rec_id)
+    if not rec or rec.instrument_id != instrument_id:
+        return None
+    return rec
+
+
+def _report_storage_path(rec: CalibrationRecord) -> Path | None:
+    if not rec.report_file_path:
+        return None
+    p = storage.get_path(rec.report_file_path)
+    return p if p.exists() else None
+
+
+@router.post("/{instrument_id}/calibrations/{rec_id}/report", status_code=201)
+def upload_calibration_report(
+    instrument_id: int,
+    rec_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """为某条校准记录上传/替换电子版校准报告（.docx/.pdf/.doc，自动转 doc→docx）。"""
+    rec = _get_calibration(db, instrument_id, rec_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="未找到校准记录")
+    content = file.file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+    content, stored_name, file_ext, original_filename = _maybe_convert_doc(file.filename, content)
+    rel = storage.save("calibration_reports", stored_name, content)
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第9页 / 共60页（总源码3537行，取自原第9页）
+------------------------------------------------------
+    # 替换旧报告文件
+    if rec.report_file_path:
+        storage.delete(rec.report_file_path)
+    rec.report_file_path = rel
+    rec.report_filename = original_filename
+    db.commit()
+    refresh_calibration_notifications(db)
+    write_audit(db, user, "create", "calibration_records", rec.id, {"report": rel})
+    return {
+        "id": rec.id,
+        "report_file_path": rec.report_file_path,
+        "report_filename": rec.report_filename,
+        "file_ext": file_ext,
+    }
+
+
+@router.get("/{instrument_id}/calibrations/{rec_id}/report")
+def download_calibration_report(
+    instrument_id: int,
+    rec_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """下载 / 预览校准报告（返回文件流，前端按扩展名决定预览或下载）。"""
+    rec = _get_calibration(db, instrument_id, rec_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="未找到校准记录")
+    p = _report_storage_path(rec)
+    if not p:
+        raise HTTPException(status_code=404, detail="报告文件不存在")
+    return FileResponse(
+        p, filename=rec.report_filename or p.name,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.delete("/{instrument_id}/calibrations/{rec_id}/report")
+def delete_calibration_report(
+    instrument_id: int,
+    rec_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    rec = _get_calibration(db, instrument_id, rec_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="未找到校准记录")
+    if rec.report_file_path:
+        storage.delete(rec.report_file_path)
+    rec.report_file_path = ""
+    rec.report_filename = ""
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第10页 / 共60页（总源码3537行，取自原第10页）
+--------------------------------------------------------
+    db.commit()
+    refresh_calibration_notifications(db)
+    return {"ok": True}
+
+
+@router.get("/calibrations/status")
+def calibrations_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """返回所有在用仪器的校准预警状态（供列表快速标记：下次校准日期 / 逾期 / 即将到期 / 是否有报告）。"""
+    return compute_calibration_alerts(db)
+
+
+# ----------------------------------------------------------------------------
+# 仪器档案文件：每个仪器对应一个档案文件（.docx/.pdf/.doc），支持上传/下载/预览/删除
+# ----------------------------------------------------------------------------
+
+def _get_archive(db: Session, instrument_id: int):
+    return db.query(InstrumentArchive).filter(InstrumentArchive.instrument_id == instrument_id).first()
+
+
+def _maybe_convert_doc(filename, content):
+    """返回 (content, stored_filename, file_ext, original_filename)。
+
+    旧版 .doc（OLE2 复合文档）无法在浏览器内预览，尝试通过 Word COM 转换为
+    .docx。判定依据是文件头魔数（而非扩展名），因此即便是「伪装成 .docx」的
+    旧 .doc 也能被识别并转换。转换失败则保留原文件（预览时回退下载）。
+    """
+    base = filename or "archive.docx"
+    ext = Path(base).suffix.lower()
+    # 真实 .docx（ZIP 包）直接放行
+    if content[:2] == b"PK":
+        return content, base, ext, (filename or "")
+    # OLE2 复合文档（旧版 .doc，可能顶着 .docx 扩展名）→ 转 docx
+    if content and content[:4] == b"\xd0\xcf\x11\xe0":
+        converted = convert_doc_bytes_to_docx(content)
+        if converted:
+            stem = Path(base).stem
+            new_name = stem + ".docx"
+            return converted, new_name, ".docx", new_name
+    return content, base, ext, (filename or "")
+
+
+@router.get("/archives/status")
+def archives_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """返回所有仪器的建档状态（用于列表快速标记已建档/未建档）。"""
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第11页 / 共60页（总源码3537行，取自原第11页）
+--------------------------------------------------------
+    rows = db.query(
+        InstrumentArchive.instrument_id,
+        InstrumentArchive.original_filename,
+        InstrumentArchive.file_ext,
+    ).all()
+    return [
+        {"instrument_id": r[0], "has_archive": True, "original_filename": r[1], "file_ext": r[2]}
+        for r in rows
+    ]
+
+
+@router.post("/{instrument_id}/archive", status_code=201)
+def upload_archive(
+    instrument_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """为指定仪器上传/替换档案文件（同名覆盖旧文件）。"""
+    inst = db.get(Instrument, instrument_id)
+    if not inst:
+        raise HTTPException(status_code=404, detail="未找到仪器")
+    content = file.file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+    content, stored_name, file_ext, original_filename = _maybe_convert_doc(file.filename, content)
+    rel = storage.save("instrument_archives", stored_name, content)
+    old = _get_archive(db, instrument_id)
+    if old:
+        storage.delete(old.filename)
+        db.delete(old)
+        db.commit()
+    rec = InstrumentArchive(
+        instrument_id=instrument_id,
+        filename=rel,
+        original_filename=original_filename,
+        file_size=len(content),
+        file_ext=file_ext,
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    write_audit(db, user, "create", "instrument_archives", rec.id, {"instrument_id": instrument_id})
+    return {
+        "id": rec.id,
+        "has_archive": True,
+        "original_filename": rec.original_filename,
+        "file_size": rec.file_size,
+        "file_ext": rec.file_ext,
+        "uploaded_at": rec.uploaded_at,
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第12页 / 共60页（总源码3537行，取自原第12页）
+--------------------------------------------------------
+    }
+
+
+@router.get("/{instrument_id}/archive/info")
+def archive_info(
+    instrument_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    rec = _get_archive(db, instrument_id)
+    if not rec:
+        return {"has_archive": False}
+    return {
+        "has_archive": True,
+        "original_filename": rec.original_filename,
+        "file_size": rec.file_size,
+        "file_ext": rec.file_ext,
+        "uploaded_at": rec.uploaded_at,
+    }
+
+
+@router.get("/{instrument_id}/archive")
+def download_archive(
+    instrument_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    rec = _get_archive(db, instrument_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="未找到档案")
+    p = storage.get_path(rec.filename)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    return FileResponse(
+        p, filename=rec.original_filename or p.name,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.delete("/{instrument_id}/archive")
+def delete_archive(
+    instrument_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    rec = _get_archive(db, instrument_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="未找到档案")
+    storage.delete(rec.filename)
+    db.delete(rec)
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第13页 / 共60页（总源码3537行，取自原第13页）
+--------------------------------------------------------
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/archives/import-folder")
+def import_archives_folder(
+    body: dict,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """按目录批量导入仪器档案：用文件名中的科室编号(dept_no)匹配仪器。"""
+    folder = (body.get("path") or "").strip()
+    if not folder or not os.path.isdir(folder):
+        raise HTTPException(status_code=400, detail="目录不存在或无法访问")
+    dept_list = [(inst.dept_no, inst) for inst in db.query(Instrument).all() if inst.dept_no]
+    matched_ids = set()
+    imported = 0
+    skipped = []
+    files = [
+        f for f in sorted(os.listdir(folder))
+        if f.lower().endswith((".docx", ".doc", ".pdf"))
+    ]
+    for f in files:
+        stem = Path(f).stem
+        m = re.search(r"SM-\d+", stem)
+        if not m:
+            skipped.append(f)
+            continue
+        code = m.group(0)
+        matched = next((inst for dept_no, inst in dept_list if dept_no and dept_no.endswith(code)), None)
+        if not matched:
+            skipped.append(f"{f}（未匹配到仪器 {code}）")
+            continue
+        if matched.id in matched_ids:
+            skipped.append(f"{f}（重复匹配到同一仪器，已跳过）")
+            continue
+        fpath = os.path.join(folder, f)
+        try:
+            with open(fpath, "rb") as fh:
+                content = fh.read()
+        except Exception:
+            skipped.append(f"{f}（读取失败）")
+            continue
+        if not content:
+            skipped.append(f"{f}（空文件）")
+            continue
+        content, stored_name, file_ext, original_filename = _maybe_convert_doc(f, content)
+        rel = storage.save("instrument_archives", stored_name, content)
+        old = _get_archive(db, matched.id)
+        if old:
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第14页 / 共60页（总源码3537行，取自原第14页）
+--------------------------------------------------------
+            storage.delete(old.filename)
+            db.delete(old)
+            db.commit()
+        db.add(
+            InstrumentArchive(
+                instrument_id=matched.id,
+                filename=rel,
+                original_filename=original_filename,
+                file_size=len(content),
+                file_ext=file_ext,
+            )
+        )
+        db.commit()
+        imported += 1
+        matched_ids.add(matched.id)
+    return {"imported": imported, "skipped": skipped, "total_files": len(files)}
+
+
+# ============ 临时诊断接口（排查线上 /instruments 500，修复后删除）============
+# 用两段路径 /_debug/raw 规避与 /{instrument_id} 单段路由的参数匹配冲突
+@router.get("/_debug/raw")
+def debug_instruments_raw(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    import traceback as _tb
+    try:
+        rows = db.query(Instrument).order_by(*_instrument_order).all()
+    except Exception as e:
+        return {"stage": "query", "error": repr(e), "tb": _tb.format_exc()}
+    problems = []
+    for r in rows:
+        try:
+            InstrumentRead.model_validate(r, from_attributes=True)
+        except Exception as e:
+            problems.append({
+                "id": r.id,
+                "name": r.name,
+                "created_at": repr(r.created_at),
+                "updated_at": repr(r.updated_at),
+                "qc_instrument": repr(r.qc_instrument),
+                "error": repr(e),
+            })
+    return {"total": len(rows), "problems": problems}
+
+======================================================================
+# 文件: api/v1/instrument_families.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\instrument_families.py)
+======================================================================
+
+"""「项目使用仪器总型号 ↔ 仪器档案」关联的管理接口。
+
+- 总型号(instrument_families) 对应 test_items.instrument 的取值；
+- 成员(instrument_family_members) 关联具体仪器(instruments)。
+
+提供：列表/详情/新增/改名/删除，以及成员的整体替换（供前端多选器保存）。
+"""
+
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第15页 / 共60页（总源码3537行，取自原第15页）
+--------------------------------------------------------
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from ...core.database import get_db
+from ...core.security import get_current_user
+from ...models.instrument import Instrument
+from ...models.instrument_archive import InstrumentArchive
+from ...models.instrument_family import InstrumentFamily, InstrumentFamilyMember
+from ...models.test_item import TestItem
+from ...models.user import User
+from ...schemas import (
+    InstrumentFamilyCreate,
+    InstrumentFamilyMemberOut,
+    InstrumentFamilyRead,
+    InstrumentFamilyUpdate,
+)
+
+router = APIRouter(prefix="/instrument-families", tags=["instrument_families"])
+
+
+def _member_ids(db: Session, family_id: int) -> list[int]:
+    return [
+        m.instrument_id
+        for m in db.query(InstrumentFamilyMember)
+        .filter(InstrumentFamilyMember.family_id == family_id)
+        .all()
+    ]
+
+
+def _active_member_ids(db: Session, family_id: int) -> list[int]:
+    """返回该总型号关联、且未停用的仪器 id（停用仪器不显示、不可跳转）。"""
+    ids = _member_ids(db, family_id)
+    if not ids:
+        return []
+    return [
+        iid
+        for (iid,) in db.query(Instrument.id)
+        .filter(Instrument.id.in_(ids), Instrument.status != "停用")
+        .all()
+    ]
+
+
+def _members_detail(db: Session, family_id: int) -> list[dict]:
+    ids = _active_member_ids(db, family_id)
+    insts = db.query(Instrument).filter(Instrument.id.in_(ids)).all() if ids else []
+    insts.sort(key=lambda x: x.id)
+    return [
+        {
+            "id": i.id,
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第16页 / 共60页（总源码3537行，取自原第16页）
+--------------------------------------------------------
+            "name": i.name,
+            "model": i.model,
+            "dept_no": i.dept_no,
+            "status": i.status,
+            "has_archive": db.query(InstrumentArchive)
+            .filter(InstrumentArchive.instrument_id == i.id)
+            .first()
+            is not None,
+        }
+        for i in insts
+    ]
+
+
+def _to_read(db: Session, fam: InstrumentFamily) -> InstrumentFamilyRead:
+    ids = _active_member_ids(db, fam.id)
+    # 用量：既统计「总型号」直接命中的项目，也统计「仪器组」含该 token 的项目
+    used = (
+        db.query(func.count(TestItem.id))
+        .filter(
+            (TestItem.instrument == fam.name)
+            | (TestItem.instrument_group.like("%" + fam.name + "%"))
+        )
+        .scalar()
+        or 0
+    )
+    return InstrumentFamilyRead(
+        id=fam.id,
+        name=fam.name,
+        description=fam.description,
+        instrument_ids=ids,
+        member_count=len(ids),
+        used_count=used,
+        members=[InstrumentFamilyMemberOut(**m) for m in _members_detail(db, fam.id)],
+        created_at=fam.created_at,
+        updated_at=fam.updated_at,
+    )
+
+
+@router.get("", response_model=list[InstrumentFamilyRead])
+def list_families(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    fams = db.query(InstrumentFamily).order_by(InstrumentFamily.name).all()
+    return [_to_read(db, f) for f in fams]
+
+
+@router.post("", response_model=InstrumentFamilyRead, status_code=201)
+def create_family(
+    body: InstrumentFamilyCreate,
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第17页 / 共60页（总源码3537行，取自原第17页）
+--------------------------------------------------------
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="总型号名称不能为空")
+    if db.query(InstrumentFamily).filter(InstrumentFamily.name == name).first():
+        raise HTTPException(status_code=400, detail=f"总型号「{name}」已存在")
+    fam = InstrumentFamily(name=name, description=(body.description or "").strip())
+    db.add(fam)
+    db.commit()
+    db.refresh(fam)
+    return _to_read(db, fam)
+
+
+@router.get("/{family_id}", response_model=InstrumentFamilyRead)
+def get_family(
+    family_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    fam = db.get(InstrumentFamily, family_id)
+    if not fam:
+        raise HTTPException(status_code=404, detail="未找到总型号")
+    return _to_read(db, fam)
+
+
+@router.put("/{family_id}", response_model=InstrumentFamilyRead)
+def update_family(
+    family_id: int,
+    body: InstrumentFamilyUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    fam = db.get(InstrumentFamily, family_id)
+    if not fam:
+        raise HTTPException(status_code=404, detail="未找到总型号")
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="总型号名称不能为空")
+        dup = db.query(InstrumentFamily).filter(InstrumentFamily.name == name, InstrumentFamily.id != family_id).first()
+        if dup:
+            raise HTTPException(status_code=400, detail=f"总型号「{name}」已存在")
+        fam.name = name
+    if body.description is not None:
+        fam.description = body.description.strip()
+    db.commit()
+    db.refresh(fam)
+    return _to_read(db, fam)
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第18页 / 共60页（总源码3537行，取自原第18页）
+--------------------------------------------------------
+
+
+@router.delete("/{family_id}")
+def delete_family(
+    family_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    fam = db.get(InstrumentFamily, family_id)
+    if not fam:
+        raise HTTPException(status_code=404, detail="未找到总型号")
+    db.query(InstrumentFamilyMember).filter(InstrumentFamilyMember.family_id == family_id).delete()
+    db.delete(fam)
+    db.commit()
+    return {"ok": True}
+
+
+@router.put("/{family_id}/members", response_model=InstrumentFamilyRead)
+def set_members(
+    family_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    fam = db.get(InstrumentFamily, family_id)
+    if not fam:
+        raise HTTPException(status_code=404, detail="未找到总型号")
+    ids = [int(x) for x in (body.get("instrument_ids") or [])]
+    # 校验仪器真实存在，且不允许关联「停用」仪器（停用仪器不显示、不可跳转）
+    active = (
+        {
+            i.id
+            for i in db.query(Instrument.id)
+            .filter(Instrument.id.in_(ids), Instrument.status != "停用")
+            .all()
+        }
+        if ids
+        else set()
+    )
+    db.query(InstrumentFamilyMember).filter(InstrumentFamilyMember.family_id == family_id).delete()
+    for iid in ids:
+        if iid in active:
+            db.add(InstrumentFamilyMember(family_id=family_id, instrument_id=iid))
+    db.commit()
+    db.refresh(fam)
+    return _to_read(db, fam)
+
+======================================================================
+# 文件: models/test_item.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\models\test_item.py)
+======================================================================
+
+from datetime import datetime
+
+from sqlalchemy import DateTime, Integer, String, Text
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第19页 / 共60页（总源码3537行，取自原第19页）
+--------------------------------------------------------
+from sqlalchemy.orm import Mapped, mapped_column
+
+from ..core.database import Base
+
+
+class TestItem(Base):
+    __tablename__ = "test_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(50), index=True, default="")
+    name: Mapped[str] = mapped_column(String(200), index=True, default="")
+    aliases: Mapped[str] = mapped_column(String(200), default="")  # 别名，逗号分隔
+    category: Mapped[str] = mapped_column(String(50), index=True, default="")  # 分类
+    specimen: Mapped[str] = mapped_column(String(50), default="")  # 标本类型
+    method: Mapped[str] = mapped_column(String(100), default="")  # 检测方法
+    unit: Mapped[str] = mapped_column(String(30), default="")
+    reference: Mapped[str] = mapped_column(Text, default="")  # 参考范围
+    fee: Mapped[str] = mapped_column(String(30), default="")  # 收费（占位待补）
+    instrument: Mapped[str] = mapped_column(String(100), default="")
+    instrument_group: Mapped[str] = mapped_column(String(100), default="")
+    linear_range: Mapped[str] = mapped_column(String(100), default="")
+    dilution_fold: Mapped[str] = mapped_column(String(30), default="")
+    reportable_range: Mapped[str] = mapped_column(String(100), default="")
+    diluent: Mapped[str] = mapped_column(String(100), default="")
+    calibrator: Mapped[str] = mapped_column(String(100), default="")
+    traceability: Mapped[str] = mapped_column(String(200), default="")
+    brand: Mapped[str] = mapped_column(String(50), default="")  # 品牌标识（显式存储，优先于从校准品推导）
+    last_update: Mapped[str] = mapped_column(String(50), default="")
+    interference_hemolysis: Mapped[str] = mapped_column(String(100), default="")
+    interference_bilirubin: Mapped[str] = mapped_column(String(100), default="")
+    interference_lipemia: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # 室间质评 / 室间比对标记：默认均有（1）；无室间质评=0；无室间比对（既无 EQA 也无外部参比）=0
+    has_eqa: Mapped[int] = mapped_column(Integer, default=1)
+    has_interlab: Mapped[int] = mapped_column(Integer, default=1)
+
+======================================================================
+# 文件: models/instrument.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\models\instrument.py)
+======================================================================
+
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from ..core.database import Base
+
+
+INSTRUMENT_STATUS = ["在用", "备用", "维修", "停用"]
+
+
+class Instrument(Base):
+    __tablename__ = "instruments"
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第20页 / 共60页（总源码3537行，取自原第20页）
+--------------------------------------------------------
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), index=True, default="")
+    dept_no: Mapped[str] = mapped_column(String(50), default="")  # 科室编号
+    model: Mapped[str] = mapped_column(String(100), default="")  # 规格型号
+    manufacturer: Mapped[str] = mapped_column(String(100), default="")  # 生产厂家
+    category: Mapped[str] = mapped_column(String(50), default="")
+    location: Mapped[str] = mapped_column(String(100), default="")  # 存放位置
+    status: Mapped[str] = mapped_column(String(20), default="在用")  # 在用/备用/维修/停用
+    serial_no: Mapped[str] = mapped_column(String(100), default="")  # 出厂编号
+    purchase_date: Mapped[str] = mapped_column(String(30), default="")  # 购入日期
+    start_date: Mapped[str] = mapped_column(String(30), default="")  # 启用日期
+    owner: Mapped[str] = mapped_column(String(100), default="")  # 设备负责人
+    daily_manager: Mapped[str] = mapped_column(String(100), default="")  # 日常管理人
+    supplier: Mapped[str] = mapped_column(String(200), default="")  # 供货商名称
+    contact: Mapped[str] = mapped_column(String(200), default="")  # 联系人及电话
+    qc_instrument: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否室内质控受控仪器（月结下拉限定）
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CalibrationRecord(Base):
+    __tablename__ = "calibration_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(Integer, index=True)
+    calibration_date: Mapped[str] = mapped_column(String(30), default="")  # 校准日期
+    next_due_date: Mapped[str] = mapped_column(String(30), default="")  # 下次到期
+    result: Mapped[str] = mapped_column(String(200), default="")  # 校准结果
+    agency: Mapped[str] = mapped_column(String(200), default="")  # 检定/校准机构
+    cycle_months: Mapped[str] = mapped_column(String(10), default="")  # 检定周期(月)
+    operator: Mapped[str] = mapped_column(String(100), default="")  # 校准人
+    report_file_path: Mapped[str] = mapped_column(String(500), default="")  # 报告文件路径
+    report_filename: Mapped[str] = mapped_column(String(300), default="")  # 报告原始文件名
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+======================================================================
+# 文件: models/instrument_family.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\models\instrument_family.py)
+======================================================================
+
+"""项目「使用仪器」总型号(family) → 仪器档案(instruments) 的关联关系表。
+
+项目表 `test_items.instrument` 存的是用户填的「总型号」（如「罗氏 Cobas6000」
+「AU生化仪」「DxI800」），一台总型号往往对应多台具体仪器（罗氏 Cobas6000 =
+e601/e602/e411）。本模块把这种「一对多」关系固化成数据库关联表，替代原先写死在
+代码里的 FAMILY_MAP，并提供管理界面维护。
+
+- `instrument_families`：总型号定义（name 唯一，对应 test_items.instrument 取值）。
+- `instrument_family_members`：总型号 ↔ 具体仪器 的关联行。
+"""
+
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第21页 / 共60页（总源码3537行，取自原第21页）
+--------------------------------------------------------
+from sqlalchemy.orm import Mapped, mapped_column
+
+from ..core.database import Base
+
+
+class InstrumentFamily(Base):
+    __tablename__ = "instrument_families"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, index=True, default="")
+    description: Mapped[str] = mapped_column(String(200), default="")  # 备注说明
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class InstrumentFamilyMember(Base):
+    __tablename__ = "instrument_family_members"
+    __table_args__ = (
+        UniqueConstraint("family_id", "instrument_id", name="uq_family_instrument"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    family_id: Mapped[int] = mapped_column(ForeignKey("instrument_families.id", ondelete="CASCADE"), index=True)
+    instrument_id: Mapped[int] = mapped_column(Integer, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+======================================================================
+# 文件: models/instrument_archive.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\models\instrument_archive.py)
+======================================================================
+
+from datetime import datetime
+
+from sqlalchemy import DateTime, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from ..core.database import Base
+
+
+class InstrumentArchive(Base):
+    """仪器档案文件：每个仪器对应一个档案文件（如 MHZYY-JYK-SM-xxxx-名称.docx）。"""
+
+    __tablename__ = "instrument_archives"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(Integer, index=True)
+    filename: Mapped[str] = mapped_column(String(500), default="")  # 存储相对路径 instrument_archives/xxx
+    original_filename: Mapped[str] = mapped_column(String(500), default="")  # 原始文件名
+    file_size: Mapped[int] = mapped_column(Integer, default=0)
+    file_ext: Mapped[str] = mapped_column(String(20), default="")  # .docx / .pdf / .doc
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+======================================================================
+# 文件: models/document_instrument.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\models\document_instrument.py)
+======================================================================
+
+"""文档(documents) ↔ 仪器(instruments) 的关联关系表。
+
+用于把「操作/保养记录」等文档挂到对应仪器，使仪器档案页能反向展示该仪器
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第22页 / 共60页（总源码3537行，取自原第22页）
+--------------------------------------------------------
+关联的文档（如某台分析仪的操作+保养记录）。一份文档可关联多台仪器（如
+「贝克曼DXI800 1+2操作记录」同时属于 DXI800 1 与 DXI800 2），一台仪器也可
+关联多份文档，故为多对多关联行。
+"""
+
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+
+from ..core.database import Base
+
+
+class DocumentInstrument(Base):
+    __tablename__ = "document_instruments"
+    __table_args__ = (
+        UniqueConstraint("document_id", "instrument_id", name="uq_document_instrument"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    instrument_id: Mapped[int] = mapped_column(Integer, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+======================================================================
+# 文件: views/test_items/TestItemList.vue  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\views\test_items\TestItemList.vue)
+======================================================================
+
+<template>
+  <div class="page">
+    <div class="toolbar">
+      <div class="search-area">
+        <el-input
+          v-model="query.keyword"
+          placeholder="搜索项目编号 / 名称 / 别名 / 方法..."
+          clearable
+          size="large"
+          @keyup.enter="onSearch"
+          @clear="onSearch"
+        >
+          <template #append>
+            <el-button :icon="Search" @click="onSearch">查询</el-button>
+          </template>
+        </el-input>
+        <el-select
+          v-model="query.category"
+          placeholder="全部分类"
+          clearable
+          size="large"
+          style="width: 140px"
+          @change="onSearch"
+        >
+          <el-option label="生化" value="生化" />
+          <el-option label="免疫" value="免疫" />
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第23页 / 共60页（总源码3537行，取自原第23页）
+--------------------------------------------------------
+          <el-option label="凝血" value="凝血" />
+          <el-option label="其他" value="其他" />
+        </el-select>
+      </div>
+      <el-button v-if="auth.canWrite('test-items')" type="primary" :icon="Plus" size="large" @click="onAdd">新增项目</el-button>
+      <el-button v-if="auth.canWrite('test-items')" :icon="Upload" size="large" @click="onPickFile">批量导入</el-button>
+      <el-dropdown size="large" split-button type="success" @click="onExport" @command="onExportCommand">
+        <el-icon style="margin-right:4px"><Download /></el-icon>导出汇总清单
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="filtered" :disabled="!hasActiveFilter">
+              导出当前筛选{{ hasActiveFilter ? `（${total} 条）` : '' }}
+            </el-dropdown-item>
+            <el-dropdown-item command="all">导出全部项目</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <input ref="fileInput" type="file" accept=".xlsx" style="display:none" @change="onImportFile" />
+    </div>
+
+    <div class="stats-bar" v-if="stats">
+      <div class="stats-head">
+        <span class="stats-title">统计分类</span>
+        <span class="stats-total">共 {{ stats.total }} 个项目</span>
+        <el-button class="fold-btn" text size="small" :icon="statsCollapsed ? ArrowRight : ArrowDown" @click="statsCollapsed = !statsCollapsed">
+          {{ statsCollapsed ? '展开' : '收起' }}
+        </el-button>
+      </div>
+      <div v-show="!statsCollapsed">
+        <div class="stats-group">
+          <span class="stats-label">按类别：</span>
+          <el-tag
+            v-for="(cnt, cat) in stats.category_counts"
+            :key="'cat-' + cat"
+            :type="cat === '生化' ? 'success' : cat === '免疫' ? 'primary' : cat === '凝血' ? 'warning' : 'info'"
+            class="stat-tag"
+            :effect="query.category === cat ? 'dark' : 'plain'"
+            @click="applyCategory(cat)"
+          >{{ cat }} ({{ cnt }})</el-tag>
+        </div>
+        <div class="stats-group">
+          <span class="stats-label">按品牌：</span>
+          <el-tag
+            v-for="(cnt, brand) in stats.brand_counts"
+            :key="'brand-' + brand"
+            size="small"
+            :type="brand === '未标识' ? 'info' : 'warning'"
+            class="stat-tag"
+            :effect="query.brand === brand ? 'dark' : 'plain'"
+            @click="applyBrand(brand)"
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第24页 / 共60页（总源码3537行，取自原第24页）
+--------------------------------------------------------
+          >{{ brand }} ({{ cnt }})</el-tag>
+        </div>
+        <div class="stats-group">
+          <span class="stats-label">按仪器：</span>
+          <el-tag
+            v-for="(cnt, inst) in stats.instrument_counts"
+            :key="'inst-' + inst"
+            size="small"
+            :type="inst === '未设置' ? 'info' : 'danger'"
+            class="stat-tag"
+            :effect="query.instrument === inst ? 'dark' : 'plain'"
+            :disabled="inst === '未设置'"
+            @click="inst === '未设置' ? null : applyInstrument(inst)"
+          >{{ inst }} ({{ cnt }})</el-tag>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="query.category || query.brand || query.keyword" class="active-filters">
+      <span class="active-filters-label">当前筛选：</span>
+      <el-tag v-if="query.category" closable effect="light" :type="categoryType(query.category)" @close="clearFilter('category')">
+        类别：{{ query.category }}
+      </el-tag>
+      <el-tag v-if="query.brand" closable effect="light" type="warning" @close="clearFilter('brand')">
+        品牌：{{ query.brand }}
+      </el-tag>
+      <el-tag v-if="query.instrument" closable effect="light" type="danger" @close="clearFilter('instrument')">
+        仪器：{{ query.instrument }}
+      </el-tag>
+      <el-tag v-if="query.keyword" closable effect="light" type="info" @close="clearFilter('keyword')">
+        关键词：{{ query.keyword }}
+      </el-tag>
+      <el-button text type="primary" size="small" @click="clearAllFilters">清除全部</el-button>
+    </div>
+
+    <div class="result-header">
+      <span class="result-title">查询结果</span>
+      <span class="result-count">共 {{ total }} 条记录</span>
+    </div>
+
+    <div v-if="loading" class="loading-wrap">
+      <el-skeleton :rows="6" animated />
+    </div>
+
+    <div v-else-if="items.length === 0" class="empty-wrap">
+      <el-empty description="未找到匹配项目" />
+    </div>
+
+    <div v-else class="card-list">
+      <el-card
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第25页 / 共60页（总源码3537行，取自原第25页）
+--------------------------------------------------------
+        v-for="row in items"
+        :key="row.id"
+        class="item-card"
+        shadow="hover"
+      >
+        <div class="card-header">
+          <div class="title-group">
+            <h3 class="item-name" v-html="highlight(row.name) || '—'"></h3>
+            <el-tag v-if="extractCode(row)" type="warning" effect="light" class="code-tag">
+              <span v-html="highlight(extractCode(row))"></span>
+            </el-tag>
+          </div>
+          <div class="header-actions">
+            <el-tag v-if="row.category" :type="categoryType(row.category)" effect="plain" class="category-tag">
+              <span v-html="highlight(row.category)"></span>
+            </el-tag>
+            <el-tag v-if="eqaOrgs(row).length" type="success" effect="dark" class="eqa-badge" title="该项目参加室间质评">
+              <el-icon class="eqa-ico"><Medal /></el-icon>室间质评（{{ eqaOrgs(row).join('/') }}）
+            </el-tag>
+            <el-button v-if="rowManuals(row).length" text type="primary" :icon="Document" @click="openManuals(row)" title="查看项目说明书（按品牌）">
+              项目说明书<span v-if="rowManuals(row).length > 1">（{{ rowManuals(row).length }}）</span>
+            </el-button>
+            <el-button v-if="auth.canWrite('test-items')" text :icon="Edit" @click="onEdit(row)">编辑</el-button>
+            <el-button v-if="auth.canWrite('test-items')" text type="danger" :icon="Delete" @click="onDelete(row)">删除</el-button>
+          </div>
+        </div>
+
+        <div class="tag-row">
+          <el-tag v-if="row.aliases" size="small" type="info" effect="plain" class="alias-tag"><span v-html="highlight(row.aliases)"></span></el-tag>
+          <el-tag v-if="row.instrument" size="small" effect="plain"><span v-html="highlight(row.instrument)"></span></el-tag>
+          <el-tag v-if="row.instrument_group" size="small" type="success" effect="plain"><span v-html="highlight(row.instrument_group)"></span></el-tag>
+          <el-tag v-if="row.method" size="small" type="primary" effect="plain">
+            <span class="tag-label">方法</span><span v-html="highlight(row.method)"></span>
+          </el-tag>
+          <el-tag v-if="extractBrand(row)" size="small" type="warning" effect="plain">
+            <span class="tag-label">品牌</span>{{ extractBrand(row) }}
+          </el-tag>
+        </div>
+
+        <div v-if="linkedInstruments(row).length" class="linked-inst">
+          <span class="linked-label">关联仪器档案：</span>
+          <el-tag
+            v-for="inst in linkedInstruments(row)"
+            :key="inst.id"
+            size="small"
+            type="info"
+            effect="plain"
+            class="linked-chip"
+            title="新标签打开仪器档案"
+            @click="goInstrument(inst.id)"
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第26页 / 共60页（总源码3537行，取自原第26页）
+--------------------------------------------------------
+          >
+            <el-icon class="linked-ico"><Link /></el-icon>
+            {{ inst.name }}（{{ inst.model }}）
+            <span v-if="!inst.has_archive" class="linked-no">· 未建档</span>
+          </el-tag>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric">
+            <div class="metric-label">标本类型</div>
+            <div class="metric-value" v-html="highlight(row.specimen) || '—'"></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">单位</div>
+            <div class="metric-value" v-html="highlight(row.unit) || '—'"></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">稀释倍数</div>
+            <div class="metric-value" v-html="highlight(row.dilution_fold) || '—'"></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">稀释液</div>
+            <div class="metric-value" v-html="highlight(row.diluent) || '—'"></div>
+          </div>
+        </div>
+
+        <div class="info-list">
+          <div class="info-row">
+            <span class="info-label">参考范围</span>
+            <span class="info-value reference" v-html="highlight(row.reference) || '—'"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">线性范围</span>
+            <span class="info-value" v-html="highlight(row.linear_range) || '—'"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">可报告范围</span>
+            <span class="info-value" v-html="highlight(row.reportable_range) || '—'"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">校准品</span>
+            <span class="info-value" v-html="highlight(row.calibrator) || '—'"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">溯源性</span>
+            <span class="info-value trace" v-html="highlight(row.traceability) || '—'"></span>
+          </div>
+        </div>
+
+        <div v-if="row.interference_hemolysis || row.interference_bilirubin || row.interference_lipemia" class="interference-box">
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第27页 / 共60页（总源码3537行，取自原第27页）
+--------------------------------------------------------
+          <div class="interference-title">
+            <el-icon><Warning /></el-icon>
+            <span>抗干扰性能</span>
+          </div>
+          <div class="interference-grid">
+            <div v-if="row.interference_hemolysis" class="interference-item">
+              <div class="interference-label">
+                <span class="dot hemolysis"></span>溶血
+              </div>
+              <div class="interference-value" v-html="highlight(row.interference_hemolysis)"></div>
+            </div>
+            <div v-if="row.interference_bilirubin" class="interference-item">
+              <div class="interference-label">
+                <span class="dot bilirubin"></span>黄疸
+              </div>
+              <div class="interference-value" v-html="highlight(row.interference_bilirubin)"></div>
+            </div>
+            <div v-if="row.interference_lipemia" class="interference-item">
+              <div class="interference-label">
+                <span class="dot lipemia"></span>脂血
+              </div>
+              <div class="interference-value" v-html="highlight(row.interference_lipemia)"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <span v-if="row.last_update" class="update-time">更新于：{{ row.last_update }}</span>
+        </div>
+      </el-card>
+    </div>
+
+    <div class="pagination-wrap">
+      <el-pagination
+        v-model:current-page="query.page"
+        v-model:page-size="query.page_size"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        background
+        @size-change="onSearch"
+        @current-change="onSearch"
+      />
+    </div>
+
+    <EditDialog
+      v-model="dialogVisible"
+      :title="editingId ? '编辑项目' : '新增项目'"
+      :form="form"
+      :fields="fields"
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第28页 / 共60页（总源码3537行，取自原第28页）
+--------------------------------------------------------
+      :rules="rules"
+      :submitting="submitting"
+      @submit="onSubmit"
+    />
+
+    <el-dialog
+      v-model="manualDialog.visible"
+      :title="'项目说明书 · ' + manualDialog.project"
+      width="82%"
+      top="5vh"
+      @close="closeManualDialog"
+      destroy-on-close
+    >
+      <div class="manual-layout">
+        <div class="manual-list">
+          <div
+            v-for="m in manualDialog.manuals"
+            :key="m.id"
+            class="manual-item"
+            :class="{ active: manualDialog.current && manualDialog.current.id === m.id }"
+            @click="selectManual(m)"
+          >
+            <div class="manual-item-title">{{ m.title }}</div>
+            <div class="manual-item-meta">
+              <el-tag v-if="m.brand" size="small" type="warning" effect="plain">{{ m.brand }}</el-tag>
+              <el-tag v-if="m.is_pdf" size="small" type="success" effect="plain">PDF</el-tag>
+              <el-tag v-else size="small" type="info" effect="plain">{{ (m.ext || '').toUpperCase() }}</el-tag>
+            </div>
+          </div>
+        </div>
+        <div class="manual-preview">
+          <div v-if="manualDialog.previewLoading" class="manual-loading">
+            <el-icon class="is-loading"><Loading /></el-icon> 说明书加载中…
+          </div>
+          <iframe v-else-if="manualDialog.previewUrl" :src="manualDialog.previewUrl" class="manual-iframe"></iframe>
+          <div v-else class="manual-nopreview">
+            <el-icon class="nopreview-ico"><Document /></el-icon>
+            <p>该说明书为 {{ manualDialog.current && (manualDialog.current.ext || '').toUpperCase() }} 文件，浏览器无法直接预览。</p>
+            <el-button type="primary" @click="downloadManual(manualDialog.current)">下载查看</el-button>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="downloadManual(manualDialog.current)">下载</el-button>
+        <el-button type="primary" @click="closeManualDialog">关闭</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第29页 / 共60页（总源码3537行，取自原第29页）
+--------------------------------------------------------
+<script setup>
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Plus, Edit, Delete, Warning, Upload, Download, ArrowDown, ArrowRight, Link, Medal, Document, Loading } from '@element-plus/icons-vue'
+import EditDialog from '../../components/EditDialog.vue'
+import { listTestItems, createTestItem, updateTestItem, deleteTestItem, importTestItems, exportTestItems, getTestItemStats } from '../../api/testItems'
+import { getInstrumentFamilyMap } from '../../api/instruments'
+import { listEqaAssociations } from '../../api/eqa'
+import { listProjectManuals, fetchDocumentBlob, downloadBlob } from '../../api/documents'
+import { useAuthStore } from '../../store/auth'
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+
+const query = reactive({
+  keyword: '',
+  category: '',
+  brand: '',
+  instrument: '',
+  page: 1,
+  page_size: 10,
+})
+const statsCollapsed = ref(false)
+const items = ref([])
+const total = ref(0)
+const loading = ref(false)
+
+// 项目「使用仪器」总型号 → 对应仪器档案清单（一对多），用于卡片上跳转
+const familyMap = ref({})
+
+// 项目库 × 室间质评 关联（id → {has_wjw, has_bj, ...}），用于卡片标识
+const eqaMap = ref({})
+
+// 项目库 × 项目说明书 关联（linked_project 名 → [manuals]），用于卡片预览
+const manualMap = ref({})
+const manualDialog = reactive({
+  visible: false,
+  project: '',
+  manuals: [],
+  current: null,
+  previewUrl: '',
+  previewLoading: false,
+})
+
+const dialogVisible = ref(false)
+const editingId = ref(null)
+const submitting = ref(false)
+const fileInput = ref(null)
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第30页 / 共60页（总源码3537行，取自原第30页）
+--------------------------------------------------------
+
+const fields = [
+  { prop: 'code', label: '项目编号' },
+  { prop: 'name', label: '项目名称' },
+  { prop: 'aliases', label: '别名' },
+  { prop: 'category', label: '类别', type: 'select', options: [
+    { label: '生化', value: '生化' },
+    { label: '免疫', value: '免疫' },
+    { label: '凝血', value: '凝血' },
+    { label: '其他', value: '其他' },
+  ] },
+  { prop: 'specimen', label: '标本类型', type: 'select', options: [
+    { label: '血清', value: '血清' },
+    { label: '血浆', value: '血浆' },
+    { label: '全血', value: '全血' },
+    { label: '尿液', value: '尿液' },
+    { label: '脑脊液', value: '脑脊液' },
+    { label: '胸腹水', value: '胸腹水' },
+    { label: '其他', value: '其他' },
+  ] },
+  { prop: 'method', label: '方法学' },
+  { prop: 'unit', label: '单位' },
+  { prop: 'reference', label: '参考范围' },
+  { prop: 'fee', label: '收费' },
+  { prop: 'instrument', label: '使用仪器' },
+  { prop: 'instrument_group', label: '仪器组' },
+  { prop: 'linear_range', label: '线性范围' },
+  { prop: 'dilution_fold', label: '稀释倍数' },
+  { prop: 'reportable_range', label: '可报告范围' },
+  { prop: 'diluent', label: '稀释液' },
+  { prop: 'calibrator', label: '校准品' },
+  { prop: 'traceability', label: '溯源性' },
+  { prop: 'last_update', label: '最近更新' },
+  { prop: 'interference_hemolysis', label: '溶血干扰' },
+  { prop: 'interference_bilirubin', label: '胆红素干扰' },
+  { prop: 'interference_lipemia', label: '脂血干扰' },
+]
+
+const rules = {
+  name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
+}
+
+const emptyForm = () => ({
+  code: '', name: '', aliases: '', category: '', specimen: '', method: '',
+  unit: '', reference: '', fee: '', instrument: '', instrument_group: '',
+  linear_range: '', dilution_fold: '', reportable_range: '', diluent: '',
+  calibrator: '', traceability: '', last_update: '',
+  interference_hemolysis: '', interference_bilirubin: '', interference_lipemia: '',
+})
+const form = reactive(emptyForm())
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第31页 / 共60页（总源码3537行，取自原第42页）
+--------------------------------------------------------
+}
+.linked-ico {
+  font-size: 12px;
+}
+.linked-no {
+  color: #c0c4cc;
+  font-size: 12px;
+}
+
+.tag-label {
+  margin-right: 4px;
+  opacity: 0.8;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.metric {
+  min-width: 0;
+}
+
+.metric-label {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 6px;
+}
+
+.metric-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a365d;
+  word-break: break-all;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.info-row {
+  display: flex;
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第32页 / 共60页（总源码3537行，取自原第43页）
+--------------------------------------------------------
+  align-items: baseline;
+  gap: 12px;
+}
+
+.info-label {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: #606266;
+}
+
+.info-value {
+  flex: 1;
+  font-size: 14px;
+  color: #303133;
+  word-break: break-all;
+}
+
+.info-value.reference {
+  color: #409eff;
+  font-weight: 500;
+}
+
+.info-value.trace {
+  font-style: italic;
+  color: #606266;
+}
+
+.interference-box {
+  background: #f0f9ff;
+  border: 1px solid #d6eeff;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.interference-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #409eff;
+  margin-bottom: 10px;
+}
+
+.interference-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第33页 / 共60页（总源码3537行，取自原第44页）
+--------------------------------------------------------
+}
+
+.interference-item {
+  background: #fff;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.interference-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot.hemolysis {
+  background: #f56c6c;
+}
+
+.dot.bilirubin {
+  background: #e6a23c;
+}
+
+.dot.lipemia {
+  background: #909399;
+}
+
+.interference-value {
+  font-size: 13px;
+  color: #606266;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #909399;
+  border-top: 1px solid #ebeef5;
+  padding-top: 12px;
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第34页 / 共60页（总源码3537行，取自原第45页）
+--------------------------------------------------------
+}
+
+.specimen {
+  color: #606266;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-bottom: 8px;
+}
+
+.item-card :deep(mark.hl) {
+  background: #fff3a0;
+  color: #c0392b;
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 700;
+}
+
+/* 项目说明书预览对话框 */
+.manual-layout {
+  display: flex;
+  gap: 16px;
+  height: 72vh;
+  min-height: 420px;
+}
+.manual-list {
+  flex: 0 0 320px;
+  max-width: 320px;
+  overflow-y: auto;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f8fafc;
+}
+.manual-item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-bottom: 6px;
+  background: #fff;
+  transition: all 0.15s;
+}
+.manual-item:hover {
+  border-color: #c6dbff;
+}
+.manual-item.active {
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第35页 / 共60页（总源码3537行，取自原第46页）
+--------------------------------------------------------
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+.manual-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a365d;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+.manual-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.manual-preview {
+  flex: 1;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #525659;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.manual-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.manual-loading {
+  color: #fff;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.manual-nopreview {
+  color: #fff;
+  text-align: center;
+  padding: 24px;
+}
+.nopreview-ico {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+.manual-nopreview p {
+  margin: 0 0 16px;
+}
+
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第36页 / 共60页（总源码3537行，取自原第47页）
+--------------------------------------------------------
+@media (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .toolbar > .el-button,
+  .toolbar > .el-dropdown {
+    width: 100%;
+  }
+  .search-area {
+    max-width: none;
+    flex-direction: column !important;
+    gap: 10px;
+    width: 100%;
+  }
+  .search-area .el-input,
+  .search-area .el-select {
+    width: 100% !important;
+  }
+  .metric-grid,
+  .interference-grid {
+    grid-template-columns: 1fr;
+  }
+  .card-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .header-actions {
+    align-self: flex-end;
+  }
+}
+</style>
+
+======================================================================
+# 文件: views/instruments/InstrumentList.vue  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\views\instruments\InstrumentList.vue)
+======================================================================
+
+<template>
+  <div class="page">
+    <CrudTable
+      ref="crud"
+      :columns="columns"
+      :fetch="fetch"
+      :extra-params="instrumentExtraParams"
+      search-placeholder="搜索名称 / 编号 / 型号 / 负责人..."
+      :show-add="auth.canWrite('instruments')"
+      :can-write="auth.canWrite('instruments')"
+      @add="onAdd"
+      @edit="onEdit"
+      @delete="onDelete"
+    >
+      <template #toolbar-extra>
+        <el-button v-if="auth.canWrite('instruments')" @click="importVisible = true">批量导入档案</el-button>
+        <el-switch
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第37页 / 共60页（总源码3537行，取自原第48页）
+--------------------------------------------------------
+          v-model="hideNonActive"
+          active-text="仅看在用"
+          inline-prompt
+          style="--el-switch-on-color: #67c23a; margin-right: 4px"
+          @change="onFilterChange"
+        />
+      </template>
+      <template #row-extra="{ row }">
+        <el-button
+          link
+          :type="row.calib_level === 'danger' ? 'danger' : row.calib_level === 'warning' ? 'warning' : 'primary'"
+          @click="openCalib(row)"
+        >
+          校准记录
+          <span v-if="row.calib_level === 'danger'" style="margin-left: 2px">●逾期</span>
+          <span v-else-if="row.calib_level === 'warning'" style="margin-left: 2px">●临期</span>
+        </el-button>
+        <el-button link type="primary" @click="openArchive(row)">档案</el-button>
+      </template>
+    </CrudTable>
+
+    <EditDialog
+      v-model="dialogVisible"
+      :title="editingId ? '编辑仪器' : '新增仪器'"
+      :form="form"
+      :fields="fields"
+      :rules="rules"
+      :submitting="submitting"
+      @submit="onSubmit"
+    />
+
+    <!-- 校准记录 -->
+    <el-dialog v-model="calibOpen" :title="`校准记录 - ${calibInstrument?.name || ''}`" width="860px">
+      <el-table :data="calibs" border stripe>
+        <el-table-column prop="calibration_date" label="校准日期" width="120" />
+        <el-table-column prop="next_due_date" label="下次到期" width="120" />
+        <el-table-column prop="result" label="结果" width="90" show-overflow-tooltip />
+        <el-table-column prop="agency" label="检定机构" width="100" show-overflow-tooltip />
+        <el-table-column prop="cycle_months" label="周期(月)" width="80" align="center" />
+        <el-table-column prop="operator" label="校准人" width="90" />
+        <el-table-column label="报告" width="180" align="center">
+          <template #default="{ row }">
+            <el-button v-if="auth.canWrite('instruments') && !row.report_file_path" link type="primary" :loading="reportUploading && reportTarget.recId === row.id" @click="pickReportFile(row)">上传报告</el-button>
+            <template v-else>
+              <el-button link type="primary" @click="previewReport(row)">预览</el-button>
+              <el-button link type="info" @click="downloadReport(row)">下载</el-button>
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="70" align="center">
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第38页 / 共60页（总源码3537行，取自原第49页）
+--------------------------------------------------------
+          <template #default="{ row }">
+            <el-button v-if="auth.canWrite('instruments')" link type="danger" @click="delCalib(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <el-divider v-if="auth.canWrite('instruments')">新增校准记录</el-divider>
+      <el-form v-if="auth.canWrite('instruments')" :model="calibForm" label-width="100px" inline>
+        <el-form-item label="校准日期" required>
+          <el-date-picker v-model="calibForm.calibration_date" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="下次到期" required>
+          <el-date-picker v-model="calibForm.next_due_date" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="检定机构">
+          <el-input v-model="calibForm.agency" style="width: 120px" />
+        </el-form-item>
+        <el-form-item label="周期(月)">
+          <el-input v-model="calibForm.cycle_months" style="width: 90px" placeholder="如 12" />
+        </el-form-item>
+        <el-form-item label="校准人">
+          <el-input v-model="calibForm.operator" style="width: 120px" />
+        </el-form-item>
+        <el-form-item label="结果">
+          <el-input v-model="calibForm.result" style="width: 160px" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="calibOpen = false">关闭</el-button>
+        <el-button v-if="auth.canWrite('instruments')" type="primary" :loading="calibSubmitting" @click="addCalib">添加记录</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 仪器档案详情抽屉（详情 / 预览 / 下载 / 导入 / 替换 / 删除） -->
+    <el-drawer v-model="archiveDrawer" :title="`仪器档案 - ${archiveRow?.name || ''}`" :size="drawerSize">
+      <el-descriptions title="档案详情" :column="descColumn" border>
+        <el-descriptions-item label="设备名称">{{ archiveRow?.name || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="型号">{{ archiveRow?.model || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="制造商">{{ archiveRow?.manufacturer || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="出厂编号">{{ archiveRow?.serial_no || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="供货商名称">{{ archiveRow?.supplier || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="联系人及电话">{{ archiveRow?.contact || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="设备编号">{{ archiveRow?.dept_no || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="存放地点">{{ archiveRow?.location || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="接收日期">{{ archiveRow?.purchase_date || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="投入使用日期">{{ archiveRow?.start_date || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="设备负责人">{{ archiveRow?.owner || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="日常管理人">{{ archiveRow?.daily_manager || '—' }}</el-descriptions-item>
+      </el-descriptions>
+
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第39页 / 共60页（总源码3537行，取自原第50页）
+--------------------------------------------------------
+      <el-divider>仪器档案文件</el-divider>
+      <div v-if="archiveInfo.has_archive">
+        <el-alert type="success" :closable="false" show-icon>
+          <template #title>已建档：{{ archiveInfo.original_filename }}</template>
+          <div style="font-size: 12px; color: #888">
+            大小：{{ formatSize(archiveInfo.file_size) }} ｜ 导入时间：{{ formatTime(archiveInfo.uploaded_at) }}
+          </div>
+        </el-alert>
+        <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
+          <el-button type="primary" @click="previewArchive">预览</el-button>
+          <el-button @click="downloadArchive">下载</el-button>
+          <el-button v-if="auth.canWrite('instruments')" type="warning" :loading="uploading" @click="pickArchiveFile">替换</el-button>
+          <el-button v-if="auth.canWrite('instruments')" type="danger" @click="removeArchive">删除</el-button>
+        </div>
+      </div>
+      <div v-else>
+        <el-alert type="info" :closable="false" show-icon title="尚未导入仪器档案文件">
+          <template #default>点击右侧「导入档案」上传该仪器的档案（.docx / .pdf / .doc）。</template>
+        </el-alert>
+        <div style="margin-top: 12px">
+          <el-button v-if="auth.canWrite('instruments')" type="primary" :loading="uploading" @click="pickArchiveFile">导入档案</el-button>
+        </div>
+      </div>
+
+      <el-divider>操作 / 保养记录（关联本仪器的记录表格）</el-divider>
+      <div v-loading="docsLoading">
+        <el-table v-if="linkedDocs.length" :data="linkedDocs" border stripe size="small">
+          <el-table-column prop="doc_number" label="编号" width="130" show-overflow-tooltip />
+          <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="version" label="版本" width="70" align="center">
+            <template #default="{ row }">{{ row.version || '—' }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="130" align="center">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="previewDoc(row)">预览</el-button>
+              <el-button link type="primary" size="small" @click="downloadDoc(row)">下载</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-else description="暂无操作 / 保养记录关联到此仪器" :image-size="80" />
+        <div v-if="linkedDocs.length" class="linked-count">
+          共 <b>{{ linkedDocs.length }}</b> 份记录表格
+        </div>
+      </div>
+
+      <el-divider>对应项目（使用本仪器的检验项目）</el-divider>
+      <div v-loading="linkedLoading">
+        <el-table v-if="linkedTestItems.length" :data="linkedTestItems" border stripe size="small" @row-click="goTestItem">
+          <el-table-column prop="code" label="项目编号" width="110" show-overflow-tooltip />
+          <el-table-column prop="name" label="项目名称" min-width="140" show-overflow-tooltip>
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第40页 / 共60页（总源码3537行，取自原第51页）
+--------------------------------------------------------
+            <template #default="{ row }">
+              <span style="color: #409eff; cursor: pointer">{{ row.name }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="category" label="类别" width="80" align="center" />
+          <el-table-column prop="instrument_group" label="仪器组" min-width="120" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.instrument_group || row.instrument || '—' }}</template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-else description="暂无项目关联到此仪器" :image-size="80" />
+        <div v-if="linkedTestItems.length" class="linked-count">
+          共 <b>{{ linkedTestItems.length }}</b> 个检验项目
+        </div>
+      </div>
+    </el-drawer>
+
+    <!-- 档案预览（docx 由 mammoth 转网页在浏览器内显示，无需下载；pdf 走浏览器原生阅读器） -->
+    <el-dialog v-model="previewVisible" :title="previewTitle" width="82%" top="4vh" append-to-body>
+      <div v-loading="previewing" class="doc-preview" v-html="previewHtml"></div>
+    </el-dialog>
+
+    <!-- 批量导入仪器档案 -->
+    <el-dialog v-model="importVisible" title="批量导入仪器档案" width="580px">
+      <el-form label-width="90px">
+        <el-form-item label="档案目录">
+          <el-input v-model="importPath" placeholder="如 E:\生免组管理体系文件\生免组仪器档案" />
+        </el-form-item>
+        <div style="font-size: 12px; color: #888; margin-bottom: 8px">
+          程序会扫描该目录下所有 .docx / .pdf / .doc 文件，用文件名中的科室编号（如 MHZYY-JYK-SM-1001）自动匹配仪器。
+        </div>
+      </el-form>
+      <div v-if="importResult">
+        <el-alert type="success" :closable="false">
+          成功导入 {{ importResult.imported }} 个，共扫描 {{ importResult.total_files }} 个文件。
+        </el-alert>
+        <div v-if="importResult.skipped.length" style="margin-top: 8px">
+          <div style="font-weight: 600; margin-bottom: 4px">未匹配 / 跳过（{{ importResult.skipped.length }}）：</div>
+          <ul style="max-height: 200px; overflow: auto; font-size: 12px; color: #666; padding-left: 18px">
+            <li v-for="(s, i) in importResult.skipped" :key="i">{{ s }}</li>
+          </ul>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="importVisible = false">关闭</el-button>
+        <el-button type="primary" :loading="importing" @click="doImport">开始导入</el-button>
+      </template>
+    </el-dialog>
+
+    <input ref="fileInput" type="file" accept=".docx,.pdf,.doc" style="display: none" @change="onArchiveFileChange" />
+    <input ref="reportInput" type="file" accept=".docx,.pdf,.doc" style="display: none" @change="onReportFileChange" />
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第41页 / 共60页（总源码3537行，取自原第52页）
+--------------------------------------------------------
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import mammoth from 'mammoth'
+import CrudTable from '../../components/CrudTable.vue'
+import EditDialog from '../../components/EditDialog.vue'
+import {
+  listInstruments, getInstrument, createInstrument, updateInstrument, deleteInstrument,
+  listCalibrations, createCalibration, deleteCalibration,
+  uploadCalibrationReport, downloadCalibrationReport, deleteCalibrationReport, getCalibrationsStatus,
+  uploadInstrumentArchive, getInstrumentArchiveInfo, downloadInstrumentArchive,
+  deleteInstrumentArchive, getArchivesStatus, importArchivesFolder,
+  getInstrumentTestItems, getInstrumentDocuments,
+} from '../../api/instruments'
+import { fetchDocumentBlob, downloadBlob, previewBlob } from '../../api/documents'
+import { useAuthStore } from '../../store/auth'
+
+const crud = ref(null)
+const auth = useAuthStore()
+const dialogVisible = ref(false)
+
+// 仪器档案描述列表：桌面 2 列，窄屏（≤768px）改 1 列，避免标签/值被挤压
+const descColumn = ref(typeof window !== 'undefined' && window.innerWidth <= 768 ? 1 : 2)
+// 档案抽屉尺寸：桌面 640px，窄屏占满全屏（size 用内联 !important，CSS 覆盖不生效，故用响应式 prop）
+const drawerSize = ref(typeof window !== 'undefined' && window.innerWidth <= 768 ? '100%' : '640px')
+function syncMobileLayout() {
+  const mobile = typeof window !== 'undefined' && window.innerWidth <= 768
+  descColumn.value = mobile ? 1 : 2
+  drawerSize.value = mobile ? '100%' : '640px'
+}
+onMounted(() => window.addEventListener('resize', syncMobileLayout))
+onBeforeUnmount(() => window.removeEventListener('resize', syncMobileLayout))
+
+// 一键隐藏非在用：开启时仅显示「在用」状态的仪器（走后端 status 过滤），默认开启
+const hideNonActive = ref(true)
+const instrumentExtraParams = computed(() => (hideNonActive.value ? { status: '在用' } : {}))
+function onFilterChange() {
+  crud.value?.refresh()
+}
+
+// 从「项目查询」点击关联仪器跳转而来：?focus=<instrument_id> 时自动打开该仪器档案
+const route = useRoute()
+const router = useRouter()
+async function focusInstrument(id) {
+  const numId = Number(id)
+  if (!numId) return
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第42页 / 共60页（总源码3537行，取自原第53页）
+--------------------------------------------------------
+  try {
+    const inst = await getInstrument(numId)
+    openArchive(inst)
+  } catch (e) {
+    ElMessage.warning('未找到对应仪器档案')
+  }
+}
+onMounted(() => {
+  const f = route.query.focus
+  if (f) focusInstrument(f)
+})
+watch(
+  () => route.query.focus,
+  (nf) => {
+    if (nf) focusInstrument(nf)
+  }
+)
+const editingId = ref(null)
+const submitting = ref(false)
+
+const STATUS_OPTIONS = ['在用', '备用', '维修', '停用'].map((v) => ({ label: v, value: v }))
+
+const fields = [
+  { prop: 'name', label: '仪器名称' },
+  { prop: 'dept_no', label: '科室编号' },
+  { prop: 'model', label: '规格型号' },
+  { prop: 'manufacturer', label: '生产厂家' },
+  { prop: 'category', label: '类别' },
+  { prop: 'serial_no', label: '出厂编号' },
+  { prop: 'status', label: '状态', type: 'select', options: STATUS_OPTIONS },
+  { prop: 'location', label: '存放位置' },
+  { prop: 'owner', label: '设备负责人' },
+  { prop: 'daily_manager', label: '日常管理人' },
+  { prop: 'supplier', label: '供货商名称' },
+  { prop: 'contact', label: '联系人及电话' },
+  { prop: 'purchase_date', label: '接收日期', type: 'date' },
+  { prop: 'start_date', label: '投入使用日期', type: 'date' },
+]
+
+const rules = {
+  name: [{ required: true, message: '请填写仪器名称', trigger: 'blur' }],
+}
+
+const columns = [
+  { prop: 'name', label: '名称', minWidth: 150, tooltip: false },
+  { prop: 'dept_no', label: '科室编号', minWidth: 140, tooltip: false },
+  { prop: 'model', label: '型号', minWidth: 100, tooltip: false },
+  { prop: 'manufacturer', label: '厂家', minWidth: 110, tooltip: false },
+  { prop: 'serial_no', label: '出厂编号', minWidth: 100, tooltip: false },
+  {
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第43页 / 共60页（总源码3537行，取自原第54页）
+--------------------------------------------------------
+    prop: 'status', label: '状态', minWidth: 70,
+    formatter: (row) => {
+      const map = { 在用: 'success', 备用: 'info', 维修: 'warning', 停用: 'danger', 已停用: 'danger' }
+      const t = map[row.status] || 'info'
+      return `<el-tag type="${t}" size="small">${row.status || '-'}</el-tag>`
+    },
+  },
+  { prop: 'start_date', label: '启用时间', minWidth: 80, formatter: (row) => formatYearMonth(row.start_date) },
+  { prop: 'owner', label: '负责人', minWidth: 80, tooltip: false },
+  { prop: 'daily_manager', label: '日常管理人', minWidth: 80, formatter: (row) => row.daily_manager || '—', tooltip: false },
+  { prop: 'calib_next', label: '下次校准', minWidth: 150,
+    formatter: (row) => {
+      if (!row.calib_next) return '<span style="color:#c0c4cc">—</span>'
+      const lvl = row.calib_level
+      const color = lvl === 'danger' ? '#f56c6c' : lvl === 'warning' ? '#e6a23c' : '#67c23a'
+      const tag = lvl === 'danger' ? '逾期' : lvl === 'warning' ? '即将到期' : ''
+      const badge = tag ? ` <span style="color:${color}">(${tag})</span>` : ''
+      return `<span style="color:${color}">${row.calib_next}${badge}</span>`
+    },
+  },
+]
+
+// 启用日期取到「年-月」（兼容 YYYY-MM-DD 或已为 YYYY-MM）
+function formatYearMonth(v) {
+  if (!v) return '—'
+  const m = String(v).slice(0, 7)
+  return /^\d{4}-\d{2}$/.test(m) ? m : (v || '—')
+}
+
+const emptyForm = () => ({
+  name: '', dept_no: '', model: '', manufacturer: '', category: '',
+  serial_no: '', status: '在用', location: '', owner: '', daily_manager: '',
+  supplier: '', contact: '', purchase_date: '', start_date: '', qc_instrument: false,
+})
+
+const form = reactive(emptyForm())
+
+// 列表加载时合并建档状态 + 校准预警状态
+async function fetch(params) {
+  const res = await listInstruments(params)
+  try {
+    const status = await getArchivesStatus()
+    const map = {}
+    status.forEach((s) => { map[s.instrument_id] = s })
+    ;(res.items || []).forEach((it) => {
+      const s = map[it.id]
+      it.has_archive = !!(s && s.has_archive)
+      it.archive_name = s ? s.original_filename : ''
+    })
+  } catch (e) { /* 状态接口不可用时忽略，不影响列表 */ }
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第44页 / 共60页（总源码3537行，取自原第55页）
+--------------------------------------------------------
+  try {
+    const cstatus = await getCalibrationsStatus()
+    const cmap = {}
+    cstatus.forEach((c) => { cmap[c.instrument_id] = c })
+    ;(res.items || []).forEach((it) => {
+      const c = cmap[it.id]
+      it.calib_next = c ? c.next_due_date : ''
+      it.calib_level = c ? c.level : ''
+    })
+  } catch (e) { /* 校准状态接口不可用时忽略，不影响列表 */ }
+  return res
+}
+function onAdd() {
+  Object.assign(form, emptyForm())
+  editingId.value = null
+  dialogVisible.value = true
+}
+function onEdit(row) {
+  Object.assign(form, emptyForm(), row)
+  // 历史数据 qc_instrument 可能为 null，归一为布尔，避免回传 null 触发后端 422
+  form.qc_instrument = row.qc_instrument ?? false
+  editingId.value = row.id
+  dialogVisible.value = true
+}
+async function onSubmit() {
+  submitting.value = true
+  try {
+    if (editingId.value) {
+      await updateInstrument(editingId.value, { ...form })
+    } else {
+      await createInstrument({ ...form })
+    }
+    ElMessage.success('已保存')
+    dialogVisible.value = false
+    crud.value?.refresh()
+  } catch (e) {
+    ElMessage.error('保存失败')
+  } finally {
+    submitting.value = false
+  }
+}
+async function onDelete(row) {
+  await ElMessageBox.confirm(`确认删除「${row.name}」？`, '提示', { type: 'warning' })
+  await deleteInstrument(row.id)
+  ElMessage.success('已删除')
+  crud.value?.refresh()
+}
+
+// 校准记录
+const calibOpen = ref(false)
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第45页 / 共60页（总源码3537行，取自原第56页）
+--------------------------------------------------------
+const calibInstrument = ref(null)
+const calibs = ref([])
+const calibSubmitting = ref(false)
+const calibForm = reactive({ calibration_date: '', next_due_date: '', result: '', agency: '', cycle_months: '', operator: '' })
+
+// 校准报告：上传 / 预览 / 下载
+const reportUploading = ref(false)
+const reportInput = ref(null)
+const reportTarget = reactive({ recId: null })
+
+function reportExt(row) {
+  const name = row.report_filename || row.report_file_path || ''
+  const m = /\.[^.]+$/.exec(name)
+  return m ? m[0].toLowerCase() : ''
+}
+
+async function openCalib(row) {
+  calibInstrument.value = row
+  calibOpen.value = true
+  await loadCalibs(row.id)
+}
+async function loadCalibs(id) {
+  try {
+    calibs.value = await listCalibrations(id)
+  } catch (e) {
+    calibs.value = []
+  }
+}
+async function addCalib() {
+  if (!calibForm.calibration_date || !calibForm.next_due_date) {
+    ElMessage.warning('请填写校准日期与下次到期日')
+    return
+  }
+  calibSubmitting.value = true
+  try {
+    await createCalibration(calibInstrument.value.id, { ...calibForm })
+    ElMessage.success('已添加')
+    Object.assign(calibForm, { calibration_date: '', next_due_date: '', result: '', agency: '', cycle_months: '', operator: '' })
+    await loadCalibs(calibInstrument.value.id)
+    crud.value?.refresh()
+  } finally {
+    calibSubmitting.value = false
+  }
+}
+async function delCalib(row) {
+  await ElMessageBox.confirm('确认删除该校准记录？', '提示', { type: 'warning' })
+  await deleteCalibration(calibInstrument.value.id, row.id)
+  ElMessage.success('已删除')
+  await loadCalibs(calibInstrument.value.id)
+  crud.value?.refresh()
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第46页 / 共60页（总源码3537行，取自原第57页）
+--------------------------------------------------------
+}
+
+function pickReportFile(row) {
+  reportTarget.recId = row.id
+  reportInput.value?.click()
+}
+async function onReportFileChange(e) {
+  const file = e.target.files?.[0]
+  e.target.value = '' // 允许重复选择同一文件
+  if (!file || !calibInstrument.value || reportTarget.recId == null) return
+  reportUploading.value = true
+  const recId = reportTarget.recId
+  try {
+    await uploadCalibrationReport(calibInstrument.value.id, recId, file)
+    ElMessage.success('校准报告已保存')
+    await loadCalibs(calibInstrument.value.id)
+    crud.value?.refresh()
+  } catch (err) {
+    ElMessage.error('上传失败')
+  } finally {
+    reportUploading.value = false
+    reportTarget.recId = null
+  }
+}
+async function downloadReport(row) {
+  if (!calibInstrument.value) return
+  try {
+    const blob = await downloadCalibrationReport(calibInstrument.value.id, row.id)
+    triggerDownload(blob, row.report_filename || 'calibration_report')
+  } catch (e) {
+    ElMessage.error('下载失败')
+  }
+}
+async function previewReport(row) {
+  if (!calibInstrument.value || !row.report_file_path) return
+  const ext = reportExt(row)
+  const fname = row.report_filename || '校准报告预览'
+  if (ext === '.pdf') {
+    try {
+      const blob = await downloadCalibrationReport(calibInstrument.value.id, row.id)
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (e) {
+      ElMessage.error('预览失败')
+    }
+    return
+  }
+  if (ext === '.docx') {
+    previewVisible.value = true
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第47页 / 共60页（总源码3537行，取自原第58页）
+--------------------------------------------------------
+    previewTitle.value = fname
+    previewHtml.value = ''
+    previewing.value = true
+    try {
+      const blob = await downloadCalibrationReport(calibInstrument.value.id, row.id)
+      const arrayBuffer = await blob.arrayBuffer()
+      const result = await mammoth.convertToHtml({ arrayBuffer })
+      previewHtml.value = result.value || '<p style="color:#909399">（文档内容为空）</p>'
+    } catch (e) {
+      console.error(e)
+      previewHtml.value = '<p style="color:#f56c6c">预览失败：' + (e && e.message ? e.message : '该文档可能受保护或格式不支持') + '</p>'
+    } finally {
+      previewing.value = false
+    }
+    return
+  }
+  // 其他格式回退下载
+  try {
+    const blob = await downloadCalibrationReport(calibInstrument.value.id, row.id)
+    triggerDownload(blob, fname)
+    ElMessage.info('该格式暂不支持在线预览，已为你下载文件')
+  } catch (e) {
+    ElMessage.error('预览失败')
+  }
+}
+
+// ---------------- 仪器档案 ----------------
+const archiveDrawer = ref(false)
+const archiveRow = ref(null)
+const archiveInfo = ref({ has_archive: false })
+const uploading = ref(false)
+const fileInput = ref(null)
+const previewVisible = ref(false)
+const previewTitle = ref('')
+const previewHtml = ref('')
+const previewing = ref(false)
+
+// 反向索引：本仪器对应的项目（与项目查询页「关联仪器」芯片对称）
+const linkedTestItems = ref([])
+const linkedLoading = ref(false)
+
+// 反向索引：本仪器关联的操作/保养记录（记录表格，归属文件管理模块）
+const linkedDocs = ref([])
+const docsLoading = ref(false)
+
+async function loadArchiveInfo(id) {
+  try {
+    archiveInfo.value = await getInstrumentArchiveInfo(id)
+  } catch (e) {
+    archiveInfo.value = { has_archive: false }
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第48页 / 共60页（总源码3537行，取自原第59页）
+--------------------------------------------------------
+  }
+}
+async function loadLinkedTestItems(id) {
+  linkedLoading.value = true
+  try {
+    linkedTestItems.value = await getInstrumentTestItems(id)
+  } catch (e) {
+    linkedTestItems.value = []
+  } finally {
+    linkedLoading.value = false
+  }
+}
+async function loadLinkedDocs(id) {
+  docsLoading.value = true
+  try {
+    linkedDocs.value = await getInstrumentDocuments(id)
+  } catch (e) {
+    linkedDocs.value = []
+  } finally {
+    docsLoading.value = false
+  }
+}
+async function openArchive(row) {
+  archiveRow.value = row
+  archiveDrawer.value = true
+  await loadArchiveInfo(row.id)
+  await loadLinkedTestItems(row.id)
+  await loadLinkedDocs(row.id)
+}
+// 操作/保养记录：预览（docx 用 mammoth 内嵌显示；pdf 走浏览器；其他回退）
+async function previewDoc(row) {
+  const fname = row.original_filename || row.title || ''
+  const ext = (fname.split('.').pop() || '').toLowerCase()
+  if (ext === 'pdf') {
+    try {
+      const blob = await fetchDocumentBlob(row.id, 'preview')
+      previewBlob(blob)
+    } catch (e) {
+      ElMessage.error('文件不存在或预览失败')
+    }
+    return
+  }
+  if (ext === 'docx') {
+    previewVisible.value = true
+    previewTitle.value = row.title || fname || '预览'
+    previewHtml.value = ''
+    previewing.value = true
+    try {
+      const blob = await fetchDocumentBlob(row.id, 'preview')
+      const arrayBuffer = await blob.arrayBuffer()
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第49页 / 共60页（总源码3537行，取自原第60页）
+--------------------------------------------------------
+      const result = await mammoth.convertToHtml({ arrayBuffer })
+      previewHtml.value = result.value || '<p style="color:#909399">（文档内容为空）</p>'
+    } catch (e) {
+      console.error(e)
+      previewHtml.value = '<p style="color:#f56c6c">预览失败：' + (e && e.message ? e.message : '该文档可能受保护或格式不支持') + '</p>'
+    } finally {
+      previewing.value = false
+    }
+    return
+  }
+  try {
+    const blob = await fetchDocumentBlob(row.id, 'preview')
+    previewBlob(blob)
+  } catch (e) {
+    ElMessage.error('文件不存在或预览失败')
+  }
+}
+async function downloadDoc(row) {
+  try {
+    const blob = await fetchDocumentBlob(row.id, 'download')
+    downloadBlob(blob, row.original_filename || row.title)
+  } catch (e) {
+    ElMessage.error('文件不存在或下载失败')
+  }
+}
+// 点击项目跳转项目查询页，并自动按项目名搜索定位
+function goTestItem(item) {
+  router.push({ path: '/test-items', query: { q: item.name } })
+}
+function pickArchiveFile() {
+  fileInput.value?.click()
+}
+async function onArchiveFileChange(e) {
+  const file = e.target.files?.[0]
+  e.target.value = '' // 允许重复选择同一文件
+  if (!file || !archiveRow.value) return
+  uploading.value = true
+  try {
+    await uploadInstrumentArchive(archiveRow.value.id, file)
+    ElMessage.success('档案已保存')
+    await loadArchiveInfo(archiveRow.value.id)
+    crud.value?.refresh()
+  } catch (err) {
+    ElMessage.error('上传失败')
+  } finally {
+    uploading.value = false
+  }
+}
+async function downloadArchive() {
+  if (!archiveRow.value) return
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第50页 / 共60页（总源码3537行，取自原第61页）
+--------------------------------------------------------
+  try {
+    const blob = await downloadInstrumentArchive(archiveRow.value.id)
+    triggerDownload(blob, archiveInfo.value.original_filename || 'archive')
+  } catch (e) {
+    ElMessage.error('下载失败')
+  }
+}
+async function removeArchive() {
+  if (!archiveRow.value) return
+  try {
+    await ElMessageBox.confirm('确认删除该仪器的档案文件？', '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await deleteInstrumentArchive(archiveRow.value.id)
+    ElMessage.success('已删除')
+    await loadArchiveInfo(archiveRow.value.id)
+    crud.value?.refresh()
+  } catch (e) {
+    ElMessage.error('删除失败')
+  }
+}
+async function previewArchive() {
+  if (!archiveRow.value || !archiveInfo.value.has_archive) return
+  const ext = (archiveInfo.value.file_ext || '').toLowerCase()
+  const fname = archiveInfo.value.original_filename || '档案预览'
+  // PDF：浏览器内置阅读器可直接渲染
+  if (ext === '.pdf') {
+    try {
+      const blob = await downloadInstrumentArchive(archiveRow.value.id)
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (e) {
+      ElMessage.error('预览失败')
+    }
+    return
+  }
+  // docx（含已由 .doc 转换而来的）：前端 mammoth 转 HTML，在浏览器内显示（不下载，与文件管理一致）
+  if (ext === '.docx') {
+    previewVisible.value = true
+    previewTitle.value = fname
+    previewHtml.value = ''
+    previewing.value = true
+    try {
+      const blob = await downloadInstrumentArchive(archiveRow.value.id)
+      const arrayBuffer = await blob.arrayBuffer()
+      const result = await mammoth.convertToHtml({ arrayBuffer })
+      previewHtml.value = result.value || '<p style="color:#909399">（文档内容为空）</p>'
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第51页 / 共60页（总源码3537行，取自原第62页）
+--------------------------------------------------------
+    } catch (e) {
+      console.error(e)
+      previewHtml.value = '<p style="color:#f56c6c">预览失败：' + (e && e.message ? e.message : '该文档可能受保护或格式不支持') + '</p>'
+    } finally {
+      previewing.value = false
+    }
+    return
+  }
+  // 其他格式（极少，如转换失败保留的 .doc）：回退下载
+  try {
+    const blob = await downloadInstrumentArchive(archiveRow.value.id)
+    triggerDownload(blob, fname)
+    ElMessage.info('该格式暂不支持在线预览，已为你下载文件')
+  } catch (e) {
+    ElMessage.error('预览失败')
+  }
+}
+function triggerDownload(blob, name) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name || 'archive'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+// ---------------- 批量导入 ----------------
+const importVisible = ref(false)
+const importPath = ref('E:\\生免组管理体系文件\\生免组仪器档案')
+const importing = ref(false)
+const importResult = ref(null)
+async function doImport() {
+  if (!importPath.value.trim()) {
+    ElMessage.warning('请填写档案目录')
+    return
+  }
+  importing.value = true
+  importResult.value = null
+  try {
+    const res = await importArchivesFolder(importPath.value.trim())
+    importResult.value = res
+    ElMessage.success(`成功导入 ${res.imported} 个仪器档案`)
+    crud.value?.refresh()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '导入失败')
+  } finally {
+    importing.value = false
+  }
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第52页 / 共60页（总源码3537行，取自原第63页）
+--------------------------------------------------------
+}
+
+function formatSize(n) {
+  if (!n) return '0 B'
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / 1024 / 1024).toFixed(2)} MB`
+}
+function formatTime(v) {
+  if (!v) return '—'
+  return String(v).replace('T', ' ').slice(0, 19)
+}
+</script>
+
+<style scoped>
+.page {
+  height: 100%;
+}
+/* 仪器列表：允许单元格内容换行（最多两行），避免横向拖拉 */
+.page :deep(.el-table .cell) {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+}
+.page :deep(.el-table__row) td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+/* 对应项目数量统计 */
+.linked-count {
+  margin-top: 10px;
+  padding: 8px 12px;
+  text-align: right;
+  font-size: 13px;
+  color: #606266;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+.linked-count b {
+  color: #409eff;
+  font-size: 15px;
+  padding: 0 2px;
+}
+/* 档案预览：复用的富文本样式 */
+.doc-preview {
+  max-height: 78vh;
+  overflow: auto;
+  padding: 8px 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第53页 / 共60页（总源码3537行，取自原第64页）
+--------------------------------------------------------
+  background: #fff;
+  line-height: 1.7;
+}
+.doc-preview :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+}
+.doc-preview :deep(td),
+.doc-preview :deep(th) {
+  border: 1px solid #dcdfe6;
+  padding: 4px 8px;
+}
+.doc-preview :deep(img) {
+  max-width: 100%;
+}
+</style>
+
+======================================================================
+# 文件: views/instruments/InstrumentFamilyManage.vue  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\views\instruments\InstrumentFamilyManage.vue)
+======================================================================
+
+<template>
+  <div class="page">
+    <div class="toolbar">
+      <div>
+        <h2 class="page-title">仪器关联管理</h2>
+        <p class="page-desc">维护「项目使用仪器（总型号）→ 仪器档案」的一对多对应关系，供项目查询页点击跳转仪器档案。</p>
+      </div>
+      <el-button type="primary" :icon="Plus" size="large" @click="onAdd">新增总型号</el-button>
+    </div>
+
+    <el-table v-loading="loading" :data="families" border stripe style="width:100%">
+      <el-table-column prop="name" label="总型号（使用仪器）" min-width="220">
+        <template #default="{ row }">
+          <strong>{{ row.name }}</strong>
+          <el-tag v-if="row.description" size="small" type="info" effect="plain" class="desc-tag">{{ row.description }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="关联仪器数" width="110" align="center">
+        <template #default="{ row }">
+          <el-tag :type="row.member_count ? 'success' : 'info'">{{ row.member_count }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="项目使用数" width="110" align="center" prop="used_count">
+        <template #default="{ row }">
+          <el-tag :type="row.used_count ? 'warning' : 'info'">{{ row.used_count }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="已关联仪器" min-width="320">
+        <template #default="{ row }">
+          <template v-if="row.members && row.members.length">
+            <el-tag
+              v-for="m in row.members"
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第54页 / 共60页（总源码3537行，取自原第65页）
+--------------------------------------------------------
+              :key="m.id"
+              size="small"
+              effect="plain"
+              class="mem-tag"
+              :type="m.has_archive ? 'success' : 'info'"
+            >{{ m.name }}（{{ m.model }}）<span v-if="!m.has_archive" class="no-arch">· 未建档</span><span v-if="m.status && m.status !== '在用'" class="st-tag">· {{ m.status }}</span></el-tag>
+          </template>
+          <span v-else class="muted">— 未关联 —</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="160" fixed="right">
+        <template #default="{ row }">
+          <el-button text type="primary" :icon="Edit" @click="onEdit(row)">编辑</el-button>
+          <el-button text type="danger" :icon="Delete" @click="onDelete(row)">删除</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑总型号关联' : '新增总型号'" width="640px">
+      <el-form label-width="92px">
+        <el-form-item label="总型号" required>
+          <el-input v-model="form.name" placeholder="如：罗氏 Cobas6000 / AU生化仪" :disabled="!!editingId" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="form.description" placeholder="可选，如：含 e601/e602/e411 三台" />
+        </el-form-item>
+        <el-form-item label="关联仪器">
+          <el-select
+            v-model="form.instrument_ids"
+            multiple
+            filterable
+            clearable
+            style="width:100%"
+            placeholder="选择对应的具体仪器（可搜索型号/名称）"
+          >
+            <el-option
+              v-for="inst in allInstruments"
+              :key="inst.id"
+              :value="inst.id"
+              :label="`${inst.name}（${inst.model}）${inst.has_archive ? '' : ' · 未建档'}`"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="onSave">保存</el-button>
+      </template>
+    </el-dialog>
+  </div>
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第55页 / 共60页（总源码3537行，取自原第66页）
+--------------------------------------------------------
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Edit, Delete } from '@element-plus/icons-vue'
+import {
+  listInstrumentFamilies,
+  createInstrumentFamily,
+  updateInstrumentFamily,
+  deleteInstrumentFamily,
+  setFamilyMembers,
+  getInstrumentFamily,
+  listInstruments,
+  getArchivesStatus,
+} from '../../api/instruments'
+
+const families = ref([])
+const allInstruments = ref([])
+const loading = ref(false)
+const dialogVisible = ref(false)
+const editingId = ref(null)
+const saving = ref(false)
+
+const form = reactive({ name: '', description: '', instrument_ids: [] })
+
+onMounted(() => {
+  loadInstruments()
+  fetchFamilies()
+})
+
+async function loadInstruments() {
+  try {
+    const res = await listInstruments({ page_size: 1000 })
+    const items = res.items || []
+    let archMap = {}
+    try {
+      const st = await getArchivesStatus()
+      ;(st || []).forEach((a) => { archMap[a.instrument_id] = a.has_archive })
+    } catch (e) {}
+    // 停用仪器不纳入关联候选（不显示、不可跳转）；空字符串 status 会被后端当成 status=='' 导致全空，故此处拉全量再过滤
+    allInstruments.value = items
+      .filter((i) => i.status !== '停用')
+      .map((i) => ({ ...i, has_archive: !!archMap[i.id] }))
+  } catch (e) {
+    allInstruments.value = []
+  }
+}
+
+async function fetchFamilies() {
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第56页 / 共60页（总源码3537行，取自原第67页）
+--------------------------------------------------------
+  loading.value = true
+  try {
+    families.value = await listInstrumentFamilies()
+  } catch (e) {
+    ElMessage.error('加载关联失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+function onAdd() {
+  editingId.value = null
+  Object.assign(form, { name: '', description: '', instrument_ids: [] })
+  dialogVisible.value = true
+}
+
+async function onEdit(row) {
+  editingId.value = row.id
+  try {
+    const detail = await getInstrumentFamily(row.id)
+    Object.assign(form, {
+      name: detail.name,
+      description: detail.description || '',
+      instrument_ids: (detail.instrument_ids || []).filter((id) => {
+        const inst = allInstruments.value.find((i) => i.id === id)
+        return inst && inst.status !== '停用'
+      }),
+    })
+    dialogVisible.value = true
+  } catch (e) {
+    ElMessage.error('获取详情失败')
+  }
+}
+
+async function onSave() {
+  if (!form.name.trim()) {
+    ElMessage.warning('请填写总型号')
+    return
+  }
+  saving.value = true
+  try {
+    if (editingId.value) {
+      await updateInstrumentFamily(editingId.value, { description: form.description })
+      await setFamilyMembers(editingId.value, form.instrument_ids)
+    } else {
+      const created = await createInstrumentFamily({ name: form.name.trim(), description: form.description })
+      await setFamilyMembers(created.id, form.instrument_ids)
+    }
+    ElMessage.success('已保存')
+    dialogVisible.value = false
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第57页 / 共60页（总源码3537行，取自原第68页）
+--------------------------------------------------------
+    fetchFamilies()
+  } catch (e) {
+    const detail = e?.response?.data?.detail
+    ElMessage.error('保存失败：' + (typeof detail === 'string' ? detail : (e?.message || '未知错误')))
+  } finally {
+    saving.value = false
+  }
+}
+
+async function onDelete(row) {
+  await ElMessageBox.confirm(`确认删除总型号「${row.name}」及其关联？`, '提示', { type: 'warning' })
+  await deleteInstrumentFamily(row.id)
+  ElMessage.success('已删除')
+  fetchFamilies()
+}
+</script>
+
+<style scoped>
+.page {
+  padding: 16px 20px 24px;
+  background: #f5f7fa;
+  min-height: 100%;
+}
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+.page-title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a365d;
+}
+.page-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #909399;
+  max-width: 680px;
+}
+.desc-tag {
+  margin-left: 8px;
+}
+.mem-tag {
+  margin: 0 6px 6px 0;
+}
+.no-arch {
+  color: #c0c4cc;
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第58页 / 共60页（总源码3537行，取自原第69页）
+--------------------------------------------------------
+  font-size: 12px;
+}
+.muted {
+  color: #c0c4cc;
+}
+</style>
+
+======================================================================
+# 文件: api/testItems.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\testItems.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function listTestItems(params) {
+  return request.get('/api/v1/test-items', { params })
+}
+export function getTestItem(id) {
+  return request.get(`/api/v1/test-items/${id}`)
+}
+export function createTestItem(data) {
+  return request.post('/api/v1/test-items', data)
+}
+export function updateTestItem(id, data) {
+  return request.put(`/api/v1/test-items/${id}`, data)
+}
+export function deleteTestItem(id) {
+  return request.delete(`/api/v1/test-items/${id}`)
+}
+export function importTestItems(file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  return request.post('/api/v1/test-items/import', fd)
+}
+export function getTestItemStats() {
+  return request.get('/api/v1/test-items/stats')
+}
+export function exportTestItems(params) {
+  return request.get('/api/v1/test-items/export', { params, responseType: 'blob' })
+}
+
+======================================================================
+# 文件: api/instruments.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\instruments.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function listInstruments(params) {
+  return request.get('/api/v1/instruments', { params })
+}
+export function getInstrument(id) {
+  return request.get(`/api/v1/instruments/${id}`)
+}
+export function createInstrument(data) {
+  return request.post('/api/v1/instruments', data)
+}
+export function updateInstrument(id, data) {
+  return request.put(`/api/v1/instruments/${id}`, data)
+}
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第59页 / 共60页（总源码3537行，取自原第70页）
+--------------------------------------------------------
+export function deleteInstrument(id) {
+  return request.delete(`/api/v1/instruments/${id}`)
+}
+export function listCalibrations(instrumentId) {
+  return request.get(`/api/v1/instruments/${instrumentId}/calibrations`)
+}
+export function createCalibration(instrumentId, data) {
+  return request.post(`/api/v1/instruments/${instrumentId}/calibrations`, data)
+}
+export function deleteCalibration(instrumentId, recId) {
+  return request.delete(`/api/v1/instruments/${instrumentId}/calibrations/${recId}`)
+}
+export function uploadCalibrationReport(instrumentId, recId, file) {
+  const form = new FormData()
+  form.append('file', file)
+  return request.post(`/api/v1/instruments/${instrumentId}/calibrations/${recId}/report`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+export function downloadCalibrationReport(instrumentId, recId) {
+  return request.get(`/api/v1/instruments/${instrumentId}/calibrations/${recId}/report`, { responseType: 'blob' })
+}
+export function deleteCalibrationReport(instrumentId, recId) {
+  return request.delete(`/api/v1/instruments/${instrumentId}/calibrations/${recId}/report`)
+}
+export function getCalibrationsStatus() {
+  return request.get('/api/v1/instruments/calibrations/status')
+}
+
+// 仪器档案文件
+export function uploadInstrumentArchive(id, file) {
+  const form = new FormData()
+  form.append('file', file)
+  return request.post(`/api/v1/instruments/${id}/archive`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+export function getInstrumentArchiveInfo(id) {
+  return request.get(`/api/v1/instruments/${id}/archive/info`)
+}
+export function downloadInstrumentArchive(id) {
+  return request.get(`/api/v1/instruments/${id}/archive`, { responseType: 'blob' })
+}
+export function deleteInstrumentArchive(id) {
+  return request.delete(`/api/v1/instruments/${id}/archive`)
+}
+export function getArchivesStatus() {
+  return request.get('/api/v1/instruments/archives/status')
+}
+export function importArchivesFolder(path) {
+
+
+检验科生化免疫组检验项目与仪器管理软件 V1.0   第60页 / 共60页（总源码3537行，取自原第71页）
+--------------------------------------------------------
+  return request.post('/api/v1/instruments/archives/import-folder', { path })
+}
+
+// 项目「使用仪器」总型号 → 对应仪器档案清单（一对多）
+export function getInstrumentFamilyMap() {
+  return request.get('/api/v1/instruments/family-map')
+}
+
+// 反向索引：仪器 → 对应的项目列表
+export function getInstrumentTestItems(id) {
+  return request.get(`/api/v1/instruments/${id}/test-items`)
+}
+
+// 反向索引：仪器 → 关联文档（操作+保养记录等）
+export function getInstrumentDocuments(id) {
+  return request.get(`/api/v1/instruments/${id}/documents`)
+}
+
+// ---- 总型号 ↔ 仪器 关联管理 ----
+export function listInstrumentFamilies() {
+  return request.get('/api/v1/instrument-families')
+}
+export function getInstrumentFamily(id) {
+  return request.get(`/api/v1/instrument-families/${id}`)
+}
+export function createInstrumentFamily(data) {
+  return request.post('/api/v1/instrument-families', data)
+}
+export function updateInstrumentFamily(id, data) {
+  return request.put(`/api/v1/instrument-families/${id}`, data)
+}
+export function deleteInstrumentFamily(id) {
+  return request.delete(`/api/v1/instrument-families/${id}`)
+}
+export function setFamilyMembers(id, instrumentIds) {
+  return request.put(`/api/v1/instrument-families/${id}/members`, { instrument_ids: instrumentIds })
+}
+

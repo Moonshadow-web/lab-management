@@ -1,0 +1,3268 @@
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第1页 / 共60页（总源码6397行，取自原第1页）
+------------------------------------------------------
+
+======================================================================
+# 文件: api/v1/qc.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\qc.py)
+======================================================================
+
+from ...core.crud_base import make_router
+from ...models.qc import QCRecord
+from ...schemas import QCRecordCreate, QCRecordRead, QCRecordUpdate
+
+router = make_router(
+    QCRecord,
+    QCRecordRead,
+    QCRecordCreate,
+    QCRecordUpdate,
+    search_fields=["test_item", "level", "lot_no", "instrument", "operator", "rule_violated"],
+    filter_fields=["status", "instrument", "level"],
+    prefix="/qc-records",
+    write_roles=("admin", "qc_manager", "member"),
+    delete_roles=("admin", "qc_manager"),
+)
+
+======================================================================
+# 文件: api/v1/qc_target.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\qc_target.py)
+======================================================================
+
+"""批号累积靶值接口：
+- batches 的增删改查（make_router 工厂）
+- 录入结果 / 查明细 / 删结果 / 切换失控标记 / 手动确立 / 上传存档 / 预览存档
+"""
+import json
+import os
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy.orm import Session
+
+from ...core.config import DATA_DIR
+from ...core.crud_base import make_router, write_audit
+from ...core.database import get_db
+from ...core.security import get_current_user, require_roles
+from ...models.qc_target import QCTargetBatch, QCTargetResult, QC_MATERIAL_PRESETS
+from ...models.qc_material import QcMaterial
+from ...models.user import User
+from ...services import qc_target as svc
+
+router = APIRouter(prefix="/qc-target-batches", tags=["qc_target_batches"])
+
+ARCHIVE_DIR = DATA_DIR / "qc_target_archives"
+os.makedirs(ARCHIVE_DIR, exist_ok=True)
+
+WRITE = require_roles("admin", "qc_manager")
+
+
+# ---------------------------------------------------------------------------
+# Schema
+# ---------------------------------------------------------------------------
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第2页 / 共60页（总源码6397行，取自原第2页）
+------------------------------------------------------
+class QCTargetBatchBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    qc_material: str = ""
+    qc_material_id: int | None = None  # 关联注册质控品（主数据）；空=未关联
+    lot_no: str = ""
+    level: int = 0  # 水平 1/2/3，0=未指定
+    instrument: str = ""
+    method: str = ""        # conventional / immediate（archive 模式为空）
+    mode: str = ""          # archive / entry（前端可传；后端按质控品归一化）
+    note: str = ""
+
+
+class QCTargetBatchCreate(QCTargetBatchBase):
+    pass
+
+
+class QCTargetBatchUpdate(QCTargetBatchBase):
+    established: bool | None = None
+
+
+class QCTargetBatchRead(QCTargetBatchBase):
+    id: int
+    established: bool = False
+    targets_json: str = ""
+    archive_filename: str = ""
+    created_by: str = ""
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# 质控品下拉预设
+# ---------------------------------------------------------------------------
+@router.get("/materials/presets")
+def material_presets(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """返回质控品预设 + 历史用过的（去重）。"""
+    used = [r[0] for r in db.query(QCTargetBatch.qc_material).distinct().all() if r[0]]
+    merged = []
+    for m in QC_MATERIAL_PRESETS + used:
+        if m and m not in merged:
+            merged.append(m)
+    return merged
+
+
+# ---------------------------------------------------------------------------
+# batches CRUD（含 mode 归一化）
+# ---------------------------------------------------------------------------
+def _normalize_mode(db, action, obj):
+    """建批/改批时：
+    - 若传了 qc_material_id，回填质控品名称（来自主数据）；
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第3页 / 共60页（总源码6397行，取自原第3页）
+------------------------------------------------------
+    - 按质控品归一化 mode 与 method：生化多项质控品→仅存档，其余→录入。
+    """
+    mid = getattr(obj, "qc_material_id", None)
+    if mid:
+        reg = db.get(QcMaterial, mid)
+        if reg:
+            obj.qc_material = reg.name
+    mat = (obj.qc_material or "").strip()
+    if mat == "生化多项质控品":
+        obj.mode = "archive"
+        obj.method = ""
+        if action == "create":
+            obj.established = True
+    else:
+        if obj.mode != "archive":
+            obj.mode = "entry"
+        if obj.method not in ("conventional", "immediate"):
+            obj.method = "conventional"
+    db.commit()
+
+
+batch_router = make_router(
+    QCTargetBatch,
+    QCTargetBatchRead,
+    QCTargetBatchCreate,
+    QCTargetBatchUpdate,
+    search_fields=["qc_material", "lot_no", "instrument"],
+    filter_fields=["method", "mode", "established"],
+    prefix="",
+    after_write=_normalize_mode,
+    write_roles=("admin", "qc_manager", "member"),
+    delete_roles=("admin", "qc_manager"),
+)
+# 重写路径带上本 router 前缀后并入（避免 include_router 重复前缀 / 空路径报错）
+for _r in batch_router.routes:
+    _r.path = "/qc-target-batches" + (_r.path if _r.path != "/" else "")
+    router.routes.append(_r)
+
+
+# ---------------------------------------------------------------------------
+# 统计辅助
+# ---------------------------------------------------------------------------
+def _active_values(db, batch_id, analyte):
+    """返回参与靶值累计的测定值：
+    - is_out=False（在控）
+    - 或 manual=True（人工确认）
+    """
+    rows = (
+        db.query(QCTargetResult)
+        .filter(QCTargetResult.batch_id == batch_id, QCTargetResult.analyte == analyte,
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第4页 / 共60页（总源码6397行，取自原第4页）
+------------------------------------------------------
+                (QCTargetResult.is_out == False) | (QCTargetResult.manual == True))
+        .order_by(QCTargetResult.id)
+        .all()
+    )
+    return [r.value for r in rows]
+
+
+def _build_stats(db, batch):
+    """返回 per-analyte 统计 + 批次级状态。"""
+    results = db.query(QCTargetResult).filter(QCTargetResult.batch_id == batch.id).all()
+    analytes = []
+    for r in results:
+        if r.analyte and r.analyte not in analytes:
+            analytes.append(r.analyte)
+    per = {}
+    for a in analytes:
+        vals = _active_values(db, batch.id, a)
+        per[a] = svc.compute_analyte(vals, batch.method, batch.established)
+        # 仅当最新一条记录为人工确认时，才以人工状态展示
+        latest = db.query(QCTargetResult).filter(
+            QCTargetResult.batch_id == batch.id, QCTargetResult.analyte == a
+        ).order_by(QCTargetResult.id.desc()).first()
+        if latest and latest.manual:
+            per[a]["status"] = "在控(人工)"
+            per[a]["manual"] = True
+    # 批次级状态
+    has_out = any(r.is_out for r in results)
+    if batch.mode == "archive":
+        batch_status = "已存档"
+    elif batch.established:
+        batch_status = "已确立"
+    elif has_out:
+        batch_status = "有失控"
+    else:
+        batch_status = "累积中"
+    # 关联质控品的项目清单（供录入分析物下拉预填）
+    material_items = []
+    if batch.qc_material_id:
+        reg = db.get(QcMaterial, batch.qc_material_id)
+        if reg and reg.items_json:
+            try:
+                material_items = json.loads(reg.items_json) or []
+            except Exception:
+                material_items = []
+    return {
+        "analytes": analytes,
+        "per_analyte": per,
+        "batch_status": batch_status,
+        "total_entries": len(results),
+        "out_count": sum(1 for r in results if r.is_out),
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第5页 / 共60页（总源码6397行，取自原第5页）
+------------------------------------------------------
+        "established_analytes": sum(1 for a in per.values() if a["established"]),
+        "material_items": material_items,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 结果录入 / 查询
+# ---------------------------------------------------------------------------
+class ResultIn(BaseModel):
+    analyte: str
+    value: float
+    qc_date: str = ""
+    operator: str = ""
+    remark: str = ""
+
+
+@router.post("/{batch_id}/results", response_model=None)
+def add_result(
+    batch_id: int,
+    payload: ResultIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(WRITE),
+):
+    batch = db.get(QCTargetBatch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="批号不存在")
+    if batch.mode != "entry":
+        raise HTTPException(status_code=400, detail="存档模式（生化多项）不录入结果")
+    analyte = (payload.analyte or "").strip()
+    if not analyte:
+        raise HTTPException(status_code=400, detail="请填写项目/分析物")
+    # 该 analyte 现有在控值 + 新值
+    active = _active_values(db, batch_id, analyte)
+    new_vals = active + [payload.value]
+
+    si_up = si_lo = None
+    status = "累计中"
+    is_out = False
+    if batch.method == "immediate":
+        info = svc.classify_immediate(new_vals)
+        status = info["status"]
+        si_up = info.get("si_upper")
+        si_lo = info.get("si_lower")
+        is_out = (status == "失控")
+    else:  # conventional
+        if batch.established:
+            # 用已确立靶值判定新值
+            tgt = {}
+            try:
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第6页 / 共60页（总源码6397行，取自原第6页）
+------------------------------------------------------
+                tgt = json.loads(batch.targets_json or "{}").get(analyte, {})
+            except Exception:
+                tgt = {}
+            tm = tgt.get("mean", (sum(new_vals) / len(new_vals)) if new_vals else 0.0)
+            ts = tgt.get("sd", 0.0)
+            status = svc.classify_conventional(payload.value, tm, ts)
+            is_out = (status == "失控")
+        else:
+            status = "累计中"
+
+    seq = db.query(QCTargetResult).filter(
+        QCTargetResult.batch_id == batch_id, QCTargetResult.analyte == analyte
+    ).count() + 1
+    row = QCTargetResult(
+        batch_id=batch_id, analyte=analyte, value=payload.value, qc_date=payload.qc_date,
+        seq=seq, si_upper=si_up if si_up is not None else 0.0,
+        si_lower=si_lo if si_lo is not None else 0.0, status=status, is_out=is_out,
+        operator=payload.operator, remark=payload.remark,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    write_audit(db, user, "create", "qc_target_results", row.id, payload.model_dump(), _ip(request))
+
+    # 自动确立：active 数达 20
+    if not batch.established:
+        est_n = svc.IMMEDIATE_ESTABLISH if batch.method == "immediate" else svc.CONVENTIONAL_ESTABLISH
+        if len(new_vals) >= est_n:
+            _do_establish(db, batch)
+
+    return {"row": _ser_result(row), "stats": _build_stats(db, batch)}
+
+
+@router.get("/{batch_id}/results", response_model=None)
+def list_results(batch_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    batch = db.get(QCTargetBatch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="批号不存在")
+    rows = db.query(QCTargetResult).filter(QCTargetResult.batch_id == batch_id).order_by(
+        QCTargetResult.analyte, QCTargetResult.id
+    ).all()
+    return {"rows": [_ser_result(r) for r in rows], "stats": _build_stats(db, batch)}
+
+
+@router.post("/recalc", response_model=None)
+def recalc_all(db: Session = Depends(get_db), user: User = Depends(require_roles("admin", "qc_manager"))):
+    """批量重算所有录入型批号的结果状态/SI（修复历史因 manual_atomic 跳过判定导致的累计中）。
+
+    仅重算 status='累计中' 且非人工确认、非失控标记的记录；按 analyte 逐条累积 active
+    序列（is_out 不计入、manual 计入）复刻 add_result 的判定逻辑。
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第7页 / 共60页（总源码6397行，取自原第7页）
+------------------------------------------------------
+    """
+    from statistics import mean as _mean
+    batches = db.query(QCTargetBatch).filter(QCTargetBatch.mode == "entry").all()
+    updated = 0
+    for batch in batches:
+        results = db.query(QCTargetResult).filter(QCTargetResult.batch_id == batch.id).order_by(QCTargetResult.id).all()
+        by_analyte = {}
+        for r in results:
+            by_analyte.setdefault(r.analyte, []).append(r)
+        for analyte, rows in by_analyte.items():
+            active = []
+            for r in rows:
+                if r.manual or r.is_out:
+                    # 用户已手动处理的记录：保持原状态；manual 值计入 active，is_out 不计入
+                    if r.manual:
+                        active.append(r.value)
+                    continue
+                if r.status == "累计中":
+                    new_vals = active + [r.value]
+                    if batch.method == "immediate":
+                        info = svc.classify_immediate(new_vals)
+                        r.status = info["status"]
+                        r.si_upper = info.get("si_upper") or 0.0
+                        r.si_lower = info.get("si_lower") or 0.0
+                        r.is_out = (info["status"] == "失控")
+                        updated += 1
+                    else:
+                        if batch.established:
+                            tgt = {}
+                            try:
+                                tgt = json.loads(batch.targets_json or "{}").get(analyte, {})
+                            except Exception:
+                                tgt = {}
+                            tm = tgt.get("mean", _mean(new_vals) if new_vals else 0.0)
+                            ts = tgt.get("sd", 0.0)
+                            r.status = svc.classify_conventional(r.value, tm, ts)
+                            r.is_out = (r.status == "失控")
+                            updated += 1
+                        # 未确立的常规法：本就累计中，保持
+                active.append(r.value)
+    db.commit()
+    return {"updated": updated}
+
+
+@router.delete("/{batch_id}/results/{rid}", response_model=None)
+def delete_result(batch_id: int, rid: int, request: Request, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    row = db.get(QCTargetResult, rid)
+    if not row or row.batch_id != batch_id:
+        raise HTTPException(status_code=404, detail="结果不存在")
+    db.delete(row)
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第8页 / 共60页（总源码6397行，取自原第8页）
+------------------------------------------------------
+    db.commit()
+    write_audit(db, user, "delete", "qc_target_results", rid, {}, _ip(request))
+    batch = db.get(QCTargetBatch, batch_id)
+    # 若已无结果，撤销确立
+    remain = db.query(QCTargetResult).filter(QCTargetResult.batch_id == batch_id).count()
+    if remain == 0 and batch.mode != "archive":
+        batch.established = False
+        batch.targets_json = ""
+        db.commit()
+    return {"stats": _build_stats(db, batch)}
+
+
+@router.post("/{batch_id}/results/{rid}/toggle", response_model=None)
+def toggle_out(batch_id: int, rid: int, request: Request, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    """切换失控/人工标记：
+    - 失控→在控：设为 manual=True（人工确认），is_out=False，系统不再自动判失控
+    - 在控→失控：取消 manual，设为 is_out=True
+    """
+    row = db.get(QCTargetResult, rid)
+    if not row or row.batch_id != batch_id:
+        raise HTTPException(status_code=404, detail="结果不存在")
+    if row.is_out:
+        # 失控→人工认领
+        row.is_out = False
+        row.manual = True
+        row.status = "在控(人工)"
+    else:
+        # 在控→标回失控
+        row.is_out = True
+        row.manual = False
+        row.status = "失控"
+    db.commit()
+    write_audit(db, user, "update", "qc_target_results", rid, {"is_out": row.is_out, "manual": row.manual}, _ip(request))
+    batch = db.get(QCTargetBatch, batch_id)
+    return {"row": _ser_result(row), "stats": _build_stats(db, batch)}
+
+
+@router.post("/{batch_id}/establish", response_model=None)
+def establish(batch_id: int, request: Request, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    """手动确立靶值（≥10 次允许）。按各 analyte 在控值计算均值/SD/CV 存档。"""
+    batch = db.get(QCTargetBatch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="批号不存在")
+    if batch.mode != "entry":
+        raise HTTPException(status_code=400, detail="存档模式无需确立")
+    _do_establish(db, batch, force=True)
+    return {"stats": _build_stats(db, batch), "targets_json": batch.targets_json}
+
+
+# ---------------------------------------------------------------------------
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第9页 / 共60页（总源码6397行，取自原第9页）
+------------------------------------------------------
+# 存档 PDF 上传 / 预览
+# ---------------------------------------------------------------------------
+@router.post("/{batch_id}/archive", response_model=None)
+async def upload_archive(
+    batch_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(WRITE),
+):
+    batch = db.get(QCTargetBatch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="批号不存在")
+    fname = (file.filename or "").lower()
+    if not fname.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="仅支持 PDF 存档文件")
+    safe = f"{batch_id}_{int(datetime.utcnow().timestamp())}.pdf"
+    dest = ARCHIVE_DIR / safe
+    content = await file.read()
+    with open(dest, "wb") as f:
+        f.write(content)
+    # 删除旧文件
+    if batch.archive_file:
+        old = ARCHIVE_DIR / os.path.basename(batch.archive_file)
+        if old.exists():
+            try:
+                old.unlink()
+            except Exception:
+                pass
+    batch.archive_file = f"qc_target_archives/{safe}"
+    batch.archive_filename = file.filename or safe
+    if batch.mode == "archive":
+        batch.established = True
+    db.commit()
+    db.refresh(batch)
+    return {"archive_file": batch.archive_file, "archive_filename": batch.archive_filename}
+
+
+@router.get("/{batch_id}/archive")
+def download_archive(batch_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    batch = db.get(QCTargetBatch, batch_id)
+    if not batch or not batch.archive_file:
+        raise HTTPException(status_code=404, detail="无存档文件")
+    path = ARCHIVE_DIR / os.path.basename(batch.archive_file)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="存档文件丢失")
+    return FileResponse(str(path), media_type="application/pdf", filename=batch.archive_filename or "archive.pdf")
+
+
+# ---------------------------------------------------------------------------
+# 序列化 / 工具
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第10页 / 共60页（总源码6397行，取自原第10页）
+--------------------------------------------------------
+# ---------------------------------------------------------------------------
+def _ser_result(r: QCTargetResult):
+    return {
+        "id": r.id, "batch_id": r.batch_id, "analyte": r.analyte, "value": r.value,
+        "qc_date": r.qc_date, "seq": r.seq, "si_upper": r.si_upper, "si_lower": r.si_lower,
+        "status": r.status, "is_out": r.is_out, "manual": r.manual,
+        "operator": r.operator, "remark": r.remark,
+        "created_at": r.created_at,
+        "created_at": r.created_at,
+    }
+
+
+def _do_establish(db, batch, force=False):
+    need = svc.IMMEDIATE_ESTABLISH if batch.method == "immediate" else svc.CONVENTIONAL_ESTABLISH
+    min_n = svc.CONVENTIONAL_MIN if force else need
+    results = db.query(QCTargetResult).filter(QCTargetResult.batch_id == batch.id).all()
+    analytes = []
+    for r in results:
+        if r.analyte and r.analyte not in analytes:
+            analytes.append(r.analyte)
+    targets = {}
+    for a in analytes:
+        vals = _active_values(db, batch.id, a)
+        if len(vals) < min_n:
+            continue
+        info = svc.compute_analyte(vals, batch.method, True)
+        targets[a] = {"mean": info["mean"], "sd": info["sd"], "cv": info["cv"], "n": info["n"]}
+    batch.targets_json = json.dumps(targets, ensure_ascii=False)
+    batch.established = True
+    db.commit()
+
+
+def _ip(request: Request) -> str:
+    try:
+        return request.client.host if request.client else ""
+    except Exception:
+        return ""
+
+======================================================================
+# 文件: api/v1/qc_material.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\qc_material.py)
+======================================================================
+
+"""质控品主数据接口：增删改查。
+- 一种质控品（如「伯乐免疫多项」）含项目清单 items_json（JSON 数组）。
+- 同一质控品的不同批号共享此清单；建批选质控品后，录入结果的分析物下拉由它预填。
+"""
+import json
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy.orm import Session
+
+from ...core.database import get_db
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第11页 / 共60页（总源码6397行，取自原第11页）
+--------------------------------------------------------
+from ...core.security import get_current_user, require_roles
+from ...models.qc_material import QcMaterial
+from ...models.user import User
+
+router = APIRouter(prefix="/qc-materials", tags=["qc_materials"])
+
+WRITE = require_roles("admin", "qc_manager")
+
+
+class QcMaterialBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    name: str = ""
+    items: list[str] = []
+    note: str = ""
+
+
+class QcMaterialCreate(QcMaterialBase):
+    pass
+
+
+class QcMaterialUpdate(QcMaterialBase):
+    pass
+
+
+class QcMaterialRead(QcMaterialBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+def _ser(m: QcMaterial) -> dict:
+    try:
+        items = json.loads(m.items_json or "[]")
+    except Exception:
+        items = []
+    if not isinstance(items, list):
+        items = []
+    return {
+        "id": m.id,
+        "name": m.name,
+        "items": items,
+        "note": m.note,
+        "created_at": m.created_at,
+        "updated_at": m.updated_at,
+    }
+
+
+@router.get("", response_model=None)
+def list_materials(q: str = "", db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    qry = db.query(QcMaterial)
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第12页 / 共60页（总源码6397行，取自原第12页）
+--------------------------------------------------------
+    if q:
+        qry = qry.filter(QcMaterial.name.contains(q))
+    rows = qry.order_by(QcMaterial.name).all()
+    return [QcMaterialRead(**_ser(r)) for r in rows]
+
+
+@router.post("", response_model=None)
+def create_material(payload: QcMaterialCreate, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="请填写质控品名称")
+    if db.query(QcMaterial).filter(QcMaterial.name == name).first():
+        raise HTTPException(status_code=400, detail="该质控品已存在")
+    items = [x.strip() for x in payload.items if str(x).strip()]
+    m = QcMaterial(name=name, items_json=json.dumps(items, ensure_ascii=False), note=payload.note or "")
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    return QcMaterialRead(**_ser(m))
+
+
+@router.put("/{mid}", response_model=None)
+def update_material(mid: int, payload: QcMaterialUpdate, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    m = db.get(QcMaterial, mid)
+    if not m:
+        raise HTTPException(status_code=404, detail="质控品不存在")
+    name = (payload.name or "").strip()
+    if name and name != m.name:
+        if db.query(QcMaterial).filter(QcMaterial.name == name).first():
+            raise HTTPException(status_code=400, detail="该质控品名称已存在")
+        m.name = name
+    items = [x.strip() for x in payload.items if str(x).strip()]
+    m.items_json = json.dumps(items, ensure_ascii=False)
+    m.note = payload.note or ""
+    db.commit()
+    db.refresh(m)
+    return QcMaterialRead(**_ser(m))
+
+
+@router.delete("/{mid}", response_model=None)
+def delete_material(mid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    m = db.get(QcMaterial, mid)
+    if not m:
+        raise HTTPException(status_code=404, detail="质控品不存在")
+    db.delete(m)
+    db.commit()
+    return {"ok": True}
+
+======================================================================
+# 文件: api/v1/qc_summaries.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\qc_summaries.py)
+======================================================================
+
+import csv
+import io
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第13页 / 共60页（总源码6397行，取自原第13页）
+--------------------------------------------------------
+import os
+import re
+import tempfile
+import datetime
+
+from fastapi import Depends, File, HTTPException, Request, UploadFile, Form
+from fastapi.responses import FileResponse, Response
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from ...core.crud_base import make_router, write_audit
+from ...core.database import get_db
+from ...core.security import get_current_user, require_roles
+from ...core.storage import storage
+from ...models.qc import QCMonthlySummary, QCDailyValue, QCMonthlyReport
+from ...models.instrument import Instrument
+from ...models.user import User
+from ...schemas import (
+    QCMonthlySummaryCreate,
+    QCMonthlySummaryRead,
+    QCMonthlySummaryUpdate,
+    QCDailyValueRead,
+    QCMonthlyReportRead,
+    QCMonthlyReportUpdate,
+)
+from ...services.qc_service import aggregate_project, lookup_quality_goal, draft_report, find_test_item_by_name, _parse_rule_cell, _canon_item_name, QC_GOAL_EXACT_OVERRIDES
+
+
+def _ph_relative_goal(target_mean: float) -> str:
+    """pH(血气) 质量目标 = 0.02 / 靶值（相对允许误差），按该水平靶值逐行计算。
+
+    例：靶值 7.40 → 0.02/7.40*100 ≈ 0.27%。仅用于「质量目标」列展示，
+    Westgard 失控判定仍用 LIS 上传的 target_sd。靶值为 0 时退回空串（交由查表兜底）。
+    """
+    if not target_mean:
+        return ""
+    return f"{0.02 / target_mean * 100:.2f}%"
+
+
+# 单位纠正映射：月结项目名(=LIS 上传的 test_item 原文) -> 正确单位。
+# 用于覆盖 LIS 文件里错误的「单位」列（如定性免疫项目被错填成 IU/mL / ng/L / 空）。
+# 上传时强制采用本映射；并通过 /_backfill_units 回填历史行。
+# 新增/修改项目只需在此增删条目，然后调用 /_backfill_units 并重新部署。
+# 取值依据：用户点名的 4 项按指定 COI；其余按项目库(TestItem)权威单位核对（2026-07-23）。
+QC_UNIT_OVERRIDES = {
+    # 用户明确指定 → COI
+    "表面抗原": "COI",
+    "e-抗体": "COI",
+    "甲肝IgM抗体": "COI",
+    "梅毒特异抗体": "COI",
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第14页 / 共60页（总源码6397行，取自原第14页）
+--------------------------------------------------------
+    # 按项目库(TestItem)权威单位核对（e-抗原/表面抗体保持原单位，不入此表）
+    "HSV-1 IgM": "AU/mL",
+    "HSV-2 IgM": "AU/mL",
+    "巨细胞病毒IgM": "COI",
+    "巨细胞病毒IgG": "U/mL",
+    "弓型体IgM": "COI",
+    "弓型体IgG": "IU/mL",
+    "戊肝抗体IgM": "S/CO",
+    "戊肝抗体IgG": "S/CO",
+    "风疹IgM": "COI",
+    "风疹IgG": "IU/mL",
+    "I型单纯疱疹IgG": "COI",
+    "II型单纯疱疹IgG": "COI",
+    # 尿液分析（来源：室内质控月小结_2026年06月_12.docx 单位列）
+    # 同时给「LIS 原名」与「test_items 规范名（尿液）」两种 key，覆盖已上传与未来上传。
+    "17-羟类固醇": "mg/L", "17-酮类固醇": "mg/L",
+    "NAG": "U/L", "N-乙酰-β-D-氨基葡萄糖苷酶（尿液）": "U/L",
+    "尿ɑ1微球蛋白": "mg/L", "尿α1微球蛋白": "mg/L",
+    "尿尿素": "mmol/L", "尿素（尿液）": "mmol/L",
+    "尿尿酸": "µmol/L", "尿酸（尿液）": "µmol/L",
+    "尿微量总蛋白": "g/L", "微量总蛋白（尿液）": "g/L",
+    "尿氯": "mmol/L", "氯（尿液）": "mmol/L",
+    "尿淀粉酶": "U/L", "淀粉酶（尿液）": "U/L",
+    "尿球蛋白G": "mg/L", "尿IgG": "mg/L",
+    "尿磷": "mmol/L", "磷（尿液）": "mmol/L",
+    "尿糖": "mmol/L", "葡萄糖（尿液）": "mmol/L",
+    "尿肌酐": "µmol/L", "肌酐（尿液）": "µmol/L",
+    "尿转铁蛋白": "mg/L",
+    "尿钙": "mmol/L", "总钙（尿液）": "mmol/L",
+    "尿钠": "mmol/L", "钠（尿液）": "mmol/L",
+    "尿钾": "mmol/L", "钾（尿液）": "mmol/L",
+    "尿镁": "mmol/L", "镁（尿液）": "mmol/L",
+    "尿香草扁桃酸": "mg/L", "香草扁桃酸": "mg/L",
+    "微量白蛋白": "mg/L", "尿微量白蛋白": "mg/L",
+    "镁": "mmol/L",
+    # 血气分析仪（来源：室内质控月小结_2026年06月_13.docx 单位列）
+    "tHb": "g/L",
+}
+
+router = make_router(
+    QCMonthlySummary,
+    QCMonthlySummaryRead,
+    QCMonthlySummaryCreate,
+    QCMonthlySummaryUpdate,
+    search_fields=["test_item", "lot_no", "level", "instrument"],
+    filter_fields=["year", "month", "instrument", "instrument_id", "test_item", "lot_no"],
+    prefix="/qc-summaries",
+    write_roles=("admin", "qc_manager", "member"),
+    delete_roles=("admin", "qc_manager"),
+)
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第15页 / 共60页（总源码6397行，取自原第15页）
+--------------------------------------------------------
+
+
+@router.get("/instruments")
+def qc_instruments(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """月结下拉专用：仅返回室内质控受控仪器（instruments.qc_instrument=True），
+    按科室编号自然序返回 {id, name, dept_no, model}。
+
+    兜底：若没有任何仪器被标记为质控受控（如白名单 ID 与实际数据不一致、或重新灌库后
+    未打标），则回退返回全部仪器，避免月结下拉为空导致「上传 LIS 数据」按钮被永久禁用、
+    且无法按仪器筛选月结。"""
+    rows = (
+        db.query(Instrument)
+        .filter(Instrument.qc_instrument == True)  # noqa: E712
+        .order_by(Instrument.dept_no)
+        .all()
+    )
+    if not rows:
+        rows = db.query(Instrument).order_by(Instrument.dept_no).all()
+    return [
+        {"id": r.id, "name": r.name, "dept_no": r.dept_no, "model": r.model}
+        for r in rows
+    ]
+
+
+# ---------------------------------------------------------------------------
+# 列名别名（兼容不同 LIS 导出）
+# ---------------------------------------------------------------------------
+_COLUMN_ALIASES = {
+    # 注意 test_item 优先取 itemName（中文全名，如「艾滋病」），其次 testCommon（代码，如 HIV）
+    "test_item": ["项目", "检验项目", "项目名称", "item", "test_item", "name",
+                  "itemname", "testcommon", "检验名称", "测试项目"],
+    "lot_no": ["批号", "质控批号", "lot", "lot_no", "批", "batch"],
+    "level": ["水平", "level", "浓度水平", "testname"],
+    "unit": ["单位", "unit"],
+    "instrument": ["仪器", "instrument", "设备", "deviceid", "仪器代码", "设备编号"],
+    "qc_date": ["日期", "质控日期", "测定日期", "date", "qc_date", "testdate", "测定时间", "检测时间"],
+    # 注意：爱康导出的 averageValue 是「靶值/定值」（同一项目-水平为常量），逐次实测值在
+    # result 列；故 value 取 result，averageValue 归入 target_mean，standardDeviation 归入 target_sd。
+    "value": ["测值", "测定值", "浓度", "value", "结果", "result"],
+    "target_mean": ["靶值", "定值", "靶值均值", "target", "target_mean", "averagevalue"],
+    "target_sd": ["靶值sd", "靶值sd", "sd", "标准差", "target_sd", "standarddeviation"],
+    # 失控元数据（来自 LIS 导出）：operatorPersonName→操作人，violateReason→失控原因，violateDeal→失控处理
+    "operator": ["操作人", "操作者", "operator", "operatorpersonname", "operatorname", "检验者"],
+    "violate_reason": ["失控原因", "violatereason", "失控理由", "reason"],
+    "violate_deal": ["失控处理", "violatedeal", "处理", "deal", "处置"],
+    # 上传表格规则列（LIS 导出，如 violateRule）：覆盖后端 Westgard 判定
+    "violate_rule": ["失控规则", "violaterule", "violate_rule", "violaterule",
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第16页 / 共60页（总源码6397行，取自原第16页）
+--------------------------------------------------------
+                      "判失控规则", "失控判据", "westgard规则", "westgardrule", "失控规则列"],
+}
+
+
+def _norm_header(h: str) -> str:
+    return (h or "").strip().lower().replace(" ", "")
+
+
+def _build_header_map(headers):
+    """返回 {标准字段名: 列索引}。"""
+    norm = {_norm_header(h): i for i, h in enumerate(headers)}
+    mapping = {}
+    for field, aliases in _COLUMN_ALIASES.items():
+        for al in aliases:
+            key = _norm_header(al)
+            if key in norm:
+                mapping[field] = norm[key]
+                break
+    return mapping
+
+
+def _write_summary_level(
+    db: Session,
+    *,
+    year: int, month: int, test_item: str, lot_no: str, level: str,
+    instrument: str, instrument_id: int | None, instrument_no: str,
+    unit: str, quality_goal: str,
+    target_mean: float, target_sd: float, target_cv: float,
+    agg: dict, dmeta: list,
+    rule_column_present: bool = False,
+) -> tuple[QCMonthlySummary, bool]:
+    """按单水平聚合结果落库（upsert 月结行 + 重建每日测值）。
+
+    dmeta: 与 agg 的 idx 对齐的 [(qc_date, value, operator, violate_reason, violate_deal), ...]
+           （已按日期升序排序，与 aggregate_project 的输入顺序一致）。
+    agg:   aggregate_project 返回的该水平结果（含 ooc / warnings / 统计量）。
+    返回 (summary, is_new)。
+    """
+    n = len(dmeta)
+    existing = (
+        db.query(QCMonthlySummary)
+        .filter_by(year=year, month=month, test_item=test_item, lot_no=lot_no,
+                   level=level, instrument=instrument)
+        .first()
+    )
+    if existing:
+        summ = existing
+        is_new = False
+    else:
+        summ = QCMonthlySummary()
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第17页 / 共60页（总源码6397行，取自原第17页）
+--------------------------------------------------------
+        db.add(summ)
+        is_new = True
+    summ.year = year
+    summ.month = month
+    summ.test_item = test_item
+    summ.unit = unit
+    summ.lot_no = lot_no
+    summ.level = level
+    summ.instrument = instrument
+    summ.instrument_id = instrument_id
+    summ.instrument_no = instrument_no
+    summ.target_mean = target_mean
+    summ.target_sd = target_sd
+    summ.target_cv = target_cv
+    summ.mean = agg["mean"]
+    summ.sd = agg["sd"]
+    summ.cv = agg["cv"]
+    summ.n = n
+    summ.out_of_control_count = agg["out_of_control_count"]
+    summ.in_control_rate = agg["in_control_rate"]
+    summ.quality_goal = quality_goal
+    summ.rule_column_present = rule_column_present  # 空单元格判在控的依据
+    db.flush()
+    # 重建每日测值（dmeta 与 agg 索引对齐；ooc 来自 R-4s/单水平，warnings 仅作黄色警告）
+    db.query(QCDailyValue).filter_by(summary_id=summ.id).delete()
+    operators: set[str] = set()
+    ooc_details: list[str] = []
+    for idx, (qc_date, val, op, vreason, vdeal, vrule) in enumerate(dmeta):
+        rule = agg["ooc"].get(idx, "")
+        warn = agg["warnings"].get(idx, "")
+        is_ooc = bool(rule)
+        is_warn = bool(warn) and not is_ooc
+        if op:
+            operators.add(op)
+        if is_ooc and (vreason or vdeal):
+            parts = []
+            if vreason:
+                parts.append(f"原因：{vreason}")
+            if vdeal:
+                parts.append(f"处理：{vdeal}")
+            detail = f"{qc_date} {test_item}({level}) 失控「{rule}」"
+            if parts:
+                detail += "；" + "；".join(parts)
+            ooc_details.append(detail)
+        db.add(QCDailyValue(
+            summary_id=summ.id,
+            qc_date=qc_date,
+            value=val,
+            is_out_of_control=is_ooc,
+            is_warning=is_warn,
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第18页 / 共60页（总源码6397行，取自原第18页）
+--------------------------------------------------------
+            rule_violated=(rule if is_ooc else (warn if is_warn else "")),
+            operator=(op or ""),
+            violate_reason=(vreason or "") if is_ooc else "",
+            violate_deal=(vdeal or "") if is_ooc else "",
+            uploaded_rule=(vrule or ""),
+        ))
+    summ.operator = "、".join(sorted(operators))
+    summ.handling_note = "\n".join(ooc_details)
+    return summ, is_new
+
+
+def _to_float(s):
+    try:
+        return float(str(s).replace(",", "").strip())
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_date(s):
+    s = (s or "").strip()
+    if not s:
+        return None
+    # 标准格式（允许 0/1 开头、带时间）
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y/%m/%d %H:%M:%S",
+        "%Y/%m/%d %H:%M",
+        "%Y.%m.%d %H:%M:%S",
+        "%Y.%m.%d %H:%M",
+        "%Y-%m-%d",
+        "%Y/%m/%d",
+        "%Y.%m.%d",
+        "%Y-%m",
+        "%Y/%m",
+        "%Y.%m",
+    ):
+        try:
+            return datetime.datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    # 爱康 LIS 常见格式：2026-6-1 10:10 / 2026/6/1 10:10 / 2026.6.1
+    m = re.search(r"(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})(?:[^\d]*(\d{1,2})[^\d]*(\d{1,2})(?:[^\d]*(\d{1,2}))?)?", s)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        h = int(m.group(4) or 0)
+        mi = int(m.group(5) or 0)
+        sec = int(m.group(6) or 0)
+        if 1 <= mo <= 12 and 1 <= d <= 31:
+            try:
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第19页 / 共60页（总源码6397行，取自原第19页）
+--------------------------------------------------------
+                return datetime.datetime(y, mo, d, h, mi, sec)
+            except ValueError:
+                pass
+    # 仅年月
+    m = re.search(r"(\d{4})[^\d]*(\d{1,2})", s)
+    if m:
+        y, mo = int(m.group(1)), int(m.group(2))
+        if 1 <= mo <= 12:
+            return datetime.datetime(y, mo, 1)
+    return None
+
+
+def _read_rows(file_bytes: bytes, filename: str):
+    """返回 list[dict]，键为标准化字段名。
+
+    解析策略：
+    - 真实 xlsx（zip 包，magic=PK）走 openpyxl；
+    - 其它情况（含伪装成 .xls 的 TSV/CSV 文本、乃至非法的 .xls）一律降级为文本解析，
+      自动探测分隔符（Tab 优先于逗号）并按 utf-8/utf-8-sig/gbk 容错解码。
+    """
+    name = (filename or "").lower()
+    is_zip = file_bytes[:2] == b"PK"
+    if name.endswith(".xlsx") or is_zip:
+        try:
+            import openpyxl
+        except ImportError:
+            raise HTTPException(status_code=400, detail="服务器未安装 openpyxl，无法解析 xlsx")
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+            ws = wb.active
+            rows = list(ws.iter_rows(values_only=True))
+            if not rows:
+                return []
+            headers = [str(h) if h is not None else "" for h in rows[0]]
+            out = []
+            for r in rows[1:]:
+                if r is None:
+                    continue
+                out.append({headers[i]: (r[i] if i < len(r) else None) for i in range(len(headers))})
+            return out
+        except Exception:
+            # 不是合法 xlsx（例如 .xls 后缀实为文本），落到下方文本解析分支
+            pass
+    # 文本解析（utf-8 / utf-8-sig / gbk 容错）
+    text = None
+    for enc in ("utf-8-sig", "utf-8", "gbk"):
+        try:
+            text = file_bytes.decode(enc)
+            break
+        except UnicodeDecodeError:
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第20页 / 共60页（总源码6397行，取自原第20页）
+--------------------------------------------------------
+            continue
+    if text is None:
+        raise HTTPException(
+            status_code=400,
+            detail="无法解码文件（请使用 UTF-8、GBK 编码的 CSV/TSV 或标准 xlsx）",
+        )
+    lines = text.splitlines()
+    sample = lines[0] if lines else ""
+    delim = "\t" if ("\t" in sample and sample.count("\t") >= sample.count(",")) else ","
+    reader = csv.DictReader(io.StringIO(text), delimiter=delim)
+    return [dict(row) for row in reader]
+
+
+def _find_report(db: Session, instrument_id, instrument: str, year: int, month: int):
+    q = db.query(QCMonthlyReport).filter_by(year=year, month=month)
+    if instrument_id:
+        q = q.filter_by(instrument_id=instrument_id)
+    else:
+        q = q.filter_by(instrument=(instrument or ""))
+    return q.first()
+
+
+def _fetch_report(db: Session, instrument_id, instrument: str, year: int, month: int):
+    return _find_report(db, instrument_id, instrument, year, month)
+
+
+def _count_summary_lines(text: str | None) -> int:
+    """按草稿文本中「；」分隔的条目数，估算当前文字覆盖了多少个（项目×水平）。"""
+    if not text:
+        return 0
+    return len([x for x in text.split("；") if x.strip()])
+
+
+def _ensure_report_draft(db: Session, instrument_id, instrument: str, year: int, month: int):
+    """若报告不存在、五段文字全为空，或当前月结明细数多于文字覆盖数，则按当前数据草拟并落库。
+
+    修复：
+    1. 之前只判「报告不存在」，导致历史遗留的空文本报告永远不会被补字。
+    2. 之前只回填空字段，导致先上传部分数据、后补充数据时，文字报告不会随明细自动更新。
+       现增加「明细条目数 > 文字条目数」判定，检测到遗漏时整段重生成（覆盖原有自动文字，
+       保护用户编辑的尽力而为：若用户未删行，仅新增项目时触发更新；若用户手动精简过文字，
+       只要条目数未少于明细数，就不会被覆盖）。
+    """
+    q = db.query(QCMonthlySummary).filter_by(year=year, month=month)
+    if instrument_id:
+        q = q.filter_by(instrument_id=instrument_id)
+    else:
+        q = q.filter_by(instrument=(instrument or ""))
+    summaries = q.all()
+
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第21页 / 共60页（总源码6397行，取自原第21页）
+--------------------------------------------------------
+    rep = _find_report(db, instrument_id, instrument, year, month)
+    if not summaries:
+        if not rep:
+            rep = QCMonthlyReport(instrument_id=instrument_id, instrument=instrument or "", year=year, month=month)
+            db.add(rep)
+            db.commit()
+        return
+
+    expected = len(summaries)
+    needs_draft = False
+    if not rep:
+        needs_draft = True
+    else:
+        has_any = any((getattr(rep, f, "") or "").strip() for f in
+                      ("operation_status", "drift_trend", "cv_setting_ok", "cv_calc_ok", "freq_ok"))
+        stored_lines = max(
+            _count_summary_lines(rep.cv_setting_ok),
+            _count_summary_lines(rep.cv_calc_ok),
+        )
+        if not has_any:
+            needs_draft = True
+        elif expected > stored_lines:
+            # 月结明细比文字覆盖的多 → 自动文字已过时，需要重生成
+            needs_draft = True
+
+    if not needs_draft:
+        return
+
+    sids = [s.id for s in summaries]
+    dvs = db.query(QCDailyValue).filter(QCDailyValue.summary_id.in_(sids)).all()
+    daily = {}
+    for dv in dvs:
+        daily.setdefault(dv.summary_id, []).append(dv)
+    drafted = draft_report(instrument or summaries[0].instrument, year, month, summaries, daily)
+    if not rep:
+        rep = QCMonthlyReport(
+            instrument_id=instrument_id,
+            instrument=instrument or summaries[0].instrument,
+            instrument_no=summaries[0].instrument_no,
+            year=year, month=month, **drafted,
+        )
+        db.add(rep)
+    else:
+        # 重生成时覆盖全部五段文字（仅在有需要时进入此分支）
+        for k, v in drafted.items():
+            setattr(rep, k, v)
+    db.commit()
+
+
+@router.post("/upload", status_code=201)
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第22页 / 共60页（总源码6397行，取自原第22页）
+--------------------------------------------------------
+def upload_qc_summary(
+    file: UploadFile = File(...),
+    instrument_id: int | None = Form(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """上传 LIS 导出的 CSV/XLSX（含每日测值），解析并按 (年,月,项目,批号,水平)
+    分组聚合，自动跑 Westgard 判定失控点，存入 qc_monthly_summaries + qc_daily_values。
+    同名(同维度)月结自动覆盖重算。
+
+    instrument_id（必填）：受控仪器（绑定 instruments 表）。该文件全部数据归于此仪器，
+    文件中的仪器代码（deviceId 等）一律忽略，不会单独作为仪器生成总结。
+    """
+    content = file.file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+    rows = _read_rows(content, file.filename)
+    if not rows:
+        raise HTTPException(status_code=400, detail="文件中没有数据行")
+
+    headers = list(rows[0].keys())
+    hmap = _build_header_map(headers)
+    if "value" not in hmap or "qc_date" not in hmap:
+        raise HTTPException(
+            status_code=400,
+            detail="未识别到必要列（测值/日期）。当前识别映射：" + str(hmap),
+        )
+    if "test_item" not in hmap:
+        raise HTTPException(status_code=400, detail="未识别到「项目」列。当前识别映射：" + str(hmap))
+
+    # 受控仪器（必填）：文件中的仪器代码不允许单独成一台仪器出总结
+    if not instrument_id:
+        raise HTTPException(
+            status_code=400,
+            detail="请先在『质控仪器』下拉中选择真实受控仪器后再上传；文件中的仪器代码不会单独作为仪器生成总结。",
+        )
+    sel_inst = db.get(Instrument, instrument_id)
+    if not sel_inst:
+        raise HTTPException(status_code=400, detail=f"instrument_id={instrument_id} 对应的仪器不存在")
+    sel_inst_no = sel_inst.dept_no or ""
+
+    groups: dict[tuple, list[float]] = {}
+    meta: dict[tuple, dict] = {}
+    daily_meta: dict[tuple, list] = {}
+    block_keys: set[tuple] = set()  # (instrument_id, instrument, year, month)
+
+    for row in rows:
+        def get(field):
+            idx = hmap.get(field)
+            return row.get(headers[idx]) if idx is not None else None
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第23页 / 共60页（总源码6397行，取自原第23页）
+--------------------------------------------------------
+
+        d = _parse_date(get("qc_date"))
+        v = _to_float(get("value"))
+        if d is None or v is None:
+            continue
+        ti = (get("test_item") or "").strip()
+        lot = (get("lot_no") or "").strip()
+        lvl = (get("level") or "").strip()
+        # 仪器只取用户选定的真实受控仪器；文件中的仪器代码忽略，不单独成仪器
+        inst = sel_inst.name
+        inst_no = sel_inst_no
+        key = (d.year, d.month, ti, lot, lvl, inst)
+        groups.setdefault(key, [])
+        groups[key].append(v)
+        op = (get("operator") or "").strip()
+        vreason = (get("violate_reason") or "").strip()
+        vdeal = (get("violate_deal") or "").strip()
+        vrule = (get("violate_rule") or "").strip()  # 上传表格规则列（覆盖后端Westgard）
+        daily_meta.setdefault(key, []).append((d.strftime("%Y-%m-%d"), v, op, vreason, vdeal, vrule))
+        if key not in meta:
+            ti_name = (get("test_item") or "").strip()
+            matched = find_test_item_by_name(db, ti_name, instrument=inst) if ti_name else None
+            file_unit = (get("unit") or "").strip()
+            unit = QC_UNIT_OVERRIDES.get(ti_name, file_unit or (matched.unit if matched else ""))
+            meta[key] = {
+                "unit": unit,
+                "target_mean": _to_float(get("target_mean")) or 0.0,
+                "target_sd": _to_float(get("target_sd")) or 0.0,
+                "instrument_no": inst_no,
+                "test_item_aliases": matched.aliases if matched else "",
+                # 解析到的规范项目名（优先用 test_items 规范名，便于月结报告展示/质量目标命中）
+                "resolved_test_item": _canon_item_name(matched.name) if matched else _canon_item_name(ti_name),
+            }
+        block_keys.add((instrument_id if sel_inst else None, inst, d.year, d.month))
+
+    # 按「项目(仪器,年,月,项目,批号)」归组：跨水平 R-4s 需要同一项目多个水平同批计算
+    rule_col_present = "violate_rule" in hmap  # 本次上传是否识别到规则列（空单元格据此判在控）
+    projects: dict[tuple, list] = {}
+    for key, values in groups.items():
+        year, month, test_item, lot_no, level, instrument = key
+        m = meta[key]
+        proj_key = (instrument_id if sel_inst else None, instrument, year, month, test_item, lot_no)
+        # 按日期升序排序（稳定），保证 Westgard 时序与 R-4s 跨水平时间线正确
+        paired = sorted(zip(values, daily_meta[key]), key=lambda t: t[1][0])
+        svalues = [p[0] for p in paired]
+        sdates = [p[1][0] for p in paired]
+        sdmeta = [p[1] for p in paired]
+        projects.setdefault(proj_key, []).append({
+            "level": level,
+            "values": svalues,
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第24页 / 共60页（总源码6397行，取自原第24页）
+--------------------------------------------------------
+            "dates": sdates,
+            "daily_meta": sdmeta,
+            "violate_rules": [t[5] for t in sdmeta],  # 与 values 同序的上传规则原始串
+            "rule_column_present": rule_col_present,  # 空单元格据此判在控
+            "target_mean": m["target_mean"],
+            "target_sd": m["target_sd"],
+            "unit": m["unit"],
+            "instrument_no": m["instrument_no"],
+            "test_item_aliases": m.get("test_item_aliases", ""),
+        })
+
+    # 规则列解析诊断：统计非空格子中被成功识别 / 未被识别的数量，便于核对 LIS 写法
+    _rule_total = _rule_recognized = _rule_unrecognized = 0
+    for _lvls in projects.values():
+        for _spec in _lvls:
+            for _cell in (_spec.get("violate_rules") or []):
+                if str(_cell or "").strip():
+                    _rule_total += 1
+                    if _parse_rule_cell(_cell):
+                        _rule_recognized += 1
+                    else:
+                        _rule_unrecognized += 1
+
+    created = 0
+    updated = 0
+    items = []
+    for proj_key, levels in projects.items():
+        inst_id_p, instrument_p, year, month, test_item, lot_no = proj_key
+        aggr = aggregate_project(levels)
+        for spec in levels:
+            level = spec["level"]
+            agg = aggr[level]
+            tm = spec["target_mean"]
+            ts = spec["target_sd"]
+            if not tm and not ts:
+                # 未提供靶值：用本批实测均值/标准差回填，保证报表可读
+                tm = agg["mean"]
+                ts = agg["sd"]
+            target_cv = (ts / tm * 100) if tm else 0.0
+            quality_goal = lookup_quality_goal(
+                spec.get("resolved_test_item", test_item),
+                spec.get("test_item_aliases", ""),
+                db, level=level,
+            )
+            # pH(血气)：质量目标 = 0.02 / 靶值（逐水平按靶值算相对值），覆盖查表静态值
+            if (test_item == "pH" or spec.get("resolved_test_item") in ("pH", "pH（血气）")) and tm:
+                quality_goal = _ph_relative_goal(tm)
+            # 精确名覆盖（白蛋白(A) 等，避免被血清同名项串扰）
+            elif test_item in QC_GOAL_EXACT_OVERRIDES:
+                quality_goal = QC_GOAL_EXACT_OVERRIDES[test_item]
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第25页 / 共60页（总源码6397行，取自原第25页）
+--------------------------------------------------------
+            summ, is_new = _write_summary_level(
+                db,
+                year=year, month=month,
+                test_item=spec.get("resolved_test_item", test_item), lot_no=lot_no,
+                level=level, instrument=instrument_p, instrument_id=inst_id_p,
+                instrument_no=spec["instrument_no"], unit=spec["unit"],
+                quality_goal=quality_goal,
+                target_mean=tm, target_sd=ts, target_cv=target_cv,
+                agg=agg, dmeta=spec["daily_meta"],
+                rule_column_present=spec.get("rule_column_present", False),
+            )
+            if is_new:
+                created += 1
+            else:
+                updated += 1
+            items.append({
+                "id": summ.id, "year": year, "month": month, "test_item": test_item,
+                "lot_no": lot_no, "level": level, "instrument": instrument_p,
+                "instrument_id": summ.instrument_id, "instrument_no": summ.instrument_no,
+                "n": summ.n, "out_of_control_count": summ.out_of_control_count,
+                "in_control_rate": round(summ.in_control_rate, 4),
+            })
+
+    db.commit()
+    write_audit(db, user, "import", "qc_monthly_summaries", 0,
+                {"file": file.filename, "created": created, "updated": updated})
+    # 为每个 (仪器, 年, 月) 块确保存在文字报告草稿（不覆盖已有编辑）
+    for (bid, inst, y, mo) in block_keys:
+        try:
+            _ensure_report_draft(db, bid, inst, y, mo)
+        except Exception:
+            db.rollback()
+    return {
+        "ok": True,
+        "created": created,
+        "updated": updated,
+        "groups": len(groups),
+        "items": items,
+        # 是否识别到上传表格的「规则列」（violateRule 等）；未识别则仍按后端 Westgard 判定
+        "rule_column_matched": "violate_rule" in hmap,
+        # 规则列解析诊断：非空格子中成功/未成功识别的数量（未识别>0 说明 LIS 写法仍需适配）
+        "rule_cells_total": _rule_total,
+        "rule_cells_recognized": _rule_recognized,
+        "rule_cells_unrecognized": _rule_unrecognized,
+    }
+
+
+@router.post("/_backfill_goals", dependencies=[Depends(require_roles("admin", "qc_manager"))])
+def backfill_quality_goals(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """回填已存月结行的质量目标（按水平重算，纠正历史值）。
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第26页 / 共60页（总源码6397行，取自原第26页）
+--------------------------------------------------------
+
+    质量目标在 LIS 上传时由 lookup_quality_goal 算好并冻结进 qc_monthly_summaries.quality_goal。
+    当质量目标表（QualityRequirement）扩容/修复匹配逻辑（如凝血「正常/异常」水平区分）后，
+    历史月结行可能仍是旧值（错误水平目标或空）。本接口按「项目名 + 别名 + 水平」重新查表
+    全量重算，确保与最新质量目标一致。
+
+    返回 {updated, total, samples}（samples 列出本次被重算的 {test_item, level, instrument, old, goal} 便于核对）。
+    """
+    rows = db.query(QCMonthlySummary).all()
+    updated = 0
+    samples = []
+    for s in rows:
+        matched = find_test_item_by_name(db, s.test_item, instrument=s.instrument) if s.test_item else None
+        aliases = matched.aliases if matched else ""
+        # pH(血气)：质量目标 = 0.02 / 靶值（逐水平按靶值算相对值），覆盖查表静态值
+        if s.test_item in ("pH", "pH（血气）") and s.target_mean:
+            goal = _ph_relative_goal(s.target_mean)
+        elif s.test_item in QC_GOAL_EXACT_OVERRIDES:
+            goal = QC_GOAL_EXACT_OVERRIDES[s.test_item]
+        else:
+            goal = lookup_quality_goal(s.test_item, aliases, db, level=s.level)
+        if goal and goal != (s.quality_goal or ""):
+            old = s.quality_goal
+            s.quality_goal = goal
+            updated += 1
+            if len(samples) < 40:
+                samples.append({
+                    "test_item": s.test_item, "level": s.level, "instrument": s.instrument,
+                    "old": old, "goal": goal,
+                })
+    db.commit()
+    return {"updated": updated, "total": len(rows), "samples": samples}
+
+
+@router.post("/_backfill_units", dependencies=[Depends(require_roles("admin", "qc_manager"))])
+def backfill_units(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """按 QC_UNIT_OVERRIDES 回填已存月结行的单位。
+
+    单位在 LIS 上传时由文件「单位」列决定，定性免疫项目常被错填为 IU/mL / ng/L / 空，
+    覆盖 TestItem 里本就正确的 COI。本接口按项目名映射强制纠正历史行（无视原值，直接改成正值）。
+    返回 {updated, total, samples}。
+    """
+    if not QC_UNIT_OVERRIDES:
+        return {"updated": 0, "total": 0, "samples": []}
+    rows = db.query(QCMonthlySummary).all()
+    updated = 0
+    samples = []
+    for s in rows:
+        target = QC_UNIT_OVERRIDES.get((s.test_item or "").strip())
+        if not target:
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第27页 / 共60页（总源码6397行，取自原第27页）
+--------------------------------------------------------
+            continue
+        if (s.unit or "") != target:
+            old = s.unit
+            s.unit = target
+            updated += 1
+            if len(samples) < 50:
+                samples.append({
+                    "test_item": s.test_item, "instrument": s.instrument,
+                    "lot_no": s.lot_no, "old_unit": old, "new_unit": target,
+                })
+    db.commit()
+    return {"updated": updated, "total": len(rows), "samples": samples}
+
+
+@router.post("/_recalc", dependencies=[Depends(require_roles("admin", "qc_manager"))])
+def recalc_summaries(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """全量重算所有月结的 Westgard 判定与在控统计量。
+
+    当 evaluate_westgard 规则修复后，历史已上传的 daily values 仍按旧规则冻结。
+    本接口读取每个 summary 的每日测值，重新 aggregate，并更新 summary 统计量与 daily value 的失控标记。
+    返回 {updated, total, samples}（samples 列出部分变更项便于核对）。
+    """
+    summaries = db.query(QCMonthlySummary).all()
+    updated = 0
+    samples = []
+    # 按「项目(仪器,年,月,项目,批号)」归组：跨水平 R-4s 需同一项目多水平同批计算
+    projects: dict[tuple, list] = {}
+    for s in summaries:
+        proj_key = (s.instrument_id, s.instrument, s.year, s.month, s.test_item, s.lot_no)
+        projects.setdefault(proj_key, []).append(s)
+    for proj_key, s_list in projects.items():
+        inst_id_p, instrument_p, year, month, test_item, lot_no = proj_key
+        levels = []
+        level_to_summary = {}
+        for s in s_list:
+            dvs = db.query(QCDailyValue).filter_by(summary_id=s.id).order_by(QCDailyValue.qc_date).all()
+            if not dvs:
+                continue
+            values = [float(v.value) for v in dvs]
+            dates = [v.qc_date for v in dvs]
+            dmeta = [
+                (v.qc_date, v.value, (v.operator or ""), (v.violate_reason or ""), (v.violate_deal or ""), (v.uploaded_rule or ""))
+                for v in dvs
+            ]
+            levels.append({
+                "level": s.level, "values": values, "dates": dates,
+                "daily_meta": dmeta,
+                "violate_rules": [(v.uploaded_rule or "") for v in dvs],
+                "rule_column_present": bool(s.rule_column_present),
+                "target_mean": s.target_mean or 0.0,
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第28页 / 共60页（总源码6397行，取自原第28页）
+--------------------------------------------------------
+                "target_sd": s.target_sd or 0.0,
+                "unit": s.unit, "instrument_no": s.instrument_no,
+                "test_item_aliases": "",
+            })
+            level_to_summary[s.level] = s
+        if not levels:
+            continue
+        aggr = aggregate_project(levels)
+        for spec in levels:
+            s = level_to_summary[spec["level"]]
+            agg = aggr[spec["level"]]
+            tm = spec["target_mean"]
+            ts = spec["target_sd"]
+            if not tm and not ts:
+                tm = agg["mean"]
+                ts = agg["sd"]
+            target_cv = (ts / tm * 100) if tm else 0.0
+            # 保留既有 quality_goal（重算仅改判定/统计量，不改质量目标；改目标用 /_backfill_goals）
+            quality_goal = s.quality_goal or ""
+            before_mean, before_sd, before_cv, before_ooc = s.mean, s.sd, s.cv, s.out_of_control_count
+            summ, _ = _write_summary_level(
+                db,
+                year=year, month=month, test_item=test_item, lot_no=lot_no,
+                level=spec["level"], instrument=instrument_p, instrument_id=inst_id_p,
+                instrument_no=spec["instrument_no"], unit=spec["unit"],
+                quality_goal=quality_goal,
+                target_mean=tm, target_sd=ts, target_cv=target_cv,
+                agg=agg, dmeta=spec["daily_meta"],
+                rule_column_present=spec.get("rule_column_present", False),
+            )
+            if (summ.out_of_control_count != before_ooc
+                    or abs((summ.mean or 0) - (before_mean or 0)) > 1e-9
+                    or abs((summ.sd or 0) - (before_sd or 0)) > 1e-9
+                    or abs((summ.cv or 0) - (before_cv or 0)) > 1e-9):
+                updated += 1
+                if len(samples) < 20:
+                    samples.append({
+                        "id": summ.id, "test_item": test_item, "instrument": instrument_p,
+                        "level": spec["level"], "lot_no": lot_no,
+                        "ooc_count": summ.out_of_control_count,
+                    })
+    db.commit()
+    return {"updated": updated, "total": len(summaries), "samples": samples}
+
+
+@router.get("/daily/project")
+def list_project_daily(
+    year: int,
+    month: int,
+    instrument_id: int,
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第29页 / 共60页（总源码6397行，取自原第29页）
+--------------------------------------------------------
+    test_item: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """按（仪器,年,月,项目）取所有水平(level)的每日测值，用于 LJ 质控图。
+
+    返回每个测值的日期、测值、水平、靶值均值、靶值SD、失控标记及触发规则。
+    """
+    summaries = (
+        db.query(QCMonthlySummary)
+        .filter_by(year=year, month=month, instrument_id=instrument_id, test_item=test_item)
+        .order_by(QCMonthlySummary.level)
+        .all()
+    )
+    if not summaries:
+        return []
+    sids = [s.id for s in summaries]
+    summary_map = {s.id: s for s in summaries}
+    rows = (
+        db.query(QCDailyValue)
+        .filter(QCDailyValue.summary_id.in_(sids))
+        .order_by(QCDailyValue.qc_date, QCDailyValue.summary_id)
+        .all()
+    )
+    result = []
+    for dv in rows:
+        s = summary_map[dv.summary_id]
+        result.append({
+            "qc_date": dv.qc_date,
+            "value": dv.value,
+            "level": s.level,
+            "target_mean": s.target_mean,
+            "target_sd": s.target_sd,
+            "is_out_of_control": dv.is_out_of_control,
+            "rule_violated": dv.rule_violated,
+        })
+    return result
+
+
+@router.get("/{summary_id}/daily", response_model=list[QCDailyValueRead])
+def list_daily(
+    summary_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return (
+        db.query(QCDailyValue)
+        .filter(QCDailyValue.summary_id == summary_id)
+        .order_by(QCDailyValue.qc_date)
+        .all()
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第30页 / 共60页（总源码6397行，取自原第30页）
+--------------------------------------------------------
+    )
+
+
+# 注：质控图 PDF 上传/预览/下载/删除 已在 2026-07-19 移除（d3e93eb）—— 前端按钮 + 后端三路由
+# （POST/GET/DELETE /{summary_id}/pdf）一并删除。月结改用 build_docx 内嵌 14 列表格 + 5 段文字。
+
+@router.get("/report", response_model=QCMonthlyReportRead)
+def get_qc_report(
+    instrument_id: int | None = None,
+    instrument: str = "",
+    year: int = 0,
+    month: int = 0,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """获取某(仪器,年,月)的月结文字报告；不存在/为空/明细增加时自动按当前数据重生成。"""
+    _ensure_report_draft(db, instrument_id, instrument, year, month)
+    rep = _find_report(db, instrument_id, instrument, year, month)
+    if not rep:
+        rep = QCMonthlyReport(instrument_id=instrument_id, instrument=instrument or "", year=year, month=month)
+        db.add(rep)
+        db.commit()
+        db.refresh(rep)
+    return rep
+
+
+@router.put("/report", response_model=QCMonthlyReportRead)
+def upsert_qc_report(
+    body: QCMonthlyReportUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """新建或更新月结文字报告（检验人编辑后保存）。"""
+    rep = _find_report(db, body.instrument_id, body.instrument, body.year, body.month)
+    if not rep:
+        rep = QCMonthlyReport()
+        db.add(rep)
+    rep.instrument_id = body.instrument_id
+    rep.instrument = body.instrument
+    rep.instrument_no = body.instrument_no
+    rep.year = body.year
+    rep.month = body.month
+    rep.operation_status = body.operation_status or ""
+    rep.drift_trend = body.drift_trend or ""
+    rep.cv_setting_ok = body.cv_setting_ok or ""
+    rep.cv_calc_ok = body.cv_calc_ok or ""
+    rep.freq_ok = body.freq_ok or ""
+    db.commit()
+    db.refresh(rep)
+    return rep
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第31页 / 共60页（总源码6397行，取自原第99页）
+--------------------------------------------------------
+    gridItems.value = items.map((n) => ({
+      key: n, name: n, unit: units[n] || '', conv: conv[n] || null,
+      qualitative: isQualitativeProgram(resultPlan.value?.program),
+      reverse: isReverseItem(n),
+    }))
+    gridRows.value = samples.map((s) => {
+      const prev = oldCells[s] || {}
+      const prevR = oldReport[s] || {}
+      const values = {}
+      const report = {}
+      for (const it of items) {
+        values[it] = prev[it] || ''
+        report[it] = prevR[it] || ''
+      }
+      return { sample: s, values, report }
+    })
+    const sysNote = (row && row.note) || ''
+    const savedNote = (rd.meta && rd.meta.note) || ''
+    // 历史防护：若已存备注与系统自动说明雷同，视为系统内容，不回填人工备注框
+    const looksSystem = sysNote && savedNote && savedNote.replace(/\s/g, '').includes(sysNote.replace(/\s/g, '').slice(0, 6))
+    Object.assign(meta, {
+      tester: (rd.meta && rd.meta.tester) || '',
+      reviewer: (rd.meta && rd.meta.reviewer) || '',
+      test_date: (rd.meta && rd.meta.test_date) || (row.sample_date || ''),
+      return_date: (rd.meta && rd.meta.return_date) || (row.due_date || ''),
+      note: looksSystem ? '' : savedNote,
+    })
+    resultDialog.value = true
+  } catch (err) {
+    ElMessage.error('加载失败：' + (err.response?.data?.detail || err.message))
+  }
+}
+function applyGrid() {
+  const samples = sampleText.value.split('\n').map((s) => s.trim()).filter(Boolean)
+  const items = [...new Set(itemText.value.split('\n').map((s) => s.trim()).filter(Boolean))]
+  const unitLines = unitText.value.split('\n').map((s) => s.trim())
+  // 保留已有值（按样本名 + 项目名匹配）
+  const old = {}
+  for (const r of gridRows.value) old[r.sample] = { values: r.values || {}, report: r.report || {} }
+  gridItems.value = items.map((n, i) => {
+    const c = matchConv(n)
+    const unit = c ? c.to : (unitLines[i] || '')
+    return { key: n, name: n, unit, conv: c, qualitative: isQualitativeProgram(resultPlan.value?.program), reverse: isReverseItem(n) }
+  })
+  gridRows.value = samples.map((s) => {
+    const prev = old[s] || { values: {}, report: {} }
+    const values = {}
+    const report = {}
+    for (const it of items) {
+      values[it] = prev.values[it] || ''
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第32页 / 共60页（总源码6397行，取自原第100页）
+---------------------------------------------------------
+      report[it] = prev.report[it] || ''
+    }
+    return { sample: s, values, report }
+  })
+}
+function onConvInput(row, it) {
+  if (!it.conv) return
+  const num = parseFloat(row.values[it.key])
+  if (!isNaN(num)) {
+    row.report[it.key] = String(_roundNum(num * it.conv.factor))
+  } else {
+    row.report[it.key] = ''
+  }
+}
+function onQualInput(row, it) {
+  // 定性试验：COI 值变化触发响应式，P/N 由 qualPN 实时计算（无需额外处理）
+}
+function qualPN(row, it) {
+  const v = row.values ? row.values[it.key] : ''
+  return computePN(v, it.reverse)
+}
+function pnClass(pn) {
+  return pn === 'P' ? 'pn-pos' : (pn === 'N' ? 'pn-neg' : 'pn-none')
+}
+function addRow() {
+  gridRows.value.push({
+    sample: '',
+    values: Object.fromEntries(gridItems.value.map((it) => [it.key, ''])),
+    report: Object.fromEntries(gridItems.value.map((it) => [it.key, ''])),
+  })
+}
+function addCol() {
+  const name = '新项目' + (gridItems.value.length + 1)
+  const c = matchConv(name)
+  gridItems.value.push({ key: name, name, unit: c ? c.to : '', conv: c, qualitative: isQualitativeProgram(resultPlan.value?.program), reverse: isReverseItem(name) })
+  for (const r of gridRows.value) {
+    if (!(name in r.values)) r.values[name] = ''
+    if (!(name in r.report)) r.report[name] = ''
+  }
+}
+function onResultClose() {
+  resultTargetId.value = null
+  resultPlan.value = null
+}
+async function saveResult() {
+  if (!resultTargetId.value) return
+  applyGrid()
+  const payload = {
+    samples: gridRows.value.map((r) => r.sample),
+    items: gridItems.value.map((it) => it.name),
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第33页 / 共60页（总源码6397行，取自原第101页）
+---------------------------------------------------------
+    units: Object.fromEntries(gridItems.value.map((it) => [it.name, it.conv ? it.conv.to : (it.unit || '')])),
+    conv: Object.fromEntries(gridItems.value.filter((it) => it.conv).map((it) => [it.name, it.conv])),
+    cells: Object.fromEntries(gridRows.value.map((r) => [r.sample, { ...r.values }])),
+    cells_report: Object.fromEntries(gridRows.value.map((r) => [r.sample, { ...r.report }])),
+    meta: { ...meta },
+  }
+  resultSaving.value = true
+  try {
+    await saveEqaResult(resultTargetId.value, payload)
+    ElMessage.success('结果已保存')
+  } catch (err) {
+    ElMessage.error('保存失败：' + (err.response?.data?.detail || err.message))
+  } finally {
+    resultSaving.value = false
+  }
+}
+function buildPrintHtml() {
+  const plan = resultPlan.value || {}
+  const allItems = gridItems.value
+  const rows = gridRows.value
+  // 项目过多（>10）→ 上下两行：项目分两半，各一张整页宽表格上下叠放，列宽翻倍、字放大
+  const useTwoRow = allItems.length > 10
+
+  const buildHead = (items) =>
+    '<th>样本编号</th>' + items.map((it) => {
+      const unit = it.unit ? ` (${escapeHtml(it.unit)})` : ''
+      return `<th>${escapeHtml(it.name)}${unit}</th>`
+    }).join('')
+
+  const buildBody = (items) =>
+    rows.map((r) => {
+      const tds = items.map((it) => {
+        let main, sub = ''
+        if (it.conv) {
+          main = r.report[it.key] || ''
+          const orig = r.values[it.key]
+          if (orig) sub = `原 ${escapeHtml(orig)} ${escapeHtml(it.conv.from)}`
+        } else if (it.qualitative) {
+          main = r.values[it.key] || ''
+          const pn = computePN(r.values[it.key], it.reverse)
+          if (pn) sub = `判定：${pn === 'P' ? '阳性' : '阴性'}`
+        } else {
+          main = r.values[it.key] || ''
+        }
+        return `<td>${escapeHtml(main)}${sub ? `<div class="orig">${sub}</div>` : ''}</td>`
+      }).join('')
+      return `<tr><td>${escapeHtml(r.sample)}</td>${tds}</tr>`
+    }).join('')
+
+  let tableHtml
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第34页 / 共60页（总源码6397行，取自原第102页）
+---------------------------------------------------------
+  if (useTwoRow) {
+    const mid = Math.ceil(allItems.length / 2)
+    const top = allItems.slice(0, mid)
+    const bottom = allItems.slice(mid)
+    const tbl = (items, label) =>
+      `<div class="tbl-block"><div class="tbl-cap">${label}</div><table><thead><tr>${buildHead(items)}</tr></thead><tbody>${buildBody(items)}</tbody></table></div>`
+    tableHtml = `${tbl(top, '（一）')}${tbl(bottom, '（二）')}`
+  } else {
+    tableHtml = `<table><thead><tr>${buildHead(allItems)}</tr></thead><tbody>${buildBody(allItems)}</tbody></table>`
+  }
+
+  const title = `${escapeHtml(plan.org || '')} ${escapeHtml(plan.program || '')} ${escapeHtml(plan.round_no || '')} 室间质评结果记录`
+  return `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  /* 打印基础样式 */
+  body{font-family:"Microsoft YaHei","SimSun",serif;padding:24px;color:#000}
+  h2{text-align:center;margin:0 0 4px;font-size:18px}
+  .sub{text-align:center;color:#444;font-size:12px;margin-bottom:10px}
+  table{border-collapse:collapse;width:100%;font-size:11px;table-layout:fixed}
+  th,td{border:1px solid #000;padding:4px 3px;text-align:center;word-break:break-all}
+  th{background:#f0f0f0;font-size:10.5px}
+  .orig{font-size:9.5px;color:#666;margin-top:1px}
+  .meta{display:flex;flex-wrap:wrap;gap:18px;font-size:12px;margin:10px 0}
+  /* 签字区——一行排开，年月日留足手写空位 */
+  .sign{margin-top:28px;display:flex;align-items:flex-end;font-size:14px;white-space:nowrap}
+  .sign-item{display:inline-flex;flex-direction:column;align-items:center}
+  .sign-item.tester,.sign-item.reviewer{flex:0 0 auto;margin-right:6%}
+  .sign-item.date{flex:1 1 auto;text-align:right}
+  .sign-item .line{border-top:1px solid #000;margin-top:6px;padding-top:2px;min-height:28px;display:flex;align-items:flex-end;justify-content:center}
+  .sign-item.date .line{justify-content:flex-end;padding-right:4px;gap:8px}
+  .sign-item.date .line span{display:inline-block;width:36px;text-align:center;border-bottom:1px solid #999;line-height:20px}
+  /* 分页控制 */
+  thead{display:table-header-group}
+  tbody tr{break-inside:avoid;page-break-inside:avoid}
+  .sign{break-inside:avoid;page-break-inside:avoid}
+  /* 项目多：上下两行叠放，每张整页宽、项目减半、列宽翻倍、字放大 */
+  .two-row table{font-size:13px}
+  .two-row table th{font-size:12px}
+  .two-row table .orig{font-size:10px}
+  .tbl-block{margin-bottom:14px}
+  .tbl-cap{font-size:13px;font-weight:bold;margin:6px 0 4px}
+  .sys-note-print{margin:10px 0 2px;font-size:11px;color:#555;border:1px dashed #bbb;padding:4px 8px;background:#fafafa}
+  @media print{
+    body{padding:0}
+    @page{size:A4 landscape;margin:8mm 10mm}
+    th,td{padding:3px 2px;font-size:9.5px}
+    th{font-size:9px}
+    .orig{font-size:8.5px}
+    .two-row table{font-size:11px}
+    .two-row table th{font-size:10px}
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第35页 / 共60页（总源码6397行，取自原第103页）
+---------------------------------------------------------
+    .two-row table .orig{font-size:9px}
+  }
+</style></head>
+<body>
+  <h2>${title}</h2>
+  <div class="sub">年度：${escapeHtml(String(plan.year || ''))} ｜ 测定日期：${escapeHtml(meta.test_date || '')} ｜ 回报日期：${escapeHtml(meta.return_date || '')}</div>
+  <div class="${useTwoRow ? 'two-row' : ''}">${tableHtml}</div>
+  <div class="meta">
+    <span>测定人：${escapeHtml(meta.tester || '＿＿＿＿')}</span>
+    <span>审核人：${escapeHtml(meta.reviewer || '＿＿＿＿')}</span>
+    <span>备注：${escapeHtml(meta.note || '')}</span>
+  </div>
+  <div class="sign">
+    <div class="sign-item tester"><span>测定人（签字）</span><div class="line">&nbsp;</div></div>
+    <div class="sign-item reviewer"><span>审核人（签字）</span><div class="line">&nbsp;</div></div>
+    <div class="sign-item date"><span>日期：</span><div class="line"><span>　年</span><span>　月</span><span>　日</span></div></div>
+  </div>
+</body></html>`
+}
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+}
+function printResult() {
+  applyGrid()
+  const html = buildPrintHtml()
+  const w = window.open('', '_blank')
+  if (!w) {
+    ElMessage.warning('浏览器拦截了打印窗口，请允许弹出窗口后重试')
+    return
+  }
+  w.document.open()
+  w.document.write(html)
+  w.document.close()
+  setTimeout(() => { w.focus(); w.print() }, 300)
+}
+async function exportExcel() {
+  try {
+    exporting.value = true
+    // 动态按需加载 exceljs（938KB），仅导出 Excel 时才加载，不占首屏
+    const ExcelJS = (await import('exceljs')).default
+    applyGrid()
+    const plan = resultPlan.value || {}
+    const items = gridItems.value
+    const rows = gridRows.value
+    const title = `${plan.org || ''} ${plan.program || ''} ${plan.round_no || ''} 室间质评结果记录`
+    // 项目过多（>10）→ 上下两行：两组共用同一列区域，每张表整页宽、项目减半、列宽翻倍、字放大
+    const useTwoRow = items.length > 10
+    let groups
+    if (useTwoRow) {
+      const mid = Math.ceil(items.length / 2)
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第36页 / 共60页（总源码6397行，取自原第104页）
+---------------------------------------------------------
+      groups = [items.slice(0, mid), items.slice(mid)]
+    } else {
+      groups = [items]
+    }
+    const sheetCols = groups[0].length + 1
+
+    const wb = new ExcelJS.Workbook()
+    wb.creator = '生免速查工具'
+    wb.views = [{ x: 0, y: 0, firstSheet: 0, activeTab: 0, visibility: 'visible' }]
+    const ws = wb.addWorksheet('质评结果', { views: [{ state: 'visible' }] })
+
+    // 标题（合并居中）
+    ws.mergeCells(1, 1, 1, sheetCols)
+    const tCell = ws.getCell(1, 1)
+    tCell.value = title
+    tCell.font = { bold: true, size: 14 }
+    tCell.alignment = { horizontal: 'center', vertical: 'middle' }
+    ws.getRow(1).height = 22
+
+    // 副标题
+    ws.mergeCells(2, 1, 2, sheetCols)
+    const sCell = ws.getCell(2, 1)
+    sCell.value = `年度：${plan.year || ''} ｜ 测定日期：${meta.test_date || ''} ｜ 回报日期：${meta.return_date || ''} ｜ 测定人：${meta.tester || ''} ｜ 审核人：${meta.reviewer || ''}`
+    sCell.font = { size: 10, color: { argb: 'FF444444' } }
+    sCell.alignment = { horizontal: 'center', vertical: 'middle' }
+
+    const thin = { style: 'thin' }
+    const styleCell = (cell, isHeader) => {
+      cell.border = { top: thin, left: thin, bottom: thin, right: thin }
+      cell.alignment = { horizontal: 'center', vertical: 'center', wrapText: true }
+      if (isHeader) {
+        cell.font = { bold: true }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } }
+      }
+    }
+
+    // 逐组写表（每组上下叠放，共用列区域 → fitToWidth 让每张表占满页宽）
+    let r = 3
+    for (let gi = 0; gi < groups.length; gi++) {
+      const gItems = groups[gi]
+      const gCols = gItems.length + 1
+      const headerRow = r
+      ws.getCell(headerRow, 1).value = '样本编号'
+      gItems.forEach((it, i) => {
+        const c = ws.getCell(headerRow, i + 2)
+        c.value = it.unit ? `${it.name} (${it.unit})` : it.name
+      })
+      for (let c = 1; c <= gCols; c++) styleCell(ws.getCell(headerRow, c), true)
+      ws.getRow(headerRow).height = 28
+      r = headerRow + 1
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第37页 / 共60页（总源码6397行，取自原第105页）
+---------------------------------------------------------
+      rows.forEach((row) => {
+        ws.getCell(r, 1).value = row.sample
+        gItems.forEach((it, i) => {
+          let main, sub = ''
+          if (it.conv) {
+            main = row.report[it.key] || ''
+            const orig = row.values[it.key]
+            if (orig) sub = `原 ${orig} ${it.conv.from}`
+          } else if (it.qualitative) {
+            main = row.values[it.key] || ''
+            const pn = computePN(row.values[it.key], it.reverse)
+            if (pn) sub = pn === 'P' ? '阳性' : '阴性'
+          } else {
+            main = row.values[it.key] || ''
+          }
+          const c = ws.getCell(r, i + 2)
+          c.value = main + (sub ? `\n${sub}` : '')
+        })
+        for (let c = 1; c <= gCols; c++) styleCell(ws.getCell(r, c), false)
+        r++
+      })
+      r += 2 // 两组之间空两行
+    }
+
+    // 系统自动说明（来自计划级 note，单独成行，不与人工备注混淆）
+    if (plan.note) {
+      ws.getCell(r, 1).value = '系统自动说明：' + plan.note + '（本行为系统生成，非人工备注）'
+      ws.getCell(r, 1).font = { size: 10, italic: true, color: { argb: 'FF666666' } }
+      r++
+    }
+    // 签字区（一行：测定人 / 审核人 / 日期 年 月 日）
+    const signRow = r
+    ws.getCell(signRow, 1).value = '测定人（签字）：'
+    const testEnd = Math.max(3, Math.floor(sheetCols * 0.16))
+    ws.mergeCells(signRow, 2, signRow, testEnd)
+    ws.getCell(signRow, 2).border = { bottom: thin }
+    const mid = Math.max(testEnd + 1, Math.floor(sheetCols * 0.5))
+    ws.getCell(signRow, mid).value = '审核人（签字）：'
+    ws.mergeCells(signRow, mid + 1, signRow, mid + 2)
+    ws.getCell(signRow, mid + 1).border = { bottom: thin }
+    const dCol = Math.max(mid + 3, sheetCols - 3)
+    ws.getCell(signRow, dCol).value = '日期：'
+    if (dCol + 1 <= sheetCols) {
+      ws.getCell(signRow, dCol + 1).value = '年'
+      ws.getCell(signRow, dCol + 1).border = { bottom: thin }
+    }
+    if (dCol + 2 <= sheetCols) {
+      ws.getCell(signRow, dCol + 2).value = '月'
+      ws.getCell(signRow, dCol + 2).border = { bottom: thin }
+    }
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第38页 / 共60页（总源码6397行，取自原第106页）
+---------------------------------------------------------
+    if (dCol + 3 <= sheetCols) {
+      ws.getCell(signRow, dCol + 3).value = '日'
+      ws.getCell(signRow, dCol + 3).border = { bottom: thin }
+    }
+    ws.getCell(signRow, 1).font = { size: 11 }
+    ws.getCell(signRow, mid).font = { size: 11 }
+
+    // 列宽（A4 横向 fitToWidth=1 会进一步压缩）
+    ws.getColumn(1).width = 12
+    groups[0].forEach((_, i) => { ws.getColumn(i + 2).width = Math.max(10, 16 - groups[0].length * 0.3) })
+
+    // A4 打印设置
+    ws.pageSetup = {
+      paperSize: 9, // A4
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      horizontalCentered: true,
+      margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 },
+    }
+    // 仅单表时设表头重复（双表时每组都自带表头且通常在页内）
+    if (!useTwoRow) ws.pageSetup.printTitlesRow = '3:3'
+
+    const buf = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('已导出 Excel')
+  } catch (err) {
+    ElMessage.error('导出失败：' + (err.message || err))
+  } finally {
+    exporting.value = false
+  }
+}
+async function onDeleteReportInline() {
+  if (!planEditingId.value) return
+  try {
+    await deleteEqaReport(planEditingId.value)
+    planForm.report_file = ''
+    ElMessage.success('已移除报告')
+    await loadEqa()
+  } catch (err) {
+    ElMessage.error('移除失败：' + (err.response?.data?.detail || err.message))
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第39页 / 共60页（总源码6397行，取自原第107页）
+---------------------------------------------------------
+  }
+}
+async function onDelPlan(row) {
+  await ElMessageBox.confirm(`确认删除「${row.org} ${row.program} ${row.round_no}」质评计划？`, '提示', { type: 'warning' })
+  await deleteEqaPlan(row.id)
+  ElMessage.success('已删除')
+  await loadEqa()
+  await loadAlerts()
+}
+async function savePlan() {
+  planSaving.value = true
+  try {
+    const payload = { ...planForm, year: Number(planForm.year) || 0 }
+    if (planEditingId.value) await updateEqaPlan(planEditingId.value, payload)
+    else await createEqaPlan(payload)
+    ElMessage.success('已保存')
+    planDialog.value = false
+    await loadEqa()
+    await loadAlerts()
+  } catch (e) {
+    ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    planSaving.value = false
+  }
+}
+async function loadSummaryStat() {
+  if (!eqaYear.value) return
+  loadingSummaryStat.value = true
+  const cat = summaryCategory.value
+  const dep = summaryDept.value
+  try {
+    summaryStat.value = await getEqaSummaryByCategory(Number(eqaYear.value), summaryHalf.value, cat, dep)
+    try {
+      const rep = await getEqaSummaryText(Number(eqaYear.value), summaryHalf.value, cat, dep)
+      summaryText.value = rep.summary_text || ''
+      if (!summaryText.value.trim()) {
+        // 文字为空 → 预填「合格项目分析」模版（含动态数字）
+        summaryText.value = buildSummaryTemplate()
+      }
+      if (rep.docx_path) {
+        summaryDocUrl.value = eqaSummaryDocUrl(Number(eqaYear.value), summaryHalf.value, cat, dep)
+        summaryGeneratedAt.value = rep.generated_at ? String(rep.generated_at).replace('T', ' ').slice(0, 19) : ''
+      } else {
+        summaryDocUrl.value = ''
+        summaryGeneratedAt.value = ''
+      }
+    } catch (e) {
+      summaryText.value = buildSummaryTemplate()
+      summaryDocUrl.value = ''
+      summaryGeneratedAt.value = ''
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第40页 / 共60页（总源码6397行，取自原第108页）
+---------------------------------------------------------
+    }
+  } finally {
+    loadingSummaryStat.value = false
+  }
+}
+// 保存某（部门×专业组）总结文字并生成 Word（自动存档）
+async function saveAndGenerate() {
+  if (!eqaYear.value) { ElMessage.warning('请先选择年度'); return }
+  generatingSummary.value = true
+  try {
+    const res = await generateEqaSummary({
+      year: Number(eqaYear.value),
+      half: summaryHalf.value,
+      department: summaryDept.value,
+      category: summaryCategory.value,
+      summary_text: summaryText.value,
+    })
+    summaryStat.value = res.stats
+    summaryDocUrl.value = res.docx_url
+    summaryGeneratedAt.value = res.generated_at ? String(res.generated_at).replace('T', ' ').slice(0, 19) : ''
+    ElMessage.success('总结报告已生成并存档')
+  } catch (e) {
+    ElMessage.error('生成失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    generatingSummary.value = false
+  }
+}
+function exportSummaryDoc() {
+  if (!summaryDocUrl.value) return
+  window.open(summaryDocUrl.value, '_blank')
+}
+// 结果报告合并打印：合并该专业组已导入的全部报告为一 PDF，在新标签打开（可直接打印）
+async function mergePrint(category) {
+  if (mergingReport.value) return
+  mergingReport.value = true
+  try {
+    const resp = await mergeEqaReports({
+      year: Number(eqaYear.value),
+      half: summaryHalf.value,
+      category,
+      department: summaryDept.value,
+    })
+    // 响应拦截器已把 response.data（Blob 本身）作为返回值，故 resp 即 Blob，不要再取 .data
+    const blob = resp instanceof Blob ? resp : new Blob([resp], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const win = window.open(url, '_blank')
+    if (!win) {
+      // 浏览器拦截弹窗时降级为下载
+      const a = document.createElement('a')
+      a.href = url
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第41页 / 共60页（总源码6397行，取自原第109页）
+---------------------------------------------------------
+      a.download = `结果报告合并_${category}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    }
+    // 大 PDF（如卫健委合并可达数 MB）需足够时间加载，5 分钟后再释放 blob
+    setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000)
+  } catch (e) {
+    let detail = ''
+    const respData = e.response?.data
+    try {
+      if (respData instanceof Blob) {
+        detail = (JSON.parse(await respData.text()).detail) || ''
+      } else if (typeof respData === 'string') {
+        detail = (JSON.parse(respData).detail) || ''
+      }
+    } catch (_) { /* ignore parse error */ }
+    detail = detail || e.message || ''
+    if (detail.includes('没有可合并')) {
+      ElMessage.warning(`「${category}」在当前范围下没有可合并的已导入报告`)
+    } else {
+      ElMessage.error('合并打印失败：' + detail)
+    }
+  } finally {
+    mergingReport.value = false
+  }
+}
+async function onExportEqa() {
+  if (!eqaYear.value) return
+  try {
+    const blob = await exportEqaPlans(Number(eqaYear.value), eqaOrg.value || undefined, eqaGroup.value || undefined)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `室间质评计划_${eqaYear.value}${eqaOrg.value ? '_' + eqaOrg.value : ''}${eqaGroup.value ? '_' + eqaGroup.value : ''}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    ElMessage.error('导出失败：' + (err.response?.data?.detail || err.message))
+  }
+}
+watch(activeTab, (t) => {
+  if (t === 'eqa' && eqaYear.value) {
+    loadEqa()
+    loadAlerts()
+    loadSummaryStat()
+  }
+})
+</script>
+
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第42页 / 共60页（总源码6397行，取自原第110页）
+---------------------------------------------------------
+<style scoped>
+.page { height: 100%; }
+.toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.toolbar .hint { color: #909399; font-size: 12px; flex: 1 1 100%; }
+.empty-tip { color: #909399; font-size: 13px; padding: 24px 0; text-align: center; }
+.inst-block { margin-bottom: 18px; }
+.inst-title {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 6px 10px; margin-bottom: 6px;
+  background: #f2f6fc; border-left: 4px solid #409eff; border-radius: 3px;
+}
+.inst-name { font-weight: 600; font-size: 14px; color: #303133; }
+.inst-count { font-size: 12px; color: #909399; }
+.daily-wrap { padding: 8px 16px; }
+.daily-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.note-box { margin-top: 10px; }
+.note-label { font-size: 13px; color: #606266; margin-bottom: 4px; }
+.sys-note { margin-top: 8px; padding: 6px 10px; background: #f4f4f5; color: #909399; font-size: 12px; border-radius: 4px; line-height: 1.5; }
+.sys-note-label { color: #c0c4cc; margin-right: 4px; }
+.danger { color: #f56c6c; font-weight: 600; }
+.report-box {
+  margin-top: 10px; padding: 12px 14px;
+  background: #fbfdff; border: 1px dashed #c6e2ff; border-radius: 6px;
+}
+.report-title { font-weight: 600; font-size: 13px; color: #409eff; margin-bottom: 8px; }
+.report-form { margin-bottom: 6px; }
+.report-form :deep(.el-form-item) { margin-bottom: 10px; }
+.report-form :deep(.el-form-item__label) { font-size: 13px; color: #606266; padding-bottom: 2px; }
+/* 室间质评 */
+/* 行列间距调整：单元格内边距收紧、行高适中，按钮不挤 */
+.eqa-table :deep(.el-table__cell) { padding: 6px 0; }
+.eqa-table :deep(.cell) { padding: 0 10px; line-height: 1.45; }
+.eqa-table :deep(.el-table__row) { height: 46px; }
+.eqa-table :deep(.el-button) { margin: 2px 4px; }
+.file-tip { margin-top: 6px; font-size: 12px; color: #606266; }
+.file-tip.muted { color: #c0c4cc; }
+.pending-tag { display: block; margin-top: 4px; width: fit-content; }
+/* 操作列：窄列多行（2-3 行），文字完整不缩写 */
+.eqa-table .op-cell { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-start; align-items: center; }
+.eqa-table .op-cell .el-button { margin: 2px; }
+.eqa-alerts { margin: 12px 0; }
+/* 结果报告合并打印 */
+.merge-print { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.merge-print .merge-label { font-size: 13px; font-weight: 600; color: #303133; }
+.merge-print .merge-tip { font-size: 12px; color: #909399; }
+.eqa-alerts-title { font-weight: 600; font-size: 13px; color: #e6a23c; margin-bottom: 6px; }
+.eqa-alerts .el-alert { margin-bottom: 6px; }
+.form-group-title { font-weight: 600; color: #409eff; margin: 6px 0 10px; padding-left: 8px; border-left: 3px solid #409eff; }
+.eqa-summary {
+  margin-top: 18px; padding: 12px 14px;
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第43页 / 共60页（总源码6397行，取自原第111页）
+---------------------------------------------------------
+  background: #fbfdff; border: 1px dashed #c6e2ff; border-radius: 6px;
+}
+.summary-stat { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: #606266; margin-bottom: 6px; }
+.summary-stat b { color: #303133; }
+.summary-cats { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 6px; }
+.cat-block {
+  flex: 1 1 280px; padding: 10px 12px; border: 1px solid #ebeef5; border-radius: 6px;
+  background: #fff; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; font-size: 13px; color: #606266;
+}
+.cat-block.total { background: #f0f7ff; border-color: #b3d8ff; font-weight: 600; }
+.cat-head { width: 100%; font-weight: 700; color: #303133; font-size: 14px; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; }
+.cat-block b { color: #303133; }
+.gen-tip { font-size: 12px; color: #67c23a; align-self: center; }
+.eqa-summary-preview { font-size: 13px; line-height: 1.8; color: #303133; }
+.prev-title { text-align: center; font-size: 18px; margin: 4px 0 12px; }
+.prev-meta { text-align: center; color: #606266; margin-bottom: 12px; }
+.eqa-summary-preview h3 { font-size: 15px; margin: 16px 0 8px; border-left: 3px solid #409eff; padding-left: 8px; }
+.prev-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+.prev-table th, .prev-table td { border: 1px solid #dcdfe6; padding: 5px 8px; text-align: center; font-size: 12.5px; vertical-align: middle; }
+.prev-table th { background: #f5f7fa; font-weight: 600; }
+.prev-table .prev-total { background: #f0f7ff; font-weight: 600; }
+.prev-narr { white-space: pre-wrap; color: #606266; }
+.docx-preview { font-size: 13px; line-height: 1.8; color: #303133; }
+.docx-preview h3 { font-size: 15px; margin: 16px 0 8px; border-left: 3px solid #409eff; padding-left: 8px; }
+.docx-preview p { margin: 6px 0; }
+.prev-foot { margin-top: 16px; text-align: right; }
+
+/* LJ 质控图 */
+.chart-layout { display: flex; gap: 16px; margin-top: 12px; }
+.chart-left { flex: 0 0 460px; }
+.chart-right { flex: 1 1 auto; min-width: 0; }
+.chart-box { width: 100%; height: 560px; border: 1px solid #e4e7ed; border-radius: 4px; background: #fff; }
+.chart-section-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #303133; }
+
+/* 录入结果矩阵 */
+.result-entry { font-size: 13px; }
+.re-def { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 12px; flex-wrap: wrap; }
+.re-def-col { flex: 1 1 240px; }
+.re-label { font-size: 12px; color: #606266; margin-bottom: 4px; }
+.re-def-btns { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; }
+.re-grid { margin-bottom: 12px; }
+.conv-cell { display: flex; flex-direction: column; gap: 2px; }
+.conv-arrow { font-size: 11px; color: #909399; text-align: center; line-height: 1.2; }
+/* 定性试验（COI）阴阳性显示 */
+.qual-cell { display: flex; align-items: center; gap: 6px; }
+.pn-badge {
+  flex: 0 0 auto; min-width: 22px; height: 22px; line-height: 22px; text-align: center;
+  border-radius: 4px; font-size: 12px; font-weight: 700;
+}
+.pn-pos { background: #fef0f0; color: #f56c6c; border: 1px solid #fbc4c4; }
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第44页 / 共60页（总源码6397行，取自原第112页）
+---------------------------------------------------------
+.pn-neg { background: #f0f9eb; color: #67c23a; border: 1px solid #c2e7b0; }
+.pn-none { background: #f4f4f5; color: #909399; border: 1px solid #e9e9eb; }
+.re-grid :deep(.el-input__wrapper) { box-shadow: none; }
+.re-grid :deep(.el-table__cell) { padding: 2px 0; }
+.re-meta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 6px; }
+.re-meta-item { display: flex; align-items: center; gap: 6px; }
+.re-meta-item > span { font-size: 12px; color: #606266; white-space: nowrap; }
+.re-meta-item .el-input, .re-meta-item .el-date-editor { width: 130px; }
+.level-cell { display: flex; flex-direction: column; gap: 2px; }
+.level-cell .level-val { font-weight: 500; }
+.text-muted { color: #c0c4cc; }
+</style>
+
+======================================================================
+# 文件: views/qc/TargetValueBoard.vue  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\views\qc\TargetValueBoard.vue)
+======================================================================
+
+<template>
+  <div class="target-board">
+    <!-- 工具栏 -->
+    <div class="tb">
+      <el-select v-model="filterMaterial" placeholder="质控品" clearable filterable allow-create
+        style="width:200px" @change="loadBatches">
+        <el-option v-for="m in presets" :key="m" :label="m" :value="m" />
+      </el-select>
+      <el-select v-model="filterMode" placeholder="模式" clearable style="width:130px" @change="loadBatches">
+        <el-option label="录入" value="entry" />
+        <el-option label="存档" value="archive" />
+      </el-select>
+      <el-select v-model="filterMethod" placeholder="方法" clearable style="width:130px" @change="loadBatches">
+        <el-option label="常规法" value="conventional" />
+        <el-option label="即刻法" value="immediate" />
+      </el-select>
+      <el-input v-model="kw" placeholder="搜索批号/仪器" clearable style="width:180px" @keyup.enter="loadBatches" @clear="loadBatches" />
+      <el-button type="primary" @click="loadBatches">查询</el-button>
+      <el-button v-if="auth.canWrite('qc')" type="success" @click="openNew">+ 新建批号</el-button>
+      <el-button v-if="auth.canWrite('qc')" @click="openMatManage">质控品管理</el-button>
+      <span class="tb-hint">一盒质控品一条批号（同质控品不同批号共享项目清单）；生化多项仅存档，其余录入结果按所选方法累计靶值。</span>
+    </div>
+
+    <!-- 列表 -->
+    <el-table :data="rows" v-loading="loading" border stripe>
+      <el-table-column prop="qc_material" label="质控品" min-width="150" />
+      <el-table-column label="项目" min-width="120">
+        <template #default="{ row }">
+          <div class="items-ellipsis" :title="materialItems(row.qc_material).join('、')">
+            {{ materialItems(row.qc_material).join('、') || '—' }}
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="lot_no" label="批号" width="120" />
+      <el-table-column label="水平" width="70" align="center">
+        <template #default="{ row }">
+          <span v-if="row.level && row.level > 0">{{ row.level }}</span>
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第45页 / 共60页（总源码6397行，取自原第113页）
+---------------------------------------------------------
+          <span v-else class="lv-muted">—</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="instrument" label="仪器" width="130" />
+      <el-table-column label="方法" width="90">
+        <template #default="{ row }">
+          <span v-if="row.mode === 'archive'">—</span>
+          <el-tag v-else size="small" :type="row.method === 'immediate' ? 'warning' : 'info'">
+            {{ row.method === 'immediate' ? '即刻法' : '常规法' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="模式" width="80">
+        <template #default="{ row }">
+          <el-tag size="small" effect="plain">{{ row.mode === 'archive' ? '存档' : '录入' }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="录入次数" width="90" align="center">
+        <template #default="{ row }">{{ row._entries ?? '—' }}</template>
+      </el-table-column>
+      <el-table-column label="状态" width="110">
+        <template #default="{ row }">
+          <el-tag :type="statusType(row._status)">{{ row._status || '—' }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" min-width="240" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" @click="openDetail(row)">查看/录入</el-button>
+          <el-button v-if="auth.canWrite('qc')" link type="primary" @click="openEdit(row)">编辑</el-button>
+          <el-button v-if="row.archive_filename" link type="success" @click="previewArchive(row)">预览存档</el-button>
+          <el-button v-if="auth.canWrite('qc')" link type="danger" @click="removeBatch(row)">删除</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <div class="pager">
+      <el-pagination v-model:current-page="page" :page-size="pageSize" :total="total" layout="prev,pager,next,total"
+        @current-change="loadBatches" />
+    </div>
+
+    <!-- 新建/编辑对话框 -->
+    <el-dialog v-model="editVisible" :title="editForm.id ? '编辑质控品换批号累靶' : '新建质控品换批号累靶'" width="560px" append-to-body>
+      <el-form label-width="92px">
+        <el-form-item label="质控品" required>
+          <div class="mat-pick">
+            <el-select v-model="editForm.qc_material_id" filterable placeholder="选择质控品" style="width:100%"
+              @change="onMaterialPick">
+              <el-option v-for="m in materials" :key="m.id" :label="m.name" :value="m.id" />
+            </el-select>
+            <el-button link type="primary" @click="openMatManage()">+ 新建质控品</el-button>
+          </div>
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第46页 / 共60页（总源码6397行，取自原第114页）
+---------------------------------------------------------
+          <div class="form-tip" v-if="currentMatItems.length">
+            该项目含：{{ currentMatItems.join('、') }}
+          </div>
+        </el-form-item>
+        <el-form-item label="批号" required>
+          <el-input v-model="editForm.lot_no" placeholder="如 20260101" />
+        </el-form-item>
+        <el-form-item label="水平">
+          <el-select v-model="editForm.level" style="width:100%">
+            <el-option label="未指定" :value="0" />
+            <el-option label="水平 1" :value="1" />
+            <el-option label="水平 2" :value="2" />
+            <el-option label="水平 3" :value="3" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="仪器">
+          <el-input v-model="editForm.instrument" placeholder="如 DXI800 / AU5800" />
+        </el-form-item>
+        <el-form-item label="方法">
+          <el-select v-model="editForm.method" :disabled="editForm.qc_material === '生化多项质控品'" style="width:100%">
+            <el-option label="常规法（≥10暂定，≥20确立）" value="conventional" />
+            <el-option label="即刻法（≥3次起判，累计20次）" value="immediate" />
+          </el-select>
+          <div class="form-tip" v-if="editForm.qc_material === '生化多项质控品'">
+            生化多项质控品仅做存档（上传PDF），不录入结果，方法无意义。
+          </div>
+        </el-form-item>
+        <el-form-item label="备注/靶值说明">
+          <el-input v-model="editForm.note" type="textarea" :rows="2" placeholder="如靶值来源说明、备注" />
+        </el-form-item>
+        <el-form-item label="存档PDF">
+          <input type="file" accept="application/pdf" @change="onArchivePick" />
+          <div v-if="archiveFile" class="file-tip">已选：{{ archiveFile.name }}</div>
+          <div v-else-if="editForm.id && currentArchive" class="file-tip muted">当前：{{ currentArchive }}</div>
+          <div class="form-tip">生化多项质控品建议上传靶值记录PDF存档（可预览）。</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveBatch">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 详情/录入对话框 -->
+    <el-dialog v-model="detailVisible" :title="`质控品换批号累靶 - ${detailRow?.qc_material || ''} ${detailRow?.lot_no || ''}`"
+      width="92%" top="3vh" append-to-body @close="onDetailClose">
+      <div v-if="detailRow" v-loading="detailLoading">
+        <div class="d-info">
+          <span>水平：<b v-if="detailRow.level && detailRow.level > 0">{{ detailRow.level }}</b><span v-else>—</span></span>
+          <span>仪器：{{ detailRow.instrument || '—' }}</span>
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第47页 / 共60页（总源码6397行，取自原第115页）
+---------------------------------------------------------
+          <span>方法：{{ detailRow.mode === 'archive' ? '存档' : (detailRow.method === 'immediate' ? '即刻法' : '常规法') }}</span>
+          <span>状态：<el-tag :type="statusType(stats.batch_status)" size="small">{{ stats.batch_status }}</el-tag></span>
+          <span>录入 {{ stats.total_entries }} 次</span>
+          <span v-if="stats.out_count">失控标记 {{ stats.out_count }}</span>
+        </div>
+
+        <!-- 存档模式：仅预览 + 备注 -->
+        <template v-if="detailRow.mode === 'archive'">
+          <el-alert type="info" :closable="false" show-icon title="生化多项质控品：仅存档，不录入结果。" style="margin:8px 0" />
+          <div class="d-note">
+            <div class="d-note-label">靶值说明：</div>
+            <el-input v-model="detailRow.note" type="textarea" :rows="2" @blur="saveNote" />
+          </div>
+          <div class="pdf-wrap" v-if="archiveUrl">
+            <iframe :src="archiveUrl" style="width:100%;height:60vh;border:none" />
+          </div>
+          <el-empty v-else description="未上传存档 PDF" />
+          <div v-if="auth.canWrite('qc')" style="margin-top:8px">
+            <input type="file" accept="application/pdf" @change="onDetailArchivePick" />
+            <el-button size="small" type="primary" :loading="archSaving" @click="uploadDetailArchive">上传/替换存档</el-button>
+          </div>
+        </template>
+
+        <!-- 录入模式 -->
+        <template v-else>
+          <!-- 各项目累计统计卡 -->
+          <div class="ana-cards">
+            <div class="ana-card" v-for="a in stats.analytes" :key="a">
+              <div class="ana-name">
+                {{ a }}
+                <el-tag v-if="stats.per_analyte[a].manual" size="small" type="success" style="margin-left:4px">手动</el-tag>
+              </div>
+              <div class="ana-row"><span>次数</span><b>{{ stats.per_analyte[a].n }}</b></div>
+              <div class="ana-row"><span>均值</span><b>{{ stats.per_analyte[a].mean }}</b></div>
+              <div class="ana-row"><span>SD</span><b>{{ stats.per_analyte[a].sd }}</b></div>
+              <div class="ana-row"><span>CV%</span><b>{{ stats.per_analyte[a].cv }}</b></div>
+              <div class="ana-row"><span>状态</span>
+                <el-tag :type="statusType(stats.per_analyte[a].status)" size="small">{{ stats.per_analyte[a].status }}</el-tag>
+              </div>
+              <el-button v-if="stats.per_analyte[a].can_establish && !stats.per_analyte[a].established"
+                size="small" type="success" plain @click="doEstablish">确立靶值</el-button>
+            </div>
+            <el-empty v-if="!stats.analytes.length" description="尚未录入结果" :image-size="60" />
+          </div>
+
+          <!-- 录入区 -->
+          <div v-if="auth.canWrite('qc')" class="entry">
+            <el-select v-model="resultForm.analyte" filterable allow-create placeholder="项目/分析物" style="width:200px">
+              <el-option-group label="质控品项目">
+                <el-option v-for="a in stats.material_items" :key="'m_' + a" :label="a" :value="a" />
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第48页 / 共60页（总源码6397行，取自原第116页）
+---------------------------------------------------------
+              </el-option-group>
+              <el-option-group label="已录入">
+                <el-option v-for="a in stats.analytes" :key="'e_' + a" :label="a" :value="a" />
+              </el-option-group>
+            </el-select>
+            <el-input v-model="resultForm.value" type="number" placeholder="测定值" style="width:140px" @keyup.enter="submitResult" />
+            <el-date-picker v-model="resultForm.qc_date" type="date" value-format="YYYY-MM-DD" placeholder="日期" style="width:160px" />
+            <el-button type="primary" :loading="adding" @click="submitResult">录入</el-button>
+          </div>
+
+          <el-alert v-if="lastNote" :type="lastNoteType" :closable="true" show-icon :title="lastNote" style="margin:8px 0" />
+
+          <!-- 历史表 -->
+          <el-table :data="resultRows" border size="small" style="margin-top:8px">
+            <el-table-column prop="seq" label="#" width="50" align="center" />
+            <el-table-column prop="analyte" label="项目" width="150" />
+            <el-table-column prop="value" label="测定值" width="110" />
+            <el-table-column prop="qc_date" label="日期" width="120" />
+            <el-table-column label="SI上限" width="90">
+              <template #default="{ row }">{{ row.si_upper ? row.si_upper : '—' }}</template>
+            </el-table-column>
+            <el-table-column label="SI下限" width="90">
+              <template #default="{ row }">{{ row.si_lower ? row.si_lower : '—' }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">
+                <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="170" v-if="auth.canWrite('qc')">
+              <template #default="{ row }">
+                <template v-if="row.is_out">
+                  <el-button link type="success" size="small" @click="toggleRow(row)">人工确认</el-button>
+                  <el-tag size="small" type="danger">失控</el-tag>
+                </template>
+                <template v-else-if="row.manual">
+                  <el-button link type="warning" size="small" @click="toggleRow(row)">取消确认</el-button>
+                  <el-tag size="small" type="success">人工确认</el-tag>
+                </template>
+                <template v-else>
+                  <el-button link type="warning" size="small" @click="toggleRow(row)">标记失控</el-button>
+                </template>
+                <el-button link type="danger" size="small" @click="delRow(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </template>
+      </div>
+    </el-dialog>
+
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第49页 / 共60页（总源码6397行，取自原第117页）
+---------------------------------------------------------
+    <!-- 质控品管理对话框 -->
+    <el-dialog v-model="matManageVisible" title="质控品管理" width="680px" top="5vh" append-to-body>
+      <div class="mat-toolbar" v-if="auth.canWrite('qc')">
+        <el-button type="primary" size="small" @click="openMatNew">+ 新建质控品</el-button>
+        <span class="form-tip">同一种质控品（不同批号）共享同一份项目清单；建批选质控品后，录入结果的分析物下拉即由它预填。</span>
+      </div>
+      <el-table :data="materials" border size="small" v-loading="matLoading" style="margin-top:8px">
+        <el-table-column prop="name" label="质控品" min-width="140" />
+        <el-table-column label="包含项目" min-width="240">
+          <template #default="{ row }">
+            <el-tag v-for="it in (row.items || [])" :key="it" size="small" style="margin:2px">{{ it }}</el-tag>
+            <span v-if="!row.items || !row.items.length" class="lv-muted">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150" v-if="auth.canWrite('qc')">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openMatEdit(row)">编辑</el-button>
+            <el-button link type="danger" size="small" @click="delMat(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 新建/编辑质控品 -->
+      <el-dialog v-model="matEditVisible" :title="matForm.id ? '编辑质控品' : '新建质控品'" width="460px" append-to-body>
+        <el-form label-width="84px">
+          <el-form-item label="名称" required>
+            <el-input v-model="matForm.name" placeholder="如 伯乐免疫多项" />
+          </el-form-item>
+          <el-form-item label="包含项目">
+            <el-input v-model="matItemsText" type="textarea" :rows="6" placeholder="每行一个项目，如：&#10;ALT&#10;AST&#10;肌酐" />
+            <div class="form-tip">同一质控品的不同批号共享此项目清单；录入结果时作为分析物下拉候选（仍可手填其他项）。</div>
+          </el-form-item>
+          <el-form-item label="备注">
+            <el-input v-model="matForm.note" type="textarea" :rows="2" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="matEditVisible = false">取消</el-button>
+          <el-button type="primary" :loading="matSaving" @click="saveMat">保存</el-button>
+        </template>
+      </el-dialog>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useAuthStore } from '../../store/auth'
+import {
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第50页 / 共60页（总源码6397行，取自原第118页）
+---------------------------------------------------------
+  listTargetBatches, createTargetBatch, updateTargetBatch, deleteTargetBatch,
+  getMaterialPresets, addTargetResult, listTargetResults, deleteTargetResult,
+  toggleTargetResult, establishTarget, uploadTargetArchive, downloadTargetArchive,
+} from '../../api/qc_target'
+import {
+  listQcMaterials, createQcMaterial, updateQcMaterial, deleteQcMaterial,
+} from '../../api/qc_material'
+
+const auth = useAuthStore()
+const ARCHIVE_MATERIAL = '生化多项质控品'
+
+const rows = ref([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = ref(10)
+const loading = ref(false)
+const presets = ref([ARCHIVE_MATERIAL, '伯乐免疫多项', '昆涞免疫多项'])
+const materials = ref([])
+const filterMaterial = ref('')
+const filterMode = ref('')
+const filterMethod = ref('')
+const kw = ref('')
+
+async function loadBatches() {
+  loading.value = true
+  try {
+    const params = { page: page.value, page_size: pageSize.value }
+    if (filterMaterial.value) params.qc_material = filterMaterial.value
+    if (filterMode.value) params.mode = filterMode.value
+    if (filterMethod.value) params.method = filterMethod.value
+    if (kw.value) params.q = kw.value
+    const res = await listTargetBatches(params)
+    const data = res.items || res || []
+    rows.value = data
+    total.value = res.total || data.length
+    // 拉取每个批号的录入次数与状态
+    await Promise.all(rows.value.map(async (r) => {
+      try {
+        const d = await listTargetResults(r.id)
+        r._entries = d.stats.total_entries
+        r._status = d.stats.batch_status
+      } catch (e) { r._entries = '—'; r._status = '—' }
+    }))
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(async () => {
+  await loadMaterials()
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第51页 / 共60页（总源码6397行，取自原第119页）
+---------------------------------------------------------
+  loadBatches()
+})
+
+async function loadMaterials() {
+  try {
+    const res = await listQcMaterials()
+    materials.value = res || []
+    presets.value = materials.value.map(m => m.name)
+  } catch (e) {}
+}
+
+function statusType(s) {
+  if (s === '已确立' || s === '在控' || s === '在控(人工)') return 'success'
+  if (s === '警告' || s === '可暂定' || s === '可确立') return 'warning'
+  if (s === '失控' || s === '有失控') return 'danger'
+  return 'info'
+}
+
+function materialItems(name) {
+  const m = materials.value.find(x => x.name === name)
+  return m && m.items ? m.items : []
+}
+
+// ---------------- 新建/编辑 ----------------
+const editVisible = ref(false)
+const saving = ref(false)
+const editForm = reactive({ id: null, qc_material: '', qc_material_id: null, lot_no: '', level: 0, instrument: '', method: 'conventional', note: '' })
+const archiveFile = ref(null)
+const currentArchive = ref('')
+
+const currentMatItems = computed(() => {
+  if (!editForm.qc_material_id) return []
+  const m = materials.value.find(x => x.id === editForm.qc_material_id)
+  return m && m.items ? m.items : []
+})
+
+function onMaterialPick(id) {
+  const m = materials.value.find(x => x.id === id)
+  editForm.qc_material = m ? m.name : ''
+  if (editForm.qc_material === ARCHIVE_MATERIAL) editForm.method = ''
+}
+function openNew() {
+  Object.assign(editForm, { id: null, qc_material: '', qc_material_id: null, lot_no: '', level: 0, instrument: '', method: 'conventional', note: '' })
+  archiveFile.value = null
+  currentArchive.value = ''
+  editVisible.value = true
+}
+function openEdit(row) {
+  Object.assign(editForm, {
+    id: row.id,
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第52页 / 共60页（总源码6397行，取自原第120页）
+---------------------------------------------------------
+    qc_material: row.qc_material || '',
+    qc_material_id: row.qc_material_id || null,
+    lot_no: row.lot_no || '',
+    level: row.level || 0,
+    instrument: row.instrument || '',
+    method: row.mode === 'archive' ? '' : (row.method || 'conventional'),
+    note: row.note || '',
+  })
+  archiveFile.value = null
+  currentArchive.value = row.archive_filename || ''
+  editVisible.value = true
+}
+function onArchivePick(e) {
+  archiveFile.value = e.target.files[0] || null
+}
+async function saveBatch() {
+  if (!editForm.qc_material || !editForm.lot_no) {
+    ElMessage.warning('请填写质控品与批号')
+    return
+  }
+  saving.value = true
+  try {
+    const payload = {
+      qc_material: editForm.qc_material,
+      qc_material_id: editForm.qc_material_id || null,
+      lot_no: editForm.lot_no,
+      level: Number(editForm.level) || 0,
+      instrument: editForm.instrument,
+      method: editForm.qc_material === ARCHIVE_MATERIAL ? '' : editForm.method,
+      mode: editForm.qc_material === ARCHIVE_MATERIAL ? 'archive' : 'entry',
+      note: editForm.note,
+    }
+    let id = editForm.id
+    if (id) {
+      await updateTargetBatch(id, payload)
+    } else {
+      const created = await createTargetBatch(payload)
+      id = created.id
+    }
+    // 上传存档
+    if (archiveFile.value) {
+      await uploadTargetArchive(id, archiveFile.value)
+    }
+    ElMessage.success('已保存')
+    editVisible.value = false
+    loadBatches()
+  } catch (e) {
+    ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    saving.value = false
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第53页 / 共60页（总源码6397行，取自原第121页）
+---------------------------------------------------------
+  }
+}
+
+async function removeBatch(row) {
+  try {
+    await ElMessageBox.confirm(`确认删除「${row.qc_material} ${row.lot_no}」？`, '提示', { type: 'warning' })
+  } catch (e) { return }
+  try {
+    await deleteTargetBatch(row.id)
+    ElMessage.success('已删除')
+    loadBatches()
+  } catch (e) {
+    ElMessage.error('删除失败：' + (e.response?.data?.detail || e.message))
+  }
+}
+
+// ---------------- 质控品主数据管理 ----------------
+const matManageVisible = ref(false)
+const matEditVisible = ref(false)
+const matLoading = ref(false)
+const matSaving = ref(false)
+const matForm = reactive({ id: null, name: '', note: '' })
+const matItemsText = ref('')
+
+function openMatManage() {
+  loadMaterials()
+  matManageVisible.value = true
+}
+function openMatNew() {
+  Object.assign(matForm, { id: null, name: '', note: '' })
+  matItemsText.value = ''
+  matEditVisible.value = true
+}
+function openMatEdit(row) {
+  Object.assign(matForm, { id: row.id, name: row.name, note: row.note || '' })
+  matItemsText.value = (row.items || []).join('\n')
+  matEditVisible.value = true
+}
+async function saveMat() {
+  if (!matForm.name || !matForm.name.trim()) {
+    ElMessage.warning('请填写质控品名称')
+    return
+  }
+  matSaving.value = true
+  try {
+    const items = matItemsText.value.split('\n').map(s => s.trim()).filter(Boolean)
+    const payload = { name: matForm.name.trim(), items, note: matForm.note }
+    if (matForm.id) await updateQcMaterial(matForm.id, payload)
+    else await createQcMaterial(payload)
+    ElMessage.success('已保存')
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第54页 / 共60页（总源码6397行，取自原第122页）
+---------------------------------------------------------
+    matEditVisible.value = false
+    await loadMaterials()
+  } catch (e) {
+    ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    matSaving.value = false
+  }
+}
+async function delMat(row) {
+  try {
+    await ElMessageBox.confirm(`确认删除质控品「${row.name}」？关联批号的项目预填将失效（批号本身保留）。`, '提示', { type: 'warning' })
+  } catch (e) { return }
+  try {
+    await deleteQcMaterial(row.id)
+    ElMessage.success('已删除')
+    await loadMaterials()
+  } catch (e) {
+    ElMessage.error('删除失败：' + (e.response?.data?.detail || e.message))
+  }
+}
+
+// ---------------- 详情/录入 ----------------
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detailRow = ref(null)
+const stats = reactive({ analytes: [], per_analyte: {}, batch_status: '', total_entries: 0, out_count: 0, established_analytes: 0 })
+const resultRows = ref([])
+const adding = ref(false)
+const resultForm = reactive({ analyte: '', value: '', qc_date: '' })
+const lastNote = ref('')
+const lastNoteType = ref('info')
+const archiveUrl = ref('')
+const archSaving = ref(false)
+const detailArchiveFile = ref(null)
+
+async function openDetail(row) {
+  detailRow.value = row
+  detailVisible.value = true
+  detailLoading.value = true
+  lastNote.value = ''
+  resultForm.analyte = ''
+  resultForm.value = ''
+  resultForm.qc_date = new Date().toISOString().slice(0, 10)
+  try {
+    if (row.mode === 'archive' && row.archive_filename) {
+      await previewArchive(row, true)
+    }
+    await refreshDetail()
+  } finally {
+    detailLoading.value = false
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第55页 / 共60页（总源码6397行，取自原第123页）
+---------------------------------------------------------
+  }
+}
+
+async function refreshDetail() {
+  if (!detailRow.value) return
+  const d = await listTargetResults(detailRow.value.id)
+  resultRows.value = d.rows || []
+  Object.assign(stats, d.stats)
+}
+
+async function submitResult() {
+  if (!resultForm.analyte || resultForm.value === '' || resultForm.value === null) {
+    ElMessage.warning('请填写项目与测定值')
+    return
+  }
+  adding.value = true
+  lastNote.value = ''
+  try {
+    const res = await addTargetResult(detailRow.value.id, {
+      analyte: resultForm.analyte,
+      value: Number(resultForm.value),
+      qc_date: resultForm.qc_date,
+    })
+    await refreshDetail()
+    // 即刻法：展示查表判定
+    const a = resultForm.analyte
+    const per = (res.stats?.per_analyte || {})[a] || {}
+    const r = res.row || {}
+    if (detailRow.value.method === 'immediate' && r.si_upper != null) {
+      lastNote.value = `本次（n=${per.n}）：SI上限=${r.si_upper}，SI下限=${r.si_lower}；查表 2s=${per.n2s} 3s=${per.n3s} → ${r.status}`
+      lastNoteType.value = r.status === '失控' ? 'error' : (r.status === '警告' ? 'warning' : 'success')
+    } else if (per.manual) {
+      lastNote.value = `该项目已有手动确认记录，新值直接纳入累计（跳过自动判定）`
+      lastNoteType.value = 'success'
+    } else if (detailRow.value.method === 'conventional' && per.n < 20 && per.n < 10) {
+      lastNote.value = `已累计 ${per.n} 次（常规法需≥10可暂定、≥20确立）`
+      lastNoteType.value = 'info'
+    }
+    resultForm.value = ''
+  } catch (e) {
+    ElMessage.error('录入失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    adding.value = false
+  }
+}
+
+async function delRow(row) {
+  try {
+    await deleteTargetResult(detailRow.value.id, row.id)
+    await refreshDetail()
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第56页 / 共60页（总源码6397行，取自原第124页）
+---------------------------------------------------------
+  } catch (e) {
+    ElMessage.error('删除失败：' + (e.response?.data?.detail || e.message))
+  }
+}
+async function toggleRow(row) {
+  try {
+    await toggleTargetResult(detailRow.value.id, row.id)
+    await refreshDetail()
+  } catch (e) {
+    ElMessage.error('操作失败：' + (e.response?.data?.detail || e.message))
+  }
+}
+async function doEstablish() {
+  try {
+    await establishTarget(detailRow.value.id)
+    ElMessage.success('已确立靶值')
+    await refreshDetail()
+  } catch (e) {
+    ElMessage.error('确立失败：' + (e.response?.data?.detail || e.message))
+  }
+}
+async function saveNote() {
+  if (!detailRow.value) return
+  try { await updateTargetBatch(detailRow.value.id, { note: detailRow.value.note }) } catch (e) {}
+}
+
+// ---------------- 存档预览 ----------------
+async function previewArchive(row, forDetail = false) {
+  if (!row.archive_filename) { ElMessage.warning('无存档文件'); return }
+  try {
+    const blob = await downloadTargetArchive(row.id)
+    const url = URL.createObjectURL(blob)
+    if (forDetail) {
+      if (archiveUrl.value) URL.revokeObjectURL(archiveUrl.value)
+      archiveUrl.value = url
+    } else {
+      const win = window.open(url, '_blank')
+      if (!win) {
+        const a = document.createElement('a')
+        a.href = url; a.download = row.archive_filename; document.body.appendChild(a); a.click(); a.remove()
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000)
+    }
+  } catch (e) {
+    ElMessage.error('预览失败：' + (e.response?.data?.detail || e.message))
+  }
+}
+function onDetailClose() {
+  if (archiveUrl.value) { URL.revokeObjectURL(archiveUrl.value); archiveUrl.value = '' }
+}
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第57页 / 共60页（总源码6397行，取自原第125页）
+---------------------------------------------------------
+function onDetailArchivePick(e) {
+  detailArchiveFile.value = e.target.files[0] || null
+}
+async function uploadDetailArchive() {
+  if (!detailArchiveFile.value) { ElMessage.warning('请选择PDF'); return }
+  archSaving.value = true
+  try {
+    await uploadTargetArchive(detailRow.value.id, detailArchiveFile.value)
+    detailRow.value.archive_filename = detailArchiveFile.value.name
+    await previewArchive(detailRow.value, true)
+    ElMessage.success('已上传')
+  } catch (e) {
+    ElMessage.error('上传失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    archSaving.value = false
+  }
+}
+</script>
+
+<style scoped>
+.target-board { padding: 4px; }
+.tb { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.tb-hint { color: #909399; font-size: 12px; margin-left: 4px; }
+.lv-muted { color: #c0c4cc; }
+.pager { margin-top: 12px; display: flex; justify-content: center; }
+.form-tip { color: #909399; font-size: 12px; margin-top: 4px; }
+.file-tip { font-size: 12px; color: #606266; margin-top: 4px; }
+.file-tip.muted { color: #909399; }
+.d-info { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; font-size: 13px; color: #606266; align-items: center; }
+.d-note { margin: 8px 0; }
+.d-note-label { font-size: 13px; color: #606266; margin-bottom: 4px; }
+.pdf-wrap { background: #f5f7fa; border-radius: 6px; overflow: hidden; }
+.ana-cards { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; }
+.ana-card { border: 1px solid #ebeef5; border-radius: 8px; padding: 10px 12px; min-width: 180px; background: #fafafa; }
+.ana-name { font-weight: 600; margin-bottom: 6px; color: #1a365d; }
+.ana-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+.ana-row b { color: #303133; }
+.entry { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+.mat-pick { display: flex; gap: 8px; align-items: center; width: 100%; }
+.mat-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.items-ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; cursor: default; }
+</style>
+
+======================================================================
+# 文件: api/qc.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\qc.js)
+======================================================================
+
+import request from '../utils/request'
+
+// ---- 原始质控记录（qc_records 通用 CRUD）----
+export function listQC(params) {
+  return request.get('/api/v1/qc-records', { params })
+}
+export function createQC(data) {
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第58页 / 共60页（总源码6397行，取自原第126页）
+---------------------------------------------------------
+  return request.post('/api/v1/qc-records', data)
+}
+export function updateQC(id, data) {
+  return request.put(`/api/v1/qc-records/${id}`, data)
+}
+export function deleteQC(id) {
+  return request.delete(`/api/v1/qc-records/${id}`)
+}
+
+// ---- 室内质控月结（qc_monthly_summaries）----
+export function listQCSummaries(params) {
+  return request.get('/api/v1/qc-summaries', { params })
+}
+export function uploadQCSummary(file, instrumentId, onProgress) {
+  const form = new FormData()
+  form.append('file', file)
+  if (instrumentId) form.append('instrument_id', instrumentId)
+  return request.post('/api/v1/qc-summaries/upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    // onProgress(pct:number) —— 仅在浏览器能拿到 content-length 时回调百分比，
+    // 否则 pct 持续为 0（由调用方降级为「上传中…」文案）
+    onUploadProgress: onProgress
+      ? (e) => {
+          const pct = e.total ? Math.round((e.loaded / e.total) * 100) : 0
+          onProgress(pct)
+        }
+      : undefined,
+  })
+}
+export function getQCDaily(id) {
+  return request.get(`/api/v1/qc-summaries/${id}/daily`)
+}
+export function updateQCSummary(id, data) {
+  return request.put(`/api/v1/qc-summaries/${id}`, data)
+}
+export function deleteQCSummary(id) {
+  return request.delete(`/api/v1/qc-summaries/${id}`)
+}
+export function uploadQCPdf(id, file) {
+  const form = new FormData()
+  form.append('file', file)
+  return request.post(`/api/v1/qc-summaries/${id}/pdf`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+export function downloadQCPdf(id) {
+  return request.get(`/api/v1/qc-summaries/${id}/pdf`, { responseType: 'blob' })
+}
+export function deleteQCPdf(id) {
+  return request.delete(`/api/v1/qc-summaries/${id}/pdf`)
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第59页 / 共60页（总源码6397行，取自原第127页）
+---------------------------------------------------------
+}
+// 月结文字报告（CZ-012 文字部分）
+export function getQCReport(instrumentId, year, month) {
+  const params = { year, month }
+  if (instrumentId) params.instrument_id = instrumentId
+  return request.get('/api/v1/qc-summaries/report', { params })
+}
+export function upsertQCReport(data) {
+  return request.put('/api/v1/qc-summaries/report', data)
+}
+export function regenerateQCReport(instrumentId, year, month) {
+  const params = { year, month }
+  if (instrumentId) params.instrument_id = instrumentId
+  return request.post('/api/v1/qc-summaries/report/regenerate', null, { params })
+}
+export function exportQCSummary(year, month, instrumentId) {
+  const params = { year, month }
+  if (instrumentId) params.instrument_id = instrumentId
+  return request.get('/api/v1/qc-summaries/export', {
+    params,
+    responseType: 'blob',
+  })
+}
+export function exportQCReportDocx(year, month, instrumentId) {
+  const params = { year, month }
+  if (instrumentId) params.instrument_id = instrumentId
+  return request.get('/api/v1/qc-summaries/report/docx', {
+    params,
+    responseType: 'blob',
+  })
+}
+export function getQCProjectDaily(year, month, instrumentId, testItem) {
+  const params = { year, month, instrument_id: instrumentId, test_item: testItem }
+  return request.get('/api/v1/qc-summaries/daily/project', { params })
+}
+
+export function getQCInstruments() {
+  return request.get('/api/v1/qc-summaries/instruments')
+}
+
+======================================================================
+# 文件: api/qc_target.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\qc_target.js)
+======================================================================
+
+import request from '../utils/request'
+
+// 批号累积靶值
+export function listTargetBatches(params) {
+  return request.get('/api/v1/qc-target-batches', { params })
+}
+export function createTargetBatch(data) {
+  return request.post('/api/v1/qc-target-batches', data)
+}
+export function updateTargetBatch(id, data) {
+
+
+检验科生化免疫组室内质控与靶值管理软件 V1.0   第60页 / 共60页（总源码6397行，取自原第128页）
+---------------------------------------------------------
+  return request.put(`/api/v1/qc-target-batches/${id}`, data)
+}
+export function deleteTargetBatch(id) {
+  return request.delete(`/api/v1/qc-target-batches/${id}`)
+}
+export function getMaterialPresets() {
+  return request.get('/api/v1/qc-target-batches/materials/presets')
+}
+export function addTargetResult(batchId, data) {
+  return request.post(`/api/v1/qc-target-batches/${batchId}/results`, data)
+}
+export function listTargetResults(batchId) {
+  return request.get(`/api/v1/qc-target-batches/${batchId}/results`)
+}
+export function deleteTargetResult(batchId, rid) {
+  return request.delete(`/api/v1/qc-target-batches/${batchId}/results/${rid}`)
+}
+export function toggleTargetResult(batchId, rid) {
+  return request.post(`/api/v1/qc-target-batches/${batchId}/results/${rid}/toggle`)
+}
+export function establishTarget(batchId) {
+  return request.post(`/api/v1/qc-target-batches/${batchId}/establish`)
+}
+export function uploadTargetArchive(batchId, file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  return request.post(`/api/v1/qc-target-batches/${batchId}/archive`, fd)
+}
+export function downloadTargetArchive(batchId) {
+  return request.get(`/api/v1/qc-target-batches/${batchId}/archive`, { responseType: 'blob' })
+}
+
+======================================================================
+# 文件: api/qc_material.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\qc_material.js)
+======================================================================
+
+import request from '../utils/request'
+
+// 质控品主数据（含项目清单）
+export function listQcMaterials(params) {
+  return request.get('/api/v1/qc-materials', { params })
+}
+export function createQcMaterial(data) {
+  return request.post('/api/v1/qc-materials', data)
+}
+export function updateQcMaterial(id, data) {
+  return request.put(`/api/v1/qc-materials/${id}`, data)
+}
+export function deleteQcMaterial(id) {
+  return request.delete(`/api/v1/qc-materials/${id}`)
+}
+

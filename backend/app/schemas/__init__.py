@@ -807,3 +807,6 @@ class SchedulingMergePlansRequest(BaseModel):
     source_plan_ids: list[int]
     target_plan_id: int
 
+
+from .iso15189 import *  # 15189 内审专项 schema（文件评审 / 自查 / 科室内审）
+

@@ -1,0 +1,3312 @@
+检验科生化免疫组综合业务管理平台软件 V1.0   第1页 / 共60页（总源码10673行，取自原第1页）
+------------------------------------------------------
+
+======================================================================
+# 文件: api/v1/documents.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\documents.py)
+======================================================================
+
+from datetime import datetime
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse, Response
+from sqlalchemy.orm import Session
+from sqlalchemy import case, func, text
+from sqlalchemy.orm import defer
+import re
+
+from ...core.crud_base import paginate, write_audit
+from ...core.database import get_db
+from ...core.security import get_current_user, require_roles
+from ...core.storage import storage
+from ...core.cos_storage import cos_storage
+from ...core.docmeta import parse_doc_metadata
+from ...models.document import Document, DocumentVersion, DOC_CATEGORIES
+from ...models.file_change_log import FileChangeLog
+from ...models.test_item import TestItem
+from ...models.user import User
+from ...schemas import DocumentRead, DocumentUpdate, DocumentVersionRead
+
+router = APIRouter(prefix="/documents", tags=["documents"])
+
+
+# ---- 项目说明书 → 项目查询 关联（卡片上预览用）----
+def _norm(s: str) -> str:
+    s = (s or "").strip().replace("（", "(").replace("）", ")").replace("　", " ").replace(" ", "")
+    return s.lower()
+
+
+# 厂商关键词（标题/文件名命中即推断品牌）；注意顺序靠前的优先
+_BRAND_RULES = [
+    ("贝克曼", ["贝克曼", "beekman", "beckman", "osr", "au生化", "au系列"]),
+    ("罗氏", ["罗氏", "roche"]),
+    ("安图", ["安图", "autobio"]),
+    ("迈瑞", ["迈瑞", "mindray"]),
+    ("西门子", ["西门子", "siemens"]),
+    ("雅培", ["雅培", "abbott"]),
+    ("积水", ["积水"]),
+    ("九强", ["九强"]),
+    ("美康", ["美康"]),
+    ("利德曼", ["利德曼"]),
+    ("透景", ["透景"]),
+    ("基蛋", ["基蛋"]),
+    ("奥森", ["奥森"]),
+    ("东芝", ["东芝", "toshiba"]),
+    ("日立", ["日立", "hitachi"]),
+    ("沃芬", ["沃芬", "werfen", "il"]),
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第2页 / 共60页（总源码10673行，取自原第2页）
+------------------------------------------------------
+]
+
+
+def _brand_heuristic(title: str, filename: str, project_brand: str = "") -> str:
+    if project_brand:
+        return project_brand
+    hay = _norm((title or "") + " " + (filename or ""))
+    for brand, keys in _BRAND_RULES:
+        for k in keys:
+            if _norm(k) in hay:
+                return brand
+    return ""
+
+
+def _manual_core(title: str) -> str:
+    """从「项目说明书」标题中提取核心项目名（去方法/试剂盒/说明书/编号等外壳）。"""
+    t = title or ""
+    t = re.sub(r"[（(][^（）()]*[)）]", "", t)        # 去括号及内容（方法学）
+    t = re.sub(r"(测定|检测|定量)?试剂盒", "", t)
+    t = re.sub(r"(产品|中文)?说明书", "", t)
+    t = re.sub(r"投放版本", "", t)
+    t = re.sub(r"rev[\d.]*", "", t, flags=re.I)
+    t = re.sub(r"[A-Za-z]\d{3,}", "", t)              # 去货号（如 C22593 / A16369）
+    t = re.sub(r"[—\-–\s/]+", "", t)
+    t = re.sub(r"^[0-9]+", "", t)                     # 去开头序号
+    return _norm(t)
+
+
+@router.get("/project-manuals")
+def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """返回全部「项目说明书」文档，并归一化匹配到项目查询(test_items)，
+    供项目卡片点击预览。每项含 linked_project（关联项目名）与 brand（品牌）。"""
+    items = db.query(TestItem.id, TestItem.name, TestItem.aliases, TestItem.brand).all()
+    index = []
+    for _tid, name, aliases, brand in items:
+        keys = {_norm(name)}
+        for part in re.split(r"[、,，/]", name):
+            p = part.strip()
+            if p:
+                keys.add(_norm(p))
+        if aliases:
+            for seg in aliases.replace("，", ",").split(","):
+                seg = seg.strip()
+                if seg:
+                    keys.add(_norm(seg))
+        index.append({"oname": name or "", "nname": _norm(name), "brand": brand or "", "keys": keys})
+
+    docs = (
+        db.query(Document.id, Document.title, Document.original_filename)
+        .filter(Document.category == "项目说明书")
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第3页 / 共60页（总源码10673行，取自原第3页）
+------------------------------------------------------
+        .all()
+    )
+    out = []
+    for did, title, fn in docs:
+        core = _manual_core(title)
+        best = None
+        if core:
+            core_nh = core.replace("-", "")
+            # 1) 精确命中 名称/别名（含拆分片段）：如「磷」「pct」「高敏肌钙蛋白I」
+            for it in index:
+                if core in it["keys"]:
+                    best = it
+                    break
+            # 2) 子串匹配：仅允许较长 key，避免「钙/磷/pc」等过短别名被长词误含
+            if not best:
+                for it in index:
+                    for k in it["keys"]:
+                        if len(k) < 3 or len(core) < 3:
+                            continue
+                        k_nh = k.replace("-", "")
+                        if core in k or k in core or core_nh in k_nh or k_nh in core_nh:
+                            best = it
+                            break
+                    if best:
+                        break
+        linked = best["oname"] if best else None
+        linked_brand = best["brand"] if best else ""
+        brand = _brand_heuristic(title, fn, linked_brand)
+        ext = (fn or title or "").split(".")[-1].lower()
+        out.append({
+            "id": did,
+            "title": title,
+            "brand": brand,
+            "linked_project": linked,
+            "ext": ext,
+            "is_pdf": ext == "pdf",
+        })
+    out.sort(key=lambda x: (x["linked_project"] is None, x["linked_project"] or "", x["title"]))
+    return out
+
+# 文档头元数据字段（与 Document 模型属性一一对应）
+META_FIELDS = [
+    "doc_number", "doc_version", "revision", "author", "reviewer",
+    "approver", "issued_date", "audit_date", "approve_date",
+    "effective_date", "meta_raw",
+]
+
+
+def _strip_title_prefix(name: str) -> str:
+    """去掉标题开头的文件编号前缀，仅保留正文标题：
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第4页 / 共60页（总源码10673行，取自原第4页）
+------------------------------------------------------
+    1) 体系编号前缀：BG-KS-GL-076- / MHZYY-JYK-SM-SOP-572-
+    2) 文件序号前缀：101  / 001 / 2,A16369 / 011（数字+分隔符或正文）
+    3) 文件扩展名：.docx / .pdf 等
+    无前缀或纯中文时原样返回。"""
+    if not name:
+        return name
+    # 去掉扩展名
+    name = re.sub(r"\.[a-zA-Z0-9]+$", "", name)
+    # 体系编号前缀（大写字母/数字，连字符分隔，以连字符结尾）
+    name = re.sub(r"^[A-Z0-9]+(?:-[A-Z0-9]+)+-", "", name).strip()
+    # 文件序号前缀（数字 + 可选分隔符 空格/逗号/点/连字符，或紧跟正文）
+    name = re.sub(r"^\d+[\s,，.\-]*", "", name).strip()
+    # 结尾残留分隔符
+    name = re.sub(r"[\s\-–—]+$", "", name)
+    return name or name
+
+
+def _apply_meta(obj, meta: dict):
+    """把解析到的文件头元数据写入对象（只写入非空字段，避免覆盖已有值）。"""
+    for k in META_FIELDS:
+        v = meta.get(k)
+        if v:
+            setattr(obj, k, v)
+
+
+def _log_change(db: Session, doc, change_type: str, operator: str):
+    """写入一条文件更改日志（新增 / 修改 / 作废）。doc 可为已删除对象（属性仍可读取）。"""
+    db.add(
+        FileChangeLog(
+            doc_id=doc.id if doc else None,
+            file_name=doc.title if doc else "",
+            file_code=(doc.doc_number or "") if doc else "",
+            change_type=change_type,
+            operator=operator,
+            change_date=datetime.now().date(),
+        )
+    )
+    db.commit()
+
+
+@router.get("")
+def list_documents(
+    request: Request,
+    page: int = 1,
+    page_size: int = 20,
+    q: str | None = None,
+    hide_invalid: bool = False,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第5页 / 共60页（总源码10673行，取自原第5页）
+------------------------------------------------------
+    params = dict(request.query_params)
+    query = db.query(Document).options(defer(Document.data))  # 列表不加载二进制字节（JSON 序列化会 UnicodeDecodeError）
+    if q:
+        query = query.filter(
+            Document.title.ilike(f"%{q}%")
+            | Document.original_filename.ilike(f"%{q}%")
+            | Document.doc_number.ilike(f"%{q}%")
+        )
+    cat = params.get("category")
+    if cat:
+        query = query.filter(Document.category == cat)
+    # 隐藏作废文件：仅保留非「作废」状态
+    if hide_invalid:
+        query = query.filter(Document.status != "作废")
+    # 作废状态排到最后，其余按编号自然序（作废在末、同状态下仍按编号从小到大）
+    query = query.order_by(
+        case((Document.status == "作废", 1), else_=0),
+        Document.doc_number,
+    )
+    return paginate(query, page, page_size)
+
+
+@router.get("/{doc_id}", response_model=DocumentRead)
+def get_document(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    d = db.query(Document).options(defer(Document.data)).filter(Document.id == doc_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="未找到文件")
+    return d
+
+
+@router.patch("/{doc_id}", response_model=DocumentRead, response_model_exclude={"data"})
+def update_document(
+    doc_id: int,
+    payload: DocumentUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "specialty_leader")),
+):
+    d = db.get(Document, doc_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="未找到文件")
+    if payload.category and payload.category not in DOC_CATEGORIES:
+        raise HTTPException(status_code=400, detail="文件分类不合法")
+    data = payload.model_dump(exclude_unset=True)
+    skip = {"id", "created_at", "updated_at", "file_path", "original_filename", "uploader", "version", "parent_id", "meta_raw"}
+    for k, v in data.items():
+        if k in skip:
+            continue
+        setattr(d, k, v)
+    d.updated_at = datetime.utcnow()
+    db.commit()
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第6页 / 共60页（总源码10673行，取自原第6页）
+------------------------------------------------------
+    db.refresh(d)
+    write_audit(db, user, "update", "documents", d.id, {"fields": list(data.keys())})
+    _log_change(db, d, "修改", user.full_name or user.username)
+    return d
+
+
+@router.post("/upload", response_model=DocumentRead, response_model_exclude={"data"}, status_code=201)
+def upload_document(
+    file: UploadFile = File(...),
+    title: str = Form(""),
+    category: str = Form("通用SOP"),
+    note: str = Form(""),
+    status: str = Form("生效"),
+    description: str = Form(""),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "specialty_leader")),
+):
+    if category not in DOC_CATEGORIES:
+        raise HTTPException(status_code=400, detail="文件分类不合法")
+    content = file.file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+    rel = storage.save("docs", file.filename or title or "file", content)
+    # 文件字节存 COS 云存储（不占 DB 内存），cloud_key 落库；磁盘仅兜底
+    cloud_key = None
+    if cos_storage.ready:
+        try:
+            cloud_key = cos_storage.save("documents", file.filename or title or "file", content)
+        except Exception as e:
+            pass  # COS 失败不阻塞上传，仍走磁盘 + LONGBLOB 兜底
+    # 解析文件头元数据（.docx 解析表头；.doc 用文件名兜底提取编号）
+    meta = parse_doc_metadata(str(storage.get_path(rel)), title or file.filename or "", category)
+    version = "1.0"
+    d = Document(
+        title=title or _strip_title_prefix(file.filename or "未命名"),
+        category=category,
+        version=version,
+        file_path=rel,
+        cloud_key=cloud_key,
+        data=content if not cloud_key else None,  # COS 成功后不再存 BLOB
+        original_filename=file.filename or "",
+        uploader=user.full_name or user.username,
+        status=status,
+        description=description,
+    )
+    _apply_meta(d, meta)
+    db.add(d)
+    db.commit()
+    db.refresh(d)
+    dv = DocumentVersion(document_id=d.id, version=version, file_path=rel, uploader=d.uploader, note=note or "初始版本")
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第7页 / 共60页（总源码10673行，取自原第7页）
+------------------------------------------------------
+    _apply_meta(dv, meta)
+    db.add(dv)
+    db.commit()
+    write_audit(db, user, "create", "documents", d.id, {"title": d.title, "category": category})
+    _log_change(db, d, "新增", user.full_name or user.username)
+    return d
+
+
+@router.post("/{doc_id}/new-version", response_model=DocumentRead, response_model_exclude={"data"})
+def new_version(
+    doc_id: int,
+    file: UploadFile = File(...),
+    note: str = Form(""),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "specialty_leader")),
+):
+    d = db.get(Document, doc_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="未找到文件")
+    content = file.file.read()
+    rel = storage.save("docs", file.filename or d.title, content)
+    # COS 上传
+    cloud_key = None
+    if cos_storage.ready:
+        try:
+            cloud_key = cos_storage.save("documents", file.filename or d.title or "file", content)
+        except Exception:
+            pass
+    # 解析新文件头元数据，覆盖文档当前元数据（空白字段保留旧值）
+    meta = parse_doc_metadata(str(storage.get_path(rel)), d.title or d.original_filename or "", d.category)
+    _apply_meta(d, meta)
+    try:
+        maj, minor = str(d.version).split(".")
+        new_ver = f"{maj}.{int(minor) + 1}"
+    except Exception:
+        new_ver = f"{d.version}.1"
+    d.version = new_ver
+    d.file_path = rel
+    d.cloud_key = cloud_key
+    d.data = content if not cloud_key else None
+    d.original_filename = file.filename or d.original_filename
+    d.updated_at = datetime.utcnow()
+    dv = DocumentVersion(document_id=d.id, version=new_ver, file_path=rel,
+                         cloud_key=cloud_key, data=content if not cloud_key else None,
+                         uploader=user.full_name or user.username, note=note)
+    _apply_meta(dv, meta)
+    db.add(dv)
+    db.commit()
+    db.refresh(d)
+    write_audit(db, user, "update", "documents", d.id, {"version": new_ver})
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第8页 / 共60页（总源码10673行，取自原第8页）
+------------------------------------------------------
+    _log_change(db, d, "修改", user.full_name or user.username)
+    return d
+
+
+@router.get("/{doc_id}/versions", response_model=list[DocumentVersionRead], response_model_exclude={"data"})
+def list_versions(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return (
+        db.query(DocumentVersion)
+        .options(defer(DocumentVersion.data))
+        .filter(DocumentVersion.document_id == doc_id)
+        .order_by(DocumentVersion.id.desc())
+        .all()
+    )
+
+
+def _content_disposition(disposition: str, filename: str) -> str:
+    """生成带 RFC5987 UTF-8 文件名的内容处置头（中文名安全）。
+    
+    旧版 filename="..." 仅支持 ASCII，非 ASCII 回退为 "download"；
+    真实文件名通过 RFC 5987 filename*=UTF-8''... 传递。
+    """
+    ascii_name = filename.encode("ascii", "ignore").decode("ascii") or "download"
+    return f'{disposition}; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(filename)}'
+
+
+def _get_file_bytes(d) -> bytes | None:
+    """从 COS → MySQL BLOB → 磁盘  顺序获取文件字节。"""
+    # 1) COS 云存储
+    if d.cloud_key and cos_storage.ready:
+        content = cos_storage.get_bytes(d.cloud_key)
+        if content:
+            return content
+    # 2) 遗留 MySQL LONGBLOB
+    if d.data:
+        return d.data
+    # 3) 本地磁盘兜底
+    if d.file_path:
+        p = storage.get_path(d.file_path)
+        if p.exists():
+            return p.read_bytes()
+    return None
+
+
+@router.get("/{doc_id}/download")
+def download(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    d = db.get(Document, doc_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="未找到文件")
+    fname = d.original_filename or f"doc-{doc_id}"
+
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第9页 / 共60页（总源码10673行，取自原第9页）
+------------------------------------------------------
+    # COS 有文件 → 重定向到临时签名 URL（不经过服务器转发，省带宽）
+    if d.cloud_key and cos_storage.ready:
+        cos_url = cos_storage.url(d.cloud_key, fname)
+        if cos_url:
+            return RedirectResponse(url=cos_url, status_code=302)
+
+    # 否则读取字节
+    content = _get_file_bytes(d)
+    if not content:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    return Response(
+        content, media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": _content_disposition("attachment", fname),
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/{doc_id}/preview")
+def preview(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    d = db.get(Document, doc_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="未找到文件")
+    fname = d.original_filename or f"doc-{doc_id}"
+    content = _get_file_bytes(d)
+    if not content:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    src = d.file_path or fname
+    suffix = src.rsplit(".", 1)[-1].lower() if "." in src else ""
+    media = {
+        "pdf": "application/pdf",
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "xls": "application/vnd.ms-excel",
+    }.get(suffix)
+    return Response(
+        content, media_type=media,
+        headers={
+            "Content-Disposition": _content_disposition("inline", fname),
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.post("/_backfill_data_from_disk")
+def backfill_data_from_disk(db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))):
+    """一次性迁移：把磁盘上现存的文件字节读入 MySQL LONGBLOB（data 列）。
+
+    用于「文档字节从本地盘迁移到数据库」的过渡：部署新代码（已加 data 列）后调用一次，
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第10页 / 共60页（总源码10673行，取自原第10页）
+--------------------------------------------------------
+    把当前仍在磁盘上的文件固化进 DB，从此与容器生命周期解耦。幂等：已写过的不重复写。
+    磁盘已丢失的文件（data 保持 NULL）需用户重新上传。
+    分批小事务提交，规避 wait_timeout / 大 BLOB 单包超时（2013 Lost connection）。
+    """
+    try:
+        # net_write_timeout 已由 engine connect 事件全局放宽（CloudBase 默认 60s 易 2013）；
+        # 此处再补一次，双保险。
+        try:
+            db.execute(text("SET SESSION net_write_timeout=28800"))
+            db.execute(text("SET SESSION net_read_timeout=28800"))
+        except Exception:  # noqa: BLE001
+            pass
+        doc_done = 0
+        doc_skipped = 0
+        ver_done = 0
+        ver_skipped = 0
+        ver_failed = []
+
+        # 单会话 + 逐条提交 + 失败跳过：既不冲垮连接池，又能隔离单条大 BLOB 触发的
+        # 代理 60s 断连（2013）——失败仅跳过该记录，不影响其余。
+        docs = db.query(Document).all()
+        for d in docs:
+            if d.data is None and d.file_path:
+                p = storage.get_path(d.file_path)
+                if p.exists():
+                    try:
+                        d.data = p.read_bytes()
+                        db.commit()
+                        doc_done += 1
+                    except Exception:  # noqa: BLE001
+                        db.rollback()
+                        doc_skipped += 1
+                else:
+                    doc_skipped += 1
+            else:
+                doc_skipped += 1
+
+        vers = db.query(DocumentVersion).all()
+        for v in vers:
+            if v.data is None and v.file_path:
+                p = storage.get_path(v.file_path)
+                if p.exists():
+                    try:
+                        v.data = p.read_bytes()
+                        db.commit()
+                        ver_done += 1
+                    except Exception:  # noqa: BLE001
+                        db.rollback()
+                        ver_failed.append(v.id)
+                        ver_skipped += 1
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第11页 / 共60页（总源码10673行，取自原第11页）
+--------------------------------------------------------
+                else:
+                    ver_skipped += 1
+            else:
+                ver_skipped += 1
+
+        return {
+            "ok": True,
+            "documents_written": doc_done,
+            "documents_skipped": doc_skipped,
+            "versions_written": ver_done,
+            "versions_skipped": ver_skipped,
+            "versions_failed": ver_failed[:50],
+        }
+    except Exception as e:  # noqa: BLE001
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return {"ok": False, "error": str(e)[:500]}
+
+
+@router.post("/_migrate_to_cos")
+def migrate_to_cos(db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))):
+    """把 MySQL LONGBLOB（data 列）中的文件字节迁移到 COS 云存储。
+
+    成功后：cloud_key 记 COS 对象键，data 置 NULL（释放 DB 内存）。
+    已迁移的不重复。分批小事务，单条失败跳过不影响其余。
+    """
+    if not cos_storage.ready:
+        raise HTTPException(status_code=400, detail="COS 云存储未配置，请先设置环境变量")
+    try:
+        doc_migrated = 0
+        doc_skipped = 0
+        doc_failed = 0
+        ver_migrated = 0
+        ver_skipped = 0
+        ver_failed = 0
+        doc_errs = []
+        ver_errs = []
+
+        # 分批 yield 处理 documents（一次性 all() 会撑爆内存）
+        BATCH = 20
+        doc_q = db.query(Document).filter(Document.data.isnot(None), Document.cloud_key.is_(None))
+        for d in doc_q.yield_per(BATCH):
+            try:
+                key = cos_storage.save("documents", d.original_filename or f"doc-{d.id}", d.data)
+                d.cloud_key = key
+                d.data = None
+                db.commit()
+                doc_migrated += 1
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第12页 / 共60页（总源码10673行，取自原第12页）
+--------------------------------------------------------
+            except Exception as e:
+                db.rollback()
+                db.refresh(d)  # 重新 attach，避免后续循环 stale
+                doc_failed += 1
+                if len(doc_errs) < 5:
+                    doc_errs.append(f"doc#{d.id}: {type(e).__name__}: {str(e)[:200]}")
+        doc_skipped = db.query(Document).filter(Document.cloud_key.isnot(None)).count()
+
+        # 分批 yield 处理 versions
+        ver_q = db.query(DocumentVersion).filter(DocumentVersion.data.isnot(None), DocumentVersion.cloud_key.is_(None))
+        for v in ver_q.yield_per(BATCH):
+            try:
+                key = cos_storage.save("document_versions", f"v{v.id}", v.data)
+                v.cloud_key = key
+                v.data = None
+                db.commit()
+                ver_migrated += 1
+            except Exception as e:
+                db.rollback()
+                db.refresh(v)
+                ver_failed += 1
+                if len(ver_errs) < 5:
+                    ver_errs.append(f"ver#{v.id}: {type(e).__name__}: {str(e)[:200]}")
+        ver_skipped = db.query(DocumentVersion).filter(DocumentVersion.cloud_key.isnot(None)).count()
+
+        return {
+            "ok": True,
+            "documents_migrated": doc_migrated,
+            "documents_already_in_cos": doc_skipped,
+            "documents_failed": doc_failed,
+            "versions_migrated": ver_migrated,
+            "versions_already_in_cos": ver_skipped,
+            "versions_failed": ver_failed,
+            "sample_errors": doc_errs + ver_errs,
+        }
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return {"ok": False, "error": str(e)[:500]}
+
+
+@router.delete("/{doc_id}")
+def delete_document(
+    doc_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "specialty_leader")),
+):
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第13页 / 共60页（总源码10673行，取自原第13页）
+--------------------------------------------------------
+    d = db.get(Document, doc_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="未找到文件")
+    # 记录作废日志（删除前捕获名称/编码）
+    _log_change(db, d, "作废", user.full_name or user.username)
+    if d.file_path:
+        storage.delete(d.file_path)
+    db.delete(d)
+    db.commit()
+    write_audit(db, user, "delete", "documents", doc_id, "", request.client.host if request.client else None)
+    return {"ok": True}
+
+======================================================================
+# 文件: api/v1/training.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\training.py)
+======================================================================
+
+from ...core.crud_base import make_router
+from ...models.training import TrainingRecord
+from ...schemas import TrainingRecordCreate, TrainingRecordRead, TrainingRecordUpdate
+
+router = make_router(
+    TrainingRecord,
+    TrainingRecordRead,
+    TrainingRecordCreate,
+    TrainingRecordUpdate,
+    search_fields=["person", "title", "category", "organizer", "certificate_no"],
+    filter_fields=["category", "status", "person"],
+    prefix="/training-records",
+    write_roles=("admin", "training_manager"),
+)
+
+======================================================================
+# 文件: api/v1/education.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\education.py)
+======================================================================
+
+"""人员继教管理接口：六大子功能 CRUD + 通用附件（照片/签到扫描件/课件/通知/考题/效果评价等）。
+
+权限：写（增删改）需 admin 或 training_manager；读对所有登录用户开放。模块 key 沿用 'training'。
+"""
+import json
+import os
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
+
+from ...core.database import get_db
+from ...core.security import get_current_user, require_roles
+from ...models.education import (
+    PersonnelMaster, PersonnelEducation, PersonnelWorkExp, PersonnelCert, PersonnelReward, PersonnelEduExp,
+    NewEmployeeTrain, NewEmployeeCertAuth,
+    CompetencyAssessment, PersonnelComparison,
+    TrainingPlan, TrainingSession,
+    InternshipMentor, InternshipScore,
+    EducationAttachment,
+)
+from ...models.user import User
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第14页 / 共60页（总源码10673行，取自原第14页）
+--------------------------------------------------------
+from ...core.crud_base import make_router
+from ...core.cos_storage import cos_storage
+from ...services.attachment_compress import optimize_image_bytes
+from ...schemas.education import (
+    PersonnelMasterCreate, PersonnelMasterUpdate, PersonnelMasterRead,
+    PersonnelEducationCreate, PersonnelEducationUpdate, PersonnelEducationRead,
+    PersonnelWorkExpCreate, PersonnelWorkExpUpdate, PersonnelWorkExpRead,
+    PersonnelCertCreate, PersonnelCertUpdate, PersonnelCertRead,
+    PersonnelRewardCreate, PersonnelRewardUpdate, PersonnelRewardRead,
+    PersonnelEduExpCreate, PersonnelEduExpUpdate, PersonnelEduExpRead,
+    NewEmployeeTrainCreate, NewEmployeeTrainUpdate, NewEmployeeTrainRead,
+    NewEmployeeCertAuthCreate, NewEmployeeCertAuthUpdate, NewEmployeeCertAuthRead,
+    CompetencyAssessmentCreate, CompetencyAssessmentUpdate, CompetencyAssessmentRead,
+    PersonnelComparisonCreate, PersonnelComparisonUpdate, PersonnelComparisonRead,
+    TrainingPlanCreate, TrainingPlanUpdate, TrainingPlanRead,
+    TrainingSessionCreate, TrainingSessionUpdate, TrainingSessionRead,
+    InternshipMentorCreate, InternshipMentorUpdate, InternshipMentorRead,
+    InternshipScoreCreate, InternshipScoreUpdate, InternshipScoreRead,
+    EducationAttachmentRead,
+)
+
+WRITE = require_roles("admin", "training_manager")
+
+router = APIRouter(prefix="/education", tags=["education"])
+
+# A. 人员档案主表 + 5 张子表
+personnel_router = make_router(
+    PersonnelMaster, PersonnelMasterRead, PersonnelMasterCreate, PersonnelMasterUpdate,
+    search_fields=["name", "title", "position", "group_duty"],
+    filter_fields=["gender", "title", "political_status"],
+    order_by=[PersonnelMaster.name],
+    prefix="/personnel", write_roles=("admin", "training_manager"),
+)
+edu_router = make_router(
+    PersonnelEducation, PersonnelEducationRead, PersonnelEducationCreate, PersonnelEducationUpdate,
+    filter_fields=["person_id"], prefix="/personnel-education", write_roles=("admin", "training_manager"),
+)
+work_router = make_router(
+    PersonnelWorkExp, PersonnelWorkExpRead, PersonnelWorkExpCreate, PersonnelWorkExpUpdate,
+    filter_fields=["person_id"], prefix="/personnel-work-exp", write_roles=("admin", "training_manager"),
+)
+cert_router = make_router(
+    PersonnelCert, PersonnelCertRead, PersonnelCertCreate, PersonnelCertUpdate,
+    filter_fields=["person_id"], prefix="/personnel-certs", write_roles=("admin", "training_manager"),
+)
+reward_router = make_router(
+    PersonnelReward, PersonnelRewardRead, PersonnelRewardCreate, PersonnelRewardUpdate,
+    filter_fields=["person_id", "reward_type"], prefix="/personnel-rewards", write_roles=("admin", "training_manager"),
+)
+edu_exp_router = make_router(
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第15页 / 共60页（总源码10673行，取自原第15页）
+--------------------------------------------------------
+    PersonnelEduExp, PersonnelEduExpRead, PersonnelEduExpCreate, PersonnelEduExpUpdate,
+    filter_fields=["person_id"], prefix="/personnel-edu-exp", write_roles=("admin", "training_manager"),
+)
+
+# B. 新员工培训 + 独立上岗认证
+new_emp_router = make_router(
+    NewEmployeeTrain, NewEmployeeTrainRead, NewEmployeeTrainCreate, NewEmployeeTrainUpdate,
+    search_fields=["name", "employee_category", "train_major"],
+    filter_fields=["employee_category", "status", "person_id"],
+    order_by=[NewEmployeeTrain.id.desc()],
+    prefix="/new-employee-trains", write_roles=("admin", "training_manager"),
+    json_fields=["plan_items", "detail_json"],
+)
+cert_auth_router = make_router(
+    NewEmployeeCertAuth, NewEmployeeCertAuthRead, NewEmployeeCertAuthCreate, NewEmployeeCertAuthUpdate,
+    search_fields=["applicant", "apply_content"], filter_fields=["status", "person_id"],
+    order_by=[NewEmployeeCertAuth.id.desc()],
+    prefix="/cert-auths", write_roles=("admin", "training_manager"),
+)
+
+# C. 能力评估 + 人员比对
+competency_router = make_router(
+    CompetencyAssessment, CompetencyAssessmentRead, CompetencyAssessmentCreate, CompetencyAssessmentUpdate,
+    search_fields=["name", "post", "department"], filter_fields=["year", "department", "person_id"],
+    order_by=[CompetencyAssessment.id.desc()],
+    prefix="/competency-assessments", write_roles=("admin", "training_manager"),
+    json_fields=["scores_json"],
+)
+comparison_router = make_router(
+    PersonnelComparison, PersonnelComparisonRead, PersonnelComparisonCreate, PersonnelComparisonUpdate,
+    search_fields=["project", "method", "reagent"], filter_fields=["year", "specialty_group", "department"],
+    order_by=[PersonnelComparison.id.desc()],
+    prefix="/personnel-comparisons", write_roles=("admin", "training_manager"),
+    json_fields=["sample_nos", "results_json"],
+)
+
+# D/E/F. 培训计划 / 培训记录 / 实习带教
+plan_router = make_router(
+    TrainingPlan, TrainingPlanRead, TrainingPlanCreate, TrainingPlanUpdate,
+    filter_fields=["year"], order_by=[TrainingPlan.year.desc()],
+    prefix="/training-plans", write_roles=("admin", "training_manager"),
+    json_fields=["items_json"],
+)
+session_router = make_router(
+    TrainingSession, TrainingSessionRead, TrainingSessionCreate, TrainingSessionUpdate,
+    search_fields=["name", "teacher", "tag"], filter_fields=["tag", "plan_id"],
+    order_by=[TrainingSession.id.desc()],
+    prefix="/training-sessions", write_roles=("admin", "training_manager"),
+    json_fields=["sign_in_header"],
+)
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第16页 / 共60页（总源码10673行，取自原第16页）
+--------------------------------------------------------
+mentor_router = make_router(
+    InternshipMentor, InternshipMentorRead, InternshipMentorCreate, InternshipMentorUpdate,
+    search_fields=["intern_name", "sop_ref"], filter_fields=["intern_type"],
+    order_by=[InternshipMentor.id.desc()],
+    prefix="/internship-mentors", write_roles=("admin", "training_manager"),
+    json_fields=["items_json"],
+)
+score_router = make_router(
+    InternshipScore, InternshipScoreRead, InternshipScoreCreate, InternshipScoreUpdate,
+    search_fields=["intern_name"], filter_fields=["intern_type"],
+    order_by=[InternshipScore.id.desc()],
+    prefix="/internship-scores", write_roles=("admin", "training_manager"),
+    json_fields=["subjects_json"],
+)
+
+router.include_router(personnel_router)
+router.include_router(edu_router)
+router.include_router(work_router)
+router.include_router(cert_router)
+router.include_router(reward_router)
+router.include_router(edu_exp_router)
+router.include_router(new_emp_router)
+router.include_router(cert_auth_router)
+router.include_router(competency_router)
+router.include_router(comparison_router)
+router.include_router(plan_router)
+router.include_router(session_router)
+router.include_router(mentor_router)
+router.include_router(score_router)
+
+
+# =========================================================================
+# 附件：照片 / 签到扫描件 / 课件 / 通知 / 考题 / 效果评价 等
+# （独立挂载到顶层 api_router，避免被 /education 前缀二次包裹）
+# =========================================================================
+attach_router = APIRouter(prefix="/education-attachments", tags=["education-attachments"])
+
+_IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp", "bmp"}
+_PDF_EXTS = {"pdf"}
+_DOC_EXTS = {"doc", "docx", "xls", "xlsx", "csv", "ppt", "pptx"}
+
+
+def _classify_ext(ext: str) -> str:
+    e = (ext or "").lstrip(".").lower()
+    if e in _IMAGE_EXTS:
+        return "image"
+    if e in _PDF_EXTS:
+        return "pdf"
+    if e in _DOC_EXTS:
+        return "doc"
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第17页 / 共60页（总源码10673行，取自原第17页）
+--------------------------------------------------------
+    return "other"
+
+
+def _ser_attachment(a: EducationAttachment) -> dict:
+    return {
+        "id": a.id, "owner_type": a.owner_type, "owner_id": a.owner_id, "kind": a.kind,
+        "file_type": a.file_type, "original_name": a.original_name, "size_bytes": a.size_bytes,
+        "uploaded_by": a.uploaded_by,
+        "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
+    }
+
+
+@attach_router.get("/{owner_type}/{owner_id}")
+def list_attachments(
+    owner_type: str, owner_id: int, kind: str | None = None,
+    db: Session = Depends(get_db), user: User = Depends(get_current_user),
+):
+    q = db.query(EducationAttachment).filter_by(owner_type=owner_type, owner_id=owner_id)
+    if kind:
+        q = q.filter_by(kind=kind)
+    items = q.order_by(EducationAttachment.id.desc()).all()
+    return {"items": [_ser_attachment(a) for a in items], "total": len(items)}
+
+
+@attach_router.post("/{owner_type}/{owner_id}", status_code=201)
+async def upload_attachments(
+    owner_type: str, owner_id: int, kind: str = "other",
+    files: list[UploadFile] = File(...),
+    db: Session = Depends(get_db), user: User = Depends(WRITE),
+):
+    out = []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        ext = os.path.splitext(f.filename)[1] or ""
+        safe = f"{owner_type}_{owner_id}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{len(out)}{ext}"
+        content = await f.read()
+        ft = _classify_ext(ext)
+        if ft == "image":
+            content = optimize_image_bytes(content, ext)
+        cloud_key = None
+        if cos_storage.ready:
+            try:
+                cloud_key = cos_storage.save("education_attachments", f.filename or safe, content)
+            except Exception:
+                pass
+        a = EducationAttachment(
+            owner_type=owner_type, owner_id=owner_id, kind=kind,
+            file_type=ft, original_name=f.filename, stored_name=safe, rel_path="",
+            cloud_key=cloud_key, data=content if not cloud_key else None,
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第18页 / 共60页（总源码10673行，取自原第18页）
+--------------------------------------------------------
+            size_bytes=len(content), uploaded_by=user.username,
+        )
+        db.add(a)
+        out.append(a)
+    try:
+        db.commit()
+    except Exception as e:  # noqa: BLE001
+        db.rollback()
+        msg = str(e)
+        if "max_allowed_packet" in msg or "packet bigger" in msg:
+            raise HTTPException(413, "文件过大：超过数据库单包大小限制(max_allowed_packet)。请压缩后再上传。")
+        raise
+    for a in out:
+        db.refresh(a)
+    return {"items": [_ser_attachment(a) for a in out], "total": len(out)}
+
+
+@attach_router.get("/file/{aid}")
+def get_attachment(aid: int, inline: bool = True, db: Session = Depends(get_db),
+                   user: User = Depends(get_current_user)):
+    a = db.get(EducationAttachment, aid)
+    if not a:
+        raise HTTPException(404, "附件不存在")
+    if a.cloud_key and cos_storage.ready:
+        if not inline:
+            cos_url = cos_storage.url(a.cloud_key, a.original_name)
+            if cos_url:
+                return RedirectResponse(url=cos_url, status_code=302)
+        content = cos_storage.get_bytes(a.cloud_key)
+        if content:
+            media = _media_for(a)
+            disp = "inline" if inline else "attachment"
+            return Response(content, media_type=media,
+                            headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'})
+    if not a.data:
+        raise HTTPException(404, "文件已丢失")
+    media = _media_for(a)
+    disp = "inline" if inline else "attachment"
+    return Response(a.data, media_type=media,
+                    headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'})
+
+
+@attach_router.delete("/file/{aid}")
+def delete_attachment(aid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    a = db.get(EducationAttachment, aid)
+    if not a:
+        raise HTTPException(404, "附件不存在")
+    db.delete(a)
+    db.commit()
+    return {"ok": True}
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第19页 / 共60页（总源码10673行，取自原第19页）
+--------------------------------------------------------
+
+
+def _media_for(a: EducationAttachment) -> str:
+    if a.file_type == "image":
+        ext = os.path.splitext(a.stored_name)[1].lstrip(".").lower() or "jpeg"
+        return f"image/{ext}" if ext != "jpg" else "image/jpeg"
+    if a.file_type == "pdf":
+        return "application/pdf"
+    return "application/octet-stream"
+
+======================================================================
+# 文件: api/v1/scheduling.py  (D:\workbuddyprojects\网页版-生免速查工具\backend\app\api\v1\scheduling.py)
+======================================================================
+
+"""排班模块 API：岗位/计划/分配的 CRUD + 自动生成 + 排班表矩阵 + 我的今日 + 配置 + 单格录入。
+
+路由规划（均挂在 /api/v1 下）：
+- /scheduling/posts        岗位定义 CRUD（make_router）
+- /scheduling/plans        排班计划 CRUD（make_router）
+- /scheduling/assignments  每日分配 CRUD（make_router）
+- /scheduling/config       排班全局配置（GET/PUT，单行）
+- /scheduling/generate     自动生成排班（POST）
+- /scheduling/cell         手动录入/修改单个单元格（POST，upsert）
+- /scheduling/grid         排班表矩阵（GET，按 岗×日）
+- /scheduling/my-today     当前用户某日岗位（GET）
+
+自定义端点单独挂在 router（prefix=/scheduling），不与 assignments 的 /{item_id} 冲突。
+"""
+import logging
+from datetime import date, datetime, timedelta
+
+logger_swap = logging.getLogger("scheduling_swap")
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from ...core.crud_base import make_router
+from ...core.database import get_db
+from ...core.security import get_current_user, require_roles
+from ...models.scheduling import (
+    SchedulingPost,
+    SchedulingPlan,
+    SchedulingAssignment,
+    SchedulingConfig,
+    SchedulingSwapRequest,
+    SchedulingRestRequest,
+    POST_GROUP_DAY,
+    POST_GROUP_NIGHT,
+    POST_GROUP_SPECIAL,
+    ASSIGN_STATUS_ONDUTY,
+    ASSIGN_STATUS_REST,
+    ASSIGN_STATUS_ALL,
+    STATUS_CATEGORIES,
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第20页 / 共60页（总源码10673行，取自原第20页）
+--------------------------------------------------------
+    ASSIGN_STATUS_EARLY,
+    ASSIGN_STATUS_CONTINUOUS,
+    SWAP_STATUS_PENDING,
+    SWAP_STATUS_CONFIRMED,
+    SWAP_STATUS_REJECTED,
+    SWAP_STATUS_CANCELED,
+    REST_STATUS_ACTIVE,
+    REST_STATUS_CANCELED,
+)
+from ...models.user import User
+from ...models.notification import Notification
+from ...models.reminder import NotifyRecipient
+from ...services.serverchan_service import send_serverchan
+from ...core.config import SYSTEM_NAME, FRONTEND_ORIGIN
+from ...schemas import (
+    SchedulingPostCreate,
+    SchedulingPostRead,
+    SchedulingPostUpdate,
+    SchedulingPlanCreate,
+    SchedulingPlanRead,
+    SchedulingPlanUpdate,
+    SchedulingAssignmentCreate,
+    SchedulingAssignmentRead,
+    SchedulingAssignmentUpdate,
+    SchedulingConfigRead,
+    SchedulingGenerateRequest,
+    SchedulingCellRequest,
+    SchedulingBatchRequest,
+    SchedulingMergePlansRequest,
+    MyScheduleItem,
+    SchedulingSwapRequestCreate,
+    SchedulingSwapRequestRead,
+    SchedulingRestRequestCreate,
+    SchedulingRestRequestRead,
+)
+
+WRITE_ROLES = ("admin", "specialty_leader", "leader")
+
+posts_router = make_router(
+    SchedulingPost, SchedulingPostRead, SchedulingPostCreate, SchedulingPostUpdate,
+    search_fields=["name", "notes"],
+    filter_fields=["group", "required"],
+    order_by=[SchedulingPost.order, SchedulingPost.id],
+    prefix="/scheduling/posts",
+    write_roles=WRITE_ROLES,
+)
+
+plans_router = make_router(
+    SchedulingPlan, SchedulingPlanRead, SchedulingPlanCreate, SchedulingPlanUpdate,
+    search_fields=["name", "notes"],
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第21页 / 共60页（总源码10673行，取自原第21页）
+--------------------------------------------------------
+    order_by=[SchedulingPlan.id.desc()],
+    prefix="/scheduling/plans",
+    write_roles=WRITE_ROLES,
+)
+
+assignments_router = make_router(
+    SchedulingAssignment, SchedulingAssignmentRead, SchedulingAssignmentCreate, SchedulingAssignmentUpdate,
+    search_fields=["person", "note"],
+    filter_fields=["plan_id", "post_id", "status", "is_early", "is_continuous", "date"],
+    order_by=[SchedulingAssignment.date, SchedulingAssignment.post_id],
+    prefix="/scheduling/assignments",
+    write_roles=WRITE_ROLES,
+)
+
+router = APIRouter(prefix="/scheduling", tags=["scheduling"])
+
+
+def _daterange(start_str: str, end_str: str):
+    s = datetime.strptime(start_str, "%Y-%m-%d").date()
+    e = datetime.strptime(end_str, "%Y-%m-%d").date()
+    cur = s
+    while cur <= e:
+        yield cur
+        cur += timedelta(days=1)
+
+
+def _load_config(db: Session) -> SchedulingConfig:
+    cfg = db.get(SchedulingConfig, 1)
+    if not cfg:
+        cfg = SchedulingConfig(id=1)
+        db.add(cfg)
+        db.commit()
+        db.refresh(cfg)
+    return cfg
+
+
+def _pick_person(post: SchedulingPost, people: list, excluded: set, occupied: set,
+                 assigned_today: set, post_cursor: dict) -> str:
+    """为某岗挑一人：按固定岗优先人「优先级递减」排，除非该人当天不在岗（休息/病假/开会/行政/质控）
+    或已被排了别的岗，否则优先排他；都不可用才回退到通用池（轮换分散）。
+
+    与用户约定一致：preferred_people[0] 优先级最高，[1] 次之……不是轮转均摊。
+    """
+    for cand in (post.preferred_people or []):
+        if (cand and cand not in excluded and cand not in occupied
+                and cand not in assigned_today):
+            return cand
+    # 固定优先人均不在岗：回退通用池（轮换，避免总压同一个人）
+    pool = [x for x in people
+            if x and x not in excluded and x not in occupied and x not in assigned_today]
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第22页 / 共60页（总源码10673行，取自原第22页）
+--------------------------------------------------------
+    if not pool:
+        return ""
+    c = post_cursor.get(post.id, 0) % len(pool)
+    post_cursor[post.id] = c + 1
+    return pool[c]
+
+
+def generate_assignments(db: Session, plan: SchedulingPlan, people: list[str],
+                         start: str, end: str, config: SchedulingConfig) -> int:
+    """按规则自动生成每日分配。
+
+    规则（生免组，框架版）：
+    - 仅工作日（周一~周五）生成；周末/节假日另算（留空，手动录入）。
+    - 夜班岗（生化夜班/发热夜班，group=night）由科室提前录入，不自动生成。
+    - 白班岗按 preferred_people 顺序轮转；无优先人员时回退通用池。同人同日不重复占岗。
+    - 发热白班（is_fever_day）：若计划设了 fever_day_person，则该人每 4 个工作日上一班（当月固定一人），
+      且其仍参与普通白班轮转；未设则该岗按普通白班轮转。
+    - 既有「非在岗」记录（休息/病假/开会/行政/质控）受保护、不被覆盖，且占用该人当天名额。
+    - 早班/连班作为独立无岗位状态行生成：每人连上 2 天早班 → 退下连上 2 天连班，流水线轮转；
+      当天早班与连班必为不同人；自动排除当天休息/病假/开会/行政/质控/夜班/发热的人。
+    """
+    posts = db.query(SchedulingPost).order_by(SchedulingPost.order).all()
+    if not posts:
+        raise HTTPException(status_code=400, detail="请先在 /scheduling/posts 定义岗位")
+    day_posts = [p for p in posts if p.group in (POST_GROUP_DAY, POST_GROUP_SPECIAL)]
+    excluded = set(config.excluded_people or [])
+    people_pool = [p for p in people if p and p not in excluded]
+    if not people_pool:
+        raise HTTPException(status_code=400, detail="没有可用人员（可能被排除名单清空）")
+
+    existing = (
+        db.query(SchedulingAssignment)
+        .filter(SchedulingAssignment.plan_id == plan.id,
+                SchedulingAssignment.date >= start, SchedulingAssignment.date <= end)
+        .all()
+    )
+    post_by_id = {p.id: p for p in posts}
+    occupied: dict[str, set] = {}
+    protected_cells: set = set()
+    existing_on_duty: dict[tuple, SchedulingAssignment] = {}
+    for a in existing:
+        post = post_by_id.get(a.post_id) if a.post_id else None
+        is_night = post is not None and post.group == POST_GROUP_NIGHT
+        # 非在岗状态、或夜班岗的在岗记录，都视为当天被占用（不能排白班），且受保护不被覆盖。
+        if a.status != ASSIGN_STATUS_ONDUTY or is_night:
+            occupied.setdefault(a.date, set()).add(a.person)
+            protected_cells.add((a.date, a.post_id))
+        else:
+            existing_on_duty[(a.date, a.post_id)] = a
+
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第23页 / 共60页（总源码10673行，取自原第23页）
+--------------------------------------------------------
+    # 已通过换班完成早/连班义务的人（is_locked 记录）：下一轮生成时不再为他们排早/连班，
+    # 实现「系统记住换过班的人已经上过该班了」。锁定行本身受保护、不被下方删除/覆盖。
+    served_people: set = {
+        a.person for a in existing
+        if a.is_locked and a.person
+        and a.status in (ASSIGN_STATUS_EARLY, ASSIGN_STATUS_CONTINUOUS)
+    }
+
+    assignments: list[SchedulingAssignment] = []
+    post_cursor: dict[int, int] = {p.id: 0 for p in posts}
+    fever_day_idx = 0
+    fever_busy_by_date: dict[str, str] = {}  # 发热白班当天该人需排除出早班/连班
+
+    for cur in _daterange(start, end):
+        weekday = cur.weekday()
+        is_workday = weekday < 5
+        if not is_workday:
+            continue
+        date_str = cur.strftime("%Y-%m-%d")
+        day_people: list[str] = []
+        assigned_today: set = set()
+
+        # 发热白班（固定人，每4个工作日一班）
+        if plan.fever_day_person and plan.fever_day_person not in excluded:
+            fp = next((p for p in day_posts if p.is_fever_day), None)
+            if fp and (date_str, fp.id) not in protected_cells:
+                if fever_day_idx % 4 == 0:
+                    person = plan.fever_day_person
+                    if person not in occupied.get(date_str, set()) and person not in assigned_today:
+                        assignments.append(SchedulingAssignment(
+                            plan_id=plan.id, date=date_str, weekday=weekday, is_workday=True,
+                            post_id=fp.id, person=person, status=ASSIGN_STATUS_ONDUTY))
+                        assigned_today.add(person)
+                        day_people.append(person)
+                        fever_busy_by_date[date_str] = person
+                fever_day_idx += 1
+
+        # 普通白班岗（含周三质谱、周四电泳等）
+        needed = [p for p in day_posts
+                  if (p.only_weekday is None or p.only_weekday == weekday) and not p.is_fever_day]
+        needed.sort(key=lambda p: 0 if (p.required_weekday is not None and p.required_weekday == weekday) else 1)
+        for p in needed:
+            if (date_str, p.id) in protected_cells:
+                exist = existing_on_duty.get((date_str, p.id))
+                if exist:
+                    assigned_today.add(exist.person)
+                    day_people.append(exist.person)
+                continue
+            person = _pick_person(p, people_pool, excluded, occupied.get(date_str, set()),
+                                  assigned_today, post_cursor)
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第24页 / 共60页（总源码10673行，取自原第24页）
+--------------------------------------------------------
+            if not person:
+                continue
+            assignments.append(SchedulingAssignment(
+                plan_id=plan.id, date=date_str, weekday=weekday, is_workday=True,
+                post_id=p.id, person=person, status=ASSIGN_STATUS_ONDUTY))
+            assigned_today.add(person)
+            day_people.append(person)
+
+    # 早班 / 连班：作为独立的无岗位状态行生成（对齐用户 Excel 版式）。
+    # 流水线规则：每人连上 2 天早班 → 退下连上 2 天连班；下一人在其 早班 期间顶上。
+    # 故 early_seq[i]=roster[(i//2)%n]，连班=早班序列整体后移 2 天（当天早班与连班必不同人）。
+    # 自动排除当天休息/病假/开会/行政/质控/夜班/发热的人；以及「不参与早班/连班」名单中的人
+    # （这些人仍正常排白班，只是不排早班/连班）。
+    ec_excluded = set(config.early_continuous_excluded or [])
+    shift_pool = [p for p in people_pool if p not in ec_excluded]
+    if shift_pool and len(shift_pool) >= 2:
+        roster = list(shift_pool)
+        workdays = [cur for cur in _daterange(start, end) if cur.weekday() < 5]
+        early_seq = [roster[(i // 2) % len(roster)] for i in range(len(workdays))]
+        cont_seq = [roster[((i - 2) // 2) % len(roster)] for i in range(len(workdays))]
+        early_assigns: list[SchedulingAssignment] = []
+        for i, cur in enumerate(workdays):
+            date_str = cur.strftime("%Y-%m-%d")
+            busy = occupied.get(date_str, set())
+            if date_str in fever_busy_by_date:  # 发热白班当天该人排除出早班/连班
+                busy = busy | {fever_busy_by_date[date_str]}
+            e = early_seq[i]
+            c = cont_seq[i]
+            # 早班人当天不在岗、或已通过换班完成早/连班义务，则顺延到下一位
+            if e in busy or e in served_people:
+                for k in range(1, len(roster)):
+                    cand = roster[(i // 2 + k) % len(roster)]
+                    if cand not in busy and cand not in served_people:
+                        e = cand
+                        break
+            # 连班人当天不在岗、已换班完成义务，或和早班撞同一个人，则顺延到下一位（保证不同人）
+            if c in busy or c in served_people or c == e:
+                for k in range(1, len(roster)):
+                    cand = roster[((i - 2) // 2 + k) % len(roster)]
+                    if cand not in busy and cand not in served_people and cand != e:
+                        c = cand
+                        break
+            if e and e not in busy and e not in served_people:
+                early_assigns.append(SchedulingAssignment(
+                    plan_id=plan.id, date=date_str, weekday=cur.weekday(), is_workday=True,
+                    post_id=None, person=e, status=ASSIGN_STATUS_EARLY))
+            if c and c not in busy and c not in served_people and c != e:
+                early_assigns.append(SchedulingAssignment(
+                    plan_id=plan.id, date=date_str, weekday=cur.weekday(), is_workday=True,
+                    post_id=None, person=c, status=ASSIGN_STATUS_CONTINUOUS))
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第25页 / 共60页（总源码10673行，取自原第25页）
+--------------------------------------------------------
+
+    # 先删范围内「在岗」自动记录，以及旧的早班/连班状态行（保留手动录入的休息/病假/质控等），再写入新生成
+    db.query(SchedulingAssignment).filter(
+        SchedulingAssignment.plan_id == plan.id,
+        SchedulingAssignment.date >= start,
+        SchedulingAssignment.date <= end,
+        SchedulingAssignment.status == ASSIGN_STATUS_ONDUTY,
+    ).delete(synchronize_session=False)
+    db.query(SchedulingAssignment).filter(
+        SchedulingAssignment.plan_id == plan.id,
+        SchedulingAssignment.date >= start,
+        SchedulingAssignment.date <= end,
+        SchedulingAssignment.status.in_([ASSIGN_STATUS_EARLY, ASSIGN_STATUS_CONTINUOUS]),
+        SchedulingAssignment.is_locked == False,  # 换班锁定的行受保护，保留不被覆盖
+    ).delete(synchronize_session=False)
+    db.add_all(assignments)
+    if shift_pool and len(shift_pool) >= 2:
+        db.add_all(early_assigns)
+    db.commit()
+    return len(assignments) + (len(early_assigns) if (shift_pool and len(shift_pool) >= 2) else 0)
+
+
+@router.post("/generate")
+def generate(req: SchedulingGenerateRequest, db: Session = Depends(get_db),
+             user: User = Depends(require_roles(*WRITE_ROLES))):
+    plan = db.get(SchedulingPlan, req.plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="排班计划不存在")
+    config = _load_config(db)
+    people = req.people
+    if not people:
+        people = [
+            (u.full_name or u.username)
+            for u in db.query(User).filter(User.is_active == True).all()  # noqa: E712
+        ]
+    start = req.start or plan.start_date
+    if not start:
+        raise HTTPException(status_code=400, detail="缺少开始日期（计划未设起止且请求未提供）")
+    if req.days:
+        end = (datetime.strptime(start, "%Y-%m-%d").date() + timedelta(days=req.days - 1)).strftime("%Y-%m-%d")
+    else:
+        end = req.end or plan.end_date
+    if not end:
+        raise HTTPException(status_code=400, detail="缺少结束日期（计划未设起止且请求未提供）")
+    count = generate_assignments(db, plan, people, start, end, config)
+    return {"ok": True, "generated": count}
+
+
+@router.post("/merge-plans")
+def merge_plans(req: SchedulingMergePlansRequest, db: Session = Depends(get_db),
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第26页 / 共60页（总源码10673行，取自原第26页）
+--------------------------------------------------------
+                user: User = Depends(require_roles("admin"))):
+    """一次性运维：把 source 计划下的全部分配行 plan_id 改写到 target，不动行数据，source 计划保留。
+
+    用于排班计划弱化后，把历史计划(如 2026-7 / 2026-8)的数据归并到默认「主班表」，
+    使其在月视图直接可见。重复调用幂等（已归属 target 的行不会被重复处理）。
+    """
+    target = db.get(SchedulingPlan, req.target_plan_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="目标排班计划不存在")
+    sources = [s for s in req.source_plan_ids if s != req.target_plan_id]
+    if not sources:
+        raise HTTPException(status_code=400, detail="没有可归并的源计划")
+    n = (
+        db.query(SchedulingAssignment)
+        .filter(SchedulingAssignment.plan_id.in_(sources))
+        .update({SchedulingAssignment.plan_id: req.target_plan_id},
+                synchronize_session=False)
+    )
+    db.commit()
+    return {"ok": True, "migrated": n, "sources": sources, "target": req.target_plan_id}
+
+
+@router.get("/config", response_model=SchedulingConfigRead)
+def get_config(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return _load_config(db)
+
+
+@router.put("/config", response_model=SchedulingConfigRead)
+def put_config(payload: SchedulingConfigRead, db: Session = Depends(get_db),
+               user: User = Depends(require_roles(*WRITE_ROLES))):
+    cfg = _load_config(db)
+    cfg.excluded_people = payload.excluded_people or []
+    cfg.default_window_days = payload.default_window_days or 14
+    cfg.early_continuous_window_days = payload.early_continuous_window_days or 30
+    cfg.early_continuous_excluded = payload.early_continuous_excluded or []
+    cfg.notes = payload.notes or ""
+    db.commit()
+    db.refresh(cfg)
+    return cfg
+
+
+def _sync_early_continuous_rows(db: Session, plan_id: int, date_str: str, person: str,
+                                is_early: bool, is_continuous: bool):
+    """岗位行保存早班/连班标记后，同步创建或删除对应的无岗位状态行。
+
+    这样月视图里「早班」「连班」独立状态行会自动显示岗位行已标记人员，实现联动。
+    """
+    if not person:
+        return
+    for flag, status in ((is_early, ASSIGN_STATUS_EARLY), (is_continuous, ASSIGN_STATUS_CONTINUOUS)):
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第27页 / 共60页（总源码10673行，取自原第27页）
+--------------------------------------------------------
+        q = db.query(SchedulingAssignment).filter(
+            SchedulingAssignment.plan_id == plan_id,
+            SchedulingAssignment.date == date_str,
+            SchedulingAssignment.post_id.is_(None),
+            SchedulingAssignment.person == person,
+            SchedulingAssignment.status == status,
+        )
+        if flag:
+            if not q.first():
+                d = datetime.strptime(date_str, "%Y-%m-%d").date()
+                db.add(SchedulingAssignment(
+                    plan_id=plan_id, date=date_str, weekday=d.weekday(), is_workday=d.weekday() < 5,
+                    post_id=None, person=person, status=status,
+                    is_early=False, is_continuous=False, note="",
+                ))
+        else:
+            q.delete(synchronize_session=False)
+
+
+@router.post("/cell")
+def set_cell(req: SchedulingCellRequest, db: Session = Depends(get_db),
+             user: User = Depends(require_roles(*WRITE_ROLES))):
+    """手动录入/修改单个单元格（upsert）。
+    - 在岗：必须指定岗位(post_id)，按 (plan_id,date,post_id) 唯一。
+    - 休息/病假/开会/行政/质控/教学：post_id 可空，按 (plan_id,date,person,post_id IS NULL) 唯一（一人一天一条无岗位记录）。
+    用于夜班、发热门诊、休息等提前录入。
+    """
+    if req.status not in ASSIGN_STATUS_ALL:
+        raise HTTPException(status_code=400, detail=f"无效状态：{req.status}")
+    if not req.person:
+        raise HTTPException(status_code=400, detail="请指定人员")
+    if req.status == ASSIGN_STATUS_ONDUTY and req.post_id is None:
+        raise HTTPException(status_code=400, detail="在岗状态需指定岗位")
+    d = datetime.strptime(req.date, "%Y-%m-%d").date()
+    q = (
+        db.query(SchedulingAssignment)
+        .filter(SchedulingAssignment.plan_id == req.plan_id,
+                SchedulingAssignment.date == req.date)
+    )
+    if req.post_id is not None:
+        q = q.filter(SchedulingAssignment.post_id == req.post_id)
+    else:
+        q = q.filter(SchedulingAssignment.post_id.is_(None), SchedulingAssignment.person == req.person)
+    exist = q.first()
+    if exist:
+        exist.post_id = req.post_id
+        exist.person = req.person
+        exist.status = req.status
+        exist.is_early = req.is_early
+        exist.is_continuous = req.is_continuous
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第28页 / 共60页（总源码10673行，取自原第28页）
+--------------------------------------------------------
+        exist.note = req.note
+        exist.weekday = d.weekday()
+        exist.is_workday = d.weekday() < 5
+    else:
+        exist = SchedulingAssignment(
+            plan_id=req.plan_id, date=req.date, weekday=d.weekday(), is_workday=d.weekday() < 5,
+            post_id=req.post_id, person=req.person, status=req.status,
+            is_early=req.is_early, is_continuous=req.is_continuous, note=req.note,
+        )
+        db.add(exist)
+    # 岗位行保存早班/连班标记时，同步维护对应无岗位状态行，实现月视图联动
+    if req.post_id is not None and req.status == ASSIGN_STATUS_ONDUTY:
+        _sync_early_continuous_rows(db, req.plan_id, req.date, req.person, req.is_early, req.is_continuous)
+    db.commit()
+    db.refresh(exist)
+    return exist
+
+
+@router.post("/batch")
+def batch_set(req: SchedulingBatchRequest, db: Session = Depends(get_db),
+              user: User = Depends(require_roles(*WRITE_ROLES))):
+    """批量录入一批非白班约束（夜班、发热门诊、休息、病假……）。按 items 逐条 upsert，返回写入条数。
+
+    prune=True 时：
+    - prune_keys（[date, status]）把无岗位状态记录裁剪为提交人员集合（取消勾选即移除）。
+    - prune_post_keys（[date, str(post_id)]）把绑定岗位的录入（夜班/发热白班）裁剪为提交人员集合。
+    两者配合实现「矩阵整体保存」：单元格取消勾选即移除对应记录。
+    """
+    plan = db.get(SchedulingPlan, req.plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="排班计划不存在")
+
+    upserted = 0
+    # 提交人员按 (date, status) / (date, post_id) 归组，供 prune 比对
+    submitted: dict[tuple, set] = {}
+    submitted_posts: dict[tuple, set] = {}
+    for it in req.items:
+        if it.status not in ASSIGN_STATUS_ALL or not it.person:
+            continue
+        if it.status == ASSIGN_STATUS_ONDUTY and it.post_id is None:
+            continue
+        d = datetime.strptime(it.date, "%Y-%m-%d").date()
+        q = (
+            db.query(SchedulingAssignment)
+            .filter(SchedulingAssignment.plan_id == req.plan_id,
+                    SchedulingAssignment.date == it.date)
+        )
+        if it.post_id is not None:
+            q = q.filter(SchedulingAssignment.post_id == it.post_id)
+        else:
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第29页 / 共60页（总源码10673行，取自原第29页）
+--------------------------------------------------------
+            q = q.filter(SchedulingAssignment.post_id.is_(None), SchedulingAssignment.person == it.person)
+        exist = q.first()
+        if exist:
+            exist.status = it.status
+            exist.is_early = it.is_early
+            exist.is_continuous = it.is_continuous
+            exist.note = it.note
+            exist.weekday = d.weekday()
+            exist.is_workday = d.weekday() < 5
+            if it.post_id is not None:
+                exist.post_id = it.post_id
+        else:
+            db.add(SchedulingAssignment(
+                plan_id=req.plan_id, date=it.date, weekday=d.weekday(), is_workday=d.weekday() < 5,
+                post_id=it.post_id, person=it.person, status=it.status,
+                is_early=it.is_early, is_continuous=it.is_continuous, note=it.note))
+        upserted += 1
+        if it.post_id is None:
+            submitted.setdefault((it.date, it.status), set()).add(it.person)
+        else:
+            submitted_posts.setdefault((it.date, it.post_id), set()).add(it.person)
+    # prune：把 prune_keys 中列出的 (date, status) 裁剪为提交人员集合
+    if req.prune:
+        for key in req.prune_keys:
+            if len(key) != 2:
+                continue
+            date_s, status_s = key[0], key[1]
+            if status_s not in STATUS_CATEGORIES:
+                continue
+            keep = submitted.get((date_s, status_s), set())
+            q = (
+                db.query(SchedulingAssignment)
+                .filter(SchedulingAssignment.plan_id == req.plan_id,
+                        SchedulingAssignment.date == date_s,
+                        SchedulingAssignment.status == status_s,
+                        SchedulingAssignment.post_id.is_(None))
+            )
+            if keep:
+                q = q.filter(SchedulingAssignment.person.notin_(keep))
+            q.delete(synchronize_session=False)
+    # prune：岗位行(夜班/发热白班) 裁剪为提交人员集合
+    if req.prune:
+        for key in req.prune_post_keys:
+            if len(key) != 2:
+                continue
+            date_s, pid_s = key[0], key[1]
+            try:
+                pid = int(pid_s)
+            except (ValueError, TypeError):
+                continue
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第30页 / 共60页（总源码10673行，取自原第30页）
+--------------------------------------------------------
+            keep = submitted_posts.get((date_s, pid), set())
+            q = (
+                db.query(SchedulingAssignment)
+                .filter(SchedulingAssignment.plan_id == req.plan_id,
+                        SchedulingAssignment.date == date_s,
+                        SchedulingAssignment.post_id == pid,
+                        SchedulingAssignment.status == ASSIGN_STATUS_ONDUTY)
+            )
+            if keep:
+                q = q.filter(SchedulingAssignment.person.notin_(keep))
+            q.delete(synchronize_session=False)
+    db.commit()
+    return {"ok": True, "upserted": upserted}
+
+
+@router.get("/default-plan")
+def default_plan(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """返回默认排班计划（弱化 plan 概念用）：优先名「主班表」，否则取最小 id。前端月视图据此自动选计划。"""
+    plan = db.query(SchedulingPlan).filter(SchedulingPlan.name == "主班表").first()
+    if not plan:
+        plan = db.query(SchedulingPlan).order_by(SchedulingPlan.id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="尚未配置任何排班计划")
+    return {"id": plan.id, "name": plan.name, "start_date": plan.start_date, "end_date": plan.end_date,
+            "fever_day_person": plan.fever_day_person or ""}
+
+
+@router.get("/grid")
+def grid(plan_id: int = Query(...), start: str | None = None, end: str | None = None,
+         db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    plan = db.get(SchedulingPlan, plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="排班计划不存在")
+    s = start or plan.start_date
+    e = end or plan.end_date
+    if not s or not e:
+        raise HTTPException(status_code=400, detail="缺少日期范围")
+    posts = db.query(SchedulingPost).order_by(SchedulingPost.order).all()
+    # 展示顺序：白班 → 特殊岗 → 夜班
+    posts.sort(key=lambda p: (
+        0 if p.group == POST_GROUP_DAY else (1 if p.group == POST_GROUP_SPECIAL else 2),
+        p.order or 0,
+    ))
+    dates = [d.strftime("%Y-%m-%d") for d in _daterange(s, e)]
+    rows = (
+        db.query(SchedulingAssignment)
+        .filter(SchedulingAssignment.plan_id == plan_id,
+                SchedulingAssignment.date >= s, SchedulingAssignment.date <= e)
+        .all()
+    )
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第31页 / 共60页（总源码10673行，取自原第185页）
+---------------------------------------------------------
+        </el-form-item>
+        <el-form-item label="启用"><el-switch v-model="ruleForm.enabled" /></el-form-item>
+        <el-form-item label="提前天数"><el-input-number v-model="ruleForm.lead_days" :min="1" :max="365" /></el-form-item>
+        <el-form-item label="升级里程碑">
+          <el-input v-model="ruleForm.escalate_days_left" placeholder="如 14,7（剩余天数降到这些值时再发）" />
+        </el-form-item>
+        <template v-if="ruleForm.ref_kind === 'shift'">
+          <el-divider content-position="left">早/连班提醒时机（11:30 推送）</el-divider>
+          <el-form-item label="前一天 11:30">
+            <el-switch v-model="ruleForm.shift_send_prev_day" />
+            <div style="font-size:12px;color:#999;margin-top:4px">早班固定开启；连班建议开启（提前一天提醒准备）。</div>
+          </el-form-item>
+          <el-form-item label="当天 11:30">
+            <el-switch v-model="ruleForm.shift_send_same_day" />
+            <div style="font-size:12px;color:#999;margin-top:4px">连班当天上岗前再提醒一次；早班无需开启。</div>
+          </el-form-item>
+        </template>
+        <el-form-item label="范围字段">
+          <el-select v-model="ruleForm.scope_kind" style="width: 100%">
+            <el-option label="按专业组 group" value="group" />
+            <el-option label="全部 all" value="all" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="范围值">
+          <el-input v-model="ruleForm.scope_values" placeholder="质评填 生化,凝血 / 免疫；全部留空" />
+        </el-form-item>
+        <el-form-item label="备注"><el-input v-model="ruleForm.note" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showRule = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="onSubmitRule">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ServerChan 绑定无需二维码，SendKey 直接粘贴 -->
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed } from 'vue'
+import { Plus, Refresh } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  listRecipients, createRecipient, updateRecipient, deleteRecipient,
+  listRules, createRule, updateRule, deleteRule, runReminders, listSendLog,
+  getRecipientWxTest,
+} from '../api/reminders'
+import { testEmail } from '../api/notifications'
+
+const tab = ref('recipients')
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第32页 / 共60页（总源码10673行，取自原第186页）
+---------------------------------------------------------
+const recipients = ref([])
+const rules = ref([])
+const sendLog = ref([])
+const loadingR = ref(false)
+const loadingRule = ref(false)
+const loadingLog = ref(false)
+const submitting = ref(false)
+const running = ref(false)
+const testingMail = ref(false)
+const runResult = ref(null)
+const previewList = ref([])
+
+const categoryOptions = computed(() => rules.value.map(r => ({ value: r.category, label: r.label })))
+function categoryLabel(cat) {
+  const r = rules.value.find(x => x.category === cat)
+  return r ? r.label : cat
+}
+
+const showRecipient = ref(false)
+const editingRecipient = ref(null)
+const recipientForm = ref({ name: '', email: '', phone: '', wx_uid: '', channels: 'email', enabled: true, rule_categories: [], note: '' })
+const testWxLoading = ref(false)
+
+const showRule = ref(false)
+const editingRule = ref(null)
+const ruleForm = ref({ label: '', ref_kind: 'eqa', enabled: true, lead_days: 14, escalate_days_left: '7', scope_kind: 'group', scope_values: '', shift_send_prev_day: true, shift_send_same_day: true, note: '' })
+
+async function loadAll() {
+  loadingR.value = true; loadingRule.value = true
+  try {
+    recipients.value = await listRecipients()
+    rules.value = await listRules()
+  } catch {
+    ElMessage.error('加载失败')
+  } finally {
+    loadingR.value = false; loadingRule.value = false
+  }
+  await loadLog()
+}
+
+async function loadLog() {
+  loadingLog.value = true
+  try { sendLog.value = await listSendLog({ limit: 50 }) } catch {}
+  finally { loadingLog.value = false }
+}
+
+// 发送人
+function onAddRecipient() {
+  editingRecipient.value = null
+  recipientForm.value = { name: '', email: '', phone: '', channels: 'email', enabled: true, rule_categories: rules.value.map(r => r.category), note: '' }
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第33页 / 共60页（总源码10673行，取自原第187页）
+---------------------------------------------------------
+  showRecipient.value = true
+}
+function onEditRecipient(row) {
+  editingRecipient.value = row
+  recipientForm.value = { ...row, wx_uid: row.wx_uid || '', rule_categories: (row.rule_categories || '').split(',').filter(Boolean) }
+  showRecipient.value = true
+}
+async function onSubmitRecipient() {
+  if (!recipientForm.value.name) { ElMessage.warning('请填写姓名'); return }
+  const payload = { ...recipientForm.value, rule_categories: (recipientForm.value.rule_categories || []).join(',') }
+  submitting.value = true
+  try {
+    if (editingRecipient.value?.id) {
+      await updateRecipient(editingRecipient.value.id, payload)
+    } else {
+      await createRecipient(payload)
+    }
+    ElMessage.success('已保存')
+    showRecipient.value = false
+    await loadAll()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '保存失败')
+  } finally { submitting.value = false }
+}
+async function onToggleRecipient(row, v) {
+  try { await updateRecipient(row.id, { enabled: v }); ElMessage.success(v ? '已启用' : '已停用') }
+  catch { ElMessage.error('操作失败') }
+}
+async function onDeleteRecipient(row) {
+  try {
+    await ElMessageBox.confirm(`确认删除发送人 ${row.name}？`, '删除', { type: 'error' })
+    await deleteRecipient(row.id)
+    ElMessage.success('已删除')
+    await loadAll()
+  } catch (e) { if (e !== 'cancel') ElMessage.error('删除失败') }
+}
+
+// 微信(ServerChan)测试发送
+async function onTestWx() {
+  const id = editingRecipient.value?.id
+  if (!id) { ElMessage.warning('请先保存接收人再发送测试'); return }
+  if (!recipientForm.value.wx_uid) { ElMessage.warning('请先填写 ServerChan SendKey'); return }
+  testWxLoading.value = true
+  try {
+    await getRecipientWxTest(id)
+    ElMessage.success('测试微信已发送，请查看微信是否收到')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '发送失败')
+  } finally { testWxLoading.value = false }
+}
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第34页 / 共60页（总源码10673行，取自原第188页）
+---------------------------------------------------------
+
+// 提醒类型
+function onAddRule() {
+  editingRule.value = null
+  ruleForm.value = { label: '', ref_kind: 'eqa', enabled: true, lead_days: 14, escalate_days_left: '7', scope_kind: 'group', scope_values: '', shift_send_prev_day: true, shift_send_same_day: true, note: '' }
+  showRule.value = true
+}
+function onEditRule(row) {
+  editingRule.value = row
+  ruleForm.value = { ...row }
+  showRule.value = true
+}
+async function onSubmitRule() {
+  if (!ruleForm.value.label) { ElMessage.warning('请填写名称'); return }
+  submitting.value = true
+  try {
+    if (editingRule.value?.id) {
+      await updateRule(editingRule.value.id, ruleForm.value)
+    } else {
+      await createRule(ruleForm.value)
+    }
+    ElMessage.success('已保存')
+    showRule.value = false
+    await loadAll()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '保存失败')
+  } finally { submitting.value = false }
+}
+async function onToggleRule(row, v) {
+  try { await updateRule(row.id, { enabled: v }); ElMessage.success(v ? '已启用' : '已停用') }
+  catch { ElMessage.error('操作失败') }
+}
+async function onDeleteRule(row) {
+  try {
+    await ElMessageBox.confirm(`确认删除提醒类型 ${row.label}？`, '删除', { type: 'error' })
+    await deleteRule(row.id)
+    ElMessage.success('已删除')
+    await loadAll()
+  } catch (e) { if (e !== 'cancel') ElMessage.error('删除失败') }
+}
+
+// 执行
+async function onRun(dry) {
+  running.value = true
+  runResult.value = null
+  previewList.value = []
+  try {
+    const res = await runReminders({ dry_run: dry, as_of: '' })
+    runResult.value = res
+    previewList.value = res.planned || []
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第35页 / 共60页（总源码10673行，取自原第189页）
+---------------------------------------------------------
+    if (dry) ElMessage.success(`预览完成，计划发送 ${previewList.value.filter(p => p.will_send).length} 条`)
+    else ElMessage.success(`执行完成，成功发信 ${res.emails_sent} 人`)
+    await loadLog()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '执行失败')
+  } finally { running.value = false }
+}
+async function onTestMail() {
+  testingMail.value = true
+  try {
+    const res = await testEmail('815268425@qq.com')
+    if (res?.sent) ElMessage.success('测试邮件已发送，请查收 815268425@qq.com')
+    else ElMessage.warning('SMTP 未配置或发送失败：' + (res?.detail || ''))
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '发送失败')
+  } finally { testingMail.value = false }
+}
+
+onMounted(loadAll)
+</script>
+
+<style scoped>
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+.ec-tag { margin: 2px 4px 2px 0; }
+</style>
+
+======================================================================
+# 文件: api/documents.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\documents.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function listDocuments(params) {
+  return request.get('/api/v1/documents', { params })
+}
+export function getDocument(id) {
+  return request.get(`/api/v1/documents/${id}`)
+}
+export function updateDocument(id, data) {
+  return request.patch(`/api/v1/documents/${id}`, data)
+}
+export function uploadDocument(formData) {
+  return request.post('/api/v1/documents/upload', formData)
+}
+export function newVersion(docId, formData) {
+  return request.post(`/api/v1/documents/${docId}/new-version`, formData)
+}
+export function listVersions(docId) {
+  return request.get(`/api/v1/documents/${docId}/versions`)
+}
+export function deleteDocument(id) {
+  return request.delete(`/api/v1/documents/${id}`)
+}
+// 项目说明书 → 项目查询 关联（卡片预览用）
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第36页 / 共60页（总源码10673行，取自原第190页）
+---------------------------------------------------------
+export function listProjectManuals() {
+  return request.get('/api/v1/documents/project-manuals')
+}
+
+// 文件更改日志
+export function listChangeLogs(params) {
+  return request.get('/api/v1/change-logs', { params })
+}
+export function exportChangeLogs(params = {}) {
+  return request.get('/api/v1/change-logs/export', { params, responseType: 'blob' })
+}
+export function setChangeLogHandled(id, handled) {
+  return request.patch(`/api/v1/change-logs/${id}`, { handled })
+}
+
+// 下载/预览需要携带鉴权头，故用 axios 取 blob 再处理（直接 window.open 会被 401 拦截）
+// 追加时间戳 query 以绕过浏览器/代理对文件响应的缓存（避免预览到旧的/未转换文件）
+export async function fetchDocumentBlob(id, action = 'download') {
+  return request.get(`/api/v1/documents/${id}/${action}?_=${Date.now()}`, { responseType: 'blob' })
+}
+
+export function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || 'download'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export function previewBlob(blob) {
+  const url = URL.createObjectURL(blob)
+  window.open(url, '_blank')
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+
+======================================================================
+# 文件: api/training.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\training.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function listTraining(params) {
+  return request.get('/api/v1/training-records', { params })
+}
+export function createTraining(data) {
+  return request.post('/api/v1/training-records', data)
+}
+export function updateTraining(id, data) {
+  return request.put(`/api/v1/training-records/${id}`, data)
+}
+export function deleteTraining(id) {
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第37页 / 共60页（总源码10673行，取自原第191页）
+---------------------------------------------------------
+  return request.delete(`/api/v1/training-records/${id}`)
+}
+
+======================================================================
+# 文件: api/education.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\education.js)
+======================================================================
+
+import request from '../utils/request'
+
+const P = '/api/v1/education'
+
+// A. 人员档案
+export function listPersonnel(params) { return request.get(`${P}/personnel`, { params }) }
+export function getPersonnel(id) { return request.get(`${P}/personnel/${id}`) }
+export function createPersonnel(data) { return request.post(`${P}/personnel`, data) }
+export function updatePersonnel(id, data) { return request.put(`${P}/personnel/${id}`, data) }
+export function deletePersonnel(id) { return request.delete(`${P}/personnel/${id}`) }
+
+// 人员档案子表（按 person_id 过滤）
+export function listPersonnelChild(path, params) { return request.get(`${P}/${path}`, { params }) }
+export function createPersonnelChild(path, data) { return request.post(`${P}/${path}`, data) }
+export function updatePersonnelChild(path, id, data) { return request.put(`${P}/${path}/${id}`, data) }
+export function deletePersonnelChild(path, id) { return request.delete(`${P}/${path}/${id}`) }
+
+// B. 新员工培训 + 独立上岗认证
+export function listNewEmployee(params) { return request.get(`${P}/new-employee-trains`, { params }) }
+export function getNewEmployee(id) { return request.get(`${P}/new-employee-trains/${id}`) }
+export function createNewEmployee(data) { return request.post(`${P}/new-employee-trains`, data) }
+export function updateNewEmployee(id, data) { return request.put(`${P}/new-employee-trains/${id}`, data) }
+export function deleteNewEmployee(id) { return request.delete(`${P}/new-employee-trains/${id}`) }
+
+export function listCertAuth(params) { return request.get(`${P}/cert-auths`, { params }) }
+export function getCertAuth(id) { return request.get(`${P}/cert-auths/${id}`) }
+export function createCertAuth(data) { return request.post(`${P}/cert-auths`, data) }
+export function updateCertAuth(id, data) { return request.put(`${P}/cert-auths/${id}`, data) }
+export function deleteCertAuth(id) { return request.delete(`${P}/cert-auths/${id}`) }
+
+// C. 能力评估 + 人员比对
+export function listCompetency(params) { return request.get(`${P}/competency-assessments`, { params }) }
+export function getCompetency(id) { return request.get(`${P}/competency-assessments/${id}`) }
+export function createCompetency(data) { return request.post(`${P}/competency-assessments`, data) }
+export function updateCompetency(id, data) { return request.put(`${P}/competency-assessments/${id}`, data) }
+export function deleteCompetency(id) { return request.delete(`${P}/competency-assessments/${id}`) }
+
+export function listComparison(params) { return request.get(`${P}/personnel-comparisons`, { params }) }
+export function getComparison(id) { return request.get(`${P}/personnel-comparisons/${id}`) }
+export function createComparison(data) { return request.post(`${P}/personnel-comparisons`, data) }
+export function updateComparison(id, data) { return request.put(`${P}/personnel-comparisons/${id}`, data) }
+export function deleteComparison(id) { return request.delete(`${P}/personnel-comparisons/${id}`) }
+
+// D/E/F. 培训计划 / 培训记录 / 实习带教
+export function listTrainingPlan(params) { return request.get(`${P}/training-plans`, { params }) }
+export function getTrainingPlan(id) { return request.get(`${P}/training-plans/${id}`) }
+export function createTrainingPlan(data) { return request.post(`${P}/training-plans`, data) }
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第38页 / 共60页（总源码10673行，取自原第192页）
+---------------------------------------------------------
+export function updateTrainingPlan(id, data) { return request.put(`${P}/training-plans/${id}`, data) }
+export function deleteTrainingPlan(id) { return request.delete(`${P}/training-plans/${id}`) }
+
+export function listTrainingSession(params) { return request.get(`${P}/training-sessions`, { params }) }
+export function getTrainingSession(id) { return request.get(`${P}/training-sessions/${id}`) }
+export function createTrainingSession(data) { return request.post(`${P}/training-sessions`, data) }
+export function updateTrainingSession(id, data) { return request.put(`${P}/training-sessions/${id}`, data) }
+export function deleteTrainingSession(id) { return request.delete(`${P}/training-sessions/${id}`) }
+
+export function listMentor(params) { return request.get(`${P}/internship-mentors`, { params }) }
+export function getMentor(id) { return request.get(`${P}/internship-mentors/${id}`) }
+export function createMentor(data) { return request.post(`${P}/internship-mentors`, data) }
+export function updateMentor(id, data) { return request.put(`${P}/internship-mentors/${id}`, data) }
+export function deleteMentor(id) { return request.delete(`${P}/internship-mentors/${id}`) }
+
+export function listScore(params) { return request.get(`${P}/internship-scores`, { params }) }
+export function getScore(id) { return request.get(`${P}/internship-scores/${id}`) }
+export function createScore(data) { return request.post(`${P}/internship-scores`, data) }
+export function updateScore(id, data) { return request.put(`${P}/internship-scores/${id}`, data) }
+export function deleteScore(id) { return request.delete(`${P}/internship-scores/${id}`) }
+
+// 附件（照片/签到扫描件/课件/通知/考题/效果评价 等）
+export function listEduAttachments(ownerType, ownerId, kind) {
+  const params = {}
+  if (kind) params.kind = kind
+  return request.get(`/api/v1/education-attachments/${ownerType}/${ownerId}`, { params })
+}
+export function uploadEduAttachments(ownerType, ownerId, kind, files) {
+  const fd = new FormData()
+  for (const f of files) fd.append('files', f)
+  return request.post(`/api/v1/education-attachments/${ownerType}/${ownerId}?kind=${encodeURIComponent(kind || 'other')}`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+export function eduAttachmentUrl(id, inline = true) {
+  const token = localStorage.getItem('token')
+  return `/api/v1/education-attachments/file/${id}${inline ? '?inline=true' : '?inline=false'}${token ? '&token=' + encodeURIComponent(token) : ''}`
+}
+export function deleteEduAttachment(id) {
+  return request.delete(`/api/v1/education-attachments/file/${id}`)
+}
+
+======================================================================
+# 文件: api/scheduling.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\scheduling.js)
+======================================================================
+
+import request from '../utils/request'
+
+// 岗位定义
+export function listSchedulingPosts(params) {
+  return request.get('/api/v1/scheduling/posts', { params })
+}
+export function createSchedulingPost(data) {
+  return request.post('/api/v1/scheduling/posts', data)
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第39页 / 共60页（总源码10673行，取自原第193页）
+---------------------------------------------------------
+}
+export function updateSchedulingPost(id, data) {
+  return request.put(`/api/v1/scheduling/posts/${id}`, data)
+}
+export function deleteSchedulingPost(id) {
+  return request.delete(`/api/v1/scheduling/posts/${id}`)
+}
+
+// 排班计划
+export function listSchedulingPlans(params) {
+  return request.get('/api/v1/scheduling/plans', { params })
+}
+export function getDefaultPlan() {
+  return request.get('/api/v1/scheduling/default-plan')
+}
+export function createSchedulingPlan(data) {
+  return request.post('/api/v1/scheduling/plans', data)
+}
+export function updateSchedulingPlan(id, data) {
+  return request.put(`/api/v1/scheduling/plans/${id}`, data)
+}
+export function deleteSchedulingPlan(id) {
+  return request.delete(`/api/v1/scheduling/plans/${id}`)
+}
+
+// 每日分配
+export function listSchedulingAssignments(params) {
+  return request.get('/api/v1/scheduling/assignments', { params })
+}
+export function createSchedulingAssignment(data) {
+  return request.post('/api/v1/scheduling/assignments', data)
+}
+export function updateSchedulingAssignment(id, data) {
+  return request.put(`/api/v1/scheduling/assignments/${id}`, data)
+}
+export function deleteSchedulingAssignment(id) {
+  return request.delete(`/api/v1/scheduling/assignments/${id}`)
+}
+
+// 排班表矩阵 / 我的今日 / 自动生成
+export function getSchedulingGrid(params) {
+  return request.get('/api/v1/scheduling/grid', { params })
+}
+export function getMyToday(params) {
+  return request.get('/api/v1/scheduling/my-today', { params })
+}
+export function generateScheduling(data) {
+  return request.post('/api/v1/scheduling/generate', data)
+}
+
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第40页 / 共60页（总源码10673行，取自原第194页）
+---------------------------------------------------------
+// 排班全局配置（排除人员 / 生成窗口）
+export function getSchedulingConfig() {
+  return request.get('/api/v1/scheduling/config')
+}
+export function updateSchedulingConfig(data) {
+  return request.put('/api/v1/scheduling/config', data)
+}
+
+// 手动录入/修改单个单元格（夜班、休息/病假/开会/行政/质控等）
+export function setSchedulingCell(data) {
+  return request.post('/api/v1/scheduling/cell', data)
+}
+
+// 批量录入一批非白班约束（夜班、发热门诊、休息、病假……）
+export function batchSchedulingCells(data) {
+  return request.post('/api/v1/scheduling/batch', data)
+}
+
+// 我的排班（本周 / 近两周 / 本月，只读）
+export function getMySchedule(params) {
+  return request.get('/api/v1/scheduling/my-schedule', { params })
+}
+
+// 换班
+export function requestSwap(data) {
+  return request.post('/api/v1/scheduling/swap/request', data)
+}
+export function listSwaps(params) {
+  return request.get('/api/v1/scheduling/swap/list', { params })
+}
+export function confirmSwap(id) {
+  return request.post(`/api/v1/scheduling/swap/${id}/confirm`)
+}
+export function rejectSwap(id) {
+  return request.post(`/api/v1/scheduling/swap/${id}/reject`)
+}
+export function cancelSwap(id) {
+  return request.post(`/api/v1/scheduling/swap/${id}/cancel`)
+}
+
+// 休息申请（自服务，无需审批）
+export function requestRest(data) {
+  return request.post('/api/v1/scheduling/rest-request', data)
+}
+export function listRestRequests(params) {
+  return request.get('/api/v1/scheduling/rest-request/list', { params })
+}
+export function cancelRest(id) {
+  return request.post(`/api/v1/scheduling/rest-request/${id}/cancel`)
+}
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第41页 / 共60页（总源码10673行，取自原第195页）
+---------------------------------------------------------
+
+// 休息花名册（本周/近两周/本月，哪些人休息）
+export function getRestRoster(params) {
+  return request.get('/api/v1/scheduling/rest-roster', { params })
+}
+
+======================================================================
+# 文件: api/notifications.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\notifications.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function listNotifications(params) {
+  return request.get('/api/v1/notifications', { params })
+}
+export function markRead(nid) {
+  return request.post(`/api/v1/notifications/${nid}/read`)
+}
+export function markAllRead() {
+  return request.post('/api/v1/notifications/read-all')
+}
+export function markUnread(nid) {
+  return request.post(`/api/v1/notifications/${nid}/unread`)
+}
+export function markAllUnread() {
+  return request.post('/api/v1/notifications/unread-all')
+}
+export function testEmail(to) {
+  return request.post('/api/v1/notifications/test-email', to ? { to } : {})
+}
+
+======================================================================
+# 文件: api/reminders.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\reminders.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function listRecipients() {
+  return request.get('/api/v1/reminders/recipients')
+}
+export function createRecipient(data) {
+  return request.post('/api/v1/reminders/recipients', data)
+}
+export function updateRecipient(id, data) {
+  return request.put(`/api/v1/reminders/recipients/${id}`, data)
+}
+export function deleteRecipient(id) {
+  return request.delete(`/api/v1/reminders/recipients/${id}`)
+}
+export function getRecipientWxTest(id) {
+  return request.post(`/api/v1/reminders/recipients/${id}/wx-test`)
+}
+
+export function listRules() {
+  return request.get('/api/v1/reminders/rules')
+}
+export function createRule(data) {
+  return request.post('/api/v1/reminders/rules', data)
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第42页 / 共60页（总源码10673行，取自原第196页）
+---------------------------------------------------------
+}
+export function updateRule(id, data) {
+  return request.put(`/api/v1/reminders/rules/${id}`, data)
+}
+export function deleteRule(id) {
+  return request.delete(`/api/v1/reminders/rules/${id}`)
+}
+
+export function runReminders(params) {
+  return request.post('/api/v1/reminders/run', null, { params })
+}
+export function listSendLog(params) {
+  return request.get('/api/v1/reminders/send-log', { params })
+}
+export function initReminderDefaults() {
+  return request.post('/api/v1/reminders/init-defaults')
+}
+
+======================================================================
+# 文件: api/audit.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\audit.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function listAuditLogs(params = {}) {
+  return request.get('/api/v1/audit-logs', { params })
+}
+
+export function listActions() {
+  return request.get('/api/v1/audit-logs/actions')
+}
+
+export function listTables() {
+  return request.get('/api/v1/audit-logs/tables')
+}
+
+======================================================================
+# 文件: api/nonconformity.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\nonconformity.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function listNC(params) {
+  return request.get('/api/v1/nonconformities', { params })
+}
+export function createNC(data) {
+  return request.post('/api/v1/nonconformities', data)
+}
+export function updateNC(id, data) {
+  return request.put(`/api/v1/nonconformities/${id}`, data)
+}
+export function deleteNC(id) {
+  return request.delete(`/api/v1/nonconformities/${id}`)
+}
+
+======================================================================
+# 文件: api/verification.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\verification.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function listVerification(params) {
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第43页 / 共60页（总源码10673行，取自原第197页）
+---------------------------------------------------------
+  return request.get('/api/v1/verification-records', { params })
+}
+export function createVerification(data) {
+  return request.post('/api/v1/verification-records', data)
+}
+export function updateVerification(id, data) {
+  return request.put(`/api/v1/verification-records/${id}`, data)
+}
+export function deleteVerification(id) {
+  return request.delete(`/api/v1/verification-records/${id}`)
+}
+
+======================================================================
+# 文件: api/users.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\users.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function listUsers(params = {}) {
+  return request.get('/api/v1/users', { params })
+}
+
+export function createUser(data) {
+  return request.post('/api/v1/users', data)
+}
+
+export function updateUser(uid, data) {
+  return request.put(`/api/v1/users/${uid}`, data)
+}
+
+export function deleteUser(uid) {
+  return request.delete(`/api/v1/users/${uid}`)
+}
+
+export function resetPassword(uid) {
+  return request.post(`/api/v1/users/${uid}/reset-password`)
+}
+
+export function getRoleOptions() {
+  return request.get('/api/v1/users/role-options')
+}
+
+// 任意已登录用户可访问：返回活跃用户精简信息，供操作者/审核者下拉复用。
+export function listActiveUsers() {
+  return request.get('/api/v1/users/active')
+}
+
+======================================================================
+# 文件: api/auth.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\auth.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function login(username, password) {
+  const form = new URLSearchParams()
+  form.append('username', username)
+  form.append('password', password)
+  return request.post('/api/v1/auth/login', form, {
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第44页 / 共60页（总源码10673行，取自原第198页）
+---------------------------------------------------------
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  })
+}
+
+export function getMe() {
+  return request.get('/api/v1/auth/me')
+}
+
+export function changePassword(oldPassword, newPassword) {
+  return request.post('/api/v1/auth/change-password', {
+    old_password: oldPassword,
+    new_password: newPassword,
+  })
+}
+
+======================================================================
+# 文件: api/modulePermissions.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\modulePermissions.js)
+======================================================================
+
+import request from '../utils/request'
+
+export function getModulePermissionsStructure() {
+  return request.get('/api/v1/module-permissions/structure')
+}
+export function setModuleRoles(moduleKey, roles) {
+  return request.put(`/api/v1/module-permissions/${moduleKey}`, { roles })
+}
+export function resetModulePermissions() {
+  return request.post('/api/v1/module-permissions/reset')
+}
+
+======================================================================
+# 文件: store/auth.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\store\auth.js)
+======================================================================
+
+import { defineStore } from 'pinia'
+import request from '../utils/request'
+import { usePermissionStore } from './permission'
+
+// 模块 → 写权限角色映射（启动期 fallback；登录后会从后端拉新值覆盖）
+// 与 backend/models/module_permission.py DEFAULT_MODULE_PERMISSIONS 一致
+const FALLBACK_MODULE_WRITE_ROLES = {
+  'test-items': ['admin'],
+  'documents': ['admin', 'specialty_leader'],
+  'instruments': ['admin', 'specialty_leader'],
+  'instrument-families': ['admin', 'specialty_leader'],
+  'qc-monthly': ['admin', 'qc_manager', 'member'],
+  'qc-monthly_delete': ['admin', 'qc_manager'],
+  'qc-target': ['admin', 'qc_manager', 'member'],
+  'qc-target_delete': ['admin', 'qc_manager'],
+  'eqa': ['admin', 'qc_manager'],
+  'eqa_delete': ['admin', 'qc_manager'],
+  'comparison': ['admin', 'qc_manager', 'technical_support'],
+  'comparison-edit': ['admin', 'qc_manager'],
+  'interlab': ['admin', 'qc_manager', 'technical_support'],
+  'interlab-edit': ['admin', 'qc_manager'],
+  'reagents': ['admin', 'reagent_manager'],
+  'reagents_delete': ['admin', 'reagent_manager'],
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第45页 / 共60页（总源码10673行，取自原第199页）
+---------------------------------------------------------
+  'reagent-receivings': ['admin', 'reagent_manager', 'reagent_delivery'],
+  'reagent-orders': ['admin', 'reagent_manager'],
+  'training': ['admin', 'training_manager'],
+  'training_delete': ['admin', 'training_manager'],
+  'verification': ['admin', 'specialty_leader'],
+  'iso15189': ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader'],
+  'quality-requirements': ['admin'],
+  'scheduling':         ['admin', 'specialty_leader', 'leader'],
+}
+
+export const useAuthStore = defineStore('auth', {
+  state: () => ({
+    token: localStorage.getItem('token') || '',
+    refreshToken: localStorage.getItem('refresh_token') || '',
+    user: JSON.parse(localStorage.getItem('user') || 'null'),
+  }),
+  getters: {
+    isLoggedIn: (state) => !!state.token,
+    // 用户拥有的全部角色码列表
+    myRoles: (state) => {
+      if (!state.user) return []
+      const set = new Set()
+      if (state.user.role) set.add(state.user.role)
+      if (state.user.roles) state.user.roles.split(',').filter(Boolean).forEach(r => set.add(r))
+      return [...set]
+    },
+    // 是否管理员（admin 始终有全部权限）
+    isAdmin: (state) => {
+      if (!state.user) return false
+      return state.user.role === 'admin' || (state.user.roles || '').includes('admin')
+    },
+    // 是否为技术支持（仅该角色需要严格按授权隐藏未授权模块）
+    isTechnicalSupport: (state) => {
+      if (!state.user) return false
+      return state.user.role === 'technical_support' || (state.user.roles || '').includes('technical_support')
+    },
+  },
+  actions: {
+    async login(username, password) {
+      const form = new URLSearchParams()
+      form.append('username', username)
+      form.append('password', password)
+      const data = await request.post('/api/v1/auth/login', form, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      })
+      this.token = data.access_token
+      localStorage.setItem('token', this.token)
+      if (data.refresh_token) {
+        this.refreshToken = data.refresh_token
+        localStorage.setItem('refresh_token', data.refresh_token)
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第46页 / 共60页（总源码10673行，取自原第200页）
+---------------------------------------------------------
+      }
+      const me = await request.get('/api/v1/auth/me')
+      this.user = me
+      localStorage.setItem('user', JSON.stringify(this.user))
+      // 登录成功后拉一次模块权限映射（用于全站 canWrite 判定）
+      try {
+        const permStore = usePermissionStore()
+        await permStore.load(true)
+      } catch (_) { /* 拉失败不阻塞登录 */ }
+      return data
+    },
+    async changePassword(oldPassword, newPassword) {
+      return request.post('/api/v1/auth/change-password', {
+        old_password: oldPassword,
+        new_password: newPassword,
+      })
+    },
+    logout() {
+      const refreshToken = localStorage.getItem('refresh_token')
+      if (refreshToken) {
+        // 尽力吊销服务端 refresh token（失败不影响本地退出）
+        request.post('/api/v1/auth/logout', { refresh_token: refreshToken }).catch(() => {})
+      }
+      this.token = ''
+      this.refreshToken = ''
+      this.user = null
+      localStorage.removeItem('token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
+    },
+    // 判断当前用户对某模块是否有写权限
+    canWrite(module) {
+      if (this.isAdmin) return true
+      // 优先读后端拉的最新配置；尚未加载或找不到时用 fallback
+      let required
+      let permStore
+      try {
+        permStore = usePermissionStore()
+        required = permStore.moduleRoles[module]
+      } catch (_) { /* store 未挂载时退化 */ }
+      if (!required) required = FALLBACK_MODULE_WRITE_ROLES[module]
+      // 旧版 'qc' 兼容：自动映射到 qc-monthly / qc-target
+      if (!required && module === 'qc') required = (permStore?.moduleRoles?.['qc-monthly']) || FALLBACK_MODULE_WRITE_ROLES['qc-monthly']
+      if (!required) return true // 未配置的模块默认允许
+      return this.myRoles.some(r => required.includes(r))
+    },
+    // 删除权限（沿用 canWrite 同样的 store 查找，但查找 `xxx_delete` 专属配置）
+    canDelete(module) {
+      if (this.isAdmin) return true
+      let required
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第47页 / 共60页（总源码10673行，取自原第201页）
+---------------------------------------------------------
+      try {
+        const permStore = usePermissionStore()
+        required = permStore.moduleRoles[module + '_delete'] || permStore.moduleRoles[module]
+      } catch (_) { /* store 未挂载时退化 */ }
+      if (!required) required = FALLBACK_MODULE_WRITE_ROLES[module + '_delete'] || FALLBACK_MODULE_WRITE_ROLES[module]
+      if (!required) return true
+      return this.myRoles.some(r => required.includes(r))
+    },
+    // 菜单/页签是否可见。
+    // 规则：technical_support 与 reagent_delivery 严格按授权收口（未授权模块一律不显示）；
+    // 其余角色维持原行为（全部可见），不做全站 RBAC 改造以免误伤。
+    canAccessMenu(moduleKey) {
+      const strict = this.isTechnicalSupport || this.myRoles.includes('reagent_delivery')
+      if (!strict) return true
+      if (this.isAdmin) return true
+      try {
+        const permStore = usePermissionStore()
+        return permStore.canAccess(this.myRoles, moduleKey)
+      } catch (_) { return false }
+    },
+    // 聚合菜单（如"质控管理"含多个权限模块）：任一可见即显示
+    canAccessAnyMenu(moduleKeys) {
+      return moduleKeys.some((k) => this.canAccessMenu(k))
+    },
+  },
+})
+
+======================================================================
+# 文件: store/permission.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\store\permission.js)
+======================================================================
+
+// 模块写权限 store：登录后从后端拉一次"模块→允许角色"映射，
+// canWrite 读这里（找不到时回退到硬编码默认）。
+import { defineStore } from 'pinia'
+import { getModulePermissionsStructure } from '../api/modulePermissions'
+
+// 硬编码 fallback（与后端 DEFAULT_MODULE_PERMISSIONS 一致），用于 store 尚未加载时
+const FALLBACK = {
+  'test-items':           ['admin'],
+  'documents':            ['admin', 'specialty_leader'],
+  'instruments':          ['admin', 'specialty_leader'],
+  'instrument-families':  ['admin', 'specialty_leader'],
+  'qc-monthly':           ['admin', 'qc_manager', 'member', 'staff'],
+  'qc-monthly_delete':    ['admin', 'qc_manager'],
+  'qc-target':            ['admin', 'qc_manager', 'member', 'staff'],
+  'qc-target_delete':     ['admin', 'qc_manager'],
+  'eqa':                  ['admin', 'qc_manager'],
+  'eqa_delete':           ['admin', 'qc_manager'],
+  'comparison':           ['admin', 'qc_manager', 'technical_support', 'member', 'staff'],
+  'comparison-create':    ['admin', 'qc_manager', 'technical_support'],
+  'comparison-edit':      ['admin', 'qc_manager'],
+  'interlab':             ['admin', 'qc_manager', 'technical_support', 'member', 'staff'],
+  'interlab-create':      ['admin', 'qc_manager', 'technical_support'],
+  'interlab-edit':        ['admin', 'qc_manager'],
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第48页 / 共60页（总源码10673行，取自原第202页）
+---------------------------------------------------------
+  'reagents':             ['admin', 'reagent_manager'],
+  'reagents_delete':      ['admin', 'reagent_manager'],
+  'training':             ['admin', 'training_manager'],
+  'training_delete':      ['admin', 'training_manager'],
+  'verification':         ['admin', 'specialty_leader'],
+  'iso15189':             ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader'],
+  'quality-requirements': ['admin'],
+  'scheduling':           ['admin', 'specialty_leader', 'leader'],
+}
+
+export const usePermissionStore = defineStore('permissions', {
+  state: () => ({
+    // module_key -> [role_code]
+    moduleRoles: { ...FALLBACK },
+    loaded: false,           // 是否从后端拉过
+    loading: false,
+    error: null,
+  }),
+
+  getters: {
+    isLoaded: (s) => s.loaded,
+    getModuleRoles: (s) => (moduleKey) => s.moduleRoles[moduleKey] || FALLBACK[moduleKey] || ['admin'],
+  },
+
+  actions: {
+    async load(force = false) {
+      if (this.loading) return
+      if (this.loaded && !force) return
+      this.loading = true
+      this.error = null
+      try {
+        const r = await getModulePermissionsStructure()
+        const map = {}
+        for (const m of r.modules) {
+          map[m.key] = m.roles
+        }
+        // 与 FALLBACK 取并集（后端 map 覆盖 FALLBACK）：保证即使后端漏返回某键，
+        // 本地仍有完整默认角色表，canWrite 不会命中「缺键→默认允许」分支。
+        this.moduleRoles = { ...FALLBACK, ...map }
+        this.loaded = true
+      } catch (e) {
+        this.error = e?.response?.data?.detail || e.message
+        // 保留 fallback，不阻塞 UI
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // 单个模块的写权限判定（与 auth.canWrite 一致；admin 短路）
+    canWrite(userRoles, moduleKey) {
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第49页 / 共60页（总源码10673行，取自原第203页）
+---------------------------------------------------------
+      if (userRoles.includes('admin')) return true
+      const allowed = this.moduleRoles[moduleKey]
+      if (!allowed) return true  // 未配置白名单 = 默认允许
+      return userRoles.some((r) => allowed.includes(r))
+    },
+
+    // 单个模块的删除权限判定
+    // 查找规则：先查 `moduleKey + '_delete'` 专属配置；找不到则回退到写权限
+    canDelete(userRoles, moduleKey) {
+      if (userRoles.includes('admin')) return true
+      const allowed = this.moduleRoles[moduleKey + '_delete'] || this.moduleRoles[moduleKey]
+      if (!allowed) return true
+      return userRoles.some((r) => allowed.includes(r))
+    },
+
+    // admin 在 UI 改了某个模块的角色后，调用此方法同步到本地 store
+    setLocal(moduleKey, roles) {
+      this.moduleRoles = { ...this.moduleRoles, [moduleKey]: [...roles] }
+    },
+
+    // 模块可见性（菜单/页签是否展示）。
+    // 角色对该模块的「基础键 / '_delete' 变体 / '-edit' 变体」中任一拥有授权即视为可见。
+    // admin 短路为可见；未配置白名单的模块按"可见"兜底，避免误隐藏。
+    canAccess(userRoles, moduleKey) {
+      if (userRoles.includes('admin')) return true
+      const variants = [moduleKey, moduleKey + '_delete', moduleKey + '-edit']
+      for (const vk of variants) {
+        const allowed = this.moduleRoles[vk]
+        if (allowed && userRoles.some((r) => allowed.includes(r))) return true
+      }
+      return false
+    },
+
+    // 多个模块键中任一可见即视为可见（用于"质控管理"这种聚合菜单）
+    canAccessAny(userRoles, moduleKeys) {
+      return moduleKeys.some((k) => this.canAccess(userRoles, k))
+    },
+  },
+})
+
+======================================================================
+# 文件: router/index.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\router\index.js)
+======================================================================
+
+import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../store/auth'
+import { usePermissionStore } from '../store/permission'
+import AppLayout from '../layout/AppLayout.vue'
+
+const routes = [
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('../views/Login.vue'),
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第50页 / 共60页（总源码10673行，取自原第204页）
+---------------------------------------------------------
+    meta: { public: true },
+  },
+  {
+    path: '/',
+    component: AppLayout,
+    redirect: '/dashboard',
+    children: [
+      { path: 'dashboard', name: 'dashboard', component: () => import('../views/Dashboard.vue'), meta: { title: '工作台' } },
+      { path: 'test-items', name: 'test-items', component: () => import('../views/test_items/TestItemList.vue'), meta: { title: '项目查询', moduleKey: 'test-items' } },
+      { path: 'documents', name: 'documents', component: () => import('../views/documents/DocumentList.vue'), meta: { title: '文件管理', moduleKey: 'documents' } },
+      { path: 'instruments', name: 'instruments', component: () => import('../views/instruments/InstrumentList.vue'), meta: { title: '仪器档案', moduleKey: 'instruments' } },
+      { path: 'instrument-families', name: 'instrument-families', component: () => import('../views/instruments/InstrumentFamilyManage.vue'), meta: { title: '仪器关联', moduleKey: 'instrument-families' } },
+      { path: 'qc', name: 'qc', component: () => import('../views/qc/QCList.vue'), meta: { title: '质控管理', moduleKeys: ['qc-monthly', 'eqa', 'comparison', 'interlab', 'qc-target'] } },
+      { path: 'eqa-associations', name: 'eqa-associations', component: () => import('../views/eqa/EqaAssociationManage.vue'), meta: { title: '项目库与质评关联', moduleKey: 'instrument-families' } },
+      { path: 'quality-requirements', name: 'quality-requirements', component: () => import('../views/quality/QualityRequirementList.vue'), meta: { title: '项目质量要求', moduleKey: 'quality-requirements' } },
+      { path: 'reagent/items', name: 'reagent-items', component: () => import('../views/reagent/ReagentItems.vue'), meta: { title: '试剂目录', moduleKey: 'reagents' } },
+      { path: 'reagent/stock', name: 'reagent-stock', component: () => import('../views/reagent/ReagentStock.vue'), meta: { title: '实时库存', moduleKey: 'reagents' } },
+      { path: 'reagent/inventory', name: 'reagent-inventory', component: () => import('../views/reagent/InventoryCheck.vue'), meta: { title: '盘库管理', moduleKey: 'reagents' } },
+      { path: 'reagent/orders', name: 'reagent-orders', component: () => import('../views/reagent/ReagentOrders.vue'), meta: { title: '订购管理', moduleKey: 'reagent-orders' } },
+      { path: 'reagent/receivings', name: 'reagent-receivings', component: () => import('../views/reagent/ReagentReceivings.vue'), meta: { title: '到货接收', moduleKey: 'reagent-receivings' } },
+      { path: 'reagent/consumption', name: 'reagent-consumption', component: () => import('../views/reagent/ReagentConsumption.vue'), meta: { title: '月消耗', moduleKey: 'reagents' } },
+      { path: 'reagent/associations', name: 'reagent-associations', component: () => import('../views/reagent/ReagentAssociations.vue'), meta: { title: '项目与仪器关联', moduleKey: 'reagents' } },
+      { path: 'training', name: 'training', component: () => import('../views/training/StaffEducation.vue'), meta: { title: '人员继教管理', moduleKey: 'training' } },
+      { path: 'verification', name: 'verification', component: () => import('../views/verification/VerificationList.vue'), meta: { title: '性能验证', moduleKey: 'verification' } },
+      { path: 'scheduling', name: 'scheduling', component: () => import('../views/scheduling/SchedulingList.vue'), meta: { title: '排班管理', moduleKey: 'scheduling' } },
+      { path: 'iso15189', name: 'iso15189', component: () => import('../views/iso15189/NonconformityList.vue'), meta: { title: '15189专项', moduleKey: 'iso15189' } },
+      { path: 'audit-logs', name: 'audit-logs', component: () => import('../views/audit/AuditLogList.vue'), meta: { title: '审计日志', adminOnly: true } },
+      { path: 'users', name: 'users', component: () => import('../views/users/UserList.vue'), meta: { title: '用户管理', adminOnly: true } },
+      { path: 'permission-config', name: 'permission-config', component: () => import('../views/users/PermissionsConfig.vue'), meta: { title: '权限配置', adminOnly: true } },
+      { path: 'reminder-settings', name: 'reminder-settings', component: () => import('../views/ReminderSettings.vue'), meta: { title: '提醒设置', adminOnly: true } },
+    ],
+  },
+  { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+})
+
+router.beforeEach((to, from, next) => {
+  const auth = useAuthStore()
+  if (!to.meta.public && !auth.isLoggedIn) {
+    next('/login')
+  } else if (to.path === '/login' && auth.isLoggedIn) {
+    next('/dashboard')
+  } else if (to.meta.adminOnly) {
+    // adminOnly 路由仅管理员可访问
+    const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')
+    if (!isAdmin) {
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第51页 / 共60页（总源码10673行，取自原第205页）
+---------------------------------------------------------
+      next('/dashboard')
+    } else {
+      next()
+    }
+  } else if (to.meta.moduleKeys || to.meta.moduleKey) {
+    // 模块级守卫：仅 technical_support 严格收口（未授权模块不可直达）；
+    // 其余角色 canAccessMenu 恒为 true，不受影响。
+    const keys = to.meta.moduleKeys || [to.meta.moduleKey]
+    if (auth.canAccessAnyMenu(keys)) {
+      next()
+    } else {
+      next('/dashboard')
+    }
+  } else if (to.path === '/dashboard') {
+    // 试剂配送 / 技术支持 角色不显示工作台
+    const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')
+    if (isAdmin) {
+      next()
+    } else if (auth.myRoles.includes('reagent_delivery')) {
+      next('/reagent/receivings')
+    } else if (auth.isTechnicalSupport) {
+      next('/qc')
+    } else {
+      next()
+    }
+  } else {
+    next()
+  }
+})
+
+export default router
+
+======================================================================
+# 文件: layout/AppLayout.vue  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\layout\AppLayout.vue)
+======================================================================
+
+<template>
+  <el-container class="app-container">
+    <div v-if="isMobile && drawerVisible" class="overlay" @click="drawerVisible = false"></div>
+    <el-aside
+      width="220px"
+      class="aside"
+      :class="{ 'aside-mobile': isMobile, 'aside-open': isMobile && drawerVisible }"
+    >
+      <div class="logo">
+        生免组管理系统
+        <el-icon class="close-btn" @click="drawerVisible = false" v-if="isMobile"><Close /></el-icon>
+      </div>
+      <el-menu
+        :default-active="activeMenu"
+        router
+        class="menu"
+        @select="onMenuSelect"
+        background-color="#1a365d"
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第52页 / 共60页（总源码10673行，取自原第206页）
+---------------------------------------------------------
+        text-color="#cbd5e1"
+        active-text-color="#ffd04b"
+      >
+        <template v-for="m in menus" :key="m.path">
+          <el-sub-menu v-if="m.children" :index="m.path">
+            <template #title>
+              <el-icon><component :is="m.icon" /></el-icon>
+              <span>{{ m.title }}</span>
+            </template>
+            <el-menu-item v-for="c in m.children" :key="c.path" :index="c.path">{{ c.title }}</el-menu-item>
+          </el-sub-menu>
+          <el-menu-item v-else :index="m.path">
+            <el-icon><component :is="m.icon" /></el-icon>
+            <span>{{ m.title }}</span>
+            <el-tag v-if="m.wip" size="small" type="info" class="wip">建设中</el-tag>
+          </el-menu-item>
+        </template>
+      </el-menu>
+      <div class="aside-footer" v-if="auth.canAccessMenu('instrument-families') || auth.canAccessMenu('quality-requirements')">
+        <el-button v-if="auth.canAccessMenu('instrument-families')" class="families-btn" size="small" :icon="Connection" @click="goEqaAssociations">项目库与质评关联</el-button>
+        <el-button v-if="auth.canAccessMenu('instrument-families')" class="families-btn" size="small" :icon="Share" @click="goFamilies">仪器关联管理</el-button>
+        <el-button v-if="auth.canAccessMenu('quality-requirements')" class="families-btn" size="small" :icon="Document" @click="goQualityRequirements">项目质量要求</el-button>
+      </div>
+    </el-aside>
+    <el-container>
+      <el-header class="header">
+        <el-icon class="hamburger" @click="drawerVisible = true" v-if="isMobile"><Menu /></el-icon>
+        <span class="title">{{ currentTitle }}</span>
+        <el-dropdown @command="onCommand">
+          <span class="user-info">
+            {{ auth.user?.full_name || auth.user?.username }}
+            <el-icon><ArrowDown /></el-icon>
+          </span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </el-header>
+      <el-main><router-view /></el-main>
+    </el-container>
+    <SwapNotifier />
+  </el-container>
+</template>
+
+<script setup>
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '../store/auth'
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第53页 / 共60页（总源码10673行，取自原第207页）
+---------------------------------------------------------
+import { usePermissionStore } from '../store/permission'
+import { Share, Connection, Document, Menu, Close } from '@element-plus/icons-vue'
+import SwapNotifier from '../components/SwapNotifier.vue'
+
+const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
+
+const menus = computed(() => {
+  const all = [
+    { path: '/dashboard', title: '工作台', icon: 'Odometer' },
+    { path: '/test-items', title: '项目查询', icon: 'Document', moduleKey: 'test-items' },
+    { path: '/documents', title: '文件管理', icon: 'Files', moduleKey: 'documents' },
+    { path: '/instruments', title: '仪器档案', icon: 'Cpu', moduleKey: 'instruments' },
+    // 质控管理是聚合菜单：含 月结/质评/仪器间比对/室间比对/累靶 多个权限模块，任一可见即显示
+    { path: '/qc', title: '质控管理', icon: 'DataLine', moduleKeys: ['qc-monthly', 'eqa', 'comparison', 'interlab', 'qc-target'] },
+    { path: '/reagent', title: '试剂管理', icon: 'ShoppingCart', moduleKeys: ['reagents', 'reagent-orders'], children: [
+      { path: '/reagent/items', title: '试剂目录' },
+      { path: '/reagent/stock', title: '实时库存' },
+      { path: '/reagent/inventory', title: '盘库管理' },
+      { path: '/reagent/orders', title: '订购管理' },
+      { path: '/reagent/consumption', title: '月消耗' },
+      { path: '/reagent/associations', title: '项目与仪器关联' },
+    ] },
+    // 到货接收作为独立菜单：试剂配送角色（仅此页有权限）也能看到，且不与试剂管理父菜单耦合
+    { path: '/reagent/receivings', title: '到货接收', icon: 'Box', moduleKey: 'reagent-receivings' },
+    { path: '/training', title: '继教培训', icon: 'Reading', moduleKey: 'training' },
+    { path: '/verification', title: '性能验证', icon: 'DataAnalysis', moduleKey: 'verification' },
+    { path: '/scheduling', title: '排班管理', icon: 'Calendar', moduleKey: 'scheduling' },
+    { path: '/iso15189', title: '15189专项', icon: 'Stamp', moduleKey: 'iso15189' },
+  ]
+  // 按权限过滤：technical_support 仅显示其被授权的模块；其余角色维持原样（全部可见）
+  const visible = all.filter((m) => {
+    if (m.path === '/dashboard') {
+      // 试剂配送 / 技术支持 角色不显示工作台
+      const isReagentDelivery = auth.myRoles.includes('reagent_delivery')
+      const isTechSupport = auth.isTechnicalSupport
+      const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')
+      return !((isReagentDelivery || isTechSupport) && !isAdmin)
+    }
+    if (m.moduleKeys) return auth.canAccessAnyMenu(m.moduleKeys)
+    return auth.canAccessMenu(m.moduleKey)
+  })
+  // 管理员额外可见系统管理类
+  const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')
+  if (isAdmin) {
+    visible.push({ path: '/users', title: '用户管理', icon: 'UserFilled' })
+    visible.push({ path: '/permission-config', title: '权限配置', icon: 'Lock' })
+    visible.push({ path: '/audit-logs', title: '审计日志', icon: 'View' })
+    visible.push({ path: '/reminder-settings', title: '提醒设置', icon: 'Bell' })
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第54页 / 共60页（总源码10673行，取自原第208页）
+---------------------------------------------------------
+  }
+  return visible
+})
+
+const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
+const drawerVisible = ref(false)
+function checkMobile() {
+  isMobile.value = window.innerWidth <= 768
+  if (!isMobile.value) drawerVisible.value = false
+}
+function onMenuSelect() {
+  if (isMobile.value) drawerVisible.value = false
+}
+onMounted(() => {
+  window.addEventListener('resize', checkMobile)
+  // 页面刷新场景：登录态下补一次模块权限映射（canWrite 依赖）
+  if (auth.isLoggedIn) {
+    try { usePermissionStore().load() } catch (_) {}
+  }
+})
+onUnmounted(() => window.removeEventListener('resize', checkMobile))
+
+const activeMenu = computed(() => route.path)
+const currentTitle = computed(() => route.meta.title || '工作台')
+
+function onCommand(cmd) {
+  if (cmd === 'logout') {
+    auth.logout()
+    router.push('/login')
+  }
+}
+
+function goFamilies() {
+  router.push('/instrument-families')
+}
+
+function goEqaAssociations() {
+  router.push('/eqa-associations')
+}
+
+function goQualityRequirements() {
+  router.push('/quality-requirements')
+}
+</script>
+
+<style scoped>
+.app-container {
+  height: 100vh;
+}
+.aside {
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第55页 / 共60页（总源码10673行，取自原第209页）
+---------------------------------------------------------
+  background: #1a365d;
+  display: flex;
+  flex-direction: column;
+}
+.aside-footer {
+  margin-top: auto;
+  padding: 12px 14px;
+  border-top: 1px solid #2c4a73;
+}
+.families-btn {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #2c4a73;
+  color: #cbd5e1;
+}
+.families-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-color: #3b5a8a;
+}
+.logo {
+  color: #fff;
+  font-weight: 700;
+  padding: 18px 16px;
+  font-size: 16px;
+  border-bottom: 1px solid #2c4a73;
+}
+.menu {
+  border-right: none;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+.title {
+  font-size: 18px;
+  font-weight: 600;
+}
+.user-info {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.wip {
+  margin-left: 8px;
+}
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第56页 / 共60页（总源码10673行，取自原第210页）
+---------------------------------------------------------
+/* 移动端抽屉式侧边栏 */
+.aside-mobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1001;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.35);
+}
+.aside-open {
+  transform: translateX(0);
+}
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+}
+.hamburger {
+  font-size: 22px;
+  cursor: pointer;
+  margin-right: 12px;
+  color: #1a365d;
+}
+.close-btn {
+  float: right;
+  cursor: pointer;
+  font-size: 18px;
+  margin-top: 2px;
+}
+@media (max-width: 768px) {
+  .title {
+    font-size: 16px;
+  }
+  .el-main {
+    padding: 10px;
+    overflow-x: auto;
+  }
+}
+</style>
+
+======================================================================
+# 文件: App.vue  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\App.vue)
+======================================================================
+
+<template>
+  <router-view />
+</template>
+
+<script setup></script>
+
+======================================================================
+# 文件: main.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\main.js)
+======================================================================
+
+import { createApp } from 'vue'
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第57页 / 共60页（总源码10673行，取自原第211页）
+---------------------------------------------------------
+import { createPinia } from 'pinia'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+import './styles/mobile.css'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import App from './App.vue'
+import router from './router'
+
+const app = createApp(App)
+
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, component)
+}
+
+app.use(createPinia())
+app.use(router)
+app.use(ElementPlus)
+app.mount('#app')
+
+======================================================================
+# 文件: utils/request.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\utils\request.js)
+======================================================================
+
+import axios from 'axios'
+
+const API_BASE = '/'
+const request = axios.create({
+  baseURL: API_BASE,
+  // 大文件(仪器LIS/质控 Excel)上传+服务端解析耗时较长，放宽至 120s
+  timeout: 120000,
+})
+
+// 刷新锁 + 并发请求队列：多个请求同时 401 时只发一次 refresh
+let isRefreshing = false
+let pendingQueue = []
+
+function flushQueue(error, token) {
+  pendingQueue.forEach(({ resolve, reject }) => {
+    if (token) resolve(token)
+    else reject(error)
+  })
+  pendingQueue = []
+}
+
+function clearAuth() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('user')
+}
+
+function gotoLogin() {
+  import('../router').then((m) => {
+    const router = m.default
+    if (router.currentRoute.value.name !== 'login') router.push('/login')
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第58页 / 共60页（总源码10673行，取自原第212页）
+---------------------------------------------------------
+  })
+}
+
+request.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+request.interceptors.response.use(
+  (response) => response.data,
+  async (error) => {
+    const original = error.config || {}
+    const status = error.response && error.response.status
+
+    // 仅在 access token 过期(401) 且尚未重试过时尝试用 refresh token 续期
+    if (status === 401 && !original._retry) {
+      const refreshToken = localStorage.getItem('refresh_token')
+      if (!refreshToken) {
+        clearAuth()
+        gotoLogin()
+        return Promise.reject(error)
+      }
+
+      // 已有刷新在进行中：排队，等拿到新 token 后重试
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          pendingQueue.push({
+            resolve: (token) => {
+              original._retry = true
+              original.headers = original.headers || {}
+              original.headers.Authorization = `Bearer ${token}`
+              resolve(request(original))
+            },
+            reject: () => reject(error),
+          })
+        })
+      }
+
+      original._retry = true
+      isRefreshing = true
+      try {
+        // 用裸 axios 直连，避免落入本实例的响应拦截器造成递归
+        const resp = await axios.post(
+          API_BASE + 'api/v1/auth/refresh',
+          { refresh_token: refreshToken },
+          // 续期接口本身很快，但放宽到 30s 以免弱网/服务端抖动误断
+          { baseURL: API_BASE, timeout: 30000 }
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第59页 / 共60页（总源码10673行，取自原第213页）
+---------------------------------------------------------
+        )
+        const data = resp.data
+        const newAccess = data.access_token
+        const newRefresh = data.refresh_token
+        localStorage.setItem('token', newAccess)
+        if (newRefresh) localStorage.setItem('refresh_token', newRefresh)
+        flushQueue(null, newAccess)
+        original.headers = original.headers || {}
+        original.headers.Authorization = `Bearer ${newAccess}`
+        return request(original)
+      } catch (e) {
+        flushQueue(e, null)
+        clearAuth()
+        gotoLogin()
+        return Promise.reject(error)
+      } finally {
+        isRefreshing = false
+      }
+    }
+
+    return Promise.reject(error)
+  }
+)
+
+export default request
+
+======================================================================
+# 文件: utils/printHtml.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\utils\printHtml.js)
+======================================================================
+
+// 在新窗口中渲染 HTML 并触发打印，避免与站内 CSS 冲突。
+// html: 完整的内联样式 HTML 字符串（表格等）。
+export function printHtml(title, html) {
+  const w = window.open('', '_blank')
+  if (!w) {
+    alert('浏览器拦截了打印窗口，请允许弹出窗口后重试')
+    return
+  }
+  w.document.open()
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #1f2937; padding: 24px; }
+  h2 { font-size: 18px; margin: 0 0 4px; }
+  .meta { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
+  h3 { font-size: 15px; margin: 18px 0 6px; border-left: 4px solid #2563eb; padding-left: 8px; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 8px; font-size: 13px; }
+  th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+  th { background: #f1f5f9; font-weight: 600; }
+  .num { text-align: center; }
+  .grp { color: #6b7280; font-size: 12px; margin: 2px 0 4px; }
+  @media print { body { padding: 8px; } }
+</style></head><body>${html}</body></html>`)
+  w.document.close()
+  w.focus()
+
+
+检验科生化免疫组综合业务管理平台软件 V1.0   第60页 / 共60页（总源码10673行，取自原第214页）
+---------------------------------------------------------
+  setTimeout(() => {
+    w.print()
+    // 部分浏览器打印后保留窗口供查看，延迟关闭
+    setTimeout(() => { try { w.close() } catch (e) { /* ignore */ } }, 500)
+  }, 250)
+}
+
+======================================================================
+# 文件: utils/errText.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\utils\errText.js)
+======================================================================
+
+// 把 axios 异常转成可读的错误文本。
+// 后端错误体通常是 { detail: '...' } 或校验错误 { detail: [...] }，
+// 直接拼接会显示 [object Object]，这里做友好化处理。
+export function errText(e) {
+  if (!e) return '未知错误'
+  if (e?.response?.data?.detail) {
+    const d = e.response.data.detail
+    if (typeof d === 'string') return d
+    if (Array.isArray(d)) {
+      return d.map((x) => (x?.msg || x?.loc ? `${x.loc?.join('.') || ''} ${x.msg}` : JSON.stringify(x))).join('; ')
+    }
+    return JSON.stringify(d)
+  }
+  if (e?.message) return e.message
+  return String(e)
+}
+
