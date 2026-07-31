@@ -183,6 +183,31 @@ def _ser_attachment(a: EducationAttachment) -> dict:
     }
 
 
+@attach_router.get("/file/{aid}")
+def get_attachment(aid: int, inline: bool = True, db: Session = Depends(get_db),
+                   user: User = Depends(get_current_user)):
+    a = db.get(EducationAttachment, aid)
+    if not a:
+        raise HTTPException(404, "附件不存在")
+    if a.cloud_key and cos_storage.ready:
+        if not inline:
+            cos_url = cos_storage.url(a.cloud_key, a.original_name)
+            if cos_url:
+                return RedirectResponse(url=cos_url, status_code=302)
+        content = cos_storage.get_bytes(a.cloud_key)
+        if content:
+            media = _media_for(a)
+            disp = "inline" if inline else "attachment"
+            return Response(content, media_type=media,
+                            headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'})
+    if not a.data:
+        raise HTTPException(404, "文件已丢失")
+    media = _media_for(a)
+    disp = "inline" if inline else "attachment"
+    return Response(a.data, media_type=media,
+                    headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'})
+
+
 @attach_router.get("/{owner_type}/{owner_id}")
 def list_attachments(
     owner_type: str, owner_id: int, kind: str | None = None,
@@ -238,29 +263,6 @@ async def upload_attachments(
     return {"items": [_ser_attachment(a) for a in out], "total": len(out)}
 
 
-@attach_router.get("/file/{aid}")
-def get_attachment(aid: int, inline: bool = True, db: Session = Depends(get_db),
-                   user: User = Depends(get_current_user)):
-    a = db.get(EducationAttachment, aid)
-    if not a:
-        raise HTTPException(404, "附件不存在")
-    if a.cloud_key and cos_storage.ready:
-        if not inline:
-            cos_url = cos_storage.url(a.cloud_key, a.original_name)
-            if cos_url:
-                return RedirectResponse(url=cos_url, status_code=302)
-        content = cos_storage.get_bytes(a.cloud_key)
-        if content:
-            media = _media_for(a)
-            disp = "inline" if inline else "attachment"
-            return Response(content, media_type=media,
-                            headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'})
-    if not a.data:
-        raise HTTPException(404, "文件已丢失")
-    media = _media_for(a)
-    disp = "inline" if inline else "attachment"
-    return Response(a.data, media_type=media,
-                    headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'})
 
 
 @attach_router.delete("/file/{aid}")
