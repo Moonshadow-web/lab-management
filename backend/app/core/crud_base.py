@@ -138,7 +138,16 @@ def make_router(
         write_audit(db, user, "create", Model.__tablename__, obj.id, data, _ip(request))
         if after_write:
             after_write(db, "create", obj)
-        return {"id": obj.id, "_debug_dump": item.model_dump(), "_debug_data": {k: (str(v)[:300] if not isinstance(v, (int, float, bool, str, type(None))) else v) for k, v in data.items()}, "_debug_obj_plan": str(obj.plan_items)[:300] if hasattr(obj, "plan_items") else None, "_debug_obj_scores": str(obj.scores_json)[:300] if hasattr(obj, "scores_json") else None}
+        _dbg = {"id": obj.id, "_debug_dump": item.model_dump(), "_debug_data": {k: (str(v)[:300] if not isinstance(v, (int, float, bool, str, type(None))) else v) for k, v in data.items()}}
+        for fld in ("plan_items", "scores_json", "detail_json", "items_json", "sample_nos", "results_json", "sign_in_header", "subjects_json"):
+            if hasattr(obj, fld):
+                raw = getattr(obj, fld)
+                try:
+                    loaded = json.loads(raw)
+                    _dbg["_dbg_" + fld] = {"repr": repr(raw)[:200], "load_ok": True, "loaded": str(loaded)[:200]}
+                except Exception as e:
+                    _dbg["_dbg_" + fld] = {"repr": repr(raw)[:200], "load_ok": False, "err": str(e)}
+        return _dbg
 
     @router.put("/{item_id}", response_model=ReadSchema)
     def update(
