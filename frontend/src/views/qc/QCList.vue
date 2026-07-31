@@ -16,14 +16,12 @@
             placeholder="选择年月"
             format="YYYY-MM"
             value-format="YYYY-MM"
-            @change="loadSummary"
             style="width: 160px"
           />
           <el-select
             v-model="uploadInstrumentId"
             placeholder="选择仪器"
             style="width: 260px"
-            @change="onUploadInstChange"
           >
             <el-option
               v-for="opt in instrumentList"
@@ -32,6 +30,12 @@
               :value="opt.id"
             />
           </el-select>
+          <el-button
+            type="success"
+            :disabled="!monthValue || !uploadInstrumentId"
+            :loading="loadingSummary"
+            @click="loadSummary"
+          >统计</el-button>
           <el-button v-if="auth.canWrite('qc')" type="primary" :loading="uploading" @click="triggerCsv">上传该仪器 LIS 数据(CSV/XLSX)</el-button>
           <input ref="csvInput" type="file" accept=".csv,.xlsx,.xls" hidden @change="onCsvChange" />
           <div v-if="uploading" class="upload-progress">
@@ -54,7 +58,7 @@
         </div>
 
         <div v-if="!summaryRows.length && !loadingSummary" class="empty-tip">
-          请选择年月后加载，或先选「质控仪器」再点击「上传 LIS 数据」导入本月质控。
+          请先选择「年月」与「仪器」，再点击「统计」加载本月质控月结；或先选「质控仪器」再点击「上传 LIS 数据」导入本月质控。
         </div>
 
         <div v-for="g in groups" :key="g.key" class="inst-block">
@@ -66,7 +70,7 @@
             </span>
             <span class="inst-count">{{ g.rows.length }} 项</span>
           </div>
-          <el-table :data="g.rows" v-loading="loadingSummary" border stripe>
+          <el-table :data="g.rows" v-loading="loadingSummary" border stripe @expand-change="onSummaryExpand">
             <el-table-column type="expand">
               <template #default="{ row }">
                 <div class="daily-wrap">
@@ -1160,6 +1164,11 @@ onUnmounted(() => {
 
 async function loadSummary() {
   const { year, month } = parseMonth()
+  // 仅在「年月 + 仪器」都选齐后才允许加载（由工具栏「统计」按钮触发）
+  if (!year || !month || !uploadInstrumentId.value) {
+    summaryRows.value = []
+    return
+  }
   loadingSummary.value = true
   try {
     const params = {}
@@ -1168,12 +1177,9 @@ async function loadSummary() {
     if (uploadInstrumentId.value) params.instrument_id = uploadInstrumentId.value
     params.page_size = 500
     const res = await listQCSummaries(params)
-    const rows = (res.items || []).map((it) => ({ ...it, _daily: [] }))
+    // 每日测值改为展开行时懒加载（@expand-change -> onSummaryExpand），避免一次性 N 个请求拖慢页面
+    const rows = (res.items || []).map((it) => ({ ...it, _daily: [], _dailyLoaded: false }))
     summaryRows.value = rows
-    // 懒加载每日测值
-    await Promise.all(rows.map(async (r) => {
-      try { r._daily = await getQCDaily(r.id) } catch (e) { r._daily = [] }
-    }))
     // 载入各仪器块的文字报告
     const seen = new Set()
     for (const r of rows) {
@@ -1189,7 +1195,17 @@ async function loadSummary() {
     loadingSummary.value = false
   }
 }
-watch(activeTab, (t) => { if (t === 'summary' && !summaryRows.value.length && monthValue.value && uploadInstrumentId.value) loadSummary() })
+
+// 展开某行时按需拉取该行的每日测值（带 _dailyLoaded 防重复加载）
+function onSummaryExpand(row, expandedRows) {
+  if (!expandedRows.includes(row) || row._dailyLoaded) return
+  row._dailyLoaded = true
+  getQCDaily(row.id)
+    .then((d) => { row._daily = d || [] })
+    .catch(() => { row._daily = [] })
+}
+// 切回月结 tab 时保留已加载数据，不自动重新拉取（仅「统计」按钮触发加载）
+watch(activeTab, () => {})
 onMounted(loadInstruments)
 
 function triggerCsv() {

@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import {
@@ -92,7 +92,9 @@ async function remove(row) {
   } catch (e) {}
 }
 
-onMounted(refresh)
+// 切换人员时 ownerId 会变化，抽屉内容默认不销毁重建，必须 watch 重新拉取，
+// 否则始终停在第一次打开的那个人（如吕文娟）的履历。
+watch(() => props.ownerId, refresh, { immediate: true })
 </script>
 
 <style scoped>
