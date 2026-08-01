@@ -271,12 +271,13 @@
   </div>
 
   <!-- 修订文件在线预览 -->
-  <AttachmentPreview
-    v-model:visible="previewVisible"
-    :file="previewFile"
-    :get-url="getRevisionUrl"
-    @download="downloadRevisedFromReceive"
-  />
+  <el-dialog v-model="revisionPreviewVisible" title="修订文件预览" width="90%" top="2vh" append-to-body>
+    <div v-if="revisionPreviewLoading" v-loading="true" style="height: 70vh" />
+    <div v-else class="revision-preview-html" v-html="revisionPreviewHtml" />
+    <template #footer>
+      <el-button @click="revisionPreviewVisible = false">关闭</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -288,7 +289,7 @@ import {
   uploadRevision, downloadRevisionBlob, submitReview, receiveRevision, reviewerStats, reviewSummary,
   downloadDocumentBlob, myRecord, upsertMyRecord,
 } from '../../api/review'
-import AttachmentPreview from '../../components/AttachmentPreview.vue'
+import mammoth from 'mammoth'
 import { useAuthStore } from '../../store/auth'
 
 const auth = useAuthStore()
@@ -342,8 +343,9 @@ const receiveForm = reactive({
 })
 
 // 修订文件在线预览
-const previewVisible = ref(false)
-const previewFile = ref(null)
+const revisionPreviewVisible = ref(false)
+const revisionPreviewHtml = ref('')
+const revisionPreviewLoading = ref(false)
 
 // 仅允许三类 SOP 参与文件评审（范围：通用SOP / 项目SOP / 仪器SOP）
 const ALLOWED_CATS = ['通用SOP', '项目SOP', '仪器SOP']
@@ -504,22 +506,25 @@ function openReceive(row) {
   })
   receiveVisible.value = true
 }
-function getRevisionUrl(aid, inline) {
-  return `/api/v1/review/assignments/${aid}/download-revision${inline ? '?inline=1' : ''}`
-}
-
 async function previewRevision() {
   const row = assignments.value.find(a => a.id === receiveForm.assignment_id)
   if (!row) return
-  previewFile.value = {
-    id: row.id,
-    original_name: row.revised_filename || `revised-${row.id}.docx`,
-    file_type: 'docx',
+  revisionPreviewLoading.value = true
+  revisionPreviewVisible.value = true
+  revisionPreviewHtml.value = ''
+  try {
+    const blob = await downloadRevisionBlob(row.id)
+    const arrayBuffer = await blob.arrayBuffer()
+    const res = await mammoth.convertToHtml({ arrayBuffer })
+    revisionPreviewHtml.value = res.value || '<p style="color:#909399">（文档内容为空）</p>'
+  } catch (e) {
+    revisionPreviewHtml.value = `<p style="color:#f56c6c">预览失败：${e && e.message ? e.message : '无法解析文档'}</p>`
+  } finally {
+    revisionPreviewLoading.value = false
   }
-  previewVisible.value = true
 }
 
-async function downloadRevisedFromReceive(_file) {
+async function downloadRevisedFromReceive() {
   const row = assignments.value.find(a => a.id === receiveForm.assignment_id)
   if (!row) return
   const blob = await downloadRevisionBlob(row.id)
@@ -639,4 +644,10 @@ onMounted(async () => {
 .progress-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .form-tip { color: #909399; font-size: 12px; line-height: 1.4; margin-top: 4px; }
 .text-muted { color: #909399; }
+.revision-preview-html { max-height: 70vh; overflow: auto; background: #fff; padding: 4px; }
+.revision-preview-html :deep(table) { border-collapse: collapse; }
+.revision-preview-html :deep(th),
+.revision-preview-html :deep(td) { border: 1px solid #dcdfe6; padding: 4px 8px; }
+.revision-preview-html :deep(th) { background: #f5f7fa; }
+.revision-preview-html :deep(pre) { white-space: pre-wrap; word-break: break-all; }
 </style>
