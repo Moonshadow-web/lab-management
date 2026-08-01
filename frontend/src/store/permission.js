@@ -26,7 +26,7 @@ const FALLBACK = {
   'training':             ['admin', 'training_manager'],
   'training_delete':      ['admin', 'training_manager'],
   'verification':         ['admin', 'specialty_leader'],
-  'iso15189':             ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader'],
+  'iso15189':             ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader', 'leader', 'member', 'staff', 'director', 'deputy_director', 'biosafety_officer'],
   'quality-requirements': ['admin'],
   'scheduling':           ['admin', 'specialty_leader', 'leader'],
 }

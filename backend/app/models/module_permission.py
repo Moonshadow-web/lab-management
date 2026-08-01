@@ -64,7 +64,9 @@ DEFAULT_MODULE_PERMISSIONS = {
     "training":            ["admin", "training_manager"],
     "training_delete":     ["admin", "training_manager"],
     "verification":        ["admin", "specialty_leader"],
-    "iso15189":            ["admin", "quality_manager", "qc_manager", "training_manager", "reagent_manager", "it_manager", "specialty_leader"],
+    # 15189专项：向全体职工开放（admin/各管理员/专业组长/组长/主任/副主任/生物安全员/职工），
+    # 但排除 试剂配送(reagent_delivery) 与 技术支持(technical_support)；visitor(访客)系统无此角色，按外部人员处理，本就不授权。
+    "iso15189":            ["admin", "quality_manager", "qc_manager", "training_manager", "reagent_manager", "it_manager", "specialty_leader", "leader", "member", "staff", "director", "deputy_director", "biosafety_officer"],
     "quality-requirements": ["admin"],
     "scheduling":          ["admin", "specialty_leader", "leader"],
 }

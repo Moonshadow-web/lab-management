@@ -5,13 +5,13 @@
       <el-select v-model="campaignId" placeholder="选择评审活动" filterable style="width: 280px" @change="loadAll">
         <el-option v-for="c in campaigns" :key="c.id" :label="`${c.title}（${c.year}）`" :value="c.id" />
       </el-select>
-      <el-button v-if="auth.canWrite('iso15189')" type="primary" @click="onNewCampaign">新建活动</el-button>
-      <el-button v-if="auth.canWrite('iso15189')" :disabled="!campaignId" @click="onAssign">批量分配文件</el-button>
-      <el-button v-if="auth.canWrite('iso15189')" :disabled="!campaignId" @click="onSummary">汇总 A-027</el-button>
+      <el-button v-if="auth.canManageIso15189" type="primary" @click="onNewCampaign">新建活动</el-button>
+      <el-button v-if="auth.canManageIso15189" :disabled="!campaignId" @click="onAssign">批量分配文件</el-button>
+      <el-button v-if="auth.canManageIso15189" :disabled="!campaignId" @click="onSummary">汇总 A-027</el-button>
     </div>
 
     <!-- 管理员：全部分配与接收 -->
-    <template v-if="auth.canWrite('iso15189')">
+    <template v-if="auth.canManageIso15189">
       <el-divider content-position="left">分配与接收（管理员）</el-divider>
       <div class="reviewer-filter-bar">
         <el-select v-model="reviewerFilter" placeholder="按审核人筛选" clearable style="width:180px" @change="onReviewerFilterChange">

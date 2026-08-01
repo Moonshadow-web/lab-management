@@ -1,7 +1,7 @@
 <template>
   <div>
     <!-- 管理员：条款字典 + 活动 + 分配 -->
-    <template v-if="auth.canWrite('iso15189')">
+    <template v-if="auth.canManageIso15189">
       <el-divider content-position="left">条款字典（CNAS-AL02-07 附表3）</el-divider>
       <div class="bar">
         <el-button type="primary" @click="onImportClauses">批量导入条款</el-button>
@@ -283,7 +283,8 @@ const allClausesMap = computed(() => {
   return map
 })
 async function loadAllClauses() {
-  if (!auth.canWrite('iso15189')) return
+  // 条款字典为公开配置信息，任何登录用户都需读取（成员视图也要显示条款号），故不以 canWrite 收口
+  if (!auth.isLoggedIn) return
   try {
     const r = await listClauses({ page_size: 1000 })
     allClauses.value = r.items || []

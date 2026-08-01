@@ -26,7 +26,7 @@ const FALLBACK_MODULE_WRITE_ROLES = {
   'training': ['admin', 'training_manager'],
   'training_delete': ['admin', 'training_manager'],
   'verification': ['admin', 'specialty_leader'],
-  'iso15189': ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader'],
+  'iso15189': ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader', 'leader', 'member', 'staff', 'director', 'deputy_director', 'biosafety_officer'],
   'quality-requirements': ['admin'],
   'scheduling':         ['admin', 'specialty_leader', 'leader'],
 }
@@ -144,6 +144,14 @@ export const useAuthStore = defineStore('auth', {
     // 聚合菜单（如"质控管理"含多个权限模块）：任一可见即显示
     canAccessAnyMenu(moduleKeys) {
       return moduleKeys.some((k) => this.canAccessMenu(k))
+    },
+    // 15189专项「管理」身份判定：仅管理员 + 各线管理员 + 专业组长/组长 可看到建活动/分配/汇总/条款字典/不符合项增删等管理界面。
+    // 与 canWrite('iso15189') 区分：canWrite 已对全体职工开放（填写/提交自己的任务），
+    // 但管理界面必须用本判定收口，避免普通职工看到并操作管理功能。
+    canManageIso15189() {
+      if (this.isAdmin) return true
+      const MANAGE = ['admin', 'quality_manager', 'qc_manager', 'training_manager', 'reagent_manager', 'it_manager', 'specialty_leader', 'leader']
+      return this.myRoles.some((r) => MANAGE.includes(r))
     },
   },
 })
