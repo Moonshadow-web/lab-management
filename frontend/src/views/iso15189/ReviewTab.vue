@@ -330,7 +330,7 @@ import request from '../../utils/request'
 import {
   listCampaigns, createCampaign, updateCampaign, listAssignments, assignBatch, myAssignments,
   uploadRevision, downloadRevisionBlob, submitReview, receiveRevision, reviewerStats, reviewSummary,
-  downloadDocumentBlob, myRecord, upsertMyRecord,
+  downloadDocumentBlob, myRecord, upsertMyRecord, getAssignmentOpinion,
 } from '../../api/review'
 import mammoth from 'mammoth'
 import { buildReviewSummaryHtml, printHtml, downloadDoc as downloadReportDoc } from '../../utils/reportExport'
@@ -678,16 +678,38 @@ async function submitRevision(row) {
   await loadMy()
 }
 async function viewAssignRecord(row) {
-  const rec = row.record_json && typeof row.record_json === 'object' ? row.record_json : {}
-  ElMessageBox.alert(
-    `<div>专业组：${rec.review_group || '-'}</div>
-     <div>评审时间：${rec.review_date || '-'}</div>
-     <div>评审组成员：${rec.review_members || '-'}</div>
-     <div>评审文件：${rec.review_files || '-'}</div>
-     <div>主要存在问题：${rec.problems || '-'}</div>
-     <div>记录人：${rec.recorder || '-'}　审批人：${rec.approver || '-'}</div>`,
-    'A-027 评审记录', { dangerouslyUseHTMLString: true }
-  )
+  try {
+    const op = await getAssignmentOpinion(row.id)
+    const statusStyle = op.record_status === '已提交'
+      ? 'background:#e1f3d8;color:#67c23a;border:1px solid #d1edc4'
+      : op.record_status === '已填写'
+      ? 'background:#fdf6ec;color:#e6a23c;border:1px solid #faecd8'
+      : 'background:#f4f4f5;color:#909399;border:1px solid #e9e9eb'
+    const conclusionStyle = op.conclusion === '适宜'
+      ? 'background:#e1f3d8;color:#67c23a;border:1px solid #d1edc4'
+      : op.conclusion === '修改后适宜'
+      ? 'background:#fdf6ec;color:#e6a23c;border:1px solid #faecd8'
+      : op.conclusion === '作废'
+      ? 'background:#fde2e2;color:#f56c6c;border:1px solid #fcd3d3'
+      : 'background:#f4f4f5;color:#909399;border:1px solid #e9e9eb'
+    const statusTag = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;${statusStyle}">${op.record_status || '待提交'}</span>`
+    const conclusionTag = op.conclusion
+      ? `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;${conclusionStyle}">${op.conclusion}</span>`
+      : '-'
+    ElMessageBox.alert(
+      `<div style="line-height:1.8">
+        <div><b>审核人：</b>${op.reviewer || '-'}</div>
+        <div><b>评审文件：</b>${op.document_title || '-'}</div>
+        <div><b>A-027 状态：</b>${statusTag}</div>
+        <div><b>评审结论：</b>${conclusionTag}</div>
+        <div style="margin-top:8px"><b>评审意见：</b></div>
+        <div style="padding:8px;background:#f5f7fa;border-radius:4px;min-height:48px;white-space:pre-wrap">${op.comment || '（暂无评审意见）'}</div>
+      </div>`,
+      '文件评审意见', { dangerouslyUseHTMLString: true }
+    )
+  } catch (e) {
+    ElMessage.error('加载评审意见失败')
+  }
 }
 async function openRecord() {
   try {

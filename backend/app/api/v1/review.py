@@ -284,6 +284,67 @@ def download_revision(
     )
 
 
+@review_router.get("/review/assignments/{aid}/opinion")
+def get_assignment_opinion(
+    aid: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """查看某分配项对应的审核人 A-027 评审意见（按文档）。
+
+    - 审核人本人可查看；
+    - 管理员/各线管理员/专业组长可查看（便于审阅）。
+    """
+    a = db.get(ReviewAssignment, aid)
+    if not a:
+        raise HTTPException(404, "未找到分配项")
+    user_roles = (user.roles or "").split(",")
+    can_view = (
+        a.reviewer_id == user.id
+        or _is_admin(user)
+        or user.role in WRITE_ROLES
+        or any(r in WRITE_ROLES for r in user_roles)
+    )
+    if not can_view:
+        raise HTTPException(403, "无权查看")
+
+    d = db.get(Document, a.document_id)
+    doc_title = d.title if d else ""
+
+    rec = (
+        db.query(ReviewRecord)
+        .filter(ReviewRecord.campaign_id == a.campaign_id, ReviewRecord.reviewer_id == a.reviewer_id)
+        .first()
+    )
+
+    files = []
+    record_status = rec.status if rec else "待提交"
+    submitted_at = rec.submitted_at.isoformat() if rec and rec.submitted_at else None
+    if rec and rec.record_json:
+        try:
+            data = json.loads(rec.record_json)
+            files = data.get("files", []) or []
+        except Exception:
+            files = []
+
+    file_opinion = next(
+        (f for f in files if str(f.get("document_id")) == str(a.document_id)),
+        {},
+    )
+
+    return {
+        "assignment_id": a.id,
+        "document_id": a.document_id,
+        "document_title": doc_title,
+        "reviewer": a.reviewer,
+        "reviewer_id": a.reviewer_id,
+        "record_status": record_status,
+        "record_submitted_at": submitted_at,
+        "comment": file_opinion.get("comment", "") if file_opinion else "",
+        "conclusion": file_opinion.get("conclusion", "") if file_opinion else "",
+    }
+
+
 @review_router.post("/review/assignments/{aid}/submit")
 def submit_review(
     aid: int,

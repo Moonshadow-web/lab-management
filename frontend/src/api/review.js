@@ -45,6 +45,9 @@ export function downloadRevisionBlob(aid) {
 export function submitReview(aid, record) {
   return request.post(`${BASE}/assignments/${aid}/submit`, record || {})
 }
+export function getAssignmentOpinion(aid) {
+  return request.get(`${BASE}/assignments/${aid}/opinion`)
+}
 export function myRecord(campaign_id) {
   return request.get(`${BASE}/my-record`, { params: { campaign_id } })
 }
