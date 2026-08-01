@@ -66,38 +66,13 @@ def _rec_to_read(obj) -> SelfInspectionRecordRead:
     return SelfInspectionRecordRead.model_validate(d)
 
 
-def _one_decimal_key(clause_no: str) -> str:
-    """取条款号的一级小数分组键，如 8.9.3 -> 8.9，7.1 -> 7.1，6 -> 6。"""
-    parts = (clause_no or "").split(".")
-    if len(parts) >= 2:
-        return ".".join(parts[:2])
-    return clause_no or ""
-
-
-def _group_content(db, clause: "AuditClause"):
-    """给定某条款（通常是一级小数父条款），返回其下级子条款与聚合后的内容文本。
-
-    很多父条款（如 8.9）content 为空，真正文本在 8.9.1 / 8.9.2 / 8.9.3 等子条款里；
-    聚合后展示可保证「每个一级小数条款都有内容」。
-    """
-    key = _one_decimal_key(clause.clause_no)
-    children = (
-        db.query(AuditClause)
-        .filter(AuditClause.clause_no.like(f"{key}.%"))
-        .order_by(AuditClause.clause_no)
-        .all()
-    )
-    parts = [clause.content] + [c.content for c in children]
-    aggregated = "\n".join([p for p in parts if p and str(p).strip()])
-    return children, aggregated
-
-
 si_router = APIRouter(tags=["self-inspection"])
 
 clause_router = make_router(
     AuditClause, AuditClauseRead, AuditClauseCreate, AuditClauseUpdate,
     search_fields=["clause_no", "chapter", "title", "content"],
     filter_fields=["chapter"],
+    order_by=[AuditClause.clause_no.asc()],
     prefix="/audit-clauses",
     write_roles=CLAUSE_WRITE_ROLES,
 )
@@ -212,26 +187,22 @@ def assignment_clauses(
         except Exception:
             ids = []
     ids = ids or []
-    clauses = db.query(AuditClause).filter(AuditClause.id.in_(ids)).all() if ids else []
+    clauses = (
+        db.query(AuditClause)
+        .filter(AuditClause.id.in_(ids))
+        .order_by(AuditClause.clause_no)
+        .all()
+    ) if ids else []
     recs = db.query(SelfInspectionRecord).filter(SelfInspectionRecord.assignment_id == aid).all()
     rec_map = {r.clause_id: r for r in recs}
     out = []
     for c in clauses:
         r = rec_map.get(c.id)
-        children, aggregated = _group_content(db, c)
         out.append({
             "clause": {
                 "id": c.id, "clause_no": c.clause_no, "chapter": c.chapter,
                 "title": c.title, "content": c.content, "check_point": c.check_point,
             },
-            "children": [
-                {
-                    "id": ch.id, "clause_no": ch.clause_no, "chapter": ch.chapter,
-                    "title": ch.title, "content": ch.content, "check_point": ch.check_point,
-                }
-                for ch in children
-            ],
-            "aggregated_content": aggregated,
             "record": _rec_to_read(r) if r else None,
         })
     return out
@@ -307,15 +278,18 @@ def self_inspection_summary(
         ids = ids or []
         recs = db.query(SelfInspectionRecord).filter_by(assignment_id=a.id).all()
         rec_map = {r.clause_id: r for r in recs}
-        clauses = db.query(AuditClause).filter(AuditClause.id.in_(ids)).all() if ids else []
+        clauses = (
+            db.query(AuditClause)
+            .filter(AuditClause.id.in_(ids))
+            .order_by(AuditClause.clause_no)
+            .all()
+        ) if ids else []
         clause_out = []
         for c in clauses:
             r = rec_map.get(c.id)
-            _, aggregated = _group_content(db, c)
             clause_out.append({
                 "clause_no": c.clause_no, "chapter": c.chapter, "title": c.title,
                 "content": c.content, "check_point": c.check_point,
-                "aggregated_content": aggregated,
                 "result": r.result if r else "",
                 "finding": r.finding if r else "",
                 "action": r.action if r else "",

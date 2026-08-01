@@ -59,14 +59,14 @@
             <el-option v-for="u in users" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="条款（到 .1/.2）">
+        <el-form-item label="条款（可多选）">
           <el-select
-            v-model="assignForm.clause_keys"
+            v-model="assignForm.clause_ids"
             multiple filterable collapse-tags
-            placeholder="下拉选择多个条款（一级小数粒度）"
-            style="width:360px"
+            placeholder="下拉选择多个具体条款（如 8.9.1）"
+            style="width:420px"
           >
-            <el-option v-for="g in clauseGroups" :key="g.key" :label="`${g.key} ${g.title}`" :value="g.key" />
+            <el-option v-for="c in clauseOptions" :key="c.id" :label="`${c.clause_no} ${c.title}`" :value="c.id" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -82,7 +82,9 @@
         </div>
         <el-table :data="assignDetails" border size="small" v-loading="loadingDetail">
           <el-table-column prop="assignee" label="员工" width="110" />
-          <el-table-column prop="clause_range" label="分配条款（一级小数）" min-width="240" />
+          <el-table-column label="分配条款" min-width="280">
+            <template #default="{ row }">{{ clauseNosOf(row).join('、') }}</template>
+          </el-table-column>
           <el-table-column label="条数" width="70">
             <template #default="{ row }">{{ (row.clause_ids || []).length }}</template>
           </el-table-column>
@@ -107,7 +109,9 @@
     <el-divider content-position="left">我的自查分配</el-divider>
     <el-table :data="myAssigns" border size="small" v-loading="loadingMy">
       <el-table-column prop="assignee" label="员工" width="100" />
-      <el-table-column prop="clause_range" label="分配条款（一级小数）" min-width="200" />
+      <el-table-column label="分配条款" min-width="260">
+        <template #default="{ row }">{{ clauseNosOf(row).join('、') }}</template>
+      </el-table-column>
       <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }">
           <el-tag size="small" :type="row.status === '已提交' ? 'success' : 'warning'">{{ row.status }}</el-tag>
@@ -130,7 +134,7 @@
           <b>{{ item.clause.clause_no }}</b>　{{ item.clause.title }}
           <span class="clause-chapter">（{{ item.clause.chapter }}）</span>
         </div>
-        <div class="clause-content">{{ item.aggregated || '（无内容）' }}</div>
+        <div class="clause-content">{{ item.clause?.content || '（无内容）' }}</div>
         <el-form label-width="92px" size="small">
           <el-form-item label="核查内容">
             <el-input v-model="item.form.check_content" type="textarea" :rows="2" placeholder="如：查看程序文件 / 查看相关记录 / 现场查看……" />
@@ -269,8 +273,13 @@ async function onDeleteCamp(row) {
   await deleteCampaign(row.id); ElMessage.success('已删除'); campCrud.value?.refresh()
 }
 
-// 全部条款（用于聚合为一级小数分组）
+// 全部条款（用于下拉多选分配）
 const allClauses = ref([])
+const allClausesMap = computed(() => {
+  const map = {}
+  for (const c of allClauses.value) map[c.id] = c
+  return map
+})
 async function loadAllClauses() {
   if (!auth.canWrite('iso15189')) return
   try {
@@ -278,36 +287,33 @@ async function loadAllClauses() {
     allClauses.value = r.items || []
   } catch (e) {}
 }
-const clauseGroups = computed(() => {
-  const map = {}
-  for (const c of allClauses.value) {
-    const parts = (c.clause_no || '').split('.')
-    const key = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : (c.clause_no || '')
-    if (!key) continue
-    if (!map[key]) map[key] = { key, title: c.title, clauseId: c.id }
-    if (c.clause_no === key) { map[key].title = c.title; map[key].clauseId = c.id }
-  }
-  return Object.values(map).sort((a, b) => natCmp(a.key, b.key))
+const clauseOptions = computed(() => {
+  return [...allClauses.value].sort((a, b) => natCmp(a.clause_no, b.clause_no))
 })
+function clauseNosOf(row) {
+  const ids = row.clause_ids || []
+  return ids.map(id => allClausesMap.value[id]?.clause_no).filter(Boolean).sort(natCmp)
+}
 
-// 分配条款（下拉多选 -> 一级小数父条款）
-const assignForm = reactive({ campaign_id: null, assignee_id: null, clause_keys: [] })
+// 分配条款（下拉多选 -> 具体条款）
+const assignForm = reactive({ campaign_id: null, assignee_id: null, clause_ids: [] })
 const assignDetails = ref([])
 const loadingDetail = ref(false)
-const canAssign = computed(() => assignForm.campaign_id && assignForm.assignee_id && assignForm.clause_keys.length)
+const canAssign = computed(() => assignForm.campaign_id && assignForm.assignee_id && assignForm.clause_ids.length)
 async function onAssignClauses() {
   if (!canAssign.value) { ElMessage.warning('请选择活动、员工与至少一个条款'); return }
-  const ids = assignForm.clause_keys.map(k => (clauseGroups.value.find(g => g.key === k) || {}).clauseId).filter(Boolean)
+  const selected = assignForm.clause_ids.map(id => allClausesMap.value[id]).filter(Boolean)
+  const ids = selected.map(c => c.id)
   if (!ids.length) { ElMessage.warning('未匹配到条款'); return }
   const u = users.value.find(x => x.id === assignForm.assignee_id)
   await assignClausesBatch(assignForm.campaign_id, [{
     assignee: u?.full_name || u?.username || '',
     assignee_id: assignForm.assignee_id,
     clause_ids: ids,
-    clause_range: assignForm.clause_keys.join('、'),
+    clause_range: selected.map(c => c.clause_no).sort(natCmp).join('、'),
   }])
   ElMessage.success('已分配')
-  assignForm.clause_keys = []
+  assignForm.clause_ids = []
   await loadAssignDetail()
   await loadMy()
 }
@@ -352,7 +358,6 @@ async function openFill(row) {
   fillClauses.value = (data || [])
     .map(x => ({
       clause: x.clause,
-      aggregated: x.aggregated_content || x.clause?.content || '',
       form: reactive({
         check_content: x.record?.check_content || DEFAULT_CHECK,
         result: x.record?.result || '',
@@ -389,9 +394,9 @@ const reportName = ref('自查报告.doc')
 function normalizeRows(items) {
   return (items || [])
     .map(x => ({
-      clause_no: x.clause?.clause_no || '',
-      title: x.clause?.title || '',
-      content: x.aggregated_content || x.clause?.content || (x.content || ''),
+      clause_no: x.clause?.clause_no || x.clause_no || '',
+      title: x.clause?.title || x.title || '',
+      content: x.clause?.content || x.content || '',
       check_content: x.record?.check_content || x.check_content || '',
       result: x.record?.result || x.result || '',
       finding: x.record?.finding || x.finding || '',
