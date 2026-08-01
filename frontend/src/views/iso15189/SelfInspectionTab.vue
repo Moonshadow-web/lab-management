@@ -50,7 +50,7 @@
       <el-divider content-position="left">分配条款给员工</el-divider>
       <el-form :inline="true" class="bar">
         <el-form-item label="活动">
-          <el-select v-model="assignForm.campaign_id" placeholder="选择活动" style="width:220px">
+          <el-select v-model="assignForm.campaign_id" placeholder="选择活动" style="width:220px" @change="loadAssignDetail">
             <el-option v-for="c in campaigns" :key="c.id" :label="`${c.title}（${c.year}）`" :value="c.id" />
           </el-select>
         </el-form-item>
@@ -59,45 +59,84 @@
             <el-option v-for="u in users" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="条款范围">
-          <el-input v-model="assignForm.clause_range" placeholder="如 第六章 资源要求" style="width:200px" />
+        <el-form-item label="条款（到 .1/.2）">
+          <el-select
+            v-model="assignForm.clause_keys"
+            multiple filterable collapse-tags
+            placeholder="下拉选择多个条款（一级小数粒度）"
+            style="width:360px"
+          >
+            <el-option v-for="g in clauseGroups" :key="g.key" :label="`${g.key} ${g.title}`" :value="g.key" />
+          </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :disabled="!assignForm.campaign_id || !assignForm.assignee_id" @click="onPickClauses">选条款并分配</el-button>
+          <el-button type="primary" :disabled="!canAssign" @click="onAssignClauses">分配选中条款</el-button>
         </el-form-item>
       </el-form>
+
+      <!-- 分配明细（谁分了什么、是否提交） -->
+      <div v-if="assignForm.campaign_id" class="assign-detail">
+        <div class="assign-detail-bar">
+          <b>分配明细</b>
+          <el-button size="small" type="primary" plain @click="reportCampaign">预览 / 下载 / 打印 全部</el-button>
+        </div>
+        <el-table :data="assignDetails" border size="small" v-loading="loadingDetail">
+          <el-table-column prop="assignee" label="员工" width="110" />
+          <el-table-column prop="clause_range" label="分配条款（一级小数）" min-width="240" />
+          <el-table-column label="条数" width="70">
+            <template #default="{ row }">{{ (row.clause_ids || []).length }}</template>
+          </el-table-column>
+          <el-table-column prop="status" label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.status === '已提交' ? 'success' : 'warning'">{{ row.status }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="200" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" text type="primary" @click="reportAssignment(row)">预览</el-button>
+              <el-button size="small" text @click="printAssignment(row)">打印</el-button>
+              <el-button size="small" text @click="downloadAssignment(row)">下载</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!assignDetails.length" description="该活动尚未分配条款" :image-size="50" />
+      </div>
     </template>
 
     <!-- 成员：我的条款分配 -->
     <el-divider content-position="left">我的自查分配</el-divider>
     <el-table :data="myAssigns" border size="small" v-loading="loadingMy">
       <el-table-column prop="assignee" label="员工" width="100" />
-      <el-table-column prop="clause_range" label="条款范围" min-width="180" />
+      <el-table-column prop="clause_range" label="分配条款（一级小数）" min-width="200" />
       <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }">
           <el-tag size="small" :type="row.status === '已提交' ? 'success' : 'warning'">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="openFill(row)">逐条填写</el-button>
           <el-button size="small" :disabled="row.status === '已提交'" @click="submitAssign(row)">提交</el-button>
+          <el-button size="small" @click="reportAssignment(row)">报告</el-button>
         </template>
       </el-table-column>
     </el-table>
+    <el-empty v-if="!myAssigns.length" description="当前活动暂无分配给您的条款" :image-size="50" />
 
     <!-- 逐条填写弹窗 -->
-    <el-dialog v-model="fillVisible" :title="`逐条填写（${fillRange}）`" width="860px">
+    <el-dialog v-model="fillVisible" :title="fillTitle" width="900px" top="3vh">
       <div v-for="item in fillClauses" :key="item.clause.id" class="clause-card">
         <div class="clause-head">
           <b>{{ item.clause.clause_no }}</b>　{{ item.clause.title }}
-          <span class="muted">（{{ item.clause.chapter }}）</span>
+          <span class="clause-chapter">（{{ item.clause.chapter }}）</span>
         </div>
-        <div class="clause-content muted">{{ item.clause.content }}</div>
-        <el-form label-width="90px" size="small">
-          <el-form-item label="核查内容"><el-input v-model="item.form.check_content" type="textarea" :rows="2" /></el-form-item>
+        <div class="clause-content">{{ item.aggregated || '（无内容）' }}</div>
+        <el-form label-width="92px" size="small">
+          <el-form-item label="核查内容">
+            <el-input v-model="item.form.check_content" type="textarea" :rows="2" placeholder="如：查看程序文件 / 查看相关记录 / 现场查看……" />
+          </el-form-item>
           <el-form-item label="核查结果">
-            <el-select v-model="item.form.result" style="width:200px">
+            <el-select v-model="item.form.result" style="width:220px">
               <el-option v-for="r in resultOptions" :key="r" :label="r" :value="r" />
             </el-select>
           </el-form-item>
@@ -109,6 +148,16 @@
         <el-button @click="fillVisible = false">关闭</el-button>
         <el-button type="primary" @click="saveFill">保存全部条款</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 报告预览弹窗（预览 / 下载 / 打印） -->
+    <el-dialog v-model="reportVisible" :title="reportTitle" width="92%" top="2vh" append-to-body>
+      <div class="report-bar">
+        <el-button type="primary" @click="printCurrentReport">打印</el-button>
+        <el-button @click="downloadCurrentReport">下载（Word）</el-button>
+        <span class="report-hint">预览为只读；下载得到 .doc 文件，可用 Word 打开。</span>
+      </div>
+      <div class="report-html" v-html="reportHtml" />
     </el-dialog>
 
     <!-- 批量导入条款弹窗 -->
@@ -125,7 +174,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../components/CrudTable.vue'
 import EditDialog from '../../components/EditDialog.vue'
@@ -134,8 +183,10 @@ import {
   listClauses, createClause, updateClause, deleteClause, batchImportClauses,
   listCampaigns, createCampaign, updateCampaign, deleteCampaign,
   assignClausesBatch, myAssignments, assignmentClauses, upsertRecord, submitAssignment,
+  listAssignments,
 } from '../../api/selfInspection'
 import { useAuthStore } from '../../store/auth'
+import { buildSelfInspectionHtml, printHtml, downloadDoc } from '../../utils/reportExport'
 
 const auth = useAuthStore()
 const users = ref([])
@@ -143,6 +194,7 @@ const campaigns = ref([])
 const myAssigns = ref([])
 const loadingMy = ref(false)
 const resultOptions = ['符合', '不符合', '观察项', '不适用']
+const DEFAULT_CHECK = '查看程序文件\n查看相关记录\n现场查看：'
 
 // 条款字典 CRUD
 const clauseCrud = ref(null)
@@ -217,31 +269,55 @@ async function onDeleteCamp(row) {
   await deleteCampaign(row.id); ElMessage.success('已删除'); campCrud.value?.refresh()
 }
 
-// 分配条款
-const assignForm = reactive({ campaign_id: null, assignee_id: null, clause_range: '' })
-async function onPickClauses() {
-  const r = await listClauses({ page_size: 1000 })
-  const clauses = r.items || []
-  if (!clauses.length) { ElMessage.warning('请先导入条款字典'); return }
-  let picked = []
+// 全部条款（用于聚合为一级小数分组）
+const allClauses = ref([])
+async function loadAllClauses() {
+  if (!auth.canWrite('iso15189')) return
   try {
-    picked = await ElMessageBox.prompt('输入要分配的条款号（逗号分隔，留空表示全选）：', '选择条款', { inputValue: '' })
-      .then(({ value }) => value)
-  } catch (e) { return }
-  let sel
-  if (!picked || !picked.trim()) sel = clauses.map((c) => c.id)
-  else {
-    const nos = picked.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
-    sel = clauses.filter((c) => nos.includes(c.clause_no)).map((c) => c.id)
+    const r = await listClauses({ page_size: 1000 })
+    allClauses.value = r.items || []
+  } catch (e) {}
+}
+const clauseGroups = computed(() => {
+  const map = {}
+  for (const c of allClauses.value) {
+    const parts = (c.clause_no || '').split('.')
+    const key = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : (c.clause_no || '')
+    if (!key) continue
+    if (!map[key]) map[key] = { key, title: c.title, clauseId: c.id }
+    if (c.clause_no === key) { map[key].title = c.title; map[key].clauseId = c.id }
   }
-  if (!sel.length) { ElMessage.warning('未匹配到条款'); return }
-  const u = users.value.find((x) => x.id === assignForm.assignee_id)
+  return Object.values(map).sort((a, b) => natCmp(a.key, b.key))
+})
+
+// 分配条款（下拉多选 -> 一级小数父条款）
+const assignForm = reactive({ campaign_id: null, assignee_id: null, clause_keys: [] })
+const assignDetails = ref([])
+const loadingDetail = ref(false)
+const canAssign = computed(() => assignForm.campaign_id && assignForm.assignee_id && assignForm.clause_keys.length)
+async function onAssignClauses() {
+  if (!canAssign.value) { ElMessage.warning('请选择活动、员工与至少一个条款'); return }
+  const ids = assignForm.clause_keys.map(k => (clauseGroups.value.find(g => g.key === k) || {}).clauseId).filter(Boolean)
+  if (!ids.length) { ElMessage.warning('未匹配到条款'); return }
+  const u = users.value.find(x => x.id === assignForm.assignee_id)
   await assignClausesBatch(assignForm.campaign_id, [{
-    assignee: u?.full_name || u?.username || '', assignee_id: assignForm.assignee_id,
-    clause_ids: sel, clause_range: assignForm.clause_range || `共${sel.length}条`,
+    assignee: u?.full_name || u?.username || '',
+    assignee_id: assignForm.assignee_id,
+    clause_ids: ids,
+    clause_range: assignForm.clause_keys.join('、'),
   }])
   ElMessage.success('已分配')
+  assignForm.clause_keys = []
+  await loadAssignDetail()
   await loadMy()
+}
+async function loadAssignDetail() {
+  if (!assignForm.campaign_id) { assignDetails.value = []; return }
+  loadingDetail.value = true
+  try {
+    const r = await listAssignments({ campaign_id: assignForm.campaign_id, page_size: 500 })
+    assignDetails.value = r.items || []
+  } catch (e) { assignDetails.value = [] } finally { loadingDetail.value = false }
 }
 
 // 批量导入条款
@@ -249,10 +325,10 @@ const importVisible = ref(false)
 const importText = ref('')
 function onImportClauses() { importText.value = ''; importVisible.value = true }
 async function doImport() {
-  const lines = importText.value.split('\n').map((l) => l.trim()).filter(Boolean)
+  const lines = importText.value.split('\n').map(l => l.trim()).filter(Boolean)
   const items = []
   for (const line of lines) {
-    const [clause_no, chapter, title, content] = line.split('|').map((s) => (s || '').trim())
+    const [clause_no, chapter, title, content] = line.split('|').map(s => (s || '').trim())
     if (!clause_no && !title) continue
     items.push({ clause_no: clause_no || '', chapter: chapter || '', title: title || '', content: content || '' })
   }
@@ -261,26 +337,30 @@ async function doImport() {
   ElMessage.success(`已导入 ${items.length} 条`)
   importVisible.value = false
   clauseCrud.value?.refresh()
+  await loadAllClauses()
 }
 
 // 成员：我的分配 + 逐条填写
 const fillVisible = ref(false)
-const fillRange = ref('')
+const fillTitle = ref('')
 const fillClauses = ref([])
 const fillAssign = ref(null)
 async function openFill(row) {
   fillAssign.value = row
-  fillRange.value = row.clause_range || ''
+  fillTitle.value = `逐条填写 — ${row.assignee}（${row.clause_range || ''}）`
   const data = await assignmentClauses(row.id)
-  fillClauses.value = (data || []).map((x) => ({
-    clause: x.clause,
-    form: reactive({
-      check_content: x.record?.check_content || '',
-      result: x.record?.result || '',
-      finding: x.record?.finding || '',
-      action: x.record?.action || '',
-    }),
-  }))
+  fillClauses.value = (data || [])
+    .map(x => ({
+      clause: x.clause,
+      aggregated: x.aggregated_content || x.clause?.content || '',
+      form: reactive({
+        check_content: x.record?.check_content || DEFAULT_CHECK,
+        result: x.record?.result || '',
+        finding: x.record?.finding || '',
+        action: x.record?.action || '',
+      }),
+    }))
+    .sort((a, b) => natCmp(a.clause?.clause_no, b.clause?.clause_no))
   fillVisible.value = true
 }
 async function saveFill() {
@@ -299,6 +379,64 @@ async function submitAssign(row) {
   await submitAssignment(row.id)
   ElMessage.success('已提交')
   await loadMy()
+}
+
+// 报告（预览 / 下载 / 打印）
+const reportVisible = ref(false)
+const reportTitle = ref('')
+const reportHtml = ref('')
+const reportName = ref('自查报告.doc')
+function normalizeRows(items) {
+  return (items || [])
+    .map(x => ({
+      clause_no: x.clause?.clause_no || '',
+      title: x.clause?.title || '',
+      content: x.aggregated_content || x.clause?.content || (x.content || ''),
+      check_content: x.record?.check_content || x.check_content || '',
+      result: x.record?.result || x.result || '',
+      finding: x.record?.finding || x.finding || '',
+      action: x.record?.action || x.action || '',
+    }))
+    .sort((a, b) => natCmp(a.clause_no, b.clause_no))
+}
+async function buildAssignmentReport(row) {
+  const data = await assignmentClauses(row.id)
+  const rows = normalizeRows(data)
+  const name = row.assignee || '员工'
+  const camp = campaigns.value.find(c => c.id === row.campaign_id)
+  reportTitle.value = `自查报告 — ${name}`
+  reportName.value = `自查报告_${name}_${camp?.title || ''}.doc`
+  reportHtml.value = buildSelfInspectionHtml({
+    campaignTitle: camp?.title || '', year: camp?.year || '', assignee: name,
+    rows, generatedAt: new Date().toLocaleString('zh-CN'),
+  })
+  reportVisible.value = true
+}
+function reportAssignment(row) { buildAssignmentReport(row) }
+function printAssignment(row) { buildAssignmentReport(row).then(() => printCurrentReport()) }
+function downloadAssignment(row) { buildAssignmentReport(row).then(() => downloadCurrentReport()) }
+async function reportCampaign() {
+  if (!assignForm.campaign_id) return
+  const summary = await selfInspectionSummaryLocal(assignForm.campaign_id)
+  const camp = campaigns.value.find(c => c.id === assignForm.campaign_id)
+  const allRows = []
+  for (const a of summary) {
+    for (const c of (a.clauses || [])) allRows.push(c)
+  }
+  reportTitle.value = `自查汇总 — ${camp?.title || ''}`
+  reportName.value = `自查汇总_${camp?.title || ''}.doc`
+  reportHtml.value = buildSelfInspectionHtml({
+    campaignTitle: camp?.title || '', year: camp?.year || '', assignee: '全部分配人',
+    rows: normalizeRows(allRows), generatedAt: new Date().toLocaleString('zh-CN'),
+  })
+  reportVisible.value = true
+}
+function printCurrentReport() { if (reportHtml.value) printHtml(reportHtml.value) }
+function downloadCurrentReport() { if (reportHtml.value) downloadDoc(reportHtml.value, reportName.value) }
+
+// 取活动级汇总（用于全部导出）
+async function selfInspectionSummaryLocal(cid) {
+  return request.get('/api/v1/self-inspection/campaigns/' + cid + '/summary').then(r => r || [])
 }
 
 async function loadUsers() {
@@ -321,15 +459,44 @@ async function loadMy() {
 onMounted(async () => {
   await loadUsers()
   await loadCampaigns()
+  await loadAllClauses()
   await loadMy()
 })
+
+// 自然排序（条款号 4.1 < 4.2 < 5.1 ...）
+function natKey(s) { return (s || '').split('.').map(p => parseInt(p, 10) || 0) }
+function natCmp(a, b) {
+  const x = natKey(a), y = natKey(b)
+  const n = Math.max(x.length, y.length)
+  for (let i = 0; i < n; i++) {
+    const d = (x[i] || 0) - (y[i] || 0)
+    if (d) return d
+  }
+  return 0
+}
 </script>
 
 <style scoped>
-.bar { margin-bottom: 8px; }
+.bar { margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
 .el-divider { margin: 12px 0; }
-.clause-card { border: 1px solid #ebeef5; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; }
-.clause-head { font-size: 14px; margin-bottom: 4px; }
-.clause-content { margin-bottom: 8px; line-height: 1.5; }
-.muted { color: #909399; font-size: 12px; }
+.clause-card { border: 1px solid #ebeef5; border-radius: 6px; padding: 12px 16px; margin-bottom: 14px; }
+.clause-head { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.clause-chapter { color: #909399; font-size: 13px; font-weight: 400; }
+.clause-content {
+  margin-bottom: 10px; line-height: 1.7; font-size: 14px; color: #303133;
+  white-space: pre-wrap; word-break: break-word;
+  background: #fafafa; border-left: 3px solid #409eff; padding: 8px 12px; border-radius: 4px;
+}
+.assign-detail { margin-top: 12px; border: 1px solid #ebeef5; border-radius: 6px; padding: 12px; }
+.assign-detail-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.report-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.report-hint { color: #909399; font-size: 12px; }
+.report-html {
+  max-height: 72vh; overflow: auto; background: #fff; padding: 8px;
+  border: 1px solid #ebeef5; border-radius: 4px;
+}
+.report-html :deep(table) { border-collapse: collapse; width: 100%; font-size: 12px; }
+.report-html :deep(th), .report-html :deep(td) { border: 1px solid #333; padding: 5px 7px; vertical-align: top; text-align: left; }
+.report-html :deep(th) { background: #f2f2f2; text-align: center; }
+.report-html :deep(h2) { text-align: center; font-size: 18px; }
 </style>

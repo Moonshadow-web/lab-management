@@ -237,6 +237,14 @@
 
     <!-- 汇总弹窗：按人 A-027 -->
     <el-dialog v-model="summaryVisible" title="文件评审汇总（A-027，按人）" width="960px" top="4vh">
+      <div class="summary-bar">
+        <el-tag v-if="summaryArchived" type="success">已存档</el-tag>
+        <el-tag v-else type="info">未存档</el-tag>
+        <el-button size="small" type="success" :disabled="summaryArchived" @click="archiveSummary">确认存档</el-button>
+        <el-button size="small" type="primary" @click="previewSummary">预览</el-button>
+        <el-button size="small" @click="printSummary">打印</el-button>
+        <el-button size="small" @click="downloadSummary">下载（Word）</el-button>
+      </div>
       <el-table :data="summaryData" border size="small" max-height="520">
         <el-table-column type="expand">
           <template #default="{ row }">
@@ -278,6 +286,16 @@
       <el-button @click="revisionPreviewVisible = false">关闭</el-button>
     </template>
   </el-dialog>
+
+  <!-- 文件评审汇总报告预览 -->
+  <el-dialog v-model="summaryReportVisible" title="文件评审汇总报告预览" width="92%" top="2vh" append-to-body>
+    <div class="report-bar">
+      <el-button type="primary" @click="printHtml(summaryReportHtml)">打印</el-button>
+      <el-button @click="downloadDoc(summaryReportHtml, `文件评审汇总_${campaigns.find(c=>c.id===campaignId)?.title||''}.doc`)">下载（Word）</el-button>
+      <span class="report-hint">预览为只读；下载得到 .doc 文件，可用 Word 打开。</span>
+    </div>
+    <div class="summary-report-html" v-html="summaryReportHtml" />
+  </el-dialog>
 </template>
 
 <script setup>
@@ -285,11 +303,12 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 import {
-  listCampaigns, createCampaign, listAssignments, assignBatch, myAssignments,
+  listCampaigns, createCampaign, updateCampaign, listAssignments, assignBatch, myAssignments,
   uploadRevision, downloadRevisionBlob, submitReview, receiveRevision, reviewerStats, reviewSummary,
   downloadDocumentBlob, myRecord, upsertMyRecord,
 } from '../../api/review'
 import mammoth from 'mammoth'
+import { buildReviewSummaryHtml, printHtml, downloadDoc as downloadReportDoc } from '../../utils/reportExport'
 import { useAuthStore } from '../../store/auth'
 
 const auth = useAuthStore()
@@ -321,6 +340,9 @@ const myRecordStatus = ref('')
 
 const summaryVisible = ref(false)
 const summaryData = ref([])
+const summaryArchived = ref(false)
+const summaryReportVisible = ref(false)
+const summaryReportHtml = ref('')
 
 // 管理员：按人筛选 + 进度
 const reviewerFilter = ref('')
@@ -616,7 +638,28 @@ async function saveRecord(submit) {
 async function onSummary() {
   const r = await reviewSummary(campaignId.value)
   summaryData.value = r || []
+  const camp = campaigns.value.find(c => c.id === campaignId.value)
+  summaryArchived.value = camp?.status === '已存档'
   summaryVisible.value = true
+}
+async function archiveSummary() {
+  await updateCampaign(campaignId.value, { status: '已存档' })
+  summaryArchived.value = true
+  ElMessage.success('已确认存档')
+  await loadCampaigns()
+}
+function buildSummaryHtml() {
+  const camp = campaigns.value.find(c => c.id === campaignId.value)
+  return buildReviewSummaryHtml({ campaignTitle: camp?.title || '', year: camp?.year || '', rows: summaryData.value })
+}
+function previewSummary() {
+  summaryReportHtml.value = buildSummaryHtml()
+  summaryReportVisible.value = true
+}
+function printSummary() { printHtml(buildSummaryHtml()) }
+function downloadSummary() {
+  const camp = campaigns.value.find(c => c.id === campaignId.value)
+  downloadReportDoc(buildSummaryHtml(), `文件评审汇总_${camp?.title || ''}.doc`)
 }
 function triggerDownload(blob, name) {
   const url = window.URL.createObjectURL(new Blob([blob]))
@@ -650,4 +693,11 @@ onMounted(async () => {
 .revision-preview-html :deep(td) { border: 1px solid #dcdfe6; padding: 4px 8px; }
 .revision-preview-html :deep(th) { background: #f5f7fa; }
 .revision-preview-html :deep(pre) { white-space: pre-wrap; word-break: break-all; }
+.summary-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.report-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.report-hint { color: #909399; font-size: 12px; }
+.summary-report-html { max-height: 72vh; overflow: auto; background: #fff; padding: 8px; border: 1px solid #ebeef5; border-radius: 4px; }
+.summary-report-html :deep(table) { border-collapse: collapse; width: 100%; font-size: 12px; }
+.summary-report-html :deep(th), .summary-report-html :deep(td) { border: 1px solid #333; padding: 5px 7px; vertical-align: top; text-align: left; }
+.summary-report-html :deep(h2) { text-align: center; font-size: 18px; }
 </style>
