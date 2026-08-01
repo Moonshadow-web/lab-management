@@ -102,6 +102,7 @@
         <el-button size="small" @click="selectAllDocs">全选</el-button>
         <el-button size="small" @click="clearDocSelection">清空</el-button>
         <span class="sel-count">已选 {{ assignSelection.length }} 份</span>
+        <span class="remaining-tip">可分配 {{ reviewDocsFiltered.length }} 份（已分配 {{ assignedDocIds.size }} 份）</span>
       </div>
       <el-table
         ref="assignTableRef" :data="reviewDocsFiltered" border size="small" height="360"
@@ -371,9 +372,14 @@ const revisionPreviewLoading = ref(false)
 
 // 仅允许三类 SOP 参与文件评审（范围：通用SOP / 项目SOP / 仪器SOP）
 const ALLOWED_CATS = ['通用SOP', '项目SOP', '仪器SOP']
+// 当前活动里已被分配（无论分给谁）的文档 ID 集合：再次打开分配弹窗时这些文件不再出现
+const assignedDocIds = computed(() => new Set((assignments.value || []).map((a) => a.document_id)))
 const reviewDocs = computed(() =>
   docs.value.filter(
-    (d) => ALLOWED_CATS.includes(d.category) && (!d.status || !['作废', '停用', '废弃'].includes(d.status))
+    (d) =>
+      ALLOWED_CATS.includes(d.category) &&
+      (!d.status || !['作废', '停用', '废弃'].includes(d.status)) &&
+      !assignedDocIds.value.has(d.id)
   )
 )
 const reviewDocsFiltered = computed(() => {
