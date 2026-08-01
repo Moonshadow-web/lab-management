@@ -478,6 +478,24 @@ def receive_revision(
     return {"ok": True, "id": aid, "document_id": d.id, "new_version": new_version, "status": a.status}
 
 
+@review_router.delete("/review/campaigns/{cid}/cascade")
+def delete_campaign_cascade(
+    cid: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*WRITE_ROLES)),
+):
+    """管理员删除文件评审计划，级联删除其分配项与 A-027 记录。"""
+    camp = db.get(ReviewCampaign, cid)
+    if not camp:
+        raise HTTPException(404, "未找到评审计划")
+    db.query(ReviewRecord).filter(ReviewRecord.campaign_id == cid).delete(synchronize_session=False)
+    db.query(ReviewAssignment).filter(ReviewAssignment.campaign_id == cid).delete(synchronize_session=False)
+    db.delete(camp)
+    db.commit()
+    write_audit(db, user, "delete", "review_campaigns", cid, {"cascade": True})
+    return {"ok": True}
+
+
 @review_router.get("/review/campaigns/{cid}/stats-by-reviewer")
 def stats_by_reviewer(
     cid: int,

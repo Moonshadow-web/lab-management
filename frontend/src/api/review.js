@@ -12,7 +12,7 @@ export function updateCampaign(id, data) {
   return request.put(`${BASE}/campaigns/${id}`, data)
 }
 export function deleteCampaign(id) {
-  return request.delete(`${BASE}/campaigns/${id}`)
+  return request.delete(`${BASE}/campaigns/${id}/cascade`)
 }
 export function listAssignments(params) {
   return request.get(`${BASE}/assignments`, { params })

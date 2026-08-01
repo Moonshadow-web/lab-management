@@ -8,6 +8,7 @@
       <el-button v-if="auth.canManageIso15189" type="primary" @click="onNewCampaign">新建活动</el-button>
       <el-button v-if="auth.canManageIso15189" :disabled="!campaignId" @click="onAssign">批量分配文件</el-button>
       <el-button v-if="auth.canManageIso15189" :disabled="!campaignId" @click="onSummary">汇总 A-027</el-button>
+      <el-button v-if="auth.canManageIso15189" :disabled="!campaignId" type="danger" text @click="onDeleteCampaign">删除计划</el-button>
     </div>
 
     <!-- 管理员：全部分配与接收 -->
@@ -546,6 +547,25 @@ function onNewCampaign() {
       ElMessage.success('已创建')
       await loadCampaigns()
     }).catch(() => {})
+}
+async function onDeleteCampaign() {
+  if (!campaignId.value) return
+  const camp = campaigns.value.find(c => c.id === campaignId.value)
+  try {
+    await ElMessageBox.confirm(
+      `确定删除文件评审计划「${camp?.title || campaignId.value}」？\n将同步删除该计划下的分配、记录等关联数据，且不可恢复。`,
+      '删除计划',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+    )
+    await deleteCampaign(campaignId.value)
+    ElMessage.success('已删除')
+    campaignId.value = null
+    await loadCampaigns()
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error(e?.response?.data?.detail || '删除失败')
+    }
+  }
 }
 async function onAssign() {
   assignMode.value = 'single'

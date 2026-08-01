@@ -40,7 +40,7 @@ export function buildSelfInspectionHtml({ campaignTitle, year, assignee, rows, g
     </tr>`
   }).join('')
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">${PAGE_STYLE}</head><body>
-    <h2>科室自查（条款内审）报告</h2>
+    <h2>自查（条款内审）报告</h2>
     <div class="sub">CNAS-AL02-07 附表3 自查表</div>
     <div class="meta">活动：${escapeHtml(campaignTitle || '')}（${escapeHtml(year || '')}）　被查人/责任人：${escapeHtml(assignee || '')}　生成时间：${escapeHtml(generatedAt || '')}</div>
     <table>
