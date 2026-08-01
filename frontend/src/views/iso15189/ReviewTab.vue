@@ -14,7 +14,7 @@
     <template v-if="auth.canWrite('iso15189')">
       <el-divider content-position="left">分配与接收（管理员）</el-divider>
       <div class="reviewer-filter-bar">
-        <el-select v-model="reviewerFilter" placeholder="按审核人筛选" clearable style="width:180px" @change="loadStats">
+        <el-select v-model="reviewerFilter" placeholder="按审核人筛选" clearable style="width:180px" @change="onReviewerFilterChange">
           <el-option v-for="opt in reviewerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
         </el-select>
         <div class="progress-chips">
@@ -23,22 +23,46 @@
           </el-tag>
         </div>
       </div>
-      <el-table :data="filteredAssignments" border size="small" v-loading="loading">
-        <el-table-column prop="document_id" label="文档" min-width="220">
-          <template #default="{ row }">{{ docTitle(row.document_id) }} <el-tag type="info" size="small">{{ docCat(row.document_id) }}</el-tag></template>
-        </el-table-column>
-        <el-table-column prop="reviewer" label="审核人" width="100" />
-        <el-table-column prop="status" label="状态" width="120">
+      <el-table
+        :data="filteredGroups" border size="small" v-loading="loading"
+        row-key="reviewer" :expand-row-keys="expandedRowKeys"
+        @expand-change="(row, expanded) => {
+          expandedRowKeys.value = expanded.map(r => r.reviewer)
+        }"
+      >
+        <el-table-column type="expand" width="46">
           <template #default="{ row }">
-            <el-tag size="small" :type="statusType(row.status)">{{ row.status }}</el-tag>
+            <el-table :data="row.rows" border size="small" style="margin:6px 12px;width:calc(100% - 24px)">
+              <el-table-column prop="document_id" label="文档" min-width="220">
+                <template #default="{ row: r }">{{ docTitle(r.document_id) }} <el-tag type="info" size="small">{{ docCat(r.document_id) }}</el-tag></template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="120">
+                <template #default="{ row: r }">
+                  <el-tag size="small" :type="statusType(r.status)">{{ r.status }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="revised_filename" label="修订文件" min-width="160" />
+              <el-table-column prop="document_new_version" label="生成版本" width="100" />
+              <el-table-column label="操作" width="160" fixed="right">
+                <template #default="{ row: r }">
+                  <el-button size="small" :disabled="!r.revised_cloud_key" type="primary" @click="openReceive(r)">接收生成版本</el-button>
+                  <el-button size="small" text @click="viewAssignRecord(r)">记录</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
           </template>
         </el-table-column>
-        <el-table-column prop="revised_filename" label="修订文件" min-width="160" />
-        <el-table-column prop="document_new_version" label="生成版本" width="100" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column prop="reviewer" label="审核人" width="120" />
+        <el-table-column label="汇总" min-width="260">
           <template #default="{ row }">
-            <el-button size="small" :disabled="!row.revised_cloud_key" type="primary" @click="openReceive(row)">接收生成版本</el-button>
-            <el-button size="small" text @click="viewAssignRecord(row)">记录</el-button>
+            共 {{ row.total }} 份 / 已提交 {{ row.submitted }} / 已接收 {{ row.received }} / A-027 {{ row.a027_submitted ? '已交' : '未交' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="110" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" text @click="toggleExpand(row)">
+              {{ expandedRowKeys.includes(row.reviewer) ? '折叠' : '展开' }}
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -349,6 +373,13 @@ const summaryReportHtml = ref('')
 // 管理员：按人筛选 + 进度
 const reviewerFilter = ref('')
 const progressStats = ref([])
+const expandedRowKeys = ref([])
+
+function onReviewerFilterChange(val) {
+  reviewerFilter.value = val
+  // 默认折叠；筛选指定审核人后自动展开对应分组
+  expandedRowKeys.value = val ? [val] : []
+}
 
 // 接收生成版本审阅弹窗
 const receiveVisible = ref(false)
@@ -398,11 +429,44 @@ const reviewerOptions = computed(() => {
   return [{ label: '全部审核人', value: '' }, ...Array.from(names).map(n => ({ label: n, value: n }))]
 })
 
-const filteredAssignments = computed(() => {
+// 按审核人分组，用于折叠式管理员表格
+const reviewerGroups = computed(() => {
   const base = visibleAssignments.value
-  if (!reviewerFilter.value) return base
-  return base.filter(a => a.reviewer === reviewerFilter.value)
+  const groups = {}
+  base.forEach((a) => {
+    const r = a.reviewer || '未指定'
+    if (!groups[r]) groups[r] = { reviewer: r, rows: [] }
+    groups[r].rows.push(a)
+  })
+  return Object.values(groups).map((g) => {
+    const stats = g.rows.reduce(
+      (acc, r) => {
+        acc.total++
+        if (['已提交', '管理员已接收', '已完成'].includes(r.status)) acc.submitted++
+        if (['管理员已接收', '已完成'].includes(r.status)) acc.received++
+        return acc
+      },
+      { total: 0, submitted: 0, received: 0 }
+    )
+    const ps = progressStats.value.find((s) => s.reviewer === g.reviewer)
+    return { ...g, ...stats, a027_submitted: ps ? ps.a027_submitted : false }
+  })
 })
+
+const filteredGroups = computed(() => {
+  if (!reviewerFilter.value) return reviewerGroups.value
+  return reviewerGroups.value.filter((g) => g.reviewer === reviewerFilter.value)
+})
+
+function toggleExpand(row) {
+  const key = row.reviewer
+  const idx = expandedRowKeys.value.indexOf(key)
+  if (idx >= 0) {
+    expandedRowKeys.value.splice(idx, 1)
+  } else {
+    expandedRowKeys.value.push(key)
+  }
+}
 
 function statusType(s) {
   return { 待评审: 'info', 已提交: 'warning', 管理员已接收: 'success', 已完成: 'success' }[s] || 'info'
