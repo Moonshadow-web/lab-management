@@ -58,22 +58,60 @@ export function buildSelfInspectionHtml({ campaignTitle, year, assignee, rows, g
  * summaryData: [{reviewer,status,review_members,approver,problems,record_date,review_files:[{title,doc_number,version,comment,conclusion}],assign_files:[{title,status,new_version}]}]
  */
 export function buildReviewSummaryHtml({ campaignTitle, year, rows }) {
+  const header = `<table style="margin-bottom:8px">
+    <tr><td style="width:20%;font-weight:bold">表格编号</td><td style="width:30%">KS-BG-A-027</td><td style="width:20%;font-weight:bold">科室</td><td style="width:30%">民航总医院检验科</td></tr>
+    <tr><td style="font-weight:bold">生效日期</td><td>2025.04.01</td><td style="font-weight:bold">评审活动</td><td>${escapeHtml(campaignTitle || '')}（${escapeHtml(year || '')}）</td></tr>
+  </table>`
+
   const blocks = (rows || []).map((r) => {
-    const files = (r.review_files || []).map(f =>
-      `<li>${escapeHtml(f.title || '')}　编号：${escapeHtml(f.doc_number || '')}　版本：${escapeHtml(f.version || '')}　意见：${escapeHtml(f.comment || '')}　结论：${escapeHtml(f.conclusion || '')}</li>`
-    ).join('') || '<li>无</li>'
-    return `<div style="margin-bottom:14px">
-      <h3 style="margin:6px 0;font-size:14px">${escapeHtml(r.reviewer || '')}　<span style="font-weight:normal;color:#555">（${escapeHtml(r.status || '')}）</span></h3>
-      <div>评审组成员：${escapeHtml(r.review_members || '—')}　审批人：${escapeHtml(r.approver || '—')}　记录日期：${escapeHtml(r.record_date || '—')}</div>
-      <div>主要存在问题：${escapeHtml(r.problems || '无')}</div>
-      <div>评审文件：</div>
-      <ul style="margin:4px 0">${files}</ul>
+    const fileRows = (r.review_files || []).map(f =>
+      `<tr>
+        <td>${escapeHtml(f.title || '')}</td>
+        <td style="width:140px">${escapeHtml(f.doc_number || '')}</td>
+        <td style="width:60px;text-align:center">${escapeHtml(f.version || '')}</td>
+        <td style="width:200px" class="pre">${escapeHtml(f.comment || '')}</td>
+        <td style="width:80px;text-align:center">${escapeHtml(f.conclusion || '')}</td>
+      </tr>`
+    ).join('') || '<tr><td colspan="5" style="text-align:center">无</td></tr>'
+
+    const assignRows = (r.assign_files || []).map(f =>
+      `<tr>
+        <td>${escapeHtml(f.title || '')}</td>
+        <td style="width:100px;text-align:center">${escapeHtml(f.status || '')}</td>
+        <td style="width:100px;text-align:center">${escapeHtml(f.new_version || '')}</td>
+      </tr>`
+    ).join('') || '<tr><td colspan="3" style="text-align:center">无</td></tr>'
+
+    return `<div style="margin-bottom:18px">
+      <table style="margin-bottom:8px">
+        <tr>
+          <td style="width:12%;font-weight:bold">记录人</td><td style="width:18%">${escapeHtml(r.reviewer || '')}</td>
+          <td style="width:12%;font-weight:bold">状态</td><td style="width:18%">${escapeHtml(r.status || '')}</td>
+          <td style="width:12%;font-weight:bold">审批人</td><td style="width:28%">${escapeHtml(r.approver || '金子铮')}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:bold">记录日期</td><td>${escapeHtml(r.record_date || '')}</td>
+          <td colspan="2" style="font-weight:bold">评审组成员</td><td colspan="2">${escapeHtml(r.review_members || '—')}</td>
+        </tr>
+        <tr><td style="font-weight:bold">主要存在问题</td><td colspan="5" class="pre">${escapeHtml(r.problems || '无')}</td></tr>
+      </table>
+      <div style="font-weight:bold;margin:6px 0">评审文件</div>
+      <table style="margin-bottom:8px">
+        <thead><tr><th>文件名称</th><th style="width:140px">编号</th><th style="width:60px">版本</th><th style="width:200px">评审意见</th><th style="width:80px">结论</th></tr></thead>
+        <tbody>${fileRows}</tbody>
+      </table>
+      <div style="font-weight:bold;margin:6px 0">实际分配与接收</div>
+      <table>
+        <thead><tr><th>文件</th><th style="width:100px">状态</th><th style="width:100px">生成版本</th></tr></thead>
+        <tbody>${assignRows}</tbody>
+      </table>
     </div>`
   }).join('')
+
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">${PAGE_STYLE}</head><body>
     <h2>文件评审汇总表（A-027）</h2>
-    <div class="sub">${escapeHtml(campaignTitle || '')}（${escapeHtml(year || '')}）</div>
-    ${blocks || '<div style="text-align:center">暂无数据</div>'}
+    ${header}
+    ${blocks || '<div style="text-align:center;margin-top:20px">暂无数据</div>'}
   </body></html>`
 }
 
