@@ -93,9 +93,10 @@
               <el-tag size="small" :type="row.status === '已提交' ? 'success' : 'warning'">{{ row.status }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="200" fixed="right">
+          <el-table-column label="操作" width="260" fixed="right">
             <template #default="{ row }">
               <el-button size="small" text @click="printEmptySheet(row)">打印空表</el-button>
+              <el-button size="small" text type="primary" @click="openReassign(row)">重新分配</el-button>
               <el-button size="small" text type="primary" @click="reportAssignment(row)">预览</el-button>
               <el-button size="small" text @click="printAssignment(row)">打印</el-button>
               <el-button size="small" text @click="downloadAssignment(row)">下载</el-button>
@@ -137,6 +138,9 @@
           <span class="clause-chapter">（{{ item.clause.chapter }}）</span>
         </div>
         <div class="clause-content">{{ item.clause?.content || '（无内容）' }}</div>
+        <div v-if="item.clause?.check_point" class="clause-checkpoint">
+          <b>应用要求：</b>{{ item.clause.check_point }}
+        </div>
         <el-form label-width="92px" size="small">
           <el-form-item label="核查内容">
             <el-input v-model="item.form.check_content" type="textarea" :rows="2" placeholder="如：查看程序文件 / 查看相关记录 / 现场查看……" />
@@ -176,6 +180,16 @@
         <el-button type="primary" @click="doImport">导入</el-button>
       </template>
     </el-dialog>
+
+    <!-- 重新分配弹窗 -->
+    <EditDialog
+      v-model="reassignVisible"
+      title="重新分配条款"
+      :form="reassignForm"
+      :fields="reassignFields"
+      :submitting="reassignSubmitting"
+      @submit="onSubmitReassign"
+    />
   </div>
 </template>
 
@@ -187,8 +201,8 @@ import EditDialog from '../../components/EditDialog.vue'
 import request from '../../utils/request'
 import {
   listClauses, createClause, updateClause, deleteClause, batchImportClauses,
-  listCampaigns, createCampaign, updateCampaign, deleteCampaign,
-  assignClausesBatch, myAssignments, assignmentClauses, upsertRecord, submitAssignment,
+  listCampaigns, createCampaign, updateCampaign, deleteCampaign, deleteCampaignCascade,
+  assignClausesBatch, updateAssignment, myAssignments, assignmentClauses, upsertRecord, submitAssignment,
   listAssignments,
 } from '../../api/selfInspection'
 import { useAuthStore } from '../../store/auth'
@@ -271,8 +285,17 @@ async function onSubmitCamp() {
   } catch (e) { ElMessage.error('保存失败') } finally { campSubmitting.value = false }
 }
 async function onDeleteCamp(row) {
-  await ElMessageBox.confirm('确认删除该活动？', '提示', { type: 'warning' })
-  await deleteCampaign(row.id); ElMessage.success('已删除'); campCrud.value?.refresh()
+  try {
+    await ElMessageBox.confirm('确认删除该活动？其下的分配与自查记录将一并删除。', '提示', { type: 'warning' })
+    await deleteCampaignCascade(row.id)
+    ElMessage.success('已删除')
+    campCrud.value?.refresh()
+    await loadAssignDetail(); await loadMy()
+  } catch (e) {
+    if (e !== 'cancel' && e?.type !== 'cancel' && !(e?.toString?.().includes('cancel'))) {
+      ElMessage.error('删除失败：' + (e?.response?.data?.detail || e?.message || e))
+    }
+  }
 }
 
 // 全部条款（用于下拉多选分配）
@@ -327,6 +350,44 @@ async function loadAssignDetail() {
     const r = await listAssignments({ campaign_id: assignForm.campaign_id, page_size: 500 })
     assignDetails.value = r.items || []
   } catch (e) { assignDetails.value = [] } finally { loadingDetail.value = false }
+}
+
+// 重新分配
+const reassignVisible = ref(false)
+const reassignSubmitting = ref(false)
+const reassignId = ref(null)
+const reassignForm = reactive({ assignee_id: null, clause_ids: [] })
+const userOptions = computed(() => users.value.map(u => ({ label: u.full_name || u.username, value: u.id })))
+const reassignFields = computed(() => [
+  { prop: 'assignee_id', label: '员工', type: 'select', options: userOptions.value },
+  { prop: 'clause_ids', label: '条款', type: 'select', multiple: true,
+    options: clauseOptions.value.map(c => ({ label: `${c.clause_no} ${c.title}`, value: c.id })) },
+])
+function openReassign(row) {
+  reassignId.value = row.id
+  reassignForm.assignee_id = row.assignee_id || null
+  reassignForm.clause_ids = Array.isArray(row.clause_ids) ? [...row.clause_ids] : []
+  reassignVisible.value = true
+}
+async function onSubmitReassign() {
+  if (!reassignForm.assignee_id || !reassignForm.clause_ids.length) {
+    ElMessage.warning('请选择员工与至少一个条款'); return
+  }
+  reassignSubmitting.value = true
+  try {
+    const selected = reassignForm.clause_ids.map(id => allClausesMap.value[id]).filter(Boolean)
+    const u = users.value.find(x => x.id === reassignForm.assignee_id)
+    await updateAssignment(reassignId.value, {
+      assignee: u?.full_name || u?.username || '',
+      assignee_id: reassignForm.assignee_id,
+      clause_ids: reassignForm.clause_ids,
+      clause_range: selected.map(c => c.clause_no).sort(natCmp).join('、'),
+    })
+    ElMessage.success('已重新分配')
+    reassignVisible.value = false
+    await loadAssignDetail()
+    await loadMy()
+  } catch (e) { ElMessage.error('重新分配失败') } finally { reassignSubmitting.value = false }
 }
 
 // 批量导入条款
@@ -400,6 +461,7 @@ function normalizeRows(items) {
       clause_no: x.clause?.clause_no || x.clause_no || '',
       title: x.clause?.title || x.title || '',
       content: x.clause?.content || x.content || '',
+      check_point: x.clause?.check_point || x.check_point || '',
       check_content: x.record?.check_content || x.check_content || '',
       result: x.record?.result || x.result || '',
       finding: x.record?.finding || x.finding || '',
@@ -503,6 +565,11 @@ function natCmp(a, b) {
   margin-bottom: 10px; line-height: 1.7; font-size: 14px; color: #303133;
   white-space: pre-wrap; word-break: break-word;
   background: #fafafa; border-left: 3px solid #409eff; padding: 8px 12px; border-radius: 4px;
+}
+.clause-checkpoint {
+  margin-bottom: 10px; line-height: 1.7; font-size: 13px; color: #8b4513;
+  white-space: pre-wrap; word-break: break-word;
+  background: #fff8e1; border-left: 3px solid #ff9800; padding: 8px 12px; border-radius: 4px;
 }
 .assign-detail { margin-top: 12px; border: 1px solid #ebeef5; border-radius: 6px; padding: 12px; }
 .assign-detail-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }

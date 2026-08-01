@@ -16,6 +16,7 @@
         <el-select
           v-if="f.type === 'select'"
           v-model="form[f.prop]"
+          :multiple="f.multiple"
           :placeholder="f.placeholder || '请选择'"
           style="width: 100%"
         >

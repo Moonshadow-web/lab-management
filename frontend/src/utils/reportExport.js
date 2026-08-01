@@ -20,9 +20,17 @@ const PAGE_STYLE = `
     .ok{color:#167c2b} .bad{color:#c0392b} .warn{color:#b9770e} .na{color:#888}
   </style>`
 
+function clauseBody(r) {
+  let body = escapeHtml(r.content || '（无）')
+  if (r.check_point) {
+    body += `<div style="margin-top:6px;color:#8b4513"><b>【应用要求】</b>${escapeHtml(r.check_point)}</div>`
+  }
+  return body
+}
+
 /**
  * 自查（条款内审）报告 HTML。
- * rows: [{clause_no,title,content,check_content,result,finding,action}]
+ * rows: [{clause_no,title,content,check_point,check_content,result,finding,action}]
  */
 export function buildSelfInspectionHtml({ campaignTitle, year, assignee, rows, generatedAt }) {
   const trs = (rows || []).map((r, i) => {
@@ -32,7 +40,7 @@ export function buildSelfInspectionHtml({ campaignTitle, year, assignee, rows, g
     return `<tr>
       <td style="text-align:center">${i + 1}</td>
       <td><b>${escapeHtml(r.clause_no)}</b>${r.title ? ' ' + escapeHtml(r.title) : ''}</td>
-      <td class="pre">${escapeHtml(r.content || '（无）')}</td>
+      <td class="pre">${clauseBody(r)}</td>
       <td class="pre">${escapeHtml(r.check_content || '（未填写）')}</td>
       <td class="${resCls}" style="text-align:center">${escapeHtml(res || '—')}</td>
       <td class="pre">${escapeHtml(r.finding || '')}</td>
@@ -74,14 +82,6 @@ export function buildReviewSummaryHtml({ campaignTitle, year, rows }) {
       </tr>`
     ).join('') || '<tr><td colspan="5" style="text-align:center">无</td></tr>'
 
-    const assignRows = (r.assign_files || []).map(f =>
-      `<tr>
-        <td>${escapeHtml(f.title || '')}</td>
-        <td style="width:100px;text-align:center">${escapeHtml(f.status || '')}</td>
-        <td style="width:100px;text-align:center">${escapeHtml(f.new_version || '')}</td>
-      </tr>`
-    ).join('') || '<tr><td colspan="3" style="text-align:center">无</td></tr>'
-
     return `<div style="margin-bottom:18px">
       <table style="margin-bottom:8px">
         <tr>
@@ -99,11 +99,6 @@ export function buildReviewSummaryHtml({ campaignTitle, year, rows }) {
       <table style="margin-bottom:8px">
         <thead><tr><th>文件名称</th><th style="width:140px">编号</th><th style="width:60px">版本</th><th style="width:200px">评审意见</th><th style="width:80px">结论</th></tr></thead>
         <tbody>${fileRows}</tbody>
-      </table>
-      <div style="font-weight:bold;margin:6px 0">实际分配与接收</div>
-      <table>
-        <thead><tr><th>文件</th><th style="width:100px">状态</th><th style="width:100px">生成版本</th></tr></thead>
-        <tbody>${assignRows}</tbody>
       </table>
     </div>`
   }).join('')
@@ -123,7 +118,7 @@ export function buildEmptySelfInspectionHtml({ campaignTitle, year, assignee, ro
     `<tr style="height:72px">
       <td style="text-align:center">${i + 1}</td>
       <td><b>${escapeHtml(r.clause_no)}</b>${r.title ? ' ' + escapeHtml(r.title) : ''}</td>
-      <td class="pre">${escapeHtml(r.content || '（无）')}</td>
+      <td class="pre">${clauseBody(r)}</td>
       <td class="pre">${escapeHtml(r.check_content || '')}</td>
       <td style="text-align:center">　</td>
       <td>　</td>

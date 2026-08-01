@@ -158,6 +158,24 @@ def assign_clauses_batch(
     return {"ok": True, "created": created}
 
 
+@si_router.delete("/self-inspection/campaigns/{cid}/cascade")
+def delete_self_inspection_campaign_cascade(
+    cid: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*WRITE_ROLES)),
+):
+    """级联删除自查活动：先删记录、再删分配、最后删活动。"""
+    camp = db.get(SelfInspectionCampaign, cid)
+    if not camp:
+        raise HTTPException(404, "活动不存在")
+    db.query(SelfInspectionRecord).filter(SelfInspectionRecord.campaign_id == cid).delete(synchronize_session=False)
+    db.query(SelfInspectionAssignment).filter(SelfInspectionAssignment.campaign_id == cid).delete(synchronize_session=False)
+    db.delete(camp)
+    db.commit()
+    write_audit(db, user, "delete", "self_inspection_campaigns", cid, {"cascade": True})
+    return {"ok": True, "id": cid}
+
+
 @si_router.get("/self-inspection/my-assignments")
 def my_assignments(
     campaign_id: Optional[int] = None,

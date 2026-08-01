@@ -29,6 +29,9 @@ export function updateCampaign(id, data) {
 export function deleteCampaign(id) {
   return request.delete(`${BASE}/self-inspection/campaigns/${id}`)
 }
+export function deleteCampaignCascade(id) {
+  return request.delete(`${BASE}/self-inspection/campaigns/${id}/cascade`)
+}
 export function listAssignments(params) {
   return request.get(`${BASE}/self-inspection/assignments`, { params })
 }
