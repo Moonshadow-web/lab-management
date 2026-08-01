@@ -184,7 +184,8 @@
         <el-form-item label="成员修订文件">
           <div v-if="receiveForm.revised_filename">
             {{ receiveForm.revised_filename }}
-            <el-button size="small" text type="primary" @click="previewRevision">下载/预览修订版</el-button>
+            <el-button size="small" text type="primary" @click="previewRevision">预览</el-button>
+            <el-button size="small" text @click="downloadRevisedFromReceive">下载</el-button>
           </div>
           <span v-else class="text-muted">无修订文件</span>
         </el-form-item>
@@ -268,6 +269,14 @@
       </el-table>
     </el-dialog>
   </div>
+
+  <!-- 修订文件在线预览 -->
+  <AttachmentPreview
+    v-model:visible="previewVisible"
+    :file="previewFile"
+    :get-url="getRevisionUrl"
+    @download="downloadRevisedFromReceive"
+  />
 </template>
 
 <script setup>
@@ -279,6 +288,7 @@ import {
   uploadRevision, downloadRevisionBlob, submitReview, receiveRevision, reviewerStats, reviewSummary,
   downloadDocumentBlob, myRecord, upsertMyRecord,
 } from '../../api/review'
+import AttachmentPreview from '../../components/AttachmentPreview.vue'
 import { useAuthStore } from '../../store/auth'
 
 const auth = useAuthStore()
@@ -330,6 +340,10 @@ const receiveForm = reactive({
   approver: '',
   final_file: null,
 })
+
+// 修订文件在线预览
+const previewVisible = ref(false)
+const previewFile = ref(null)
 
 // 仅允许三类 SOP 参与文件评审（范围：通用SOP / 项目SOP / 仪器SOP）
 const ALLOWED_CATS = ['通用SOP', '项目SOP', '仪器SOP']
@@ -490,7 +504,22 @@ function openReceive(row) {
   })
   receiveVisible.value = true
 }
+function getRevisionUrl(aid, inline) {
+  return `/api/v1/review/assignments/${aid}/download-revision${inline ? '?inline=1' : ''}`
+}
+
 async function previewRevision() {
+  const row = assignments.value.find(a => a.id === receiveForm.assignment_id)
+  if (!row) return
+  previewFile.value = {
+    id: row.id,
+    original_name: row.revised_filename || `revised-${row.id}.docx`,
+    file_type: 'docx',
+  }
+  previewVisible.value = true
+}
+
+async function downloadRevisedFromReceive(_file) {
   const row = assignments.value.find(a => a.id === receiveForm.assignment_id)
   if (!row) return
   const blob = await downloadRevisionBlob(row.id)
