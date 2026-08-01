@@ -77,6 +77,39 @@ export function buildReviewSummaryHtml({ campaignTitle, year, rows }) {
   </body></html>`
 }
 
+/**
+ * 自查空表（现场检查用）：只打印条款列表，结果/问题/措施留空。
+ */
+export function buildEmptySelfInspectionHtml({ campaignTitle, year, assignee, rows }) {
+  const trs = (rows || []).map((r, i) =>
+    `<tr style="height:72px">
+      <td style="text-align:center">${i + 1}</td>
+      <td><b>${escapeHtml(r.clause_no)}</b>${r.title ? ' ' + escapeHtml(r.title) : ''}</td>
+      <td class="pre">${escapeHtml(r.content || '（无）')}</td>
+      <td class="pre">${escapeHtml(r.check_content || '')}</td>
+      <td style="text-align:center">　</td>
+      <td>　</td>
+      <td>　</td>
+    </tr>`
+  ).join('')
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">${PAGE_STYLE}</head><body>
+    <h2>科室自查（条款内审）现场检查表</h2>
+    <div class="sub">CNAS-AL02-07 附表3 自查表（空表）</div>
+    <div class="meta">活动：${escapeHtml(campaignTitle || '')}（${escapeHtml(year || '')}）　检查人：${escapeHtml(assignee || '')}　日期：${new Date().toLocaleDateString('zh-CN')}</div>
+    <table>
+      <thead><tr>
+        <th style="width:34px">序号</th><th style="width:150px">条款</th><th>条款内容 / 核查要点</th>
+        <th>核查内容</th><th style="width:64px">结果</th><th>问题描述</th><th>采取措施</th>
+      </tr></thead>
+      <tbody>${trs || '<tr><td colspan="7" style="text-align:center">暂无数据</td></tr>'}</tbody>
+    </table>
+    <div style="margin-top:20px;display:flex;justify-content:space-between">
+      <span>检查人签字：________________</span>
+      <span>日期：________________</span>
+    </div>
+  </body></html>`
+}
+
 export function printHtml(html) {
   const w = window.open('', '_blank')
   if (!w) {

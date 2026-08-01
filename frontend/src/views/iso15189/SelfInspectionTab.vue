@@ -95,6 +95,7 @@
           </el-table-column>
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
+              <el-button size="small" text @click="printEmptySheet(row)">打印空表</el-button>
               <el-button size="small" text type="primary" @click="reportAssignment(row)">预览</el-button>
               <el-button size="small" text @click="printAssignment(row)">打印</el-button>
               <el-button size="small" text @click="downloadAssignment(row)">下载</el-button>
@@ -121,6 +122,7 @@
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="openFill(row)">逐条填写</el-button>
           <el-button size="small" :disabled="row.status === '已提交'" @click="submitAssign(row)">提交</el-button>
+          <el-button size="small" @click="printEmptySheet(row)">打印空表</el-button>
           <el-button size="small" @click="reportAssignment(row)">报告</el-button>
         </template>
       </el-table-column>
@@ -190,7 +192,7 @@ import {
   listAssignments,
 } from '../../api/selfInspection'
 import { useAuthStore } from '../../store/auth'
-import { buildSelfInspectionHtml, printHtml, downloadDoc } from '../../utils/reportExport'
+import { buildSelfInspectionHtml, buildEmptySelfInspectionHtml, printHtml, downloadDoc } from '../../utils/reportExport'
 
 const auth = useAuthStore()
 const users = ref([])
@@ -420,6 +422,15 @@ async function buildAssignmentReport(row) {
 function reportAssignment(row) { buildAssignmentReport(row) }
 function printAssignment(row) { buildAssignmentReport(row).then(() => printCurrentReport()) }
 function downloadAssignment(row) { buildAssignmentReport(row).then(() => downloadCurrentReport()) }
+async function printEmptySheet(row) {
+  const data = await assignmentClauses(row.id)
+  const rows = normalizeRows(data).map(r => ({ ...r, check_content: r.check_content || DEFAULT_CHECK }))
+  const camp = campaigns.value.find(c => c.id === row.campaign_id)
+  const html = buildEmptySelfInspectionHtml({
+    campaignTitle: camp?.title || '', year: camp?.year || '', assignee: row.assignee || '', rows,
+  })
+  printHtml(html)
+}
 async function reportCampaign() {
   if (!assignForm.campaign_id) return
   const summary = await selfInspectionSummaryLocal(assignForm.campaign_id)

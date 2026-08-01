@@ -469,12 +469,13 @@ function onNewCampaign() {
       await loadCampaigns()
     }).catch(() => {})
 }
-function onAssign() {
+async function onAssign() {
   assignMode.value = 'single'
   assignReviewer.value = null
   assignReviewers.value = []
   assignSelection.value = []
   assignSearch.value = ''
+  if (!users.value.length) await loadDict()
   assignVisible.value = true
 }
 function onAssignSelect(rows) {
