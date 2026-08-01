@@ -51,7 +51,7 @@
       <el-tag size="small" :type="recordStatusType(myRecordStatus)">{{ myRecordStatus || '待提交' }}</el-tag>
       <el-button size="small" type="primary" @click="openRecord">填写 / 编辑</el-button>
     </div>
-    <el-table :data="myTasks" border size="small" v-loading="loadingMy">
+    <el-table :data="visibleMyTasks" border size="small" v-loading="loadingMy">
       <el-table-column prop="document_id" label="文档" min-width="240">
         <template #default="{ row }">{{ docTitle(row.document_id) }} <el-tag type="info" size="small">{{ docCat(row.document_id) }}</el-tag></template>
       </el-table-column>
@@ -75,7 +75,7 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-empty v-if="!myTasks.length" description="当前活动暂无分配给您的文件" :image-size="60" />
+    <el-empty v-if="!visibleMyTasks.length" description="当前活动暂无分配给您的文件" :image-size="60" />
 
     <!-- 批量分配弹窗（可视化：勾选表格 + 单人/多人均分） -->
     <el-dialog v-model="assignVisible" title="批量分配评审文件" width="820px" top="5vh">
@@ -325,6 +325,7 @@ const loadingMy = ref(false)
 const docMap = ref({})
 const docCatMap = ref({})
 const docFileMap = ref({})  // id -> original_filename
+const docStatusMap = ref({})  // id -> status（用于剔除「作废」文档）
 const userMap = ref({})
 
 const assignVisible = ref(false)
@@ -373,7 +374,11 @@ const revisionPreviewLoading = ref(false)
 // 仅允许三类 SOP 参与文件评审（范围：通用SOP / 项目SOP / 仪器SOP）
 const ALLOWED_CATS = ['通用SOP', '项目SOP', '仪器SOP']
 // 当前活动里已被分配（无论分给谁）的文档 ID 集合：再次打开分配弹窗时这些文件不再出现
-const assignedDocIds = computed(() => new Set((assignments.value || []).map((a) => a.document_id)))
+// 作废文档不参与评审，故可见分配均剔除 status='作废' 的文档
+const isObsolete = (docId) => docStatusMap.value[docId] === '作废'
+const visibleAssignments = computed(() => (assignments.value || []).filter((a) => !isObsolete(a.document_id)))
+const visibleMyTasks = computed(() => (myTasks.value || []).filter((a) => !isObsolete(a.document_id)))
+const assignedDocIds = computed(() => new Set(visibleAssignments.value.map((a) => a.document_id)))
 const reviewDocs = computed(() =>
   docs.value.filter(
     (d) =>
@@ -389,13 +394,14 @@ const reviewDocsFiltered = computed(() => {
 })
 
 const reviewerOptions = computed(() => {
-  const names = new Set(assignments.value.map(a => a.reviewer).filter(Boolean))
+  const names = new Set(visibleAssignments.value.map(a => a.reviewer).filter(Boolean))
   return [{ label: '全部审核人', value: '' }, ...Array.from(names).map(n => ({ label: n, value: n }))]
 })
 
 const filteredAssignments = computed(() => {
-  if (!reviewerFilter.value) return assignments.value
-  return assignments.value.filter(a => a.reviewer === reviewerFilter.value)
+  const base = visibleAssignments.value
+  if (!reviewerFilter.value) return base
+  return base.filter(a => a.reviewer === reviewerFilter.value)
 })
 
 function statusType(s) {
@@ -415,15 +421,17 @@ async function loadDict() {
   try {
     const d = await request.get('/api/v1/documents', { params: { page_size: 500, hide_invalid: true } })
     docs.value = d.items || []
-    const m = {}, cm = {}, fm = {}
+    const m = {}, cm = {}, fm = {}, sm = {}
     d.items.forEach((x) => {
       m[x.id] = x.title
       cm[x.id] = x.category
       fm[x.id] = x.original_filename || ''
+      sm[x.id] = x.status || ''
     })
     docMap.value = m
     docCatMap.value = cm
     docFileMap.value = fm
+    docStatusMap.value = sm
   } catch (e) {}
   try {
     const u = await request.get('/api/v1/users', { params: { page_size: 500 } })

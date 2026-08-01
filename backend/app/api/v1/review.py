@@ -423,10 +423,18 @@ def stats_by_reviewer(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(*WRITE_ROLES)),
 ):
-    """按审核人统计当前活动的分配/提交/接收进度。"""
+    """按审核人统计当前活动的分配/提交/接收进度。作废文档不参与统计。"""
     assigns = db.query(ReviewAssignment).filter(ReviewAssignment.campaign_id == cid).all()
+    # 作废文档不参与评审，跳过其分配项的统计
+    doc_ids = [a.document_id for a in assigns]
+    doc_status = {}
+    if doc_ids:
+        for d in db.query(Document.id, Document.status).filter(Document.id.in_(doc_ids)).all():
+            doc_status[d.id] = d.status
     stats: dict[str, dict] = {}
     for a in assigns:
+        if doc_status.get(a.document_id) == "作废":
+            continue
         name = a.reviewer or "未分配"
         if name not in stats:
             stats[name] = {
@@ -476,6 +484,8 @@ def review_summary(
         assign_files = []
         for a in assigns:
             d = db.get(Document, a.document_id)
+            if d and d.status == "作废":
+                continue
             assign_files.append({
                 "document_id": a.document_id,
                 "title": d.title if d else "",
