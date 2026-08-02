@@ -39,7 +39,7 @@ from ...models.iso15189 import REVIEW_DOC_CATEGORIES
 
 WRITE_ROLES = (
     "admin", "quality_manager", "qc_manager", "training_manager",
-    "reagent_manager", "it_manager", "specialty_leader",
+    "reagent_manager", "it_manager", "specialty_leader", "leader",
 )
 DEFAULT_APPROVER = "金子铮"
 

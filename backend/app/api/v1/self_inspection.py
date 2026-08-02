@@ -39,7 +39,7 @@ from ...schemas import (
 
 WRITE_ROLES = (
     "admin", "quality_manager", "qc_manager", "training_manager",
-    "reagent_manager", "it_manager", "specialty_leader",
+    "reagent_manager", "it_manager", "specialty_leader", "leader",
 )
 CLAUSE_WRITE_ROLES = ("admin", "quality_manager", "specialty_leader", "qc_manager", "training_manager")
 

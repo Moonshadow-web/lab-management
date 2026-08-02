@@ -9,7 +9,7 @@ from ...schemas import (
 
 WRITE_ROLES = (
     "admin", "quality_manager", "qc_manager", "training_manager",
-    "reagent_manager", "it_manager", "specialty_leader",
+    "reagent_manager", "it_manager", "specialty_leader", "leader",
 )
 
 corrective_router = make_router(
