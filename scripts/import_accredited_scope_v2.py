@@ -95,8 +95,16 @@ def parse_xlsx(path):
                 c=_cell(ws,r,COL["sample_type"]); d=_cell(ws,r,COL["method_name"])
                 e=_cell(ws,r,COL["instrument_name"]); f=_cell(ws,r,COL["reagent_name"]); g=_cell(ws,r,COL["calibrator"])
                 if c:  # 新样品类型
-                    cur_sample={"sample_type":c,"method_name":d,
-                                "instrument_name":e,"reagent_name":f,"calibrator":g}
+                    # 如果续行未填写设备/试剂/校准品，继承该项目首个样品行的内容
+                    # （Excel 中常有只写样品类型、其余留空的简写续行）
+                    base = cur_item["samples"][0] if cur_item and cur_item["samples"] else {}
+                    cur_sample={
+                        "sample_type":c,
+                        "method_name":d or base.get("method_name",""),
+                        "instrument_name":e or base.get("instrument_name",""),
+                        "reagent_name":f or base.get("reagent_name",""),
+                        "calibrator":g or base.get("calibrator",""),
+                    }
                     cur_item["samples"].append(cur_sample)
                 else:  # 同一样品类型的附加仪器/试剂/校准品
                     if cur_sample is not None:
@@ -153,16 +161,15 @@ def main():
             "method_id":None,"method_name":"","instrument_id":None,"instrument_name":"","reagent_id":None,"reagent_name":"",
         }
         if ex:
+            # 保留系统关联 ID（避免 replace 清空已有确认关联）
             rec["method_id"]=ex.get("method_id")
-            rec["method_name"]=ex.get("method_name") or s["method_name"]
-            if ex.get("instrument_id"):
-                rec["instrument_id"]=ex["instrument_id"]; rec["instrument_name"]=ex.get("instrument_name") or s["instrument_name"]
-            else:
-                rec["instrument_name"]=s["instrument_name"]
-            if ex.get("reagent_id"):
-                rec["reagent_id"]=ex["reagent_id"]; rec["reagent_name"]=ex.get("reagent_name") or s["reagent_name"]
-            else:
-                rec["reagent_name"]=s["reagent_name"]
+            rec["instrument_id"]=ex.get("instrument_id")
+            rec["reagent_id"]=ex.get("reagent_id")
+            # 名称文本优先使用 Excel 原始内容（含注册证号、设备编号、多仪器等），
+            # 只有 Excel 为空时才回退到系统已有名称
+            rec["method_name"]=s["method_name"] or ex.get("method_name") or ""
+            rec["instrument_name"]=s["instrument_name"] or ex.get("instrument_name") or ""
+            rec["reagent_name"]=s["reagent_name"] or ex.get("reagent_name") or ""
         else:
             rec["method_name"]=s["method_name"]
             rec["instrument_name"]=s["instrument_name"]
