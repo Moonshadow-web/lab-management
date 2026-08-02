@@ -132,16 +132,17 @@
 
     <!-- 逐条填写弹窗 -->
     <el-dialog v-model="fillVisible" :title="fillTitle" width="900px" top="3vh">
-      <div v-for="item in fillClauses" :key="item.clause.id" class="clause-card">
+      <div v-for="item in fillClauses" :key="item.clause.id" class="clause-card" :class="{ 'clause-na': isNoRequirementClause(item.clause) }">
         <div class="clause-head">
           <b>{{ item.clause.clause_no }}</b>　{{ item.clause.title }}
           <span class="clause-chapter">（{{ item.clause.chapter }}）</span>
+          <el-tag v-if="isNoRequirementClause(item.clause)" size="small" type="info" style="margin-left:8px">无具体应用要求 / 无需填写</el-tag>
         </div>
         <div class="clause-content">{{ item.clause?.content || '（无内容）' }}</div>
         <div v-if="item.clause?.application_requirement || item.clause?.check_point" class="clause-checkpoint">
           <b>应用要求：</b>{{ item.clause?.application_requirement || item.clause.check_point }}
         </div>
-        <el-form label-width="92px" size="small">
+        <el-form v-if="!isNoRequirementClause(item.clause)" label-width="92px" size="small">
           <el-form-item label="核查内容">
             <el-input v-model="item.form.check_content" type="textarea" :rows="2" placeholder="如：查看程序文件 / 查看相关记录 / 现场查看……" />
           </el-form-item>
@@ -153,6 +154,7 @@
           <el-form-item label="问题描述"><el-input v-model="item.form.finding" type="textarea" :rows="2" /></el-form-item>
           <el-form-item label="采取措施"><el-input v-model="item.form.action" type="textarea" :rows="2" /></el-form-item>
         </el-form>
+        <div v-else class="na-notice">该条款无具体应用要求，已自动标记为「不适用」。</div>
       </div>
       <template #footer>
         <el-button @click="fillVisible = false">关闭</el-button>
@@ -215,6 +217,13 @@ const myAssigns = ref([])
 const loadingMy = ref(false)
 const resultOptions = ['符合', '不符合', '观察项', '不适用']
 const DEFAULT_CHECK = '查看程序文件\n查看相关记录\n现场查看：'
+const NA_MARKS = ['', '（无）', '(无)']
+function isNoRequirementClause(c) {
+  if (!c) return false
+  const contentEmpty = NA_MARKS.includes((c.content || '').trim())
+  const appEmpty = NA_MARKS.includes((c.application_requirement || '').trim()) && NA_MARKS.includes((c.check_point || '').trim())
+  return contentEmpty && appEmpty
+}
 
 // 条款字典 CRUD
 const clauseCrud = ref(null)
@@ -420,15 +429,18 @@ async function openFill(row) {
   fillTitle.value = `逐条填写 — ${row.assignee}（${row.clause_range || ''}）`
   const data = await assignmentClauses(row.id)
   fillClauses.value = (data || [])
-    .map(x => ({
-      clause: x.clause,
-      form: reactive({
-        check_content: x.record?.check_content || DEFAULT_CHECK,
-        result: x.record?.result || '',
-        finding: x.record?.finding || '',
-        action: x.record?.action || '',
-      }),
-    }))
+    .map(x => {
+      const na = isNoRequirementClause(x.clause)
+      return {
+        clause: x.clause,
+        form: reactive({
+          check_content: x.record?.check_content || (na ? '' : DEFAULT_CHECK),
+          result: x.record?.result || (na ? '不适用' : ''),
+          finding: x.record?.finding || '',
+          action: x.record?.action || '',
+        }),
+      }
+    })
     .sort((a, b) => natCmp(a.clause?.clause_no, b.clause?.clause_no))
   fillVisible.value = true
 }
@@ -572,6 +584,9 @@ function natCmp(a, b) {
   white-space: pre-wrap; word-break: break-word;
   background: #fff8e1; border-left: 3px solid #ff9800; padding: 8px 12px; border-radius: 4px;
 }
+.clause-na { background: #f5f7fa; }
+.clause-na .clause-content { background: #ebeef5; border-left-color: #c0c4cc; color: #909399; }
+.na-notice { color: #909399; font-size: 13px; padding: 8px 0; }
 .assign-detail { margin-top: 12px; border: 1px solid #ebeef5; border-radius: 6px; padding: 12px; }
 .assign-detail-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .report-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }

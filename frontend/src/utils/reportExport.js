@@ -20,6 +20,13 @@ const PAGE_STYLE = `
     .ok{color:#167c2b} .bad{color:#c0392b} .warn{color:#b9770e} .na{color:#888}
   </style>`
 
+const NA_MARKS = ['', '（无）', '(无)']
+function isNoRequirementRow(r) {
+  const contentEmpty = NA_MARKS.includes((r.content || '').trim())
+  const appEmpty = NA_MARKS.includes((r.application_requirement || '').trim()) && NA_MARKS.includes((r.check_point || '').trim())
+  return contentEmpty && appEmpty
+}
+
 function clauseBody(r) {
   let body = escapeHtml(r.content || '（无）')
   const appReq = r.application_requirement || r.check_point
@@ -35,17 +42,18 @@ function clauseBody(r) {
  */
 export function buildSelfInspectionHtml({ campaignTitle, year, assignee, rows, generatedAt }) {
   const trs = (rows || []).map((r, i) => {
-    const res = (r.result || '').trim()
+    const na = isNoRequirementRow(r)
+    const res = (r.result || '').trim() || (na ? '不适用' : '')
     const resCls = res === '符合' ? 'ok' : res === '不符合' ? 'bad'
       : res === '观察项' ? 'warn' : res === '不适用' ? 'na' : ''
     return `<tr>
       <td style="text-align:center">${i + 1}</td>
       <td><b>${escapeHtml(r.clause_no)}</b>${r.title ? ' ' + escapeHtml(r.title) : ''}</td>
       <td class="pre">${clauseBody(r)}</td>
-      <td class="pre">${escapeHtml(r.check_content || '（未填写）')}</td>
+      <td class="pre">${escapeHtml(r.check_content || (na ? '—' : '（未填写）'))}</td>
       <td class="${resCls}" style="text-align:center">${escapeHtml(res || '—')}</td>
-      <td class="pre">${escapeHtml(r.finding || '')}</td>
-      <td class="pre">${escapeHtml(r.action || '')}</td>
+      <td class="pre">${escapeHtml(r.finding || (na ? '—' : ''))}</td>
+      <td class="pre">${escapeHtml(r.action || (na ? '—' : ''))}</td>
     </tr>`
   }).join('')
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">${PAGE_STYLE}</head><body>
@@ -115,17 +123,18 @@ export function buildReviewSummaryHtml({ campaignTitle, year, rows }) {
  * 自查空表（现场检查用）：只打印条款列表，结果/问题/措施留空。
  */
 export function buildEmptySelfInspectionHtml({ campaignTitle, year, assignee, rows }) {
-  const trs = (rows || []).map((r, i) =>
-    `<tr style="height:72px">
+  const trs = (rows || []).map((r, i) => {
+    const na = isNoRequirementRow(r)
+    return `<tr style="height:72px">
       <td style="text-align:center">${i + 1}</td>
       <td><b>${escapeHtml(r.clause_no)}</b>${r.title ? ' ' + escapeHtml(r.title) : ''}</td>
       <td class="pre">${clauseBody(r)}</td>
-      <td class="pre">${escapeHtml(r.check_content || '')}</td>
-      <td style="text-align:center">　</td>
-      <td>　</td>
-      <td>　</td>
+      <td class="pre">${escapeHtml(r.check_content || (na ? '—' : ''))}</td>
+      <td style="text-align:center">${na ? '不适用' : '　'}</td>
+      <td>${na ? '—' : '　'}</td>
+      <td>${na ? '—' : '　'}</td>
     </tr>`
-  ).join('')
+  }).join('')
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">${PAGE_STYLE}</head><body>
     <h2>科室自查（条款内审）现场检查表</h2>
     <div class="sub">CNAS-AL02-07 附表3 自查表（空表）</div>
