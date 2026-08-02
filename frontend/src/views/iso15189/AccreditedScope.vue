@@ -21,8 +21,7 @@
       </template>
       <div v-for="g in groups" :key="g.key" class="group-block">
         <div class="group-title">
-          <span class="l1">{{ g.l1 || '未分类' }}</span>
-          <span v-if="g.l2" class="l2"> / {{ g.l2 }}</span>
+          <span class="l1">{{ g.title || '未分类' }}</span>
           <span class="count">（{{ g.rows.length }} 项）</span>
         </div>
         <el-table :data="g.rows" border size="small" stripe style="width: 100%">
@@ -231,16 +230,81 @@ const filteredItems = computed(() => {
   )
 })
 
+// 提取分类字母前缀用于排序（AA < AC < AD ...）
+function catPrefix(s) {
+  const m = (s || '').match(/^([A-Za-z]+)/)
+  return m ? m[1] : 'ZZ'
+}
 const groups = computed(() => {
-  const map = new Map()
+  // 1) 按 category_l2 分块（真正的 AA/AC/AD 分类）
+  const byCat = new Map()
   for (const it of filteredItems.value) {
-    const l1 = it.category_l1 || ''
-    const l2 = it.category_l2 || ''
-    const key = `${l1}||${l2}`
-    if (!map.has(key)) map.set(key, { key, l1, l2, rows: [] })
-    map.get(key).rows.push(it)
+    const cat = it.category_l2 || it.category_l1 || '未分类'
+    if (!byCat.has(cat)) byCat.set(cat, [])
+    byCat.get(cat).push(it)
   }
-  return Array.from(map.values())
+  // 2) 分类排序：按字母前缀 AA→AC→AD
+  const cats = Array.from(byCat.keys()).sort((a, b) => {
+    const pa = catPrefix(a), pb = catPrefix(b)
+    if (pa !== pb) return pa < pb ? -1 : 1
+    return a < b ? -1 : 1
+  })
+  return cats.map((cat) => {
+    const rows = byCat.get(cat)
+    // 3) 按「序号 + 项目名」合并多样品类型（血清/血浆算同一项目，序号算一个）
+    const merged = new Map()
+    for (const it of rows) {
+      const key = `${it.seq}||${it.item_name}`
+      if (!merged.has(key)) {
+        merged.set(key, {
+          _ids: [], _rep: it,
+          seq: it.seq, item_name: it.item_name,
+          sample_type: [], method_name: [], instrument_name: [], reagent_name: [],
+          calibrator: [], perf_correctness: [], perf_precision: [], perf_linearity: [],
+          perf_reportable: [], perf_other: [], description: [], remark: [],
+          instrument_id: it.instrument_id, reagent_id: it.reagent_id, method_id: it.method_id,
+        })
+      }
+      const m = merged.get(key)
+      m._ids.push(it.id)
+      const push = (arr, v) => { if (v != null && v !== '' && !arr.includes(v)) arr.push(v) }
+      push(m.sample_type, it.sample_type)
+      push(m.method_name, it.method_name)
+      push(m.instrument_name, it.instrument_name)
+      push(m.reagent_name, it.reagent_name)
+      push(m.calibrator, it.calibrator)
+      push(m.perf_correctness, it.perf_correctness)
+      push(m.perf_precision, it.perf_precision)
+      push(m.perf_linearity, it.perf_linearity)
+      push(m.perf_reportable, it.perf_reportable)
+      push(m.perf_other, it.perf_other)
+      push(m.description, it.description)
+      push(m.remark, it.remark)
+    }
+    // 4) 块内按序号升序
+    const mergedRows = Array.from(merged.values()).sort((a, b) => {
+      const na = parseInt(a.seq, 10), nb = parseInt(b.seq, 10)
+      if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb
+      return (a.seq || '') < (b.seq || '') ? -1 : 1
+    })
+    const joinInline = (arr) => (arr.length ? arr.join(' / ') : '—')
+    const joinStack = (arr) => (arr.length ? arr.join('\n') : '—')
+    mergedRows.forEach((m) => {
+      m.sample_type = joinInline(m.sample_type)
+      m.method_name = joinStack(m.method_name)
+      m.instrument_name = joinStack(m.instrument_name)
+      m.reagent_name = joinStack(m.reagent_name)
+      m.calibrator = joinStack(m.calibrator)
+      m.perf_correctness = joinStack(m.perf_correctness)
+      m.perf_precision = joinStack(m.perf_precision)
+      m.perf_linearity = joinStack(m.perf_linearity)
+      m.perf_reportable = joinStack(m.perf_reportable)
+      m.perf_other = joinStack(m.perf_other)
+      m.description = joinStack(m.description)
+      m.remark = joinStack(m.remark)
+    })
+    return { key: cat, title: cat, rows: mergedRows }
+  })
 })
 
 async function loadOptions() {
@@ -302,8 +366,10 @@ function onAdd() {
   dialogVisible.value = true
 }
 function onEdit(row) {
-  Object.assign(form, emptyForm(), JSON.parse(JSON.stringify(row)))
-  editingId.value = row.id
+  // 合并行：编辑其代表性原始记录（首个样品类型行）
+  const src = row._rep || row
+  Object.assign(form, emptyForm(), JSON.parse(JSON.stringify(src)))
+  editingId.value = src.id
   dialogVisible.value = true
 }
 async function onSubmit() {
@@ -326,8 +392,12 @@ async function onSubmit() {
   }
 }
 async function onDelete(row) {
-  await ElMessageBox.confirm(`确认删除「${row.item_name}」？`, '提示', { type: 'warning' })
-  await deleteScope(row.id)
+  // 合并行：删除其下所有样品类型记录
+  const ids = (row._ids && row._ids.length) ? row._ids : [row.id]
+  await ElMessageBox.confirm(`确认删除「${row.item_name}」（含 ${ids.length} 个样品类型行）？`, '提示', { type: 'warning' })
+  for (const id of ids) {
+    await deleteScope(id)
+  }
   ElMessage.success('已删除')
   await loadData()
 }
