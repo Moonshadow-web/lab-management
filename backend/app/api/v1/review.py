@@ -69,6 +69,13 @@ campaign_router = make_router(
     prefix="/review/campaigns",
     write_roles=WRITE_ROLES,
 )
+# 评审计划删除必须级联：移除 make_router 自带的非级联 DELETE（计划有分配时会因外键约束 500），
+# 改由下方 /review/campaigns/{cid} 与 /review/campaigns/{cid}/cascade 统一级联处理，避免旧前端缓存误调标准删除而失败。
+campaign_router.routes = [
+    r for r in campaign_router.routes
+    if not (getattr(r, "path", "") in ("/{item_id}", "/review/campaigns/{item_id}")
+            and "DELETE" in getattr(r, "methods", set()))
+]
 assignment_router = make_router(
     ReviewAssignment, ReviewAssignmentRead, ReviewAssignmentCreate, ReviewAssignmentUpdate,
     search_fields=["reviewer", "note"],
@@ -478,6 +485,7 @@ def receive_revision(
     return {"ok": True, "id": aid, "document_id": d.id, "new_version": new_version, "status": a.status}
 
 
+@review_router.delete("/review/campaigns/{cid}")
 @review_router.delete("/review/campaigns/{cid}/cascade")
 def delete_campaign_cascade(
     cid: int,
