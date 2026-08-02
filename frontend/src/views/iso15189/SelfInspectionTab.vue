@@ -138,8 +138,8 @@
           <span class="clause-chapter">（{{ item.clause.chapter }}）</span>
         </div>
         <div class="clause-content">{{ item.clause?.content || '（无内容）' }}</div>
-        <div v-if="item.clause?.check_point" class="clause-checkpoint">
-          <b>应用要求：</b>{{ item.clause.check_point }}
+        <div v-if="item.clause?.application_requirement || item.clause?.check_point" class="clause-checkpoint">
+          <b>应用要求：</b>{{ item.clause?.application_requirement || item.clause.check_point }}
         </div>
         <el-form label-width="92px" size="small">
           <el-form-item label="核查内容">
@@ -462,6 +462,7 @@ function normalizeRows(items) {
       title: x.clause?.title || x.title || '',
       content: x.clause?.content || x.content || '',
       check_point: x.clause?.check_point || x.check_point || '',
+      application_requirement: x.clause?.application_requirement || x.application_requirement || '',
       check_content: x.record?.check_content || x.check_content || '',
       result: x.record?.result || x.result || '',
       finding: x.record?.finding || x.finding || '',

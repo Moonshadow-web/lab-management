@@ -96,6 +96,7 @@ class AuditClauseBase(BaseModel):
     title: str = ""
     content: str = ""
     check_point: str = ""
+    application_requirement: str = ""
 
 
 class AuditClauseCreate(AuditClauseBase):

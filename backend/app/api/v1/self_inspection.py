@@ -112,7 +112,7 @@ def batch_import_clauses(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(*CLAUSE_WRITE_ROLES)),
 ):
-    """批量导入条款字典。items: [{clause_no, chapter, title, content, check_point}]。"""
+    """批量导入条款字典。items: [{clause_no, chapter, title, content, check_point, application_requirement}]。"""
     created = []
     for it in items:
         if not it.get("clause_no") and not it.get("title"):
@@ -123,6 +123,7 @@ def batch_import_clauses(
             title=it.get("title", "") or "",
             content=it.get("content", "") or "",
             check_point=it.get("check_point", "") or "",
+            application_requirement=it.get("application_requirement", "") or "",
         )
         db.add(c)
         db.flush()
@@ -220,6 +221,7 @@ def assignment_clauses(
             "clause": {
                 "id": c.id, "clause_no": c.clause_no, "chapter": c.chapter,
                 "title": c.title, "content": c.content, "check_point": c.check_point,
+                "application_requirement": c.application_requirement or "",
             },
             "record": _rec_to_read(r) if r else None,
         })
@@ -308,6 +310,7 @@ def self_inspection_summary(
             clause_out.append({
                 "clause_no": c.clause_no, "chapter": c.chapter, "title": c.title,
                 "content": c.content, "check_point": c.check_point,
+                "application_requirement": c.application_requirement or "",
                 "result": r.result if r else "",
                 "finding": r.finding if r else "",
                 "action": r.action if r else "",

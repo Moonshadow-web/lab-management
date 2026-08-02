@@ -74,6 +74,7 @@ def main():
             "title": c.get("title", ""),
             "content": c.get("content", ""),
             "check_point": c.get("check_point", ""),
+            "application_requirement": c.get("application_requirement", ""),
         }
         if no in by_no:
             old = by_no[no]
@@ -82,6 +83,7 @@ def main():
                 and old.get("title") == payload["title"]
                 and old.get("content") == payload["content"]
                 and old.get("check_point") == payload["check_point"]
+                and old.get("application_requirement") == payload["application_requirement"]
             ):
                 unchanged += 1
             else:

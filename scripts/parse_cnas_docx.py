@@ -1,5 +1,6 @@
 """解析 CNAS-AL02-07 附表3《医学实验室质量和能力认可准则和应用要求》自查表.docx
-输出：clauses_export.json（clause_no/chapter/title/content/check_point）
+输出：clauses_export.json（clause_no/chapter/title/content/application_requirement）
+列结构：条款 | 认可准则 | 应用要求 | 自查结果 | 自查说明
 """
 from __future__ import annotations
 
@@ -99,12 +100,12 @@ def parse_docx(path: str) -> list[dict]:
             continue
 
         clause_no = m.group(1)
-        content = cells[1] if len(cells) > 1 else ""
-        check_point = cells[2] if len(cells) > 2 else ""
+        content = cells[1] if len(cells) > 1 else ""          # 认可准则（要求原文）
+        application_requirement = cells[2] if len(cells) > 2 else ""  # 应用要求
 
-        # 应用要求列与认可准则列重复时，置空
-        if check_point and check_point == content:
-            check_point = ""
+        # 应用要求列与认可准则列重复时，置空（章节行套表时两列一致）
+        if application_requirement and application_requirement == content:
+            application_requirement = ""
 
         # 标题来源优先级：内容自带标题 > 同组标题行
         title = extract_clause_title(content)
@@ -126,7 +127,7 @@ def parse_docx(path: str) -> list[dict]:
                 "chapter": chapter,
                 "title": title,
                 "content": content,
-                "check_point": check_point,
+                "application_requirement": application_requirement,
             })
         else:
             # 已存在则追加内容（处理偶发的同一条款多行）
@@ -134,8 +135,8 @@ def parse_docx(path: str) -> list[dict]:
                 if c["clause_no"] == clause_no:
                     if content:
                         c["content"] = (c["content"] + "\n" + content).strip()
-                    if check_point:
-                        c["check_point"] = (c["check_point"] + "\n" + check_point).strip()
+                    if application_requirement:
+                        c["application_requirement"] = (c["application_requirement"] + "\n" + application_requirement).strip()
                     break
 
     return clauses
@@ -153,11 +154,11 @@ def main():
 
     print("total clauses:", len(clauses))
     for c in clauses[:8]:
-        print(f"  {c['clause_no']} | {c['chapter']} | {c['title']!r} | cLen={len(c['content'])} aLen={len(c['check_point'])}")
+        print(f"  {c['clause_no']} | {c['chapter']} | {c['title']!r} | cLen={len(c['content'])} appLen={len(c['application_requirement'])}")
     print("...")
     for c in clauses:
         if c["clause_no"] in ("7.5", "7.3.7.2", "4.2", "7.3.7"):
-            print(f"  SAMPLE {c['clause_no']} | {c['title']!r} | cLen={len(c['content'])} aLen={len(c['check_point'])}")
+            print(f"  SAMPLE {c['clause_no']} | {c['title']!r} | cLen={len(c['content'])} appLen={len(c['application_requirement'])}")
 
 
 if __name__ == "__main__":

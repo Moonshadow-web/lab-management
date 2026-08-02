@@ -110,8 +110,9 @@ class AuditClause(Base):
     clause_no: Mapped[str] = mapped_column(String(30), index=True, default="")  # 6.4.1
     chapter: Mapped[str] = mapped_column(String(80), default="")  # 第六章 资源要求
     title: Mapped[str] = mapped_column(String(300), default="")  # 条款标题
-    content: Mapped[str] = mapped_column(Text, default="")  # 条款内容（原文）
+    content: Mapped[str] = mapped_column(Text, default="")  # 条款内容（认可准则原文）
     check_point: Mapped[str] = mapped_column(Text, default="")  # 核查要点（可选）
+    application_requirement: Mapped[str] = mapped_column(Text, default="")  # 应用要求（CNAS-AL02-07 附表3 第3列）
 
 
 class SelfInspectionCampaign(Base):

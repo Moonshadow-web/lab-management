@@ -22,8 +22,9 @@ const PAGE_STYLE = `
 
 function clauseBody(r) {
   let body = escapeHtml(r.content || '（无）')
-  if (r.check_point) {
-    body += `<div style="margin-top:6px;color:#8b4513"><b>【应用要求】</b>${escapeHtml(r.check_point)}</div>`
+  const appReq = r.application_requirement || r.check_point
+  if (appReq) {
+    body += `<div style="margin-top:6px;color:#8b4513"><b>【应用要求】</b>${escapeHtml(appReq)}</div>`
   }
   return body
 }
