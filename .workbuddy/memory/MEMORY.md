@@ -43,8 +43,22 @@
 - **train_date bugfix(2026-07-31)**：edu_exp.train_date VARCHAR(20)→40（张婵媛长区间日期 21 字符写入 500），启动期 ALTER 迁移；_BUILD_MARK=edu-exp-train-date-widen-2026-07-31（曾被另一 AI 的 force-recalc-goals 部署顶掉，重推重部署后生效）。
 - 部署踩坑(2026-07-30)：schemas/education 漏 import field_validator(NameError) + crud_base make_router search_fields 必填改默认 None(TypeError) → 两启动崩溃；`import app.main` 抓出。
 
+## 15189 认可能力范围模块（2026-08-02）
+- 第 4 个 15189 tab（Hub 加 `el-tab-pane name="scope"`）；参考《生免组申请认可的能力范围.xlsx》展示+编辑。
+- 模型 `AccreditedScope`(`iso15189.py`)：分组 l1/l2 + 项目信息 + 系统关联(`*_name`+`*_id`) + 分析性能5项(正确度/精密度/线性/可报告范围/其他) + 说明/备注。方法非独立实体（from test_items.method 去重），设备/试剂关联 instruments/reagent。
+- 后端 `accredited_scope.py`：`make_router(prefix="/accredited-scope")` + `POST /accredited-scope/batch?replace=true`（xlsx 种子）；**更新用 PUT**（make_router 无 PATCH，前端 `updateScope` 须 `request.put`）。
+- 导入 `scripts/import_accredited_scope.py`：openpyxl 解析 Sheet1(A1:R109)，分组判定=A列前置字母1个→l1、≥2→l2，共64条；方法/试剂/仪器先存旧文本*_name，*_id留空待前端下拉关联。
+
 ## 已知坑（Pydantic / 通用 CRUD）
 - **json_fields 经 ORM 对象读取会整列丢失**：`ReadSchema.model_validate(ORM对象)` 在 pydantic from_attributes 模式下，对 Text 列的 JSON 字符串**不触发 `mode="before"` 校验器的 `json.loads`**（实测返回 `[]`/`{}`，但 `json.loads` 裸字符串正常、普通类对象 `model_validate` 正常）。凡用 `make_router(json_fields=[...])` 的模块（新员工培训 plan_items/detail_json、能力评估 scores_json 等）读取均中招。
   - **正确做法**：`crud_base.py` 已用 `_serialize(obj)`（ORM→dict + 手动 `json.loads`）+ `_to_read(obj)`（`ReadSchema.model_validate(dict)`）绕过；list/get/create/update 全部走 `_to_read`。新增 json_fields 模块时无需再改，但**勿删 `_to_read`**。
 - **API 路径带 router 自带前缀**：auth=`/api/v1/auth/login`、education 各资源=`/api/v1/education/...`（如 new-employee-trains），不是 `/api/v1/login` / `/api/v1/new-employee-trains`。排查 404/405 先 curl `/openapi.json` 核对真实路径（勿被 SPA fallback 的 404/405 误导）。
 - **内网部署生效慢**：tcb deploy 提交后，内网 curl `/api/v1/_diag/build` 往往要 ~5 分钟才翻到新 `_BUILD_MARK`（容器构建+滚动发布），勿提前判定失败。
+
+## AU5800 系列项目 SOP 文档（桌面，2026-08-03）
+- 任务：把 `C:\Users\81526\Desktop\待办\AU5800` 下 62 份项目 SOP 里对通用仪器 SOP「SOP-1002《AU5800生化分析仪标准操作程序》」及泛称「仪器操作规程/仪器标准操作程序」的引用，改为该项目**真实所用机器**（取自系统仪器档案「使用本仪器的检验项目」）。
+- 机器编号约定（用户给）：AU5821A=AU58-1→尾号2002；AU5821B=AU58-2→尾号2003；AU5800急诊=AU5800→尾号1005。替换目标形如 `MHZYY-JYK-SM-SOP-{sops}《贝克曼{names}全自动生化分析仪操作作业指导书》`（保留原 doc 的 MHZYY/HZYY 前缀与「的」）。
+- 系统取数：`/instruments/{67,68,5}/test-items` 返回条目 **必须用 id 反查主表 `/test-items` 的规范 name**（接口自身 name 字段部分项目缺失，直接读会漏 AU5800 上的项目）。
+- 工具 `scripts/replace_au5800_sop.py`：逐 run 保留格式替换（python-docx 跨 run 重建，rPr 须 `copy.deepcopy` 否则丢格式）；APPLY=1 前先 `shutil.copy2` 备份到 `AU5800_BACKUP/`。
+- 结果：61 份替换（旧引用清零、新引用按各项目真实机器）、文档自身标题「AU5800检测系统…测定标准操作程序」不动。
+- **例外未改**：`SM-SOP-126 N-乙酰-β-D-氨基葡萄糖苷酶`——系统无此 test_item（仪器档案里也无），无法匹配机器，留待用户决定。另注意：尿酸只在 AU58-1/AU58-2（不在 AU5800）；锌只在 AU58-2/AU5800；小而密只在 AU58-2/AU5800；淀粉样蛋白A=血清淀粉样蛋白A只在 AU58-2；腺苷脱氨酶系统仅（胸腹水）/（脑脊液）变体→按 AU5800。

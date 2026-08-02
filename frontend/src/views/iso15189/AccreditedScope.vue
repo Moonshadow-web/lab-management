@@ -2,8 +2,7 @@
   <div>
     <div class="toolbar">
       <div class="hint">
-        展示并维护本室 CNAS 认可能力范围（参考《生免组申请认可的能力范围》）。
-        <span class="warn">方法 / 试剂 / 仪器 初始为旧表文本，编辑时请从右侧系统下拉关联正式实体。</span>
+        展示本室 CNAS 认可能力范围（参考《生免组申请认可的能力范围》）。下方直接显示 Excel 原始文本，包括多仪器、仪器编号、注册证号、试剂注册证号等。
       </div>
       <div class="ops">
         <el-input
@@ -30,32 +29,47 @@
           <el-table-column prop="seq" label="序号" width="60" />
           <el-table-column prop="item_name" label="检验（检查）项目" min-width="150" show-overflow-tooltip />
           <el-table-column prop="sample_type" label="样品类型" width="90" />
-          <el-table-column prop="method_name" label="方法" min-width="110" show-overflow-tooltip>
+          <el-table-column prop="method_name" label="方法" min-width="120" show-overflow-tooltip>
             <template #default="{ row }">
-              <span>{{ row.method_name || '—' }}</span>
-              <el-tag v-if="row.method_name" size="mini" type="info" effect="plain">旧</el-tag>
+              <span class="pre-line">{{ row.method_name || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="instrument_name" label="设备" min-width="180" show-overflow-tooltip>
+          <el-table-column prop="instrument_name" label="设备" min-width="220" show-overflow-tooltip>
             <template #default="{ row }">
-              <span>{{ row.instrument_name || '—' }}</span>
-              <el-tag v-if="row.instrument_id" size="mini" type="success" effect="plain">已关联</el-tag>
+              <span class="pre-line">{{ row.instrument_name || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="reagent_name" label="试剂" min-width="180" show-overflow-tooltip>
+          <el-table-column prop="reagent_name" label="试剂" min-width="220" show-overflow-tooltip>
             <template #default="{ row }">
-              <span>{{ row.reagent_name || '—' }}</span>
-              <el-tag v-if="row.reagent_id" size="mini" type="success" effect="plain">已关联</el-tag>
+              <span class="pre-line">{{ row.reagent_name || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="calibrator" label="校准品" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="perf_correctness" label="正确度" width="120" show-overflow-tooltip />
-          <el-table-column prop="perf_precision" label="精密度" width="120" show-overflow-tooltip />
-          <el-table-column prop="perf_linearity" label="线性" width="100" show-overflow-tooltip />
-          <el-table-column prop="perf_reportable" label="可报告范围" width="110" show-overflow-tooltip />
-          <el-table-column prop="perf_other" label="其他" width="100" show-overflow-tooltip />
-          <el-table-column prop="description" label="说明" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
+          <el-table-column prop="calibrator" label="校准品" min-width="160" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="pre-line">{{ row.calibrator || '—' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="perf_correctness" label="正确度" width="140" show-overflow-tooltip>
+            <template #default="{ row }"><span class="pre-line">{{ row.perf_correctness || '—' }}</span></template>
+          </el-table-column>
+          <el-table-column prop="perf_precision" label="精密度" width="140" show-overflow-tooltip>
+            <template #default="{ row }"><span class="pre-line">{{ row.perf_precision || '—' }}</span></template>
+          </el-table-column>
+          <el-table-column prop="perf_linearity" label="线性" width="110" show-overflow-tooltip>
+            <template #default="{ row }"><span class="pre-line">{{ row.perf_linearity || '—' }}</span></template>
+          </el-table-column>
+          <el-table-column prop="perf_reportable" label="可报告范围" width="130" show-overflow-tooltip>
+            <template #default="{ row }"><span class="pre-line">{{ row.perf_reportable || '—' }}</span></template>
+          </el-table-column>
+          <el-table-column prop="perf_other" label="其他" width="110" show-overflow-tooltip>
+            <template #default="{ row }"><span class="pre-line">{{ row.perf_other || '—' }}</span></template>
+          </el-table-column>
+          <el-table-column prop="description" label="说明" min-width="140" show-overflow-tooltip>
+            <template #default="{ row }"><span class="pre-line">{{ row.description || '—' }}</span></template>
+          </el-table-column>
+          <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip>
+            <template #default="{ row }"><span class="pre-line">{{ row.remark || '—' }}</span></template>
+          </el-table-column>
           <el-table-column v-if="auth.canManageIso15189" label="操作" width="130" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" size="small" @click="onEdit(row)">编辑</el-button>
@@ -341,4 +355,9 @@ onMounted(() => {
 .group-title .l1 { color: #303133; }
 .group-title .l2 { color: #606266; }
 .group-title .count { color: #909399; font-weight: 400; font-size: 13px; }
+.pre-line {
+  white-space: pre-line;
+  line-height: 1.5;
+  display: inline-block;
+}
 </style>
