@@ -406,10 +406,15 @@ const revisionPreviewLoading = ref(false)
 // 仅允许三类 SOP 参与文件评审（范围：通用SOP / 项目SOP / 仪器SOP）
 const ALLOWED_CATS = ['通用SOP', '项目SOP', '仪器SOP']
 // 当前活动里已被分配（无论分给谁）的文档 ID 集合：再次打开分配弹窗时这些文件不再出现
-// 作废文档不参与评审，故可见分配均剔除 status='作废' 的文档
+// 作废文档不参与评审；非三类 SOP（如「项目说明书」）本就不在文件评审范围，亦剔除
 const isObsolete = (docId) => docStatusMap.value[docId] === '作废'
-const visibleAssignments = computed(() => (assignments.value || []).filter((a) => !isObsolete(a.document_id)))
-const visibleMyTasks = computed(() => (myTasks.value || []).filter((a) => !isObsolete(a.document_id)))
+const isAllowedCat = (docId) => {
+  const c = docCatMap.value[docId]
+  // 文档未纳入字典（极端情况）时保守显示，避免误隐藏正常 SOP
+  return c ? ALLOWED_CATS.includes(c) : true
+}
+const visibleAssignments = computed(() => (assignments.value || []).filter((a) => !isObsolete(a.document_id) && isAllowedCat(a.document_id)))
+const visibleMyTasks = computed(() => (myTasks.value || []).filter((a) => !isObsolete(a.document_id) && isAllowedCat(a.document_id)))
 const assignedDocIds = computed(() => new Set(visibleAssignments.value.map((a) => a.document_id)))
 const reviewDocs = computed(() =>
   docs.value.filter(

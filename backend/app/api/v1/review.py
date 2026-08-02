@@ -108,23 +108,40 @@ def assign_batch(
 
     - 同一 (campaign, document, reviewer) 已存在则跳过，避免重复分配。
     - reviewer_id 为空时按 reviewer 名字去重。
+    - 文件评审范围仅限三类 SOP（通用SOP/项目SOP/仪器SOP），非 SOP 类（如「项目说明书」）
+      不在评审范围内，直接拒绝分配并回执 rejected 列表。
     """
+    doc_ids = [int(it["document_id"]) for it in items if it.get("document_id")]
+    docs = (
+        {d.id: d for d in db.query(Document).filter(Document.id.in_(doc_ids)).all()}
+        if doc_ids else {}
+    )
     existing = {
         (a.document_id, a.reviewer_id, a.reviewer)
         for a in db.query(ReviewAssignment).filter(ReviewAssignment.campaign_id == cid).all()
     }
     created = []
+    rejected = []
     for it in items:
         doc_id = it.get("document_id")
         if not doc_id:
             continue
+        doc_id = int(doc_id)
         rid = it.get("reviewer_id")
         rname = it.get("reviewer", "") or ""
-        if (int(doc_id), rid, rname) in existing:
+        d = docs.get(doc_id)
+        if d and d.category not in REVIEW_DOC_CATEGORIES:
+            rejected.append({
+                "document_id": doc_id,
+                "title": d.title or "",
+                "reason": "非SOP类文档（%s），不在文件评审范围内" % (d.category or "未知"),
+            })
+            continue
+        if (doc_id, rid, rname) in existing:
             continue
         a = ReviewAssignment(
             campaign_id=cid,
-            document_id=int(doc_id),
+            document_id=doc_id,
             reviewer=rname,
             reviewer_id=rid,
             status="待评审",
@@ -132,10 +149,10 @@ def assign_batch(
         db.add(a)
         db.flush()
         created.append(a.id)
-        existing.add((int(doc_id), rid, rname))
+        existing.add((doc_id, rid, rname))
     db.commit()
-    write_audit(db, user, "create", "review_assignments", cid, {"count": len(created)})
-    return {"ok": True, "created": created}
+    write_audit(db, user, "create", "review_assignments", cid, {"count": len(created), "rejected": len(rejected)})
+    return {"ok": True, "created": created, "rejected": rejected}
 
 
 @review_router.get("/review/my-assignments")
