@@ -91,6 +91,7 @@ def parse_docx(path: str) -> list[dict]:
                     "title": pending_title,
                     "content": "",
                     "check_point": "",
+                    "application_requirement": "",
                 })
             continue
 
