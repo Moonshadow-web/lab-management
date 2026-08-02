@@ -39,7 +39,7 @@ from .education import (
 from .iso15189 import (
     ReviewCampaign, ReviewAssignment, ReviewRecord,
     AuditClause, SelfInspectionCampaign, SelfInspectionAssignment, SelfInspectionRecord,
-    CorrectiveAction,
+    CorrectiveAction, AccreditedScope,
 )
 
 __all__ = [
@@ -95,5 +95,5 @@ __all__ = [
     "EducationAttachment",
     "ReviewCampaign", "ReviewAssignment", "ReviewRecord",
     "AuditClause", "SelfInspectionCampaign", "SelfInspectionAssignment",
-    "SelfInspectionRecord", "CorrectiveAction",
+    "SelfInspectionRecord", "CorrectiveAction", "AccreditedScope",
 ]

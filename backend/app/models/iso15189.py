@@ -198,3 +198,47 @@ class CorrectiveAction(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+
+# ===================== 四、认可能力范围 =====================
+class AccreditedScope(Base):
+    """CNAS 认可能力范围（生免组申请认可的能力范围）。
+
+    - category_l1 / category_l2：多级分类（如 "A 检验医学" / "AA 临床血液学"），
+      由 Excel 的分组行解析而来，用于前端分组展示。
+    - 方法 / 仪器 / 试剂：Excel 原表为旧文本，存 *_name；用户可在系统中关联
+      正式实体（TestItem / Instrument / ReagentItem），关联后写对应 *_id，
+      *_name 同步为该实体的正式名称。
+    - 分析性能 5 项（正确度/精密度/线性/可报告范围/其他）对应 Excel 的子列。
+    """
+    __tablename__ = "accredited_scopes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    category_l1: Mapped[str] = mapped_column(String(50), index=True, default="")  # 一级分类
+    category_l2: Mapped[str] = mapped_column(String(80), index=True, default="")  # 二级分类
+    seq: Mapped[str] = mapped_column(String(20), default="")  # 序号
+    item_name: Mapped[str] = mapped_column(String(300), index=True, default="")  # 检验（检查）项目
+    sample_type: Mapped[str] = mapped_column(String(100), default="")  # 样品类型
+    # 方法学（关联 TestItem.method，非独立实体）
+    method_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    method_name: Mapped[str] = mapped_column(String(200), default="")
+    # 设备（关联 Instrument）
+    instrument_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    instrument_name: Mapped[str] = mapped_column(String(300), default="")
+    # 试剂（关联 ReagentItem）
+    reagent_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    reagent_name: Mapped[str] = mapped_column(String(300), default="")
+    # 校准品
+    calibrator: Mapped[str] = mapped_column(String(300), default="")
+    description: Mapped[str] = mapped_column(Text, default="")  # 说明
+    remark: Mapped[str] = mapped_column(Text, default="")  # 备注
+    # 检验（检查）系统/方法 分析性能
+    perf_correctness: Mapped[str] = mapped_column(String(200), default="")  # 正确度
+    perf_precision: Mapped[str] = mapped_column(String(200), default="")  # 精密度
+    perf_linearity: Mapped[str] = mapped_column(String(200), default="")  # 线性
+    perf_reportable: Mapped[str] = mapped_column(String(200), default="")  # 可报告范围
+    perf_other: Mapped[str] = mapped_column(Text, default="")  # 其他
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )

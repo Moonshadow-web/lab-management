@@ -214,3 +214,41 @@ class CorrectiveActionRead(CorrectiveActionBase):
     id: int
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+# ===================== 四、认可能力范围 =====================
+class AccreditedScopeBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    category_l1: str = ""
+    category_l2: str = ""
+    seq: str = ""
+    item_name: str = ""
+    sample_type: str = ""
+    method_id: Optional[int] = None
+    method_name: str = ""
+    instrument_id: Optional[int] = None
+    instrument_name: str = ""
+    reagent_id: Optional[int] = None
+    reagent_name: str = ""
+    calibrator: str = ""
+    description: str = ""
+    remark: str = ""
+    perf_correctness: str = ""
+    perf_precision: str = ""
+    perf_linearity: str = ""
+    perf_reportable: str = ""
+    perf_other: str = ""
+
+
+class AccreditedScopeCreate(AccreditedScopeBase):
+    pass
+
+
+class AccreditedScopeUpdate(AccreditedScopeBase):
+    pass
+
+
+class AccreditedScopeRead(AccreditedScopeBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

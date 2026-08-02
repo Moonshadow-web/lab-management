@@ -10,6 +10,9 @@
       <el-tab-pane label="科室内审" name="internal">
         <InternalAuditTab />
       </el-tab-pane>
+      <el-tab-pane label="认可能力范围" name="scope">
+        <AccreditedScope />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -19,6 +22,7 @@ import { ref } from 'vue'
 import ReviewTab from './ReviewTab.vue'
 import SelfInspectionTab from './SelfInspectionTab.vue'
 import InternalAuditTab from './InternalAuditTab.vue'
+import AccreditedScope from './AccreditedScope.vue'
 
 const activeTab = ref('review')
 </script>
