@@ -37,25 +37,42 @@ function clauseBody(r) {
 }
 
 /**
- * 自查（条款内审）报告 HTML。
- * rows: [{clause_no,title,content,check_point,check_content,result,finding,action}]
+ * 自查（条款内审）表格主体：预览报告与打印空表共用同一套样式，保证视觉一致。
+ * empty=true 时，核查内容/问题描述/采取措施留空供手写（无应用要求行仍标「不适用」）。
  */
-export function buildSelfInspectionHtml({ campaignTitle, year, assignee, rows, generatedAt }) {
-  const trs = (rows || []).map((r, i) => {
+function selfInspectionTableRows(rows, { empty }) {
+  return (rows || []).map((r, i) => {
     const na = isNoRequirementRow(r)
     const res = (r.result || '').trim() || (na ? '不适用' : '')
     const resCls = res === '符合' ? 'ok' : res === '不符合' ? 'bad'
       : res === '观察项' ? 'warn' : res === '不适用' ? 'na' : ''
+    const checkContent = empty
+      ? (na ? '—' : '')
+      : (r.check_content || (na ? '—' : '（未填写）'))
+    const finding = empty
+      ? (na ? '—' : '')
+      : (r.finding || (na ? '—' : ''))
+    const action = empty
+      ? (na ? '—' : '')
+      : (r.action || (na ? '—' : ''))
     return `<tr>
       <td style="text-align:center">${i + 1}</td>
       <td><b>${escapeHtml(r.clause_no)}</b>${r.title ? ' ' + escapeHtml(r.title) : ''}</td>
       <td class="pre">${clauseBody(r)}</td>
-      <td class="pre">${escapeHtml(r.check_content || (na ? '—' : '（未填写）'))}</td>
-      <td class="${resCls}" style="text-align:center">${escapeHtml(res || '—')}</td>
-      <td class="pre">${escapeHtml(r.finding || (na ? '—' : ''))}</td>
-      <td class="pre">${escapeHtml(r.action || (na ? '—' : ''))}</td>
+      <td class="pre">${escapeHtml(checkContent)}</td>
+      <td class="${resCls}" style="text-align:center">${escapeHtml(res || (empty ? '　' : '—'))}</td>
+      <td class="pre">${escapeHtml(finding)}</td>
+      <td class="pre">${escapeHtml(action)}</td>
     </tr>`
   }).join('')
+}
+
+/**
+ * 自查（条款内审）报告 HTML。
+ * rows: [{clause_no,title,content,check_point,check_content,result,finding,action}]
+ */
+export function buildSelfInspectionHtml({ campaignTitle, year, assignee, rows, generatedAt }) {
+  const trs = selfInspectionTableRows(rows, { empty: false })
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">${PAGE_STYLE}</head><body>
     <h2>自查（条款内审）报告</h2>
     <div class="sub">CNAS-AL02-07 附表3 自查表</div>
@@ -120,21 +137,10 @@ export function buildReviewSummaryHtml({ campaignTitle, year, rows }) {
 }
 
 /**
- * 自查空表（现场检查用）：只打印条款列表，结果/问题/措施留空。
+ * 自查空表（现场检查用）：条款与预览报告同款样式，核查内容/问题/措施留空供手写。
  */
 export function buildEmptySelfInspectionHtml({ campaignTitle, year, assignee, rows }) {
-  const trs = (rows || []).map((r, i) => {
-    const na = isNoRequirementRow(r)
-    return `<tr style="height:72px">
-      <td style="text-align:center">${i + 1}</td>
-      <td><b>${escapeHtml(r.clause_no)}</b>${r.title ? ' ' + escapeHtml(r.title) : ''}</td>
-      <td class="pre">${clauseBody(r)}</td>
-      <td class="pre">${escapeHtml(r.check_content || (na ? '—' : ''))}</td>
-      <td style="text-align:center">${na ? '不适用' : '　'}</td>
-      <td>${na ? '—' : '　'}</td>
-      <td>${na ? '—' : '　'}</td>
-    </tr>`
-  }).join('')
+  const trs = selfInspectionTableRows(rows, { empty: true })
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">${PAGE_STYLE}</head><body>
     <h2>科室自查（条款内审）现场检查表</h2>
     <div class="sub">CNAS-AL02-07 附表3 自查表（空表）</div>
