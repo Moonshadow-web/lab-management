@@ -59,7 +59,7 @@
           <el-col :span="8"><el-form-item label="送货人"><el-input v-model="form.delivery_person" /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="8"><el-form-item label="接收人"><el-input v-model="form.receiver" placeholder="默认当前登录人" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="接收人"><el-input v-model="form.receiver" placeholder="确认接收时自动填入当前登录人" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="备注"><el-input v-model="form.remark" /></el-form-item>
       </el-form>
@@ -197,7 +197,7 @@ function onNewReceiving() {
   form.value = {
     receipt_no: 'RCV-' + new Date().toISOString().slice(0, 7) + '-' + String(Date.now()).slice(-3),
     receipt_date: new Date().toISOString().slice(0, 10),
-    delivery_person: '', receiver: (auth.user?.full_name || auth.user?.username || ''), remark: '',
+    delivery_person: '',     receiver: '', remark: '',
   }
   items.value = []; searchResults.value = []; searchSel.value = ''
   dialogVisible.value = true

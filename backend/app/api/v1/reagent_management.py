@@ -713,7 +713,7 @@ def create_receiving(
     rec = Receiving(
         receipt_no=data.receipt_no, receipt_date=data.receipt_date,
         order_id=data.order_id, delivery_person=data.delivery_person,
-        receiver=data.receiver or user.full_name or user.username,
+        receiver=data.receiver or "",  # 新建/编辑时保存用户实际填入值（可空，由确认时填入确认人）
         remark=data.remark, created_by=user.username, is_confirmed=False,
     )
     db.add(rec)
@@ -740,8 +740,8 @@ def confirm_receiving(
         raise HTTPException(404, "收货记录未找到")
     if r.is_confirmed:
         raise HTTPException(400, "该收货单已确认接收，无需重复确认")
-    # 接收人默认取当前登录人员（若创建时未指定）
-    r.receiver = r.receiver or (user.full_name or user.username)
+    # 接收人在「确认接收」时强制填入当前登录人（即便保存时已有人工填值）
+    r.receiver = user.full_name or user.username
     for it in r.items:
         stock = db.query(ReagentStock).filter(
             ReagentStock.item_id == it.item_id,
