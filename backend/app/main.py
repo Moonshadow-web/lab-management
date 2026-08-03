@@ -880,7 +880,12 @@ class AssetCacheMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         if request.url.path.startswith("/assets/"):
+            # 带内容 hash 的静态资源：文件名随内容变化，可永久缓存
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif "text/html" in (response.headers.get("content-type") or ""):
+            # index.html / SPA fallback：禁止强缓存，每次都向服务端校验，
+            # 避免浏览器长期缓存旧版入口页（旧主 JS 被新构建删掉 → 404 白屏）
+            response.headers["Cache-Control"] = "no-cache"
         return response
 
 
