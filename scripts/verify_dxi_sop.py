@@ -131,6 +131,9 @@ def parse_project(fn):
 
 SOPREF = re.compile(r"SOP-(\d{4}(?:/\d{4})*)")
 OLD = {"1004", "1006"}
+# 非 DXI 仪器家族的 SOP 编号（如 1002=AU5800 生化仪），不在本任务改写范围，仅作信息提示
+NON_DXI_SOP = {"1002", "1004", "1006"}
+DXI_SOPS = {"2004", "2005", "2006", "2007", "2008", "2009"}
 problems = 0
 checked = 0
 for fn in sorted(os.listdir(FOLDER)):
@@ -157,7 +160,16 @@ for fn in sorted(os.listdir(FOLDER)):
     if found & OLD:
         print(f"[OLD-REMAIN] {fn[:44]} leftover={found & OLD}")
         problems += 1
-    if found != set(exp):
-        print(f"[MISMATCH] {fn[:44]} found={sorted(found)} expected={sorted(exp)}")
+    # 只校验 DXI 机器集合(2004-2009)与档案一致；非 DXI 编号(如1002=AU5800)仅提示
+    dxi_found = found & DXI_SOPS
+    other = found - DXI_SOPS - NON_DXI_SOP
+    if other:
+        print(f"[UNEXPECTED-SOP] {fn[:44]} non-DXI/unknown={sorted(other)}")
         problems += 1
+    if dxi_found != set(exp):
+        print(f"[MISMATCH] {fn[:44]} dxi_found={sorted(dxi_found)} expected={sorted(exp)}")
+        problems += 1
+    info_others = found & NON_DXI_SOP
+    if info_others and dxi_found == set(exp):
+        print(f"[INFO] {fn[:44]} 含非DXI引用(未改动)={sorted(info_others)}，DXI引用正确")
 print(f"\nChecked={checked}  problems={problems}")
