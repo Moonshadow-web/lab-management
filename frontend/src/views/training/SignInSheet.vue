@@ -11,8 +11,8 @@
       </div>
     </div>
 
-    <!-- 可打印区域 -->
-    <div class="sheet printable" id="sign-in-print-area">
+    <!-- 屏显预览（打印时隐藏） -->
+    <div class="sheet preview no-print" v-if="rows.length">
       <h2 class="sheet-title">检验科签到表</h2>
       <table class="sheet-head">
         <tr>
@@ -53,6 +53,51 @@
         </tbody>
       </table>
     </div>
+
+    <!-- 打印专用：Teleport 到 body，仅打印时显示，规避 el-dialog fixed 浮层打印空白 -->
+    <Teleport to="body">
+      <div class="print-root sheet" v-if="rows.length">
+        <h2 class="sheet-title">检验科签到表</h2>
+        <table class="sheet-head">
+          <tr>
+            <td class="lbl">培训名称</td>
+            <td>{{ header.name || '　' }}</td>
+            <td class="lbl">培训老师</td>
+            <td>{{ header.teacher || '　' }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">时间</td>
+            <td>{{ header.train_time || '　' }}</td>
+            <td class="lbl">地点</td>
+            <td>{{ header.location || '　' }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">培训对象</td>
+            <td colspan="3">{{ header.target || '　' }}</td>
+          </tr>
+        </table>
+        <table class="sign-grid">
+          <thead>
+            <tr>
+              <th>姓名</th><th>职称</th><th>签到</th>
+              <th>姓名</th><th>职称</th><th>签到</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(pair, i) in pairedRows" :key="i">
+              <template v-if="pair.left">
+                <td>{{ pair.left.name }}</td><td>{{ pair.left.title }}</td><td class="sign-cell"></td>
+              </template>
+              <template v-else><td></td><td></td><td class="sign-cell"></td></template>
+              <template v-if="pair.right">
+                <td>{{ pair.right.name }}</td><td>{{ pair.right.title }}</td><td class="sign-cell"></td>
+              </template>
+              <template v-else><td></td><td></td><td class="sign-cell"></td></template>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Teleport>
 
     <div class="no-print">
       <el-divider content-position="left">编辑签到名单（打印前可调）</el-divider>
@@ -99,6 +144,8 @@ const props = defineProps({
   ownerId: { type: [Number, String], required: true },
   header: { type: Object, default: () => ({}) },
   canWrite: { type: Boolean, default: true },
+  // 已保存的签到名单（数组 [{name,title}]）；有则优先使用，避免手动改动丢失
+  savedNames: { type: Array, default: null },
 })
 
 const attRef = ref(null)
@@ -135,13 +182,24 @@ function emitSaveHeader() {
   emit('save-header', { names: rows.value.map((r) => ({ name: r.name, title: r.title })) })
 }
 
+// 排除“培训老师”本人，避免编辑记录里出现两个金子铮（老师既作培训人又出现在签到名单）
+function excludeTeacher(list) {
+  const t = (props.header && props.header.teacher) || ''
+  if (!t) return list
+  return list.filter((p) => p.name !== t)
+}
+
 onMounted(async () => {
-  // 预填生免室人员名单
-  try {
-    const res = await listPersonnel({ page: 1, page_size: 200 })
-    const people = (res.items || []).map((p) => ({ name: p.name, title: p.title }))
-    if (people.length) rows.value = people
-  } catch (e) {}
+  if (props.savedNames && props.savedNames.length) {
+    rows.value = props.savedNames.map((n) => ({ name: n.name || '', title: n.title || '' }))
+  } else {
+    // 预填生免室人员名单
+    try {
+      const res = await listPersonnel({ page: 1, page_size: 200 })
+      const people = (res.items || []).map((p) => ({ name: p.name, title: p.title }))
+      if (people.length) rows.value = excludeTeacher(people)
+    } catch (e) {}
+  }
   if (!rows.value.length) addRow()
 })
 </script>
@@ -159,9 +217,19 @@ onMounted(async () => {
 .sign-grid th { background: #f5f5f5; }
 .sign-cell { height: 34px; }
 
+/* 打印专用副本：屏显隐藏，仅打印时通过 Teleport 到 body 显示 */
+.print-root { display: none; }
+
 @media print {
   .no-print { display: none !important; }
-  .printable { width: 100%; }
   @page { size: A4; margin: 16mm; }
+  /* print-root 已 Teleport 到 body，直接隐藏其它 body 子元素，避免 el-dialog fixed 浮层打印空白 */
+  body > *:not(.print-root) { display: none !important; }
+  .print-root {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    visibility: visible !important;
+  }
 }
 </style>
