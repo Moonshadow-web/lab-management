@@ -42,6 +42,8 @@
             v-if="canConfirm(row)">确认接收</el-button>
           <el-button size="small" link type="warning" @click="onEdit(row)"
             v-if="canEdit(row)">编辑</el-button>
+          <el-button size="small" link type="danger" @click="onDelete(row)"
+            v-if="auth.isAdmin">删除</el-button>
           <el-button size="small" link type="info" @click="onPrint(row)">打印</el-button>
         </template>
       </el-table-column>
@@ -148,7 +150,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Delete, Printer } from '@element-plus/icons-vue'
 import {
   listReagentReceivings, createReagentReceiving, getReagentReceiving,
-  updateReagentReceiving, confirmReagentReceiving, listAllReagentItems, listReagentItems,
+  updateReagentReceiving, confirmReagentReceiving, deleteReagentReceiving, listAllReagentItems, listReagentItems,
 } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
 import { useReagentStore } from '../../store/reagent'
@@ -281,6 +283,22 @@ async function onPrint(row) {
   } catch (e) { ElMessage.error('加载失败：' + errText(e)) }
 }
 function doPrint() { window.print() }
+
+// 管理员删除收货单（已确认的会回退库存）
+async function onDelete(row) {
+  if (!auth.isAdmin) return
+  try {
+    await ElMessageBox.confirm(
+      `确认删除收货单「${row.receipt_no}」？${row.is_confirmed ? '该单已确认，删除后将回退对应库存。' : ''}此操作不可恢复。`,
+      '删除收货单', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+    )
+  } catch (_) { return }
+  try {
+    await deleteReagentReceiving(row.id)
+    ElMessage.success(`收货单 ${row.receipt_no} 已删除`)
+    refresh()
+  } catch (e) { ElMessage.error('删除失败：' + errText(e)) }
+}
 
 // 权限判定：试剂配送仅能改自己建的、且未确认的；管理员/试剂管理员可改任意未确认
 function canEdit(row) {

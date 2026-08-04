@@ -123,6 +123,9 @@ export function updateReagentReceiving(id, data) {
 export function confirmReagentReceiving(id) {
   return request.post(`/api/v1/reagent/receivings/${id}/confirm`)
 }
+export function deleteReagentReceiving(id) {
+  return request.delete(`/api/v1/reagent/receivings/${id}`)
+}
 
 // ── 月消耗 ──
 export function listReagentConsumption(params) {
