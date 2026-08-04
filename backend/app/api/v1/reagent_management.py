@@ -101,7 +101,7 @@ def get_reagent_item(item_id: int, db: Session = Depends(get_db), _=Depends(get_
 @router.post("/items", response_model=ReagentItemRead)
 def create_reagent_item(
     data: ReagentItemCreate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
 ):
     item = ReagentItem(**data.model_dump())
     db.add(item)
@@ -113,7 +113,7 @@ def create_reagent_item(
 @router.put("/items/{item_id}", response_model=ReagentItemRead)
 def update_reagent_item(
     item_id: int, data: ReagentItemUpdate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
 ):
     item = db.query(ReagentItem).get(item_id)
     if not item:
