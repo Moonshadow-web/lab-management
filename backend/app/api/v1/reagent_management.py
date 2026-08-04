@@ -732,7 +732,7 @@ def create_receiving(
 @router.post("/receivings/{receiving_id}/confirm", response_model=ReceivingRead)
 def confirm_receiving(
     receiving_id: int, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     """确认接收：写入实时库存，并记录确认人/确认时间。重复确认不会重复加库存。"""
     r = db.query(Receiving).get(receiving_id)

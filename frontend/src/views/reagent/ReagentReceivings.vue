@@ -39,7 +39,7 @@
         <template #default="{ row }">
           <el-button size="small" link type="primary" @click="onView(row)">详情</el-button>
           <el-button size="small" link type="success" @click="onConfirm(row)"
-            v-if="canConfirm(row)">确认接收</el-button>
+            v-if="!row.is_confirmed" :disabled="!canConfirm(row)">确认接收</el-button>
           <el-button size="small" link type="warning" @click="onEdit(row)"
             v-if="canEdit(row)">编辑</el-button>
           <el-button size="small" link type="danger" @click="onDelete(row)"
@@ -310,8 +310,9 @@ function canEdit(row) {
   // 试剂配送：仅本人
   return row.created_by === currentUser.value
 }
-function canConfirm(row) {
-  return canWrite.value && !row.is_confirmed
+function canConfirm() {
+  if (auth.isAdmin) return true
+  return auth.myRoles.includes('reagent_manager')
 }
 onMounted(refresh)
 </script>
