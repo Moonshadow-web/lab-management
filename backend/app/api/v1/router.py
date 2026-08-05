@@ -66,6 +66,10 @@ api_router.include_router(scheduling.router)
 api_router.include_router(education.router)
 api_router.include_router(education.attach_router)
 
+# CNAS / WS-T 医学实验室认可规范文件（列表 / 预览 / 下载）
+from . import cnas_standards
+api_router.include_router(cnas_standards.router)
+
 # 15189 内审专项（文件评审 / 自查 / 科室内审 / 认可能力范围）
 from . import review, self_inspection, corrective_action, accredited_scope
 api_router.include_router(review.review_router)

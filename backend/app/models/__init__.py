@@ -41,6 +41,7 @@ from .iso15189 import (
     AuditClause, SelfInspectionCampaign, SelfInspectionAssignment, SelfInspectionRecord,
     CorrectiveAction, AccreditedScope,
 )
+from .cnas_standard import CnasStandard
 
 __all__ = [
     "User",
@@ -96,4 +97,5 @@ __all__ = [
     "ReviewCampaign", "ReviewAssignment", "ReviewRecord",
     "AuditClause", "SelfInspectionCampaign", "SelfInspectionAssignment",
     "SelfInspectionRecord", "CorrectiveAction", "AccreditedScope",
+    "CnasStandard",
 ]
