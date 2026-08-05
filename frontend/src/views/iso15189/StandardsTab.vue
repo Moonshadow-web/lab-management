@@ -2,20 +2,20 @@
   <div class="page">
     <div class="bar">
       <span class="hint">CNAS / 行标 / 申请书附件等医学实验室认可规范文件，可在线预览或下载。</span>
-      <el-select
-        v-model="catFilter"
-        placeholder="全部分类"
-        clearable
-        size="default"
-        style="width: 190px; margin-left: 12px"
-        @change="onFilterChange"
-      >
-        <el-option label="全部分类" value="" />
-        <el-option label="CNAS认可规范" value="CNAS认可规范" />
-        <el-option label="CNAS附件表" value="CNAS附件表" />
-        <el-option label="行标" value="行标" />
-      </el-select>
-      <span v-if="catFilter" class="count">共 {{ displayRows.length }} 份</span>
+      <div class="cat-filter">
+        <button class="cat-pill" :class="{ active: catFilter === '' }" @click="catFilter = ''">
+          全部 <span class="num">{{ rows.length }}</span>
+        </button>
+        <button
+          v-for="c in categories"
+          :key="c"
+          class="cat-pill"
+          :class="[catCls(c), { active: catFilter === c }]"
+          @click="catFilter = (catFilter === c ? '' : c)"
+        >
+          {{ c }} <span class="num">{{ countOf(c) }}</span>
+        </button>
+      </div>
     </div>
     <el-table v-loading="loading" :data="displayRows" border stripe>
       <el-table-column type="index" label="#" width="50" align="center" />
@@ -28,7 +28,7 @@
       <el-table-column prop="name" label="名称" min-width="280" show-overflow-tooltip />
       <el-table-column prop="category" label="类别" width="140">
         <template #default="{ row }">
-          <el-tag size="small" :type="catTag(row.category)">{{ row.category || '其他' }}</el-tag>
+          <el-tag size="small" :type="catTagType(row.category)">{{ row.category || '其他' }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="大小" width="110" align="right">
@@ -73,15 +73,31 @@ const rows = ref([])
 const loading = ref(false)
 const catFilter = ref('')
 
+const categories = computed(() => {
+  const seen = []
+  for (const r of rows.value) {
+    const c = r.category || '其他'
+    if (!seen.includes(c)) seen.push(c)
+  }
+  return seen
+})
+
 const displayRows = computed(() =>
   catFilter.value ? rows.value.filter((r) => r.category === catFilter.value) : rows.value
 )
 
-function onFilterChange() {
-  // 仅触发 computed 重算；保留此方法便于后续扩展
+function countOf(c) {
+  return rows.value.filter((r) => (r.category || '其他') === c).length
 }
 
-function catTag(c) {
+function catCls(c) {
+  if (c === 'CNAS认可规范') return 'c-danger'
+  if (c === 'CNAS附件表') return 'c-warning'
+  if (c === '行标') return 'c-success'
+  return 'c-info'
+}
+
+function catTagType(c) {
   if (c === 'CNAS认可规范') return 'danger'
   if (c === 'CNAS附件表') return 'warning'
   if (c === '行标') return 'success'
@@ -183,18 +199,57 @@ onMounted(load)
   margin-bottom: 10px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .hint {
   font-size: 13px;
   color: #909399;
 }
-.count {
-  margin-left: 10px;
-  font-size: 13px;
-  color: #606266;
-}
 .muted {
   color: #c0c4cc;
+}
+.cat-filter {
+  display: flex;
+  gap: 8px;
+  margin-left: 12px;
+  flex-wrap: wrap;
+}
+.cat-pill {
+  border: 1px solid #dcdfe6;
+  background: #fff;
+  color: #606266;
+  padding: 5px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.cat-pill:hover {
+  border-color: #c0c4cc;
+}
+.cat-pill .num {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.cat-pill.active {
+  color: #fff;
+  border-color: transparent;
+}
+.cat-pill.active.c-danger {
+  background: #f56c6c;
+}
+.cat-pill.active.c-warning {
+  background: #e6a23c;
+}
+.cat-pill.active.c-success {
+  background: #67c23a;
+}
+.cat-pill.active.c-info {
+  background: #909399;
 }
 .preview-html {
   max-height: 75vh;
