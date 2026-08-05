@@ -16,8 +16,7 @@ MSO_AUTOMATION_SECURITY_FORCE_DISABLE = 1  # 禁用宏，避免安全风险/弹�
 
 # 要转换的根目录
 DIRS = [
-    r"C:\Users\81526\Desktop\待办\DXI",
-    r"C:\Users\81526\Desktop\待办\生免组项目作业指导书260723",
+    r"D:\民航总医院\15189\15189规范文件\CNAS医学实验室认可申请书及附件20231201",
 ]
 
 
@@ -29,6 +28,8 @@ def collect_doc_files(dirs):
             continue
         for name in os.listdir(d):
             low = name.lower()
+            if low.startswith("~$"):
+                continue  # 跳过 Word 临时锁文件
             if low.endswith(".doc") and not low.endswith(".docx"):
                 files.append(os.path.join(d, name))
     return files

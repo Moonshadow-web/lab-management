@@ -41,14 +41,33 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <el-dialog
+      :model-value="previewVisible"
+      :title="previewTitle"
+      width="90%" top="2vh" append-to-body
+      @update:model-value="(v) => { if (!v) closePreview() }"
+    >
+      <div v-if="previewLoading" v-loading="true" style="height: 75vh" />
+      <template v-else>
+        <iframe v-if="previewMode === 'pdf'" :src="previewSrc" style="width: 100%; height: 75vh; border: 0" />
+        <div v-else-if="previewMode === 'html'" class="preview-html" v-html="previewHtml" />
+        <div v-else class="other-preview">
+          <el-icon :size="64"><Document /></el-icon>
+          <p>{{ previewMsg }}</p>
+          <el-button type="primary" @click="onDownload(previewFile)">下载 {{ previewFile?.original_filename }}</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { View, Download } from '@element-plus/icons-vue'
-import { listCnasStandards, previewStandard, downloadStandard } from '../../api/cnasStandards'
+import { View, Download, Document } from '@element-plus/icons-vue'
+import { listCnasStandards, fetchCnasStandardBlob, downloadStandard } from '../../api/cnasStandards'
+import mammoth from 'mammoth'
 
 const rows = ref([])
 const loading = ref(false)
@@ -76,6 +95,69 @@ function fmtSize(n) {
   return (n / 1024 / 1024).toFixed(2) + ' MB'
 }
 
+// ===== 预览（dialog）：pdf 内联、docx 用 mammoth 渲染、其余下载 =====
+const previewVisible = ref(false)
+const previewLoading = ref(false)
+const previewMode = ref('other') // pdf | html | other
+const previewSrc = ref('')
+const previewHtml = ref('')
+const previewMsg = ref('')
+const previewFile = ref(null)
+const previewTitle = computed(() => previewFile.value?.original_filename || '预览')
+
+function extOf(name) {
+  const m = (name || '').toLowerCase().match(/\.([a-z0-9]+)$/)
+  return m ? m[1] : ''
+}
+
+async function onPreview(row) {
+  previewFile.value = row
+  previewVisible.value = true
+  previewLoading.value = true
+  previewMode.value = 'other'
+  previewSrc.value = ''
+  previewHtml.value = ''
+  const ext = extOf(row.original_filename)
+  try {
+    if (ext === 'pdf') {
+      const blob = await fetchCnasStandardBlob(row.id, 'preview')
+      previewSrc.value = URL.createObjectURL(blob)
+      previewMode.value = 'pdf'
+    } else if (ext === 'docx') {
+      const blob = await fetchCnasStandardBlob(row.id, 'preview')
+      const buf = await blob.arrayBuffer()
+      const res = await mammoth.convertToHtml({ arrayBuffer: buf })
+      previewHtml.value = res.value || '<p style="color:#909399">（文档内容为空）</p>'
+      previewMode.value = 'html'
+    } else {
+      previewMsg.value = '该类型文件无法在浏览器内直接预览，请点击下载查看。'
+      previewMode.value = 'other'
+    }
+  } catch (e) {
+    console.error(e)
+    previewMsg.value = '预览失败：' + (e && e.message ? e.message : '请下载后查看')
+    previewMode.value = 'other'
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+function closePreview() {
+  if (previewSrc.value) {
+    URL.revokeObjectURL(previewSrc.value)
+    previewSrc.value = ''
+  }
+  previewVisible.value = false
+}
+
+async function onDownload(row) {
+  try {
+    await downloadStandard(row.id, row.original_filename || `${row.code || row.name}.pdf`)
+  } catch (e) {
+    ElMessage.error('下载失败')
+  }
+}
+
 async function load() {
   loading.value = true
   try {
@@ -85,25 +167,6 @@ async function load() {
     rows.value = []
   } finally {
     loading.value = false
-  }
-}
-
-async function onPreview(row) {
-  row._previewing = true
-  try {
-    await previewStandard(row.id)
-  } catch (e) {
-    ElMessage.error('预览失败，文件可能不存在')
-  } finally {
-    row._previewing = false
-  }
-}
-
-async function onDownload(row) {
-  try {
-    await downloadStandard(row.id, row.original_filename || `${row.code || row.name}.pdf`)
-  } catch (e) {
-    ElMessage.error('下载失败')
   }
 }
 
@@ -132,5 +195,38 @@ onMounted(load)
 }
 .muted {
   color: #c0c4cc;
+}
+.preview-html {
+  max-height: 75vh;
+  overflow: auto;
+  background: #fff;
+  padding: 16px;
+  line-height: 1.7;
+}
+.preview-html :deep(table) {
+  border-collapse: collapse;
+}
+.preview-html :deep(th),
+.preview-html :deep(td) {
+  border: 1px solid #dcdfe6;
+  padding: 4px 8px;
+}
+.preview-html :deep(th) {
+  background: #f5f7fa;
+}
+.preview-html :deep(pre) {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.preview-html :deep(img) {
+  max-width: 100%;
+}
+.other-preview {
+  text-align: center;
+  padding: 40px;
+  color: #888;
+}
+.other-preview p {
+  margin: 12px 0;
 }
 </style>

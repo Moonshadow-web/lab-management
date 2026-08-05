@@ -1,0 +1,1 @@
+import{p as n}from"./index-Dv4oOr9u.js";function e(r){return n.get("/api/v1/training-records",{params:r})}function a(r){return n.post("/api/v1/training-records",r)}function o(r,i){return n.put(`/api/v1/training-records/${r}`,i)}function s(r){return n.delete(`/api/v1/training-records/${r}`)}export{a as c,s as d,e as l,o as u};
