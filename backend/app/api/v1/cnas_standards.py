@@ -159,3 +159,44 @@ def download_standard(std_id: int, db: Session = Depends(get_db), user: User = D
         content, media_type="application/pdf",
         headers={"Content-Disposition": _content_disposition("attachment", fname)},
     )
+
+
+@router.post("/{std_id}/replace")
+def replace_standard(
+    std_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "specialty_leader")),
+):
+    """替换某条规范文件的二进制内容，保留 code/name/category/sort_order 等元数据。"""
+    s = db.get(CnasStandard, std_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="未找到文件")
+    content = file.file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+    original = file.filename or s.original_filename
+    # 清理旧 COS 对象
+    if s.cloud_key and cos_storage.ready and hasattr(cos_storage, "delete"):
+        try:
+            cos_storage.delete(s.cloud_key)
+        except Exception:
+            pass
+    # 写入新 COS（失败回退 BLOB）
+    cloud_key = None
+    if cos_storage.ready:
+        try:
+            cloud_key = cos_storage.save("cnas_standards", original, content)
+        except Exception:
+            cloud_key = None
+    s.original_filename = original
+    s.cloud_key = cloud_key
+    s.data = content if not cloud_key else None
+    s.file_size = len(content)
+    s.uploader = user.full_name or user.username
+    db.commit()
+    db.refresh(s)
+    return {
+        "id": s.id, "code": s.code, "name": s.name,
+        "original_filename": s.original_filename, "file_size": s.file_size,
+    }
