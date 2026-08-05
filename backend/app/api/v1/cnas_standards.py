@@ -3,11 +3,13 @@
 文件字节优先存 COS（cloud_key），COS 不可用时回退 MySQL LONGBLOB（data）。
 预览用浏览器原生 PDF 阅读器（inline），下载用附件（attachment）。
 """
+import os
 import re
 from datetime import datetime
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
@@ -17,6 +19,21 @@ from ...models.user import User
 from ...models.cnas_standard import CnasStandard
 
 router = APIRouter(prefix="/cnas-standards", tags=["cnas-standards"])
+
+_EXT_MIME = {
+    ".pdf": "application/pdf",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
+
+
+def _guess_mime(filename: str) -> str:
+    ext = os.path.splitext(filename)[1].lower()
+    return _EXT_MIME.get(ext, "application/octet-stream")
 
 
 def _content_disposition(disposition: str, filename: str) -> str:
@@ -96,6 +113,10 @@ def list_standards(db: Session = Depends(get_db), user: User = Depends(get_curre
 @router.post("/upload", status_code=201)
 def upload_standard(
     file: UploadFile = File(...),
+    code: str = Form(""),
+    name: str = Form(""),
+    category: str = Form(""),
+    sort_order: int | None = Form(None),
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "specialty_leader")),
 ):
@@ -103,7 +124,11 @@ def upload_standard(
     if not content:
         raise HTTPException(status_code=400, detail="文件内容为空")
     original = file.filename or "standard.pdf"
-    sort_order, code, name, category = _parse_filename(original)
+    auto_sort, auto_code, auto_name, auto_cat = _parse_filename(original)
+    code = code or auto_code
+    name = name or auto_name
+    category = category or auto_cat
+    sort_order = sort_order if sort_order is not None else auto_sort
     # COS 上传（失败则回退 BLOB）
     cloud_key = None
     if cos_storage.ready:
@@ -140,9 +165,12 @@ def preview_standard(std_id: int, db: Session = Depends(get_db), user: User = De
     if not content:
         raise HTTPException(status_code=404, detail="文件不存在")
     fname = s.original_filename or f"cnas-{std_id}.pdf"
+    mime = _guess_mime(fname)
+    # 仅 PDF 可在浏览器内联预览；其余类型（如 .doc）改为直接下载
+    disp = "inline" if mime == "application/pdf" else "attachment"
     return Response(
-        content, media_type="application/pdf",
-        headers={"Content-Disposition": _content_disposition("inline", fname)},
+        content, media_type=mime,
+        headers={"Content-Disposition": _content_disposition(disp, fname)},
     )
 
 
@@ -155,10 +183,41 @@ def download_standard(std_id: int, db: Session = Depends(get_db), user: User = D
     if not content:
         raise HTTPException(status_code=404, detail="文件不存在")
     fname = s.original_filename or f"cnas-{std_id}.pdf"
+    mime = _guess_mime(fname)
     return Response(
-        content, media_type="application/pdf",
+        content, media_type=mime,
         headers={"Content-Disposition": _content_disposition("attachment", fname)},
     )
+
+
+class StandardMetaUpdate(BaseModel):
+    code: str | None = None
+    name: str | None = None
+    category: str | None = None
+    sort_order: int | None = None
+
+
+@router.patch("/{std_id}")
+def update_standard_meta(
+    std_id: int,
+    payload: StandardMetaUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "specialty_leader")),
+):
+    """更新元数据（代号/名称/类别/排序），用于纠错与统一分类。"""
+    s = db.get(CnasStandard, std_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="未找到文件")
+    for fld in ("code", "name", "category", "sort_order"):
+        val = getattr(payload, fld)
+        if val is not None:
+            setattr(s, fld, val)
+    db.commit()
+    db.refresh(s)
+    return {
+        "id": s.id, "code": s.code, "name": s.name,
+        "category": s.category, "sort_order": s.sort_order,
+    }
 
 
 @router.post("/{std_id}/replace")
