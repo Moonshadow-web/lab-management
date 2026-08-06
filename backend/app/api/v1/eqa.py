@@ -275,6 +275,10 @@ def _compute_summary_by_category(year: int, half: int, db: Session, category: st
             "qualify_rate": r["qualify_rate"],
         }
     else:
+        # 跨分类合计（含 rows 为空：该 category 无匹配计划的情况）。
+        # 累加器必须在分支内重新初始化：循环体内(line 225)的初始化在 rows 为空时
+        # 因 continue 被跳过，否则下方 tot[...]=items_evaluated 触发 UnboundLocalError。
+        qualified = unqualified = not_evaluated = items_evaluated = 0
         prog_union = set()
         for b in cats.values():
             prog_union |= b["programs"]

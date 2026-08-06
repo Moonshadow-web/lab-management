@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "eqa-summary-template-fallback-v2-2026-08-06"
+_BUILD_MARK = "eqa-summary-stats-unbound-fix-2026-08-06"
 
 
 def get_build_mark() -> str:
