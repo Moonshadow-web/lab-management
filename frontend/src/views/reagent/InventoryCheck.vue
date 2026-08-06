@@ -218,10 +218,28 @@ function matchItem(it) {
   return false
 }
 
+// 甲状腺功能项目统一归到「甲状腺」分组下展示
+const THYROID_NAMES = ["甲状腺素", "三碘甲状腺原氨酸", "游离甲状腺素", "游离三碘甲状腺原氨酸", "促甲状腺激素", "抗甲状腺过氧化物酶抗体", "甲状腺球蛋白", "促甲状腺激素受体抗体", "抗甲状腺球蛋白抗体"]
+function isThyroid(name) {
+  if (!name) return false
+  if (THYROID_NAMES.includes(name)) return true
+  return name.includes('甲状腺')
+}
+function groupProjects(projects) {
+  const thyroid = []
+  const others = []
+  for (const g of projects) {
+    if (isThyroid(g.test_item_name)) thyroid.push(...g.items)
+    else others.push(g)
+  }
+  if (thyroid.length) others.unshift({ test_item_id: null, test_item_name: '甲状腺', test_item_aliases: '', items: thyroid })
+  return others
+}
 const filteredProjects = computed(() => {
   if (!tpl.value) return []
   if (categoryFilter.value && categoryFilter.value !== 'reagent') return []
-  return tpl.value.by_project.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length)
+  const filtered = tpl.value.by_project.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length)
+  return groupProjects(filtered)
 })
 const filteredInstruments = computed(() => {
   if (!tpl.value) return []
@@ -268,7 +286,7 @@ async function onNewCheck() {
 
 function buildSections(useRecorded) {
   const secs = []
-  for (const g of tpl.value.by_project) {
+  for (const g of groupProjects(tpl.value.by_project)) {
     secs.push({ heading: '项目：' + g.test_item_name, items: g.items.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
       brand: it.brand,
