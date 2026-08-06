@@ -35,7 +35,9 @@
           <template #default="{ row }">
             <el-table :data="row.rows" border size="small" style="margin:6px 12px;width:calc(100% - 24px)">
               <el-table-column prop="document_id" label="文档" min-width="220">
-                <template #default="{ row: r }">{{ docTitle(r.document_id) }} <el-tag type="info" size="small">{{ docCat(r.document_id) }}</el-tag></template>
+                <template #default="{ row: r }">{{ docTitle(r.document_id) }} <el-tag type="info" size="small">{{ docCat(r.document_id) }}</el-tag>
+                  <el-tag v-if="!r.reviewer" type="warning" size="small" style="margin-left:4px">待重分</el-tag>
+                </template>
               </el-table-column>
               <el-table-column prop="status" label="状态" width="120">
                 <template #default="{ row: r }">
@@ -44,10 +46,11 @@
               </el-table-column>
               <el-table-column prop="revised_filename" label="修订文件" min-width="160" />
               <el-table-column prop="document_new_version" label="生成版本" width="100" />
-              <el-table-column label="操作" width="160" fixed="right">
+              <el-table-column label="操作" width="220" fixed="right">
                 <template #default="{ row: r }">
                   <el-button size="small" :disabled="!r.revised_cloud_key" type="primary" @click="openReceive(r)">接收生成版本</el-button>
                   <el-button size="small" text @click="viewAssignRecord(r)">记录</el-button>
+                  <el-button size="small" text type="warning" @click="openReassign(r)">重新分配</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -322,6 +325,16 @@
     </div>
     <div class="summary-report-html" v-html="summaryReportHtml" />
   </el-dialog>
+
+  <!-- 重新分配（可作用于已释放/已分配的评审文件，直接更新原分配行，不产生重复行） -->
+  <EditDialog
+    v-model="reassignVisible"
+    title="重新分配评审文件"
+    :form="reassignForm"
+    :fields="reassignFields"
+    :submitting="reassignSubmitting"
+    @submit="onSubmitReassign"
+  />
 </template>
 
 <script setup>
@@ -331,8 +344,9 @@ import request from '../../utils/request'
 import {
   listCampaigns, createCampaign, updateCampaign, listAssignments, assignBatch, myAssignments,
   uploadRevision, downloadRevisionBlob, submitReview, receiveRevision, reviewerStats, reviewSummary,
-  downloadDocumentBlob, myRecord, upsertMyRecord, getAssignmentOpinion,
+  downloadDocumentBlob, myRecord, upsertMyRecord, getAssignmentOpinion, updateAssignment,
 } from '../../api/review'
+import EditDialog from '../../components/EditDialog.vue'
 import mammoth from 'mammoth'
 import { buildReviewSummaryHtml, printHtml, downloadDoc as downloadReportDoc } from '../../utils/reportExport'
 import { useAuthStore } from '../../store/auth'
@@ -382,6 +396,42 @@ function onReviewerFilterChange(val) {
   expandedRowKeys.value = val ? [val] : []
 }
 
+// 重新分配：直接更新已有分配行（含已释放的空审核人行），不产生重复行
+const reassignVisible = ref(false)
+const reassignSubmitting = ref(false)
+const reassignId = ref(null)
+const reassignForm = reactive({ reviewer_id: null })
+const userOptions = computed(() => users.value.map(u => ({ label: u.full_name || u.username, value: u.id })))
+const reassignFields = computed(() => [
+  { prop: 'reviewer_id', label: '审核人', type: 'select', options: userOptions.value },
+])
+function openReassign(row) {
+  reassignId.value = row.id
+  reassignForm.reviewer_id = row.reviewer_id || null
+  reassignVisible.value = true
+}
+async function onSubmitReassign() {
+  if (!reassignForm.reviewer_id) {
+    ElMessage.warning('请选择审核人'); return
+  }
+  reassignSubmitting.value = true
+  try {
+    const u = userMap.value[reassignForm.reviewer_id]
+    await updateAssignment(reassignId.value, {
+      reviewer: u?.full_name || u?.username || '',
+      reviewer_id: reassignForm.reviewer_id,
+      status: '待评审',
+    })
+    ElMessage.success('已重新分配')
+    reassignVisible.value = false
+    await loadAll()
+  } catch (e) {
+    ElMessage.error('重新分配失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    reassignSubmitting.value = false
+  }
+}
+
 // 接收生成版本审阅弹窗
 const receiveVisible = ref(false)
 const receiveForm = reactive({
@@ -415,7 +465,11 @@ const isAllowedCat = (docId) => {
 }
 const visibleAssignments = computed(() => (assignments.value || []).filter((a) => !isObsolete(a.document_id) && isAllowedCat(a.document_id)))
 const visibleMyTasks = computed(() => (myTasks.value || []).filter((a) => !isObsolete(a.document_id) && isAllowedCat(a.document_id)))
-const assignedDocIds = computed(() => new Set(visibleAssignments.value.map((a) => a.document_id)))
+// 仅统计「已分配（有审核人）」的文档；已释放（reviewer 为空）的文档不计入，
+// 使其重新出现在批量分配弹窗中可被重新分配（后端 assign_batch 会复用释放行，不产生重复行）
+const assignedDocIds = computed(() => new Set(
+  visibleAssignments.value.filter((a) => a.reviewer_id).map((a) => a.document_id)
+))
 const reviewDocs = computed(() =>
   docs.value.filter(
     (d) =>

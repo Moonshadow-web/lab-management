@@ -116,10 +116,16 @@ def assign_batch(
         {d.id: d for d in db.query(Document).filter(Document.id.in_(doc_ids)).all()}
         if doc_ids else {}
     )
+    all_assigns = db.query(ReviewAssignment).filter(ReviewAssignment.campaign_id == cid).all()
     existing = {
         (a.document_id, a.reviewer_id, a.reviewer)
-        for a in db.query(ReviewAssignment).filter(ReviewAssignment.campaign_id == cid).all()
+        for a in all_assigns
     }
+    # 已释放（空审核人）的分配行，按文档去重：重新分配时复用，避免重复创建行
+    released_map: dict[int, int] = {}
+    for a in all_assigns:
+        if a.reviewer_id is None and not (a.reviewer or "").strip():
+            released_map.setdefault(a.document_id, a.id)
     created = []
     rejected = []
     for it in items:
@@ -138,6 +144,18 @@ def assign_batch(
             })
             continue
         if (doc_id, rid, rname) in existing:
+            continue
+        # 复用该文档已释放（空审核人）的分配行，而非新建重复行
+        rel_id = released_map.get(doc_id)
+        if rel_id is not None:
+            a = db.get(ReviewAssignment, rel_id)
+            a.reviewer = rname
+            a.reviewer_id = rid
+            a.status = "待评审"
+            db.flush()
+            created.append(a.id)
+            existing.add((doc_id, rid, rname))
+            released_map.pop(doc_id, None)
             continue
         a = ReviewAssignment(
             campaign_id=cid,
