@@ -624,11 +624,11 @@ def _add_field(run, field):
     run._r.append(f1); run._r.append(instr); run._r.append(fsep); run._r.append(f2)
 
 
-def _add_footer_code(section, code, year, expire_date=None):
+def _add_footer_code(section, code, year):
     """页脚：3 列 1 行表 → 左 表格编号/生效日期（堆 2 行），中 医院名，右 第X页/共Y页。
 
-    expire_date: 传入时左下列显示「失效日期：{expire_date}」，否则默认「生效日期：{year}.01.01」。
-    仅月小结(CZ-012)传 expire_date，比对报告(CZ-022)沿用生效日期。
+    左下列固定显示「生效日期：{year}.01.01」。所有自动生成的表单（CZ-012 月小结 /
+    CZ-022 比对报告 / 室间比对报告）统一显示生效日期，不再显示失效日期。
     """
     footer = section.footer
     footer.is_linked_to_previous = False
@@ -663,10 +663,7 @@ def _add_footer_code(section, code, year, expire_date=None):
     _run_font(p1.add_run(f"表格编号：{code}"), 9)
     p2 = left.add_paragraph()
     p2.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    if expire_date:
-        _run_font(p2.add_run(f"失效日期：{expire_date}"), 9)
-    else:
-        _run_font(p2.add_run(f"生效日期：{year}.01.01"), 9)
+    _run_font(p2.add_run(f"生效日期：{year}.01.01"), 9)
 
     # 中：医院名
     center.text = ""
