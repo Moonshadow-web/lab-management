@@ -4,12 +4,18 @@
       <h2 class="title">试剂目录</h2>
       <p class="sub">试剂、校准品、质控品、耗材一览表。支持搜索、筛选、Excel导入。</p>
       <div class="stats-bar" v-if="itemStatsReady">
-        <div class="stat-pill" v-for="label in statsLabels" :key="label">
-          <span class="stat-pill-label">{{ label }}</span>
-          <span class="stat-pill-num">{{ itemStats.counts[label] || 0 }}</span>
-          <span class="stat-pill-unit">种</span>
+        <div class="stat-card" v-for="(label, idx) in statsLabels" :key="label">
+          <div class="stat-card-icon" :style="{ background: iconBgs[idx], color: iconColors[idx] }">
+            <el-icon :size="18"><component :is="statIcons[idx]" /></el-icon>
+          </div>
+          <div class="stat-card-body">
+            <div class="stat-card-num">{{ itemStats.counts[label] || 0 }}<span class="stat-card-unit">种</span></div>
+            <div class="stat-card-label">{{ label }}</div>
+          </div>
         </div>
-        <span class="muted" style="font-size:12px;margin-left:4px">（当前责任库：{{ reagentStore.library || '全部' }}，仅启用）</span>
+        <el-tag size="small" type="info" effect="plain" class="stats-scope">
+          当前责任库：{{ reagentStore.library || '全部' }} · 仅启用
+        </el-tag>
       </div>
     </div>
 
@@ -121,7 +127,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Upload, Download } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Upload, Download, FirstAidKit, Aim, Box, Collection } from '@element-plus/icons-vue'
 import { listReagentItems, listAllReagentItems, getReagentItemCounts, createReagentItem, updateReagentItem, deleteReagentItem, importReagentFromExcel } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
 import { useReagentStore, LIBRARIES } from '../../store/reagent'
@@ -145,6 +151,9 @@ const uploadFile = ref(null)
 const itemStats = ref({ counts: { '试剂': 0, '校准品': 0, '耗材': 0, '质控品': 0 }, total: 0 })
 const itemStatsReady = ref(false)
 const statsLabels = ['试剂', '校准品', '耗材', '质控品']
+const statIcons = [FirstAidKit, Aim, Box, Collection]
+const iconBgs = ['#eff6ff', '#ecfdf5', '#fffbeb', '#f5f3ff']
+const iconColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6']
 
 const emptyForm = () => ({
   name: '', type: '试剂', category: '', library: '', brand: '', spec: '', material_code: '',
@@ -262,8 +271,11 @@ onMounted(refresh)
 .pager { margin: 10px 0 16px; display: flex; justify-content: flex-end; }
 .muted { color: #cbd5e1; }
 .stats-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
-.stat-pill { display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid #e2e8f0; }
-.stat-pill-label { color: #64748b; font-size: 13px; }
-.stat-pill-num { color: #1a365d; font-size: 18px; font-weight: 700; }
-.stat-pill-unit { color: #94a3b8; font-size: 12px; }
+.stat-card { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.stat-card-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.stat-card-body { display: flex; flex-direction: column; gap: 2px; }
+.stat-card-num { font-size: 18px; font-weight: 700; color: #1e293b; line-height: 1; }
+.stat-card-unit { font-size: 12px; font-weight: 400; color: #94a3b8; margin-left: 2px; }
+.stat-card-label { font-size: 12px; color: #64748b; }
+.stats-scope { margin-left: auto; }
 </style>
