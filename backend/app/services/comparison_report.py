@@ -624,11 +624,12 @@ def _add_field(run, field):
     run._r.append(f1); run._r.append(instr); run._r.append(fsep); run._r.append(f2)
 
 
-def _add_footer_code(section, code, year):
+def _add_footer_code(section, code, year, effective_date=None):
     """页脚：3 列 1 行表 → 左 表格编号/生效日期（堆 2 行），中 医院名，右 第X页/共Y页。
 
-    左下列固定显示「生效日期：{year}.01.01」。所有自动生成的表单（CZ-012 月小结 /
-    CZ-022 比对报告 / 室间比对报告）统一显示生效日期，不再显示失效日期。
+    左下列固定显示「生效日期」。可传 effective_date 指定具体生效日期（如受控表单修订日），
+    否则默认「{year}.01.01」。所有自动生成的表单（CZ-012 月小结 / CZ-022 比对报告 /
+    室间比对报告）统一显示生效日期，不再显示失效日期。
     """
     footer = section.footer
     footer.is_linked_to_previous = False
@@ -663,7 +664,7 @@ def _add_footer_code(section, code, year):
     _run_font(p1.add_run(f"表格编号：{code}"), 9)
     p2 = left.add_paragraph()
     p2.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    _run_font(p2.add_run(f"生效日期：{year}.01.01"), 9)
+    _run_font(p2.add_run(f"生效日期：{effective_date or f'{year}.01.01'}"), 9)
 
     # 中：医院名
     center.text = ""

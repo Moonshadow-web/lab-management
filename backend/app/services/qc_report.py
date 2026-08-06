@@ -46,7 +46,7 @@ def build_docx(out_path, summaries, report, instrument_name, instrument_no, year
         s.bottom_margin = Cm(1.8)
         s.left_margin = Cm(1.8)
         s.right_margin = Cm(1.8)
-    _add_footer_code(sec, "BG-SM-CZ-012", year)
+    _add_footer_code(sec, "BG-SM-CZ-012", year, effective_date="2026.08.01")
 
     # 标题
     p = doc.add_paragraph()
