@@ -25,7 +25,11 @@ router = APIRouter(prefix="/qc-target-batches", tags=["qc_target_batches"])
 ARCHIVE_DIR = DATA_DIR / "qc_target_archives"
 os.makedirs(ARCHIVE_DIR, exist_ok=True)
 
-WRITE = require_roles("admin", "qc_manager")
+# 录入/标记/确立/上传存档：与模块权限表 qc-target 默认角色一致（admin/qc_manager/member/staff），
+# 否则员工(member)在前端能看到「录入」按钮（canWrite('qc') 含 member），后端却 403，导致录入无法保存。
+WRITE = require_roles("admin", "qc_manager", "member", "staff")
+# 删除结果/批号（qc-target_delete）：仅管理员 + 质控管理员。
+DELETE = require_roles("admin", "qc_manager")
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +330,7 @@ def recalc_all(db: Session = Depends(get_db), user: User = Depends(require_roles
 
 
 @router.delete("/{batch_id}/results/{rid}", response_model=None)
-def delete_result(batch_id: int, rid: int, request: Request, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+def delete_result(batch_id: int, rid: int, request: Request, db: Session = Depends(get_db), user: User = Depends(DELETE)):
     row = db.get(QCTargetResult, rid)
     if not row or row.batch_id != batch_id:
         raise HTTPException(status_code=404, detail="结果不存在")
