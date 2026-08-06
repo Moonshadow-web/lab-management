@@ -55,7 +55,12 @@
           <el-option label="耗材" value="consumable" />
           <el-option label="质控品" value="control" />
         </el-select>
-        <el-input v-model="dialogSearch" placeholder="模糊检索试剂/规格/编码/项目名(含英文别名如ALT)..." clearable style="width:340px" />
+        <el-select v-if="categoryFilter === 'brand'" v-model="brandTypeFilter" placeholder="类型" clearable style="width:110px" size="default">
+          <el-option label="试剂" value="reagent" />
+          <el-option label="耗材" value="consumable" />
+          <el-option label="质控品" value="control" />
+        </el-select>
+        <el-input v-model="dialogSearch" placeholder="模糊检索试剂/规格/编码/品牌/项目名(含英文别名如ALT)..." clearable style="width:340px" />
         <el-button @click="onPrintBlank" :icon="Printer" size="small">打印空白录入页</el-button>
         <span class="muted" style="font-size:12px">共 {{ totalEntries }} 项</span>
       </div>
@@ -148,7 +153,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Printer } from '@element-plus/icons-vue'
 import { listInventoryChecks, getInventoryCheck, createInventoryCheck, deleteInventoryCheck, getReagentTemplate, listAllReagentItems } from '../../api/reagent'
@@ -164,7 +169,11 @@ const canWrite = computed(() => auth.canWrite('reagents'))
 const checks = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
 const dialogVisible = ref(false), submitting = ref(false)
 const dialogSearch = ref('')
-const categoryFilter = ref('')  // '' | 'reagent' | 'consumable' | 'control'
+const categoryFilter = ref('')  // '' | 'reagent' | 'consumable' | 'control' | 'brand'
+const brandTypeFilter = ref('')  // '' | 'reagent' | 'consumable' | 'control'（仅 brand 模式生效）
+
+// 切走「按品牌」分类时清除类型子筛选，避免残留影响其他分类
+watch(categoryFilter, (v) => { if (v !== 'brand') brandTypeFilter.value = '' })
 const checkForm = ref({ check_date: '', check_type: '月末盘库', remark: '' })
 const tpl = ref(null)
 const quantities = reactive({})
@@ -190,7 +199,7 @@ function allItems() {
 }
 const totalEntries = computed(() => {
   if (!tpl.value) return 0
-  if (categoryFilter.value === 'brand') return allItems().filter(matchItem).length
+  if (categoryFilter.value === 'brand') return allItems().filter(it => matchItem(it) && matchType(it)).length
   let n = 0
   if (categoryFilter.value === '' || categoryFilter.value === 'reagent')
     for (const g of tpl.value.by_project) n += g.items.filter(matchItem).length
@@ -201,7 +210,7 @@ const totalEntries = computed(() => {
   return n
 })
 
-/** 模糊匹配：试剂名/规格/编码 + 项目中文名/英文别名 */
+/** 模糊匹配：试剂名/规格/编码/品牌 + 项目中文名/英文别名 */
 function matchItem(it) {
   const kw = dialogSearch.value.trim().toLowerCase()
   if (!kw) return true
@@ -209,6 +218,8 @@ function matchItem(it) {
   if ((it.name || '').toLowerCase().includes(kw)) return true
   if ((it.spec || '').toLowerCase().includes(kw)) return true
   if ((it.material_code || '').toLowerCase().includes(kw)) return true
+  // 品牌（按品牌检索）
+  if ((it.brand || '').toLowerCase().includes(kw)) return true
   // 项目名称 + 英文别名（逗号分隔，支持 ALT / ATIII 等）
   if (it.project_name && it.project_name.toLowerCase().includes(kw)) return true
   if (it.project_aliases) {
@@ -216,6 +227,16 @@ function matchItem(it) {
       if (alias.trim().toLowerCase().includes(kw)) return true
   }
   return false
+}
+
+/** 按品牌视图下的类型子筛选：试剂(含校准品)/耗材/质控品 */
+function matchType(it) {
+  const t = brandTypeFilter.value
+  if (!t) return true
+  if (t === 'reagent') return it.type === '试剂' || it.type === '校准品'
+  if (t === 'consumable') return it.type === '耗材'
+  if (t === 'control') return it.type === '质控品'
+  return true
 }
 
 // 甲状腺功能项目统一归到「甲状腺」分组下展示
@@ -253,9 +274,12 @@ const filteredControls = computed(() => {
 })
 const filteredByBrand = computed(() => {
   if (!tpl.value || categoryFilter.value !== 'brand') return []
+  const seen = new Set()  // 按 item_id 去重：同品牌多仪器共用的耗材（如反应杯）只显示一次
   const map = {}
   for (const it of allItems()) {
-    if (!matchItem(it)) continue
+    if (seen.has(it.item_id)) continue
+    if (!matchItem(it) || !matchType(it)) continue
+    seen.add(it.item_id)
     const b = it.brand || '未标注品牌'
     if (!map[b]) map[b] = []
     map[b].push(it)
@@ -272,6 +296,7 @@ const filteredByBrand = computed(() => {
 async function onNewCheck() {
   dialogSearch.value = ''
   categoryFilter.value = ''
+  brandTypeFilter.value = ''
   checkForm.value = { check_date: new Date().toISOString().slice(0,10), check_type: '月末盘库', remark: '' }
   dialogVisible.value = true
   submitting.value = true
