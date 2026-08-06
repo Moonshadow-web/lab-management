@@ -6,11 +6,49 @@
 """
 from docx import Document
 from pathlib import Path
+import os
 import shutil
 
 
 def _period_label(half: int) -> str:
     return {1: "上半年（1-6月）", 2: "下半年（7-12月）", 0: "全年"}.get(half, "全年")
+
+
+_TEMPLATE_NAME = "BG-SM-CZ-020-生化免疫组室间质评总结报告表.docx"
+
+
+def _find_template() -> Path:
+    """定位真实 BG-SM-CZ-020 模板。
+
+    搜索顺序（前者优先）：
+      1) 运行时数据目录（DATA_DIR/uploads/docs，CFS 持久卷，可被上传覆盖）
+      2) 构建期备份目录（镜像内 /app/backup/uploads/docs，随 COPY data/uploads 进入镜像，
+         不依赖持久卷是否同步，必含随仓库发布的模板）
+      3) 项目仓库 data/uploads/docs（本地开发）
+    任一命中即返回；均不命中再在各候选目录下递归搜索 *BG-SM-CZ-020*.docx。
+    """
+    base = Path(__file__).resolve().parents[3]
+    repo_cand = base / "data" / "uploads" / "docs" / _TEMPLATE_NAME
+
+    candidates: list[Path] = []
+    data_dir = os.environ.get("DATA_DIR")
+    if data_dir:
+        candidates.append(Path(data_dir) / "uploads" / "docs" / _TEMPLATE_NAME)
+    candidates.append(Path("/app/backup/uploads/docs") / _TEMPLATE_NAME)
+    candidates.append(repo_cand)
+
+    for cand in candidates:
+        if cand.exists():
+            return cand
+
+    # 兜底：在候选父目录下递归搜索（处理文件名微调）
+    for root in {c.parent for c in candidates}:
+        if root.exists():
+            hits = list(root.rglob("*BG-SM-CZ-020*.docx"))
+            if hits:
+                return hits[0]
+
+    raise FileNotFoundError("未找到 BG-SM-CZ-020 室间质评总结模板")
 
 
 # 质评部门（org）显示名映射
