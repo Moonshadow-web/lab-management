@@ -55,18 +55,6 @@ def _find_template() -> Path:
 _ORG_DISPLAY = {"卫健委": "国家卫健委临检中心", "北京市": "北京市临检中心"}
 
 
-def _find_template() -> Path:
-    """定位真实 BG-SM-CZ-020 模板（项目根/data/uploads/docs/...）。"""
-    base = Path(__file__).resolve().parents[3]
-    cand = base / "data" / "uploads" / "docs" / "BG-SM-CZ-020-生化免疫组室间质评总结报告表.docx"
-    if cand.exists():
-        return cand
-    hits = list((base / "data").rglob("*BG-SM-CZ-020*.docx"))
-    if hits:
-        return hits[0]
-    raise FileNotFoundError("未找到 BG-SM-CZ-020 室间质评总结模板")
-
-
 def _fill_by_text(doc, substr: str, new_text: str):
     """把所有包含 substr 的单元格整格替换为 new_text（自动兼容合并/独立单元格）。"""
     for tb in doc.tables:
