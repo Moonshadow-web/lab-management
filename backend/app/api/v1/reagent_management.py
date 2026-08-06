@@ -90,6 +90,32 @@ def list_reagent_items(
             "items": [ReagentItemRead.model_validate(r) for r in rows]}
 
 
+@router.get("/items/counts", response_model=dict)
+def get_reagent_item_counts(
+    library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
+    active_only: bool = Query(True, description="仅统计启用项"),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """按类型统计试剂目录数量。用于试剂目录页/工作台展示：试剂/校准品/耗材/质控品。"""
+    base = db.query(ReagentItem)
+    if library:
+        base = base.filter(ReagentItem.library == library)
+    if active_only:
+        base = base.filter(ReagentItem.is_active == True)
+    rows = base.with_entities(ReagentItem.type, func.count()).group_by(ReagentItem.type).all()
+    counts = {"试剂": 0, "校准品": 0, "耗材": 0, "质控品": 0}
+    for t, n in rows:
+        if t in counts:
+            counts[t] = n
+    return {
+        "library": library,
+        "active_only": active_only,
+        "total": sum(counts.values()),
+        "counts": counts,
+    }
+
+
 @router.get("/items/{item_id}", response_model=ReagentItemRead)
 def get_reagent_item(item_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
     item = db.query(ReagentItem).get(item_id)

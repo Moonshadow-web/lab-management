@@ -27,6 +27,28 @@
       </el-col>
     </el-row>
 
+    <AppCard title="试剂目录" class="mt">
+      <div class="mini-stats">
+        <div class="mini" @click="go('/reagents')">
+          <span class="mini-num">{{ stats.reagentCounts?.['试剂'] ?? '-' }}</span>
+          <span class="mini-label">试剂</span>
+        </div>
+        <div class="mini" @click="go('/reagents')">
+          <span class="mini-num">{{ stats.reagentCounts?.['校准品'] ?? '-' }}</span>
+          <span class="mini-label">校准品</span>
+        </div>
+        <div class="mini" @click="go('/reagents')">
+          <span class="mini-num">{{ stats.reagentCounts?.['耗材'] ?? '-' }}</span>
+          <span class="mini-label">耗材</span>
+        </div>
+        <div class="mini" @click="go('/reagents')">
+          <span class="mini-num">{{ stats.reagentCounts?.['质控品'] ?? '-' }}</span>
+          <span class="mini-label">质控品</span>
+        </div>
+      </div>
+      <div class="stat-sub" style="margin-top:8px">全部责任库 · 仅启用</div>
+    </AppCard>
+
     <AppCard title="今日我的岗位" class="mt">
       <template #header-extra>
         <el-radio-group v-model="rangeMode" size="small" @change="onRangeChange">
@@ -154,7 +176,7 @@ import { getMyToday, getMySchedule, getRestRoster } from '../api/scheduling'
 const router = useRouter()
 const stats = ref({
   testItems: '-', instruments: '-', documents: '-', notifications: '-',
-  qc: '-', reagents: '-', training: '-', verification: '-', nc: '-',
+  qc: '-', reagents: '-', reagentCounts: {}, training: '-', verification: '-', nc: '-',
 })
 const notices = ref([])
 const myShifts = ref([])
@@ -191,6 +213,7 @@ async function loadStats() {
       notifications: data.unread_notifications ?? '-',
       qc: data.qc_records ?? '-',
       reagents: data.reagents ?? '-',
+      reagentCounts: data.reagent_counts || {},
       training: data.training_records ?? '-',
       verification: data.verification_records ?? '-',
       nc: data.nonconformities ?? '-',

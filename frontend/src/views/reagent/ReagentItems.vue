@@ -3,6 +3,14 @@
     <div class="page-header">
       <h2 class="title">试剂目录</h2>
       <p class="sub">试剂、校准品、质控品、耗材一览表。支持搜索、筛选、Excel导入。</p>
+      <div class="stats-bar" v-if="itemStatsReady">
+        <div class="stat-pill" v-for="label in statsLabels" :key="label">
+          <span class="stat-pill-label">{{ label }}</span>
+          <span class="stat-pill-num">{{ itemStats.counts[label] || 0 }}</span>
+          <span class="stat-pill-unit">种</span>
+        </div>
+        <span class="muted" style="font-size:12px;margin-left:4px">（当前责任库：{{ reagentStore.library || '全部' }}，仅启用）</span>
+      </div>
     </div>
 
     <LibraryTabs @change="refresh" />
@@ -19,6 +27,7 @@
       </el-select>
       <el-checkbox v-model="showInactive" border @change="refresh" style="margin-left:4px">显示停用</el-checkbox>
       <el-button :icon="Refresh" @click="refresh">刷新</el-button>
+      <el-button :icon="Download" @click="onExport">导出清单</el-button>
       <el-button type="primary" :icon="Plus" @click="onAdd" v-if="canWrite">新增</el-button>
       <el-button :icon="Upload" @click="onImport" v-if="canWrite">导入Excel</el-button>
     </div>
@@ -112,8 +121,8 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Upload } from '@element-plus/icons-vue'
-import { listReagentItems, createReagentItem, updateReagentItem, deleteReagentItem, importReagentFromExcel } from '../../api/reagent'
+import { Search, Refresh, Plus, Upload, Download } from '@element-plus/icons-vue'
+import { listReagentItems, listAllReagentItems, getReagentItemCounts, createReagentItem, updateReagentItem, deleteReagentItem, importReagentFromExcel } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
 import { useReagentStore, LIBRARIES } from '../../store/reagent'
 import { errText } from '../../utils/errText'
@@ -133,11 +142,25 @@ const dialogVisible = ref(false), editingId = ref(null), submitting = ref(false)
 const importVisible = ref(false), uploading = ref(false)
 const uploadFile = ref(null)
 
+const itemStats = ref({ counts: { '试剂': 0, '校准品': 0, '耗材': 0, '质控品': 0 }, total: 0 })
+const itemStatsReady = ref(false)
+const statsLabels = ['试剂', '校准品', '耗材', '质控品']
+
 const emptyForm = () => ({
   name: '', type: '试剂', category: '', library: '', brand: '', spec: '', material_code: '',
   unit: '', manufacturer: '', supplier: '', min_stock: 0, remark: '', is_active: true,
 })
 const form = reactive(emptyForm())
+
+async function loadStats() {
+  try {
+    const r = await getReagentItemCounts({ library: reagentStore.library, active_only: true })
+    itemStats.value = r
+    itemStatsReady.value = true
+  } catch (e) {
+    // 统计失败不影响主列表
+  }
+}
 
 async function refresh() {
   loading.value = true
@@ -149,9 +172,46 @@ async function refresh() {
     if (showInactive.value) params.show_inactive = true
     const r = await listReagentItems(params)
     items.value = r.items; total.value = r.total
+    await loadStats()
   } catch (e) {
     ElMessage.error('加载失败：' + errText(e))
   } finally { loading.value = false }
+}
+
+function csvEscape(v) {
+  if (v === null || v === undefined) return ''
+  const s = String(v).replace(/"/g, '""')
+  return s.includes(',') || s.includes('\n') || s.includes('"') ? `"${s}"` : s
+}
+
+async function onExport() {
+  try {
+    const all = await listAllReagentItems({
+      library: reagentStore.library,
+      type: filterType.value,
+      category: '',
+      show_inactive: false,
+    })
+    const headers = ['名称', '类型', '类别', '责任库', '品牌', '规格', '材料编码', '单位', '最低库存', '年用量', '状态']
+    const rows = all.map(it => [
+      it.name, it.type, it.category || '', it.library || '', it.brand || '',
+      it.spec || '', it.material_code || '', it.unit || '', it.min_stock || 0,
+      it.annual_usage || 0, it.is_active ? '启用' : '停用',
+    ].map(csvEscape))
+    const bom = '\ufeff'
+    const csv = bom + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    const lib = reagentStore.library || '全部'
+    link.download = `试剂目录清单_${lib}_${new Date().toISOString().slice(0,10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    ElMessage.success(`已导出 ${all.length} 条`)
+  } catch (e) {
+    ElMessage.error('导出失败：' + errText(e))
+  }
 }
 
 function onAdd() {
@@ -201,4 +261,9 @@ onMounted(refresh)
 .toolbar { display: flex; gap: 10px; align-items: center; margin: 8px 0 12px; flex-wrap: wrap; }
 .pager { margin: 10px 0 16px; display: flex; justify-content: flex-end; }
 .muted { color: #cbd5e1; }
+.stats-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+.stat-pill { display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid #e2e8f0; }
+.stat-pill-label { color: #64748b; font-size: 13px; }
+.stat-pill-num { color: #1a365d; font-size: 18px; font-weight: 700; }
+.stat-pill-unit { color: #94a3b8; font-size: 12px; }
 </style>

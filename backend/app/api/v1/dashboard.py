@@ -11,7 +11,7 @@ from app.models.instrument import Instrument
 from app.models.document import Document
 from app.models.notification import Notification, NotificationRead
 from app.models.qc import QCRecord
-from app.models.reagent import Reagent
+from app.models.reagent_management import ReagentItem
 from app.models.training import TrainingRecord
 from app.models.verification import VerificationRecord
 from app.models.nonconformity import Nonconformity
@@ -23,7 +23,6 @@ _STATS_MODELS = [
     ("instruments", Instrument),
     ("documents", Document),
     ("qc_records", QCRecord),
-    ("reagents", Reagent),
     ("training_records", TrainingRecord),
     ("verification_records", VerificationRecord),
     ("nonconformities", Nonconformity),
@@ -42,6 +41,19 @@ async def dashboard_stats(
         stmt = select(func.count()).select_from(model)
         count = db.execute(stmt).scalar() or 0
         result[key] = count
+
+    # 试剂目录：按类型统计（仅启用），用于工作台试剂统计卡片
+    reagent_counts = {"试剂": 0, "校准品": 0, "耗材": 0, "质控品": 0}
+    rows = db.execute(
+        select(ReagentItem.type, func.count())
+        .where(ReagentItem.is_active == True)
+        .group_by(ReagentItem.type)
+    ).all()
+    for t, n in rows:
+        if t in reagent_counts:
+            reagent_counts[t] = n
+    result["reagents"] = sum(reagent_counts.values())
+    result["reagent_counts"] = reagent_counts
 
     # 待办提醒：当前用户「可见且未读」数（私密消息 recipient_user_id=本人，广播 NULL 对所有人可见）
     read_subq = (

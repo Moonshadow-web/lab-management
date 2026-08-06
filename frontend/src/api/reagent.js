@@ -9,6 +9,10 @@ export function listReagentItems(params) {
   return request.get('/api/v1/reagent/items', { params })
 }
 
+export function getReagentItemCounts(params = {}) {
+  return request.get('/api/v1/reagent/items/counts', { params })
+}
+
 // 分页拉全试剂目录（后端 page_size 上限 200，超 200 触发 422）。
 // 用于在库存/月消耗等页面一次性拿到全部试剂映射，避免 [object Object] 报错。
 // 默认包含停用项（show_inactive=true），保证盘库详情/打印的名称映射完整。
