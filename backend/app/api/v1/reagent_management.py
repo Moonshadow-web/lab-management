@@ -254,6 +254,7 @@ def _item_dto(ri: ReagentItem, stock_map: dict,
     return {
         "item_id": ri.id, "name": ri.name, "spec": ri.spec, "type": ri.type,
         "unit": ri.unit, "material_code": ri.material_code or "",
+        "brand": ri.brand or "",
         "current_stock": int(stock_map.get(ri.id, 0)), "library": ri.library,
         "min_stock": int(ri.min_stock or 0),
         "annual_usage": int(ri.annual_usage or 0),

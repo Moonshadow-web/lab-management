@@ -50,6 +50,7 @@
       </el-form>
       <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <el-select v-model="categoryFilter" placeholder="全部分类" clearable style="width:130px" size="default">
+          <el-option label="按品牌" value="brand" />
           <el-option label="试剂 / 校准品" value="reagent" />
           <el-option label="耗材" value="consumable" />
           <el-option label="质控品" value="control" />
@@ -64,8 +65,8 @@
         <template v-for="grp in filteredProjects" :key="'p'+grp.test_item_id">
           <h4 class="grp-title">项目：{{ grp.test_item_name }}</h4>
           <el-table :data="grp.items" border size="small">
-            <el-table-column label="试剂 / 校准品" min-width="180">
-              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
+            <el-table-column label="试剂 / 校准品" min-width="190">
+              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
             </el-table-column>
             <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
@@ -78,8 +79,8 @@
         <template v-for="grp in filteredInstruments" :key="'i'+grp.group">
           <h4 class="grp-title">仪器：{{ grp.group }} <span class="muted" v-if="grp.instruments.length">（{{ grp.instruments.join('、') }}）</span></h4>
           <el-table :data="grp.items" border size="small">
-            <el-table-column label="耗材" min-width="180">
-              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
+            <el-table-column label="耗材" min-width="190">
+              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
             </el-table-column>
             <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
@@ -92,8 +93,8 @@
         <template v-if="filteredControls.length">
           <h4 class="grp-title">质控品（单独）</h4>
           <el-table :data="filteredControls" border size="small">
-            <el-table-column label="质控品" min-width="180">
-              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
+            <el-table-column label="质控品" min-width="190">
+              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
             </el-table-column>
             <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
@@ -101,6 +102,22 @@
               </template>
             </el-table-column>
           </el-table>
+        </template>
+        <!-- 按品牌 -->
+        <template v-if="filteredByBrand.length">
+          <template v-for="grp in filteredByBrand" :key="'b'+grp.brand">
+            <h4 class="grp-title">品牌：{{ grp.brand }}</h4>
+            <el-table :data="grp.items" border size="small">
+              <el-table-column label="名称 / 规格 / 品牌" min-width="200">
+                <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
+              </el-table-column>
+              <el-table-column label="盘点余量" width="120" fixed="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:110px" controls-position="right" />
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
         </template>
         <el-empty v-if="totalEntries === 0" description="该分类/检索条件下无数据" />
       </div>
@@ -173,6 +190,7 @@ function allItems() {
 }
 const totalEntries = computed(() => {
   if (!tpl.value) return 0
+  if (categoryFilter.value === 'brand') return allItems().filter(matchItem).length
   let n = 0
   if (categoryFilter.value === '' || categoryFilter.value === 'reagent')
     for (const g of tpl.value.by_project) n += g.items.filter(matchItem).length
@@ -215,6 +233,23 @@ const filteredControls = computed(() => {
   if (categoryFilter.value && categoryFilter.value !== 'control') return []
   return tpl.value.controls.filter(matchItem)
 })
+const filteredByBrand = computed(() => {
+  if (!tpl.value || categoryFilter.value !== 'brand') return []
+  const map = {}
+  for (const it of allItems()) {
+    if (!matchItem(it)) continue
+    const b = it.brand || '未标注品牌'
+    if (!map[b]) map[b] = []
+    map[b].push(it)
+  }
+  return Object.keys(map)
+    .sort((a, b) => {
+      if (a === '未标注品牌') return 1
+      if (b === '未标注品牌') return -1
+      return a.localeCompare(b, 'zh-CN')
+    })
+    .map(brand => ({ brand, items: map[brand] }))
+})
 
 async function onNewCheck() {
   dialogSearch.value = ''
@@ -236,6 +271,7 @@ function buildSections(useRecorded) {
   for (const g of tpl.value.by_project) {
     secs.push({ heading: '项目：' + g.test_item_name, items: g.items.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
+      brand: it.brand,
       current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
@@ -244,6 +280,7 @@ function buildSections(useRecorded) {
     const extra = g.instruments.length ? `（${g.instruments.join('、')}）` : ''
     secs.push({ heading: '仪器：' + g.group + extra, items: g.items.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
+      brand: it.brand,
       current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
@@ -251,6 +288,7 @@ function buildSections(useRecorded) {
   if (tpl.value.controls.length) {
     secs.push({ heading: '质控品（单独）', items: tpl.value.controls.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
+      brand: it.brand,
       current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
@@ -262,9 +300,9 @@ function sectionHtml(secs) {
   let h = ''
   for (const s of secs) {
     h += `<h3>${s.heading}</h3>`
-    h += '<table><thead><tr><th>名称</th><th>规格</th><th>材料编码</th><th>单位</th><th class="num">当前库存</th><th class="num">盘点余量</th></tr></thead><tbody>'
+    h += '<table><thead><tr><th>名称</th><th>规格</th><th>品牌</th><th>材料编码</th><th>单位</th><th class="num">当前库存</th><th class="num">盘点余量</th></tr></thead><tbody>'
     for (const it of s.items) {
-      h += `<tr><td>${it.name || ''}</td><td>${it.spec || ''}</td><td>${it.material_code || ''}</td><td>${it.unit || ''}</td><td class="num">${it.current}</td><td class="num">${it.qty}</td></tr>`
+      h += `<tr><td>${it.name || ''}</td><td>${it.spec || ''}</td><td>${it.brand || ''}</td><td>${it.material_code || ''}</td><td>${it.unit || ''}</td><td class="num">${it.current}</td><td class="num">${it.qty}</td></tr>`
     }
     h += '</tbody></table>'
   }
