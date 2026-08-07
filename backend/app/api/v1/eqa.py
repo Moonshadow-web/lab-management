@@ -1065,6 +1065,41 @@ def _match_conversion(name: str):
 
 
 # ---------------------------------------------------------------------------
+# 单位换算豁免：卫健委「骨代谢标志物」组的 PTH / VD 不上报换算单位，
+# 直接报仪器原单位（PTH=pg/mL、VD=ng/mL）；其余组（如内分泌）保持换算逻辑。
+# ---------------------------------------------------------------------------
+EQA_NO_CONVERT_ITEMS = [
+    "pth", "甲状旁腺激素",
+    "vd", "25-ohvd", "维生素d", "25羟维生素d",
+]
+
+
+def _is_no_convert_item(name: str) -> bool:
+    nn = _norm_item(name)
+    if not nn:
+        return False
+    for k in EQA_NO_CONVERT_ITEMS:
+        kk = _norm_item(k)
+        if kk == nn or (len(kk) >= 2 and kk in nn):
+            return True
+    return False
+
+
+def _conversion_for(plan: EqaPlan | None, name: str):
+    """按计划上下文决定项目是否需单位换算。
+
+    - 卫健委骨代谢标志物组：PTH / VD 不换算（返回 None，报原单位）；
+    - 其余（含内分泌组）按 EQA_UNIT_CONVERSIONS 原逻辑换算。
+    """
+    if plan is not None:
+        org = plan.org or ""
+        prog = plan.program or ""
+        if ("卫健委" in org) and ("骨代谢" in prog) and _is_no_convert_item(name):
+            return None
+    return _match_conversion(name)
+
+
+# ---------------------------------------------------------------------------
 # EQA 定性试验（COI）阴阳性判定
 # 覆盖：肝炎标志物、感染性疾病血清学标志物系列A/B/C（感A/感B/感C）等。
 # 单位不改，仅按 COI（S/CO）判定阴阳性：
@@ -1191,7 +1226,7 @@ def _build_skeleton(plan: EqaPlan, db: Session = None) -> dict:
     units = _lookup_units(items, db) if db is not None else {}
     conv = {}
     for it in items:
-        c = _match_conversion(it)
+        c = _conversion_for(plan, it)
         if c:
             conv[it] = c
             units[it] = c["to"]  # 上报单位覆盖为换算目标单位
@@ -1240,15 +1275,24 @@ def get_eqa_result(
     # 已存数据若缺 units，则按当前项目查询库补算，保证单位能显示
     if isinstance(rd, dict) and not rd.get("units") and rd.get("items"):
         rd["units"] = _lookup_units(rd["items"], db)
-    # 回填单位换算信息（旧数据 / 新数据都保证 conv 与上报单位存在）
+    # 回填单位换算信息（旧数据 / 新数据都保证 conv 与上报单位存在）；
+    # 卫健委骨代谢组 PTH/VD 等豁免项目：移除旧换算、恢复原单位（修正历史已存数据）
     if isinstance(rd, dict) and rd.get("items"):
         rd.setdefault("conv", {})
         rd.setdefault("cells_report", {})
         for it in rd["items"]:
-            c = _match_conversion(it)
-            if c and it not in rd["conv"]:
-                rd["conv"][it] = c
-                rd["units"][it] = c["to"]
+            c = _conversion_for(plan, it)
+            if c:
+                if it not in rd["conv"]:
+                    rd["conv"][it] = c
+                    rd["units"][it] = c["to"]
+            else:
+                if it in rd["conv"]:
+                    del rd["conv"][it]
+                if it in rd.get("units", {}):
+                    orig = _lookup_units([it], db).get(it)
+                    if orig:
+                        rd["units"][it] = orig
     return {
         "result_data": rd,
         "plan": {

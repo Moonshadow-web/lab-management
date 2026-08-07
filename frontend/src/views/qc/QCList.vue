@@ -1687,7 +1687,22 @@ const EQA_CONV = [
 function _convNorm(s) {
   return (s || '').replace(/\s/g, '').toLowerCase()
 }
-function matchConv(name) {
+// 卫健委「骨代谢标志物」组：PTH / VD 不上报换算单位，报原单位（pg/mL、ng/mL）；
+// 与后端 eqa.py::_conversion_for 保持一致（内分泌组不豁免，保持换算）。
+const EQA_NO_CONVERT_ITEMS = ['pth', '甲状旁腺激素', 'vd', '25-ohvd', '维生素d', '25羟维生素d']
+function isNoConvertItem(name) {
+  const nn = _convNorm(name)
+  if (!nn) return false
+  return EQA_NO_CONVERT_ITEMS.some((k) => {
+    const kk = _convNorm(k)
+    return kk === nn || (kk.length >= 2 && nn.includes(kk))
+  })
+}
+function matchConv(name, plan) {
+  const ctx = plan || resultPlan.value
+  if (ctx && (ctx.org || '').includes('卫健委') && (ctx.program || '').includes('骨代谢') && isNoConvertItem(name)) {
+    return null
+  }
   const nn = _convNorm(name)
   if (!nn) return null
   for (const r of EQA_CONV) {
@@ -1790,7 +1805,7 @@ function applyGrid() {
   const old = {}
   for (const r of gridRows.value) old[r.sample] = { values: r.values || {}, report: r.report || {} }
   gridItems.value = items.map((n, i) => {
-    const c = matchConv(n)
+    const c = matchConv(n, resultPlan.value)
     const unit = c ? c.to : (unitLines[i] || '')
     return { key: n, name: n, unit, conv: c, qualitative: isQualitativeProgram(resultPlan.value?.program), reverse: isReverseItem(n) }
   })
@@ -1833,7 +1848,7 @@ function addRow() {
 }
 function addCol() {
   const name = '新项目' + (gridItems.value.length + 1)
-  const c = matchConv(name)
+  const c = matchConv(name, resultPlan.value)
   gridItems.value.push({ key: name, name, unit: c ? c.to : '', conv: c, qualitative: isQualitativeProgram(resultPlan.value?.program), reverse: isReverseItem(name) })
   for (const r of gridRows.value) {
     if (!(name in r.values)) r.values[name] = ''
