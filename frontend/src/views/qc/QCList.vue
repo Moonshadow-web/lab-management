@@ -297,6 +297,12 @@
           <el-table-column prop="item" label="细项" min-width="110" show-overflow-tooltip />
           <el-table-column prop="round_no" label="轮次" width="62" />
           <el-table-column prop="sample_date" label="检测日期" width="108" sortable="custom" />
+          <el-table-column prop="received_at" label="收样时间" width="108" sortable="custom">
+            <template #default="{ row }">
+              <span v-if="row.received_at">{{ row.received_at }}</span>
+              <el-button v-else size="small" link type="primary" @click="openReceive(row)">登记</el-button>
+            </template>
+          </el-table-column>
           <el-table-column prop="due_date" label="上报截止日期" width="110" sortable="custom" />
           <el-table-column label="已上报" width="74" prop="returned" sortable="custom">
             <template #default="{ row }">
@@ -328,9 +334,10 @@
               <span v-else>—</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="176" fixed="right">
+          <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
               <div class="op-cell">
+                <el-button size="small" type="warning" plain @click="openReceive(row)">收样登记</el-button>
                 <el-button size="small" type="warning" plain @click="openResultDialog(row)">录入结果</el-button>
                 <el-button size="small" :type="row.returned ? 'info' : 'warning'" plain @click="onReturn(row)">已上报</el-button>
                 <el-button size="small" type="success" plain @click="openImportDialog(row)">导入报告</el-button>
@@ -625,6 +632,31 @@
             <el-button type="primary" :loading="resultSaving" @click="saveResult">保存</el-button>
           </template>
         </el-dialog>
+
+        <!-- 收样登记 -->
+        <el-dialog v-model="receiveDialog" title="收样登记" width="420px" append-to-body>
+          <el-form v-if="receiveTarget" label-width="100px">
+            <el-form-item label="仪器/项目组">
+              <span>{{ receiveTarget.org }} · {{ receiveTarget.program }} · {{ receiveTarget.item || '—' }}</span>
+            </el-form-item>
+            <el-form-item label="检测日期">
+              <span>{{ receiveTarget.sample_date || '—' }}</span>
+            </el-form-item>
+            <el-form-item label="收样日期" required>
+              <el-date-picker
+                v-model="receiveForm.received_at"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="选择收样日期"
+                style="width:100%"
+              />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="receiveDialog = false">取消</el-button>
+            <el-button type="primary" :loading="receiveSaving" @click="saveReceive">保存</el-button>
+          </template>
+        </el-dialog>
       </template>
       <template v-if="activeTab === 'cmp'">
         <Comparison />
@@ -652,7 +684,7 @@ import {
   listEqaPlans, createEqaPlan, updateEqaPlan, deleteEqaPlan, copyPrevYearEqa,
   getEqaAlerts, getEqaSummary, getEqaSummaryText, upsertEqaSummaryText, exportEqaPlans,
   uploadEqaReport, downloadEqaReport, deleteEqaReport,
-  getEqaResult, saveEqaResult,
+  getEqaResult, saveEqaResult, receivePlan,
   getEqaSummaryByCategory, generateEqaSummary, eqaSummaryDocUrl, mergeEqaReports,
 } from '../../api/eqa'
 import { useAuthStore } from '../../store/auth'
@@ -1356,6 +1388,11 @@ const resultDialog = ref(false)
 const resultPlan = ref(null)
 const resultTargetId = ref(null)
 const resultSaving = ref(false)
+// 收样登记
+const receiveDialog = ref(false)
+const receiveTarget = ref(null)
+const receiveSaving = ref(false)
+const receiveForm = reactive({ received_at: '' })
 const exporting = ref(false)
 const sampleText = ref('')
 const itemText = ref('')
@@ -1795,6 +1832,29 @@ async function openResultDialog(row) {
     resultDialog.value = true
   } catch (err) {
     ElMessage.error('加载失败：' + (err.response?.data?.detail || err.message))
+  }
+}
+function openReceive(row) {
+  receiveTarget.value = row
+  receiveForm.received_at = row.received_at || ''
+  receiveDialog.value = true
+}
+async function saveReceive() {
+  if (!receiveForm.received_at) {
+    ElMessage.warning('请选择收样日期')
+    return
+  }
+  receiveSaving.value = true
+  try {
+    await receivePlan(receiveTarget.value.id, { received_at: receiveForm.received_at })
+    if (receiveTarget.value) receiveTarget.value.received_at = receiveForm.received_at
+    ElMessage.success('收样日期已保存')
+    receiveDialog.value = false
+    await loadEqa()
+  } catch (e) {
+    ElMessage.error('保存失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    receiveSaving.value = false
   }
 }
 function applyGrid() {

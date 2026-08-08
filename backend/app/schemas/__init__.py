@@ -554,6 +554,7 @@ class EqaPlanBase(BaseModel):
     item: str = ""
     round_no: str = ""
     sample_date: str = ""
+    received_at: str = ""
     due_date: str = ""
     returned: bool = False
     result: str = ""
@@ -575,6 +576,12 @@ class EqaPlanRead(EqaPlanBase):
     id: int
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class EqaPlanReceive(BaseModel):
+    """「收样登记」：录入质评样本送达签收日期。"""
+    model_config = ConfigDict(from_attributes=True)
+    received_at: str = ""
 
 
 class EqaSummaryBase(BaseModel):

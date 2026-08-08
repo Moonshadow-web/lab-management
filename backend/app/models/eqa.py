@@ -27,6 +27,7 @@ class EqaPlan(Base):
     item: Mapped[str] = mapped_column(String(200), default="")        # 细项（具体检测项目，可空）
     round_no: Mapped[str] = mapped_column(String(50), default="")     # 轮次（第1次 / 2026-1）
     sample_date: Mapped[str] = mapped_column(String(30), default="")  # 样本检测日期 YYYY-MM-DD
+    received_at: Mapped[str] = mapped_column(String(30), default="")  # 收样日期 YYYY-MM-DD（质评样本送达签收）
     due_date: Mapped[str] = mapped_column(String(30), index=True, default="")  # 上报截止日期 YYYY-MM-DD（提醒依据）
     returned: Mapped[bool] = mapped_column(Boolean, default=False)    # 是否已上报（在官方网页完成上报后标记）
     result: Mapped[str] = mapped_column(String(200), default="")      # 结果回报文本（合格/不合格/PT及格…）

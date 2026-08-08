@@ -95,6 +95,11 @@ export function saveEqaResult(planId, data) {
   return request.put(`/api/v1/eqa-plans/${planId}/result`, data)
 }
 
+// 「收样登记」：录入质评样本送达签收日期
+export function receivePlan(planId, data) {
+  return request.post(`/api/v1/eqa-plans/${planId}/receive`, data)
+}
+
 // 项目库与室间质评关联（只读）
 export function listEqaAssociations(params) {
   return request.get('/api/v1/eqa-associations', { params })

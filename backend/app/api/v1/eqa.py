@@ -24,6 +24,7 @@ from ...models.test_item import TestItem
 from ...schemas import (
     EqaPlanCreate,
     EqaPlanRead,
+    EqaPlanReceive,
     EqaPlanUpdate,
     EqaSummaryRead,
     EqaSummaryUpdate,
@@ -1369,6 +1370,24 @@ def put_eqa_result(
     plan.result_data = json.dumps(payload, ensure_ascii=False)
     db.commit()
     return {"ok": True, "result_data": payload}
+
+
+@router.post("/{plan_id}/receive", response_model=EqaPlanRead)
+def receive_plan(
+    plan_id: int,
+    body: EqaPlanReceive,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """录入质评样本收样日期（送达签收时间）。"""
+    plan = db.query(EqaPlan).filter(EqaPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="计划不存在")
+    plan.received_at = body.received_at
+    db.commit()
+    db.refresh(plan)
+    return plan
 
 
 # ---------------------------------------------------------------------------
