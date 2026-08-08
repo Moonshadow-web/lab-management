@@ -1072,6 +1072,15 @@ EQA_NO_CONVERT_ITEMS = [
     "pth", "甲状旁腺激素",
     "vd", "25-ohvd", "维生素d", "25羟维生素d",
 ]
+# 豁免项目的固定上报原单位（不依赖项目库，避免项目库单位与实际仪器单位不一致）
+EQA_NO_CONVERT_UNITS = {
+    "pth": "pg/mL",
+    "甲状旁腺激素": "pg/mL",
+    "vd": "ng/mL",
+    "25-ohvd": "ng/mL",
+    "维生素d": "ng/mL",
+    "25羟维生素d": "ng/mL",
+}
 
 
 def _is_no_convert_item(name: str) -> bool:
@@ -1085,17 +1094,36 @@ def _is_no_convert_item(name: str) -> bool:
     return False
 
 
+def _no_convert_unit(name: str) -> str:
+    """豁免项目对应的固定原单位（PTH→pg/mL、VD→ng/mL），未命中返回 ''。"""
+    nn = _norm_item(name)
+    if not nn:
+        return ""
+    for k, u in EQA_NO_CONVERT_UNITS.items():
+        kk = _norm_item(k)
+        if kk == nn or (len(kk) >= 2 and kk in nn):
+            return u
+    return ""
+
+
+def _no_convert_unit_for(plan: EqaPlan | None, name: str) -> str:
+    """卫健委骨代谢标志物组 PTH/VD 豁免换算时的固定上报原单位；否则返回 ''。"""
+    if plan is not None:
+        org = plan.org or ""
+        prog = plan.program or ""
+        if ("卫健委" in org) and ("骨代谢" in prog):
+            return _no_convert_unit(name)
+    return ""
+
+
 def _conversion_for(plan: EqaPlan | None, name: str):
     """按计划上下文决定项目是否需单位换算。
 
     - 卫健委骨代谢标志物组：PTH / VD 不换算（返回 None，报原单位）；
     - 其余（含内分泌组）按 EQA_UNIT_CONVERSIONS 原逻辑换算。
     """
-    if plan is not None:
-        org = plan.org or ""
-        prog = plan.program or ""
-        if ("卫健委" in org) and ("骨代谢" in prog) and _is_no_convert_item(name):
-            return None
+    if _no_convert_unit_for(plan, name):
+        return None
     return _match_conversion(name)
 
 
@@ -1230,6 +1258,10 @@ def _build_skeleton(plan: EqaPlan, db: Session = None) -> dict:
         if c:
             conv[it] = c
             units[it] = c["to"]  # 上报单位覆盖为换算目标单位
+        else:
+            u0 = _no_convert_unit_for(plan, it)
+            if u0:
+                units[it] = u0  # 卫健委骨代谢组 PTH/VD：固定原单位（pg/mL、ng/mL）
     year = plan.year or datetime.now().year
     rnd = _parse_round(plan.round_no)
     samples = [f"{year}{rnd}{i}" for i in range(1, 6)]  # 默认 5 个样本
@@ -1276,12 +1308,13 @@ def get_eqa_result(
     if isinstance(rd, dict) and not rd.get("units") and rd.get("items"):
         rd["units"] = _lookup_units(rd["items"], db)
     # 回填单位换算信息（旧数据 / 新数据都保证 conv 与上报单位存在）；
-    # 卫健委骨代谢组 PTH/VD 等豁免项目：移除旧换算、恢复原单位（修正历史已存数据）
+    # 卫健委骨代谢组 PTH/VD 等豁免项目：移除旧换算、固定原单位（修正历史已存数据）
     if isinstance(rd, dict) and rd.get("items"):
         rd.setdefault("conv", {})
         rd.setdefault("cells_report", {})
         for it in rd["items"]:
             c = _conversion_for(plan, it)
+            u0 = _no_convert_unit_for(plan, it)
             if c:
                 if it not in rd["conv"]:
                     rd["conv"][it] = c
@@ -1289,7 +1322,9 @@ def get_eqa_result(
             else:
                 if it in rd["conv"]:
                     del rd["conv"][it]
-                if it in rd.get("units", {}):
+                if u0:
+                    rd["units"][it] = u0  # 豁免项目固定原单位
+                elif it in rd.get("units", {}):
                     orig = _lookup_units([it], db).get(it)
                     if orig:
                         rd["units"][it] = orig
