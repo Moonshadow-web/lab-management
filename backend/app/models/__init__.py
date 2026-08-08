@@ -42,6 +42,7 @@ from .iso15189 import (
     CorrectiveAction, AccreditedScope,
 )
 from .cnas_standard import CnasStandard
+from .uncertainty import UncertaintyAssessment
 
 __all__ = [
     "User",
@@ -99,4 +100,5 @@ __all__ = [
     "AuditClause", "SelfInspectionCampaign", "SelfInspectionAssignment",
     "SelfInspectionRecord", "CorrectiveAction", "AccreditedScope",
     "CnasStandard",
+    "UncertaintyAssessment",
 ]

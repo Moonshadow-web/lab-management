@@ -10,7 +10,11 @@
       @add="onAdd"
       @edit="onEdit"
       @delete="onDelete"
-    />
+    >
+      <template #toolbar-extra>
+        <el-button type="warning" plain @click="uncertOpen = true">测量不确定度评估</el-button>
+      </template>
+    </CrudTable>
     <EditDialog
       v-model="dialogVisible"
       :title="editingId ? '编辑性能验证' : '新增性能验证'"
@@ -20,6 +24,10 @@
       :submitting="submitting"
       @submit="onSubmit"
     />
+    <!-- 测量不确定度评估工具 -->
+    <el-drawer v-model="uncertOpen" title="测量不确定度评估（BG-SM-CZ-072）" size="92%" destroy-on-close>
+      <UncertaintyAssessment />
+    </el-drawer>
   </div>
 </template>
 
@@ -29,6 +37,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../components/CrudTable.vue'
 import EditDialog from '../../components/EditDialog.vue'
 import { listVerification, createVerification, updateVerification, deleteVerification } from '../../api/verification'
+import UncertaintyAssessment from './UncertaintyAssessment.vue'
 import { useAuthStore } from '../../store/auth'
 
 const crud = ref(null)
@@ -36,6 +45,7 @@ const auth = useAuthStore()
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const submitting = ref(false)
+const uncertOpen = ref(false)
 
 const TYPE_OPTIONS = ['精密度', '正确度', '线性范围', '可报告范围', '携带污染', '参考区间', '检出限'].map((v) => ({ label: v, value: v }))
 const CONCLUSION_OPTIONS = ['通过', '不通过', '待复核'].map((v) => ({ label: v, value: v }))

@@ -609,6 +609,48 @@ class EqaSummaryRead(EqaSummaryBase):
     updated_at: datetime | None = None
 
 
+# ---------------- UncertaintyAssessment（测量不确定度评估，对应 BG-SM-CZ-072） ----------------
+class UncertaintyAssessmentBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    project_name: str = ""
+    project_code: str = ""
+    instrument: str = ""
+    reagent: str = ""
+    eval_date: str = ""
+    cycle_months: int = 12
+    prepared_by: str = ""
+    reviewed_by: str = ""
+    l1_values: list[float] = []
+    l2_values: list[float] = []
+    l1_mean: float = 0
+    l1_sd: float = 0
+    l1_cv: float = 0
+    l2_mean: float = 0
+    l2_sd: float = 0
+    l2_cv: float = 0
+    bias_rms: float = 0
+    ucal: float = 0
+    pt_result: str = "合格"
+    l1_u: float = 0
+    l2_u: float = 0
+    l1_passed: bool = False
+    l2_passed: bool = False
+
+
+class UncertaintyAssessmentCreate(UncertaintyAssessmentBase):
+    pass
+
+
+class UncertaintyAssessmentUpdate(UncertaintyAssessmentBase):
+    pass
+
+
+class UncertaintyAssessmentRead(UncertaintyAssessmentBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 # ---------------- QualityRequirement ----------------
 class QualityRequirementBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
