@@ -1,4 +1,4 @@
-from fastapi import Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pathlib import Path
 import os
