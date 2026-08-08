@@ -265,16 +265,24 @@ const docExtraParams = reactive({ category: '', hide_invalid: false })
 const columns = computed(() => {
   const cols = [
     { prop: 'title', label: '标题', minWidth: 220 },
-    { prop: 'category', label: '分类', width: 100 },
+    // 分类列：分类名含「作废」时标红，便于醒目识别
+    { prop: 'category', label: '分类', width: 110, formatter: (row) =>
+        (row.category || '').includes('作废')
+          ? `<span style="color:#f56c6c;font-weight:700">${row.category}</span>`
+          : (row.category || '') },
   ]
   // 仅记录表格显示「子类」列
   if (docExtraParams.category === '记录表格') {
     cols.push({ prop: 'sub_type', label: '子类', width: 100, formatter: (row) => subTypeTag(row.doc_number) })
   }
   cols.push({
-    prop: 'status', label: '状态', width: 90,
+    prop: 'status', label: '状态', width: 100,
     formatter: (row) => {
-      const map = { 生效: 'success', 草稿: 'info', 作废: 'danger' }
+      // 作废：红底白字加粗标签，比普通 danger 浅红 tag 更醒目
+      if (row.status === '作废') {
+        return `<span style="color:#fff;background:#f56c6c;border-radius:4px;padding:1px 8px;font-weight:700">作废</span>`
+      }
+      const map = { 生效: 'success', 草稿: 'info' }
       return `<el-tag type="${map[row.status] || 'info'}" size="small">${row.status || '-'}</el-tag>`
     },
   })
