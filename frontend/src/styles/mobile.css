@@ -241,3 +241,18 @@
     padding: 8px 10px !important;
   }
 }
+
+/* ===== 全局：弹窗遮罩改为柔和淡色 + 背景模糊（避免"背景全黑"过于压抑） =====
+ * 适用于桌面端和移动端，element-plus 默认遮罩 rgba(0,0,0,0.5) 视觉过重。
+ * 改为浅灰半透明 + backdrop-filter 模糊，保留模态聚焦感同时柔和可读。
+ */
+.el-overlay {
+  background-color: rgba(50, 50, 60, 0.18) !important;
+  backdrop-filter: blur(3px) saturate(120%);
+  -webkit-backdrop-filter: blur(3px) saturate(120%);
+}
+/* 抽屉遮罩同步 */
+.el-drawer__overlay,
+.el-drawer__wrapper {
+  background-color: rgba(50, 50, 60, 0.18) !important;
+}
