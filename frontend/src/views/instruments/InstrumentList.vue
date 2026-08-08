@@ -13,6 +13,7 @@
       @delete="onDelete"
     >
       <template #toolbar-extra>
+        <el-button type="warning" plain @click="openRepairSummary">汇总维修记录</el-button>
         <el-button v-if="auth.canWrite('instruments')" @click="importVisible = true">批量导入档案</el-button>
         <el-switch
           v-model="hideNonActive"
@@ -156,6 +157,55 @@
       <template #footer>
         <el-button @click="qrVisible = false">关闭</el-button>
         <el-button type="primary" @click="copyQrUrl">复制链接</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 汇总维修记录（跨仪器） -->
+    <el-dialog v-model="summaryOpen" title="汇总维修记录" width="1100px" top="4vh">
+      <div class="repair-summary-count">共 <b>{{ summaryRows.length }}</b> 条维修记录（按录入时间倒序）</div>
+      <el-table :data="summaryRows" border stripe v-loading="summaryLoading" max-height="540">
+        <el-table-column type="index" label="序号" width="55" align="center" />
+        <el-table-column prop="instrument_name" label="仪器" width="180" show-overflow-tooltip />
+        <el-table-column prop="instrument_model" label="型号" width="150" show-overflow-tooltip />
+        <el-table-column prop="instrument_dept_no" label="编号" width="170" show-overflow-tooltip />
+        <el-table-column prop="found_at" label="发现时间" width="140" />
+        <el-table-column prop="fault_desc" label="故障描述" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="repairer" label="维修人" width="80" />
+        <el-table-column prop="restored_at" label="恢复使用时间" width="140" />
+        <el-table-column label="操作" width="80" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="viewRepairDetail(row)">查看</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="summaryOpen = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 维修记录详情（汇总入口查看） -->
+    <el-dialog v-model="repairDetailOpen" :title="`维修记录详情 - ${repairDetailRow?.instrument_name || ''}`" width="860px" top="4vh">
+      <el-descriptions :column="2" border v-if="repairDetailRow">
+        <el-descriptions-item label="仪器">{{ repairDetailRow.instrument_name || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="编号">{{ repairDetailRow.instrument_dept_no || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="型号">{{ repairDetailRow.instrument_model || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="发现人">{{ repairDetailRow.finder || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="发现时间">{{ repairDetailRow.found_at || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="通知维修时间">{{ repairDetailRow.notify_repair_at || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="处理时间">{{ repairDetailRow.handled_at || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="恢复使用时间">{{ repairDetailRow.restored_at || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="维修人">{{ repairDetailRow.repairer || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="签字">{{ repairDetailRow.signer || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="影响项目" :span="2"><div class="detail-text">{{ repairDetailRow.affected_items || '—' }}</div></el-descriptions-item>
+        <el-descriptions-item label="故障描述" :span="2"><div class="detail-text">{{ repairDetailRow.fault_desc || '—' }}</div></el-descriptions-item>
+        <el-descriptions-item label="故障原因及维修过程" :span="2"><div class="detail-text">{{ repairDetailRow.cause_process || '—' }}</div></el-descriptions-item>
+        <el-descriptions-item label="排查后质控验证" :span="2">
+          <div class="detail-text" v-if="renderQcDetail(repairDetailRow.qc_detail)">{{ renderQcDetail(repairDetailRow.qc_detail) }}</div>
+          <div class="detail-text" v-else>{{ repairDetailRow.qc_verification || '—' }}</div>
+        </el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button @click="repairDetailOpen = false">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -305,7 +355,7 @@ import {
   uploadInstrumentArchive, getInstrumentArchiveInfo, downloadInstrumentArchive,
   deleteInstrumentArchive, getArchivesStatus, importArchivesFolder,
   getInstrumentTestItems, getInstrumentDocuments, getInstrumentSopDocuments,
-  listRepairs, createRepair, updateRepair, deleteRepair, createRepairInvite,
+  listRepairs, createRepair, updateRepair, deleteRepair, createRepairInvite, listAllRepairs,
 } from '../../api/instruments'
 import QRCode from 'qrcode'
 import RepairRecordForm from './RepairRecordForm.vue'
@@ -684,6 +734,65 @@ async function copyQrUrl() {
   }
 }
 
+// ---------------- 汇总维修记录 ----------------
+const summaryOpen = ref(false)
+const summaryRows = ref([])
+const summaryLoading = ref(false)
+const repairDetailOpen = ref(false)
+const repairDetailRow = ref(null)
+async function openRepairSummary() {
+  summaryOpen.value = true
+  summaryLoading.value = true
+  try {
+    summaryRows.value = (await listAllRepairs()) || []
+  } catch (e) {
+    ElMessage.error('加载失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    summaryLoading.value = false
+  }
+}
+function viewRepairDetail(row) {
+  repairDetailRow.value = row
+  repairDetailOpen.value = true
+}
+// 质控验证结构化数据 → 可读文本（详情展示）
+function renderQcDetail(qd) {
+  if (!qd || typeof qd !== 'object') return ''
+  const lines = []
+  const biasStr = (r) => {
+    const s = parseFloat(r.sample)
+    const v = parseFloat(r.result)
+    if (isNaN(s) || isNaN(v) || s === 0) return ''
+    return (((v - s) / s) * 100).toFixed(2) + '%'
+  }
+  const fmtTarget = (rows) => (rows || []).filter((r) => r.target !== '' || r.result !== '').map((r) => `靶值${r.target || '-'}/结果${r.result || '-'}/${r.control || '未判'}`).join('；')
+  const fmtCmp = (rows) => (rows || []).filter((r) => r.sample !== '' || r.result !== '').map((r) => `样本${r.sample || '-'}/结果${r.result || '-'}/偏倚${biasStr(r) || '-'}/${r.accept || '未判'}`).join('；')
+  if (qd.method === 'qc') {
+    lines.push(`验证方式：室内质控验证；项目：${qd.qc?.project || '—'}`)
+    lines.push(fmtTarget(qd.qc?.rows) || '（未填写行）')
+  } else if (qd.method === 'compare') {
+    lines.push(`验证方式：样本比对；项目：${qd.compare?.project || '—'}`)
+    lines.push(fmtCmp(qd.compare?.rows) || '（未填写行）')
+  } else if (qd.method === 'calibrate') {
+    const c = qd.calibrate || {}
+    const vals = (c.results || []).map((v) => parseFloat(v)).filter((n) => !isNaN(n))
+    const target = parseFloat(c.target)
+    const unc = parseFloat(c.uncertainty)
+    let judge = ''
+    if (vals.length) {
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+      judge = isNaN(target) || isNaN(unc) ? `均值${mean.toFixed(2)}（待填靶值/不确定度）` : `${Math.abs(mean - target) <= unc ? '可接受' : '否'}（均值${mean.toFixed(2)}，靶值±不确定度范围 ${target}-${unc}~${target}+${unc}）`
+    }
+    lines.push(`验证方式：校准验证；项目：${c.project || '—'}；靶值：${c.target || '-'}；不确定度：±${c.uncertainty || '-'}；3次结果：${(c.results || []).filter((v) => v !== '').join('、') || '未填'}${judge ? `；判定：${judge}` : ''}`)
+  } else {
+    lines.push(`验证方式：${qd.method || '未选'}`)
+  }
+  lines.push(qd.affect_before
+    ? `是否影响维修前检测结果：是（样本比对 项目：${qd.affect_compare?.project || '—'} → ${fmtCmp(qd.affect_compare?.rows) || '未填写行'}）`
+    : '是否影响维修前检测结果：否')
+  return lines.join('\n')
+}
+
 function pickReportFile(row) {
   reportTarget.recId = row.id
   reportInput.value?.click()
@@ -1048,6 +1157,16 @@ function formatTime(v) {
   background: #f5f7fa;
   border-radius: 4px;
   padding: 6px 10px;
+}
+.repair-summary-count {
+  margin-bottom: 10px;
+  color: #606266;
+  font-size: 13px;
+}
+.detail-text {
+  white-space: pre-line;
+  line-height: 1.7;
+  word-break: break-all;
 }
 /* 仪器列表：允许单元格内容换行（最多两行），避免横向拖拉 */
 .page :deep(.el-table .cell) {

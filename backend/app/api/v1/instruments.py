@@ -254,6 +254,30 @@ def delete_calibration(
 #       故障原因及维修过程 / 维修人 / 排查后质控验证结果 / 恢复使用时间 / 签字
 # ---------------------------------------------------------------------------
 
+@router.get("/repairs/all")
+def list_all_repairs(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """汇总所有仪器的维修记录（跨仪器，供「汇总维修记录」查看），附仪器名称/型号/编号。"""
+    rows = (
+        db.query(InstrumentRepair)
+        .order_by(InstrumentRepair.id.desc())
+        .limit(1000)
+        .all()
+    )
+    inst_map = {i.id: i for i in db.query(Instrument).all()}
+    out = []
+    for r in rows:
+        d = _repair_to_read(r)
+        inst = inst_map.get(r.instrument_id)
+        d["instrument_name"] = inst.name if inst else ""
+        d["instrument_model"] = inst.model if inst else ""
+        d["instrument_dept_no"] = inst.dept_no if inst else ""
+        out.append(d)
+    return out
+
+
 @router.post("/{instrument_id}/repairs/invite")
 def create_repair_invite(
     instrument_id: int,

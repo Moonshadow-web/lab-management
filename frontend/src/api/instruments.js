@@ -58,6 +58,10 @@ export function deleteRepair(instrumentId, recId) {
 export function createRepairInvite(instrumentId) {
   return request.post(`/api/v1/instruments/${instrumentId}/repairs/invite`)
 }
+// 汇总所有仪器的维修记录（附仪器名称/型号/编号）
+export function listAllRepairs() {
+  return request.get('/api/v1/instruments/repairs/all')
+}
 
 // 仪器档案文件
 export function uploadInstrumentArchive(id, file) {
