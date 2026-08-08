@@ -32,58 +32,7 @@
           <div class="rf-inst-item" v-if="info.location"><b>存放地点：</b>{{ info.location }}</div>
         </div>
 
-        <el-form :model="form" label-width="110px" size="default" label-position="left">
-          <el-form-item label="故障描述" required>
-            <el-input v-model="form.fault_desc" type="textarea" :rows="3" placeholder="请详细描述故障内容" />
-          </el-form-item>
-          <el-form-item label="影响项目">
-            <el-input v-model="form.affected_items" type="textarea" :rows="2" placeholder="受影响的具体项目（多个用逗号分隔）" />
-          </el-form-item>
-          <el-row :gutter="10">
-            <el-col :span="12" :xs="24">
-              <el-form-item label="发现人">
-                <el-input v-model="form.finder" placeholder="发现人姓名" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12" :xs="24">
-              <el-form-item label="发现时间">
-                <el-date-picker v-model="form.found_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="选择日期+时间" style="width:100%" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12" :xs="24">
-              <el-form-item label="通知维修时间">
-                <el-date-picker v-model="form.notify_repair_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12" :xs="24">
-              <el-form-item label="处理时间">
-                <el-date-picker v-model="form.handled_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-form-item label="故障原因及维修过程">
-            <el-input v-model="form.cause_process" type="textarea" :rows="3" placeholder="故障处理办法、处理结果及完成时间" />
-          </el-form-item>
-          <el-row :gutter="10">
-            <el-col :span="12" :xs="24">
-              <el-form-item label="维修人">
-                <el-input v-model="form.repairer" placeholder="维修人姓名" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12" :xs="24">
-              <el-form-item label="恢复使用时间">
-                <el-date-picker v-model="form.restored_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-form-item label="排查后质控验证过程及结果">
-            <el-input v-model="form.qc_verification" type="textarea" :rows="3" placeholder="样本选择、结果数据分析、影响评估等" />
-          </el-form-item>
-          <el-form-item label="签字">
-            <el-input v-model="form.signer" placeholder="填写人签字（您的姓名）" />
-          </el-form-item>
-        </el-form>
-
+        <RepairRecordForm :form="form" />
         <div class="rf-actions">
           <el-button type="primary" size="large" :loading="submitting" style="width:100%" @click="submit">
             提交维修记录
@@ -100,6 +49,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '../../utils/request'
+import RepairRecordForm from './RepairRecordForm.vue'
+import { buildQcSummary } from '../../utils/repairQc'
 
 const token = new URLSearchParams(window.location.search).get('token') || ''
 const loading = ref(true)
@@ -107,10 +58,16 @@ const error = ref('')
 const info = ref({})
 const submitted = ref(false)
 const submitting = ref(false)
+// 日期默认当日 00:00:00，时间由用户再填
+function todayDefault() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} 00:00:00`
+}
 const form = reactive({
-  fault_desc: '', affected_items: '', finder: '', found_at: '',
-  notify_repair_at: '', handled_at: '', cause_process: '', repairer: '',
-  qc_verification: '', restored_at: '', signer: '',
+  fault_desc: '', affected_items: '', finder: '', found_at: todayDefault(),
+  notify_repair_at: todayDefault(), handled_at: todayDefault(), cause_process: '', repairer: '',
+  qc_verification: '', qc_detail: null, restored_at: todayDefault(), signer: '',
 })
 
 async function loadInfo() {
@@ -133,7 +90,8 @@ async function submit() {
   }
   submitting.value = true
   try {
-    await request.post(`/api/v1/public/repairs/invite/${token}`, { ...form })
+    const payload = { ...form, qc_verification: buildQcSummary(form.qc_detail) }
+    await request.post(`/api/v1/public/repairs/invite/${token}`, payload)
     submitted.value = true
   } catch (e) {
     ElMessage.error(e?.response?.data?.detail || '提交失败，请重试')
@@ -144,10 +102,11 @@ async function submit() {
 
 function resetAll() {
   submitted.value = false
+  const td = todayDefault()
   Object.assign(form, {
-    fault_desc: '', affected_items: '', finder: '', found_at: '',
-    notify_repair_at: '', handled_at: '', cause_process: '', repairer: '',
-    qc_verification: '', restored_at: '', signer: '',
+    fault_desc: '', affected_items: '', finder: '', found_at: td,
+    notify_repair_at: td, handled_at: td, cause_process: '', repairer: '',
+    qc_verification: '', qc_detail: null, restored_at: td, signer: '',
   })
 }
 

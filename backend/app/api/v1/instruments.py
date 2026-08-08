@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pathlib import Path
+import json
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -281,12 +282,13 @@ def list_repairs(
     user: User = Depends(get_current_user),
 ):
     """按仪器列出维修记录（按 id 倒序，最新在前）。"""
-    return (
+    rows = (
         db.query(InstrumentRepair)
         .filter(InstrumentRepair.instrument_id == instrument_id)
         .order_by(InstrumentRepair.id.desc())
         .all()
     )
+    return [_repair_to_read(r) for r in rows]
 
 
 @router.post("/{instrument_id}/repairs", response_model=InstrumentRepairRead, status_code=201)
@@ -306,12 +308,13 @@ def create_repair(
     data["created_by_id"] = user.id
     if not data.get("signer_id"):
         data["signer_id"] = user.id
+    data["qc_detail"] = _qc_detail_dumps(data.get("qc_detail"))
     rec = InstrumentRepair(instrument_id=instrument_id, **data)
     db.add(rec)
     db.commit()
     db.refresh(rec)
     write_audit(db, user, "create", "instrument_repairs", rec.id, item.model_dump(), request.client.host if request.client else None)
-    return rec
+    return _repair_to_read(rec)
 
 
 @router.put("/{instrument_id}/repairs/{rec_id}", response_model=InstrumentRepairRead)
@@ -332,12 +335,14 @@ def update_repair(
         data["signer"] = user.full_name or user.username
     if not data.get("signer_id"):
         data["signer_id"] = user.id
+    if "qc_detail" in data:
+        data["qc_detail"] = _qc_detail_dumps(data["qc_detail"])
     for k, v in data.items():
         setattr(rec, k, v)
     db.commit()
     db.refresh(rec)
     write_audit(db, user, "update", "instrument_repairs", rec.id, item.model_dump(), request.client.host if request.client else None)
-    return rec
+    return _repair_to_read(rec)
 
 
 @router.delete("/{instrument_id}/repairs/{rec_id}")
@@ -361,6 +366,27 @@ def delete_repair(
 # 维修记录「扫码免登录填写」公开端点（工程师无需登录）
 # 校验 invite token（JWT，30 天有效）→ 返回仪器信息 / 提交维修记录
 # ---------------------------------------------------------------------------
+def _qc_detail_dumps(qd) -> str:
+    """qc_detail dict → JSON 字符串（空/None → ''）。"""
+    if not qd:
+        return ""
+    return json.dumps(qd, ensure_ascii=False)
+
+
+def _repair_to_read(rec: InstrumentRepair) -> dict:
+    """ORM → dict，qc_detail JSON 字符串解析为 dict（供 Read schema 序列化）。"""
+    d = {c.name: getattr(rec, c.name) for c in rec.__table__.columns}
+    raw = d.get("qc_detail")
+    if isinstance(raw, str) and raw.strip():
+        try:
+            d["qc_detail"] = json.loads(raw)
+        except Exception:
+            d["qc_detail"] = {}
+    else:
+        d["qc_detail"] = raw or {}
+    return d
+
+
 public_router = APIRouter(tags=["public-repairs"])
 
 
@@ -406,6 +432,7 @@ def repair_invite_submit(token: str, item: InstrumentRepairCreate, db: Session =
     if not db.get(Instrument, iid):
         raise HTTPException(status_code=404, detail="仪器不存在")
     data = item.model_dump(exclude={"instrument_id", "signer_id", "created_by_id"})
+    data["qc_detail"] = _qc_detail_dumps(data.get("qc_detail"))
     rec = InstrumentRepair(instrument_id=iid, **data)
     db.add(rec)
     db.commit()

@@ -65,6 +65,7 @@ class InstrumentRepair(Base):
     cause_process: Mapped[str] = mapped_column(Text, default="")              # 故障原因及维修过程
     repairer: Mapped[str] = mapped_column(String(100), default="")            # 维修人
     qc_verification: Mapped[str] = mapped_column(Text, default="")           # 排查后质控验证结果
+    qc_detail: Mapped[str] = mapped_column(Text, default="")                  # 质控验证结构化数据 JSON（方式/室内质控行/样本比对行/校准验证/影响前比对）
     restored_at: Mapped[str] = mapped_column(String(30), default="")          # 恢复使用时间
     signer: Mapped[str] = mapped_column(String(100), default="")              # 签字（默认登录人）
     signer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)     # 签字人 user_id

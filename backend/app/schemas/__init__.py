@@ -230,6 +230,7 @@ class InstrumentRepairBase(BaseModel):
     cause_process: str = ""       # 故障原因及维修过程
     repairer: str = ""            # 维修人
     qc_verification: str = ""    # 排查后质控验证结果
+    qc_detail: dict = {}          # 质控验证结构化数据（方式/室内质控行/样本比对行/校准验证/影响前比对）
     restored_at: str = ""        # 恢复使用时间
     signer: str = ""              # 签字
     signer_id: int | None = None

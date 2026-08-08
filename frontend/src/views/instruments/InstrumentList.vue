@@ -122,65 +122,7 @@
       <el-divider v-if="auth.canWrite('instruments')">
         {{ repairEditingId ? '编辑维修记录' : '新建维修记录' }}
       </el-divider>
-      <el-form v-if="auth.canWrite('instruments')" :model="repairForm" label-width="120px" label-position="right">
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="发现人">
-              <el-input v-model="repairForm.finder" placeholder="发现人姓名" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="发现时间">
-              <el-date-picker v-model="repairForm.found_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="选择日期+时间" style="width:100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="故障描述">
-              <el-input v-model="repairForm.fault_desc" type="textarea" :rows="2" placeholder="请详细描述故障内容" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="影响项目">
-              <el-input v-model="repairForm.affected_items" type="textarea" :rows="2" placeholder="列出受影响的具体项目（多个用逗号/换行分隔）" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="通知维修时间">
-              <el-date-picker v-model="repairForm.notify_repair_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="处理时间">
-              <el-date-picker v-model="repairForm.handled_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="故障原因及维修过程">
-              <el-input v-model="repairForm.cause_process" type="textarea" :rows="3" placeholder="详细说明故障处理办法、处理结果及完成时间" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="维修人">
-              <el-input v-model="repairForm.repairer" placeholder="维修人姓名" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="恢复使用时间">
-              <el-date-picker v-model="repairForm.restored_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="排查后质控验证过程及结果">
-              <el-input v-model="repairForm.qc_verification" type="textarea" :rows="3" placeholder="样本选择、结果数据分析、影响评估等" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="签字（恢复使用授权人）">
-              <el-input v-model="repairForm.signer" placeholder="默认登录人" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
+      <RepairRecordForm v-if="auth.canWrite('instruments')" :form="repairForm" finder-placeholder="默认登录人" />
       <div class="repair-tip">
         <b>表格填写说明：</b><br />
         1、故障描述：请详细描述故障内容及影响到的项目。<br />
@@ -366,6 +308,8 @@ import {
   listRepairs, createRepair, updateRepair, deleteRepair, createRepairInvite,
 } from '../../api/instruments'
 import QRCode from 'qrcode'
+import RepairRecordForm from './RepairRecordForm.vue'
+import { buildQcSummary } from '../../utils/repairQc'
 import { fetchDocumentBlob, downloadBlob, previewBlob } from '../../api/documents'
 import { useAuthStore } from '../../store/auth'
 
@@ -618,15 +562,23 @@ const repairForm = reactive({
   cause_process: '',
   repairer: '',
   qc_verification: '',
+  qc_detail: null,
   restored_at: '',
   signer: '',
 })
+// 日期默认当日 00:00:00，时间由用户再填
+function todayDefault() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} 00:00:00`
+}
 function resetRepairForm() {
   repairEditingId.value = null
+  const td = todayDefault()
   Object.assign(repairForm, {
-    fault_desc: '', affected_items: '', finder: '', found_at: '',
-    notify_repair_at: '', handled_at: '', cause_process: '', repairer: '',
-    qc_verification: '', restored_at: '', signer: defaultSigner.value,
+    fault_desc: '', affected_items: '', finder: defaultSigner.value, found_at: td,
+    notify_repair_at: td, handled_at: td, cause_process: '', repairer: '',
+    qc_verification: '', qc_detail: null, restored_at: td, signer: defaultSigner.value,
   })
 }
 async function loadRepairs(instrumentId) {
@@ -649,14 +601,15 @@ function editRepairRow(r) {
   Object.assign(repairForm, {
     fault_desc: r.fault_desc || '',
     affected_items: r.affected_items || '',
-    finder: r.finder || '',
-    found_at: r.found_at || '',
-    notify_repair_at: r.notify_repair_at || '',
-    handled_at: r.handled_at || '',
+    finder: r.finder || defaultSigner.value,
+    found_at: r.found_at || todayDefault(),
+    notify_repair_at: r.notify_repair_at || todayDefault(),
+    handled_at: r.handled_at || todayDefault(),
     cause_process: r.cause_process || '',
     repairer: r.repairer || '',
     qc_verification: r.qc_verification || '',
-    restored_at: r.restored_at || '',
+    qc_detail: (r.qc_detail && typeof r.qc_detail === 'object' && Object.keys(r.qc_detail).length) ? r.qc_detail : null,
+    restored_at: r.restored_at || todayDefault(),
     signer: r.signer || defaultSigner.value,
   })
 }
@@ -674,7 +627,11 @@ async function submitRepair() {
   }
   repairSubmitting.value = true
   try {
-    const payload = { ...repairForm, signer: repairForm.signer || defaultSigner.value }
+    const payload = {
+      ...repairForm,
+      signer: repairForm.signer || defaultSigner.value,
+      qc_verification: buildQcSummary(repairForm.qc_detail),
+    }
     if (repairEditingId.value) {
       await updateRepair(repairInstrument.value.id, repairEditingId.value, payload)
       ElMessage.success('已保存修改')
@@ -683,10 +640,11 @@ async function submitRepair() {
       ElMessage.success('已添加维修记录')
     }
     repairEditingId.value = null
+    const td = todayDefault()
     Object.assign(repairForm, {
-      fault_desc: '', affected_items: '', finder: '', found_at: '',
-      notify_repair_at: '', handled_at: '', cause_process: '', repairer: '',
-      qc_verification: '', restored_at: '', signer: defaultSigner.value,
+      fault_desc: '', affected_items: '', finder: defaultSigner.value, found_at: td,
+      notify_repair_at: td, handled_at: td, cause_process: '', repairer: '',
+      qc_verification: '', qc_detail: null, restored_at: td, signer: defaultSigner.value,
     })
     await loadRepairs(repairInstrument.value.id)
     crud.value?.refresh()
