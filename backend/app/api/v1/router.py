@@ -31,6 +31,7 @@ from . import (
     users,
     verification,
     uncertainty,
+    verification_reports,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -68,6 +69,7 @@ api_router.include_router(scheduling.router)
 api_router.include_router(education.router)
 api_router.include_router(education.attach_router)
 api_router.include_router(uncertainty.router)
+api_router.include_router(verification_reports.router)
 
 # CNAS / WS-T 医学实验室认可规范文件（列表 / 预览 / 下载）
 from . import cnas_standards

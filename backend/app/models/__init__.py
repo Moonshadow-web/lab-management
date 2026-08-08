@@ -43,6 +43,7 @@ from .iso15189 import (
 )
 from .cnas_standard import CnasStandard
 from .uncertainty import UncertaintyAssessment
+from .verification_report import VerificationReport, QUALITATIVE_ITEMS, QUANTITATIVE_ITEMS
 
 __all__ = [
     "User",
@@ -101,4 +102,7 @@ __all__ = [
     "SelfInspectionRecord", "CorrectiveAction", "AccreditedScope",
     "CnasStandard",
     "UncertaintyAssessment",
+    "VerificationReport",
+    "QUALITATIVE_ITEMS",
+    "QUANTITATIVE_ITEMS",
 ]

@@ -651,6 +651,51 @@ class UncertaintyAssessmentRead(UncertaintyAssessmentBase):
     updated_at: datetime | None = None
 
 
+# ---------------- VerificationReport（性能验证报告归档，模板驱动生成 xlsx） ----------------
+class VerificationReportBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    report_type: str = "qualitative"
+    project_name: str = ""
+    project_method: str = ""
+    unit: str = ""
+    reagent: str = ""
+    reagent_lot: str = ""
+    calibrator: str = ""
+    calibrator_lot: str = ""
+    qc: str = ""
+    qc_lot: str = ""
+    instrument: str = ""
+    instrument_manufacturer: str = ""
+    instrument_model: str = ""
+    instrument_no: str = ""
+    tea: str = ""
+    linear_low: str = ""
+    linear_high: str = ""
+    dilution: str = ""
+    verify_items: list = []
+    data: dict = {}
+    result_summary: dict = {}
+    conclusion: str = ""
+    verify_date: str = ""
+    operator: str = ""
+    reviewer: str = ""
+    report_file_path: str = ""
+
+
+class VerificationReportCreate(VerificationReportBase):
+    pass
+
+
+class VerificationReportUpdate(VerificationReportBase):
+    pass
+
+
+class VerificationReportRead(VerificationReportBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 # ---------------- QualityRequirement ----------------
 class QualityRequirementBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)

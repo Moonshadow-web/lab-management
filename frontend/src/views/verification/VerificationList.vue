@@ -1,33 +1,40 @@
 <template>
   <div class="page">
-    <CrudTable
-      ref="crud"
-      :columns="columns"
-      :fetch="fetch"
-      search-placeholder="搜索项目 / 类型 / 仪器 / 操作者..."
-      :show-add="auth.canWrite('verification')"
-      :can-write="auth.canWrite('verification')"
-      @add="onAdd"
-      @edit="onEdit"
-      @delete="onDelete"
-    >
-      <template #toolbar-extra>
-        <el-button type="warning" plain @click="uncertOpen = true">测量不确定度评估</el-button>
-      </template>
-    </CrudTable>
-    <EditDialog
-      v-model="dialogVisible"
-      :title="editingId ? '编辑性能验证' : '新增性能验证'"
-      :form="form"
-      :fields="fields"
-      :rules="rules"
-      :submitting="submitting"
-      @submit="onSubmit"
-    />
-    <!-- 测量不确定度评估工具 -->
-    <el-drawer v-model="uncertOpen" title="测量不确定度评估（BG-SM-CZ-072）" size="92%" destroy-on-close>
-      <UncertaintyAssessment />
-    </el-drawer>
+    <el-tabs v-model="tab" type="border-card">
+      <el-tab-pane label="性能验证记录" name="records">
+        <CrudTable
+          ref="crud"
+          :columns="columns"
+          :fetch="fetch"
+          search-placeholder="搜索项目 / 类型 / 仪器 / 操作者..."
+          :show-add="auth.canWrite('verification')"
+          :can-write="auth.canWrite('verification')"
+          @add="onAdd"
+          @edit="onEdit"
+          @delete="onDelete"
+        >
+          <template #toolbar-extra>
+            <el-button type="warning" plain @click="uncertOpen = true">测量不确定度评估</el-button>
+          </template>
+        </CrudTable>
+        <EditDialog
+          v-model="dialogVisible"
+          :title="editingId ? '编辑性能验证' : '新增性能验证'"
+          :form="form"
+          :fields="fields"
+          :rules="rules"
+          :submitting="submitting"
+          @submit="onSubmit"
+        />
+        <!-- 测量不确定度评估工具 -->
+        <el-drawer v-model="uncertOpen" title="测量不确定度评估（BG-SM-CZ-072）" size="92%" destroy-on-close>
+          <UncertaintyAssessment />
+        </el-drawer>
+      </el-tab-pane>
+      <el-tab-pane label="验证报告归档" name="archive">
+        <VerificationArchive />
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
@@ -38,10 +45,12 @@ import CrudTable from '../../components/CrudTable.vue'
 import EditDialog from '../../components/EditDialog.vue'
 import { listVerification, createVerification, updateVerification, deleteVerification } from '../../api/verification'
 import UncertaintyAssessment from './UncertaintyAssessment.vue'
+import VerificationArchive from './VerificationArchive.vue'
 import { useAuthStore } from '../../store/auth'
 
 const crud = ref(null)
 const auth = useAuthStore()
+const tab = ref('records')
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const submitting = ref(false)
