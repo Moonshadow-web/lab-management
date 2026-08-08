@@ -46,3 +46,28 @@ class CalibrationRecord(Base):
     report_file_path: Mapped[str] = mapped_column(String(500), default="")  # 报告文件路径
     report_filename: Mapped[str] = mapped_column(String(300), default="")  # 报告原始文件名
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class InstrumentRepair(Base):
+    """仪器维修记录（BG-KS-CZ-909 仪器维修记录表）—— 挂在仪器档案下。
+    字段：故障描述/影响项目/发现人/发现时间/通知维修时间/处理时间/故障原因及维修过程/维修人/排查后质控验证结果/恢复使用时间/签字。
+    """
+    __tablename__ = "instrument_repairs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(Integer, index=True)
+    fault_desc: Mapped[str] = mapped_column(String(500), default="")          # 故障描述
+    affected_items: Mapped[str] = mapped_column(String(500), default="")     # 影响项目
+    finder: Mapped[str] = mapped_column(String(100), default="")             # 发现人
+    found_at: Mapped[str] = mapped_column(String(30), default="")             # 发现时间
+    notify_repair_at: Mapped[str] = mapped_column(String(30), default="")     # 通知维修时间
+    handled_at: Mapped[str] = mapped_column(String(30), default="")           # 处理时间（处理日期及时间）
+    cause_process: Mapped[str] = mapped_column(Text, default="")              # 故障原因及维修过程
+    repairer: Mapped[str] = mapped_column(String(100), default="")            # 维修人
+    qc_verification: Mapped[str] = mapped_column(Text, default="")           # 排查后质控验证结果
+    restored_at: Mapped[str] = mapped_column(String(30), default="")          # 恢复使用时间
+    signer: Mapped[str] = mapped_column(String(100), default="")              # 签字（默认登录人）
+    signer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)     # 签字人 user_id
+    created_by_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 创建人 user_id
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

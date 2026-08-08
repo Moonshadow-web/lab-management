@@ -41,6 +41,20 @@ export function getCalibrationsStatus() {
   return request.get('/api/v1/instruments/calibrations/status')
 }
 
+// 仪器维修记录（BG-KS-CZ-909 仪器维修记录表）
+export function listRepairs(instrumentId) {
+  return request.get(`/api/v1/instruments/${instrumentId}/repairs`)
+}
+export function createRepair(instrumentId, data) {
+  return request.post(`/api/v1/instruments/${instrumentId}/repairs`, data)
+}
+export function updateRepair(instrumentId, recId, data) {
+  return request.put(`/api/v1/instruments/${instrumentId}/repairs/${recId}`, data)
+}
+export function deleteRepair(instrumentId, recId) {
+  return request.delete(`/api/v1/instruments/${instrumentId}/repairs/${recId}`)
+}
+
 // 仪器档案文件
 export function uploadInstrumentArchive(id, file) {
   const form = new FormData()

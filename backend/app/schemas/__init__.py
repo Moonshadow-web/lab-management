@@ -217,6 +217,39 @@ class CalibrationRecordRead(CalibrationRecordBase):
     created_at: datetime | None = None
 
 
+# ---------------- InstrumentRepair（仪器维修记录，对应 BG-KS-CZ-909 仪器维修记录表） ----------------
+class InstrumentRepairBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    instrument_id: int = 0
+    fault_desc: str = ""          # 故障描述
+    affected_items: str = ""      # 影响项目
+    finder: str = ""              # 发现人
+    found_at: str = ""            # 发现时间
+    notify_repair_at: str = ""    # 通知维修时间
+    handled_at: str = ""          # 处理时间
+    cause_process: str = ""       # 故障原因及维修过程
+    repairer: str = ""            # 维修人
+    qc_verification: str = ""    # 排查后质控验证结果
+    restored_at: str = ""        # 恢复使用时间
+    signer: str = ""              # 签字
+    signer_id: int | None = None
+    created_by_id: int | None = None
+
+
+class InstrumentRepairCreate(InstrumentRepairBase):
+    pass
+
+
+class InstrumentRepairUpdate(InstrumentRepairBase):
+    pass
+
+
+class InstrumentRepairRead(InstrumentRepairBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 # ---------------- InstrumentFamily（项目"使用仪器"总型号 ↔ 仪器档案关联） ----------------
 class InstrumentFamilyBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)

@@ -33,6 +33,7 @@
           <span v-else-if="row.calib_level === 'warning'" style="margin-left: 2px">●临期</span>
         </el-button>
         <el-button link type="primary" @click="openArchive(row)">档案</el-button>
+        <el-button link type="warning" @click="openRepair(row)">维修记录</el-button>
       </template>
     </CrudTable>
 
@@ -95,6 +96,109 @@
       <template #footer>
         <el-button @click="calibOpen = false">关闭</el-button>
         <el-button v-if="auth.canWrite('instruments')" type="primary" :loading="calibSubmitting" @click="addCalib">添加记录</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 维修记录（BG-KS-CZ-909 仪器维修记录表） -->
+    <el-dialog v-model="repairOpen" :title="`维修记录 - ${repairInstrument?.name || ''}`" width="900px" top="3vh">
+      <div class="repair-meta">
+        <b>设备名称：</b>{{ repairInstrument?.name || '—' }}　<b>设备编号：</b>{{ repairInstrument?.dept_no || '—' }}　<b>规格型号：</b>{{ repairInstrument?.model || '—' }}
+      </div>
+      <el-table :data="repairs" border stripe v-loading="repairLoading">
+        <el-table-column type="index" label="序号" width="55" align="center" />
+        <el-table-column prop="found_at" label="发现时间" width="150" />
+        <el-table-column prop="fault_desc" label="故障描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="repairer" label="维修人" width="90" />
+        <el-table-column prop="restored_at" label="恢复使用时间" width="150" />
+        <el-table-column label="操作" width="150" align="center" fixed="right">
+          <template #default="{ row: r }">
+            <el-button v-if="auth.canWrite('instruments')" link type="primary" @click="editRepairRow(r)">编辑</el-button>
+            <el-button v-if="auth.canWrite('instruments')" link type="danger" @click="delRepairRow(r)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!repairLoading && !repairs.length" description="暂无维修记录" :image-size="60" />
+      <el-divider v-if="auth.canWrite('instruments')">
+        {{ repairEditingId ? '编辑维修记录' : '新建维修记录' }}
+      </el-divider>
+      <el-form v-if="auth.canWrite('instruments')" :model="repairForm" label-width="120px" label-position="right">
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="发现人">
+              <el-input v-model="repairForm.finder" placeholder="发现人姓名" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="发现时间">
+              <el-date-picker v-model="repairForm.found_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="选择日期+时间" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="故障描述">
+              <el-input v-model="repairForm.fault_desc" type="textarea" :rows="2" placeholder="请详细描述故障内容" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="影响项目">
+              <el-input v-model="repairForm.affected_items" type="textarea" :rows="2" placeholder="列出受影响的具体项目（多个用逗号/换行分隔）" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="通知维修时间">
+              <el-date-picker v-model="repairForm.notify_repair_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="处理时间">
+              <el-date-picker v-model="repairForm.handled_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="故障原因及维修过程">
+              <el-input v-model="repairForm.cause_process" type="textarea" :rows="3" placeholder="详细说明故障处理办法、处理结果及完成时间" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="维修人">
+              <el-input v-model="repairForm.repairer" placeholder="维修人姓名" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="恢复使用时间">
+              <el-date-picker v-model="repairForm.restored_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="排查后质控验证过程及结果">
+              <el-input v-model="repairForm.qc_verification" type="textarea" :rows="3" placeholder="样本选择、结果数据分析、影响评估等" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="签字（恢复使用授权人）">
+              <el-input v-model="repairForm.signer" placeholder="默认登录人" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <div class="repair-tip">
+        <b>表格填写说明：</b><br />
+        1、故障描述：请详细描述故障内容及影响到的项目。<br />
+        2、故障原因及维修过程：详细说明故障处理办法、处理结果、处理完成的日期和时间。如有维修工单也可在工单上标明。<br />
+        3、排查后性能验证过程及结果：<br />
+        &nbsp;&nbsp;3.1 样本的选择：设备修复后，当故障对检验结果的准确性有影响时，根据影响的程度可选择可校准的项目实施校准验证、室内质控验证、至少 5 份标本与其他仪器的检测比对、以前检验过的样本留样再测等方式中的合适方式。前提是样本结果是正确的。<br />
+        &nbsp;&nbsp;3.2 需要填写故障前后结果数据分析：<br />
+        &nbsp;&nbsp;&nbsp;&nbsp;a) 实施评估的判断：分析仪器故障的类型对检验结果的准确性是否有影响，当没有影响时无须对故障前检验结果进行评估。当故障可能影响检测结果时需对故障前检验结果进行评估。<br />
+        &nbsp;&nbsp;&nbsp;&nbsp;b) 在评估时，至少抽取仪器故障发生前的最后 5 份标本，相关检测项目重测一次。以该次检验结果为靶值、计算故障前检测结果与该次检测结果的相对百分偏倚。当检测项目有大于或等于 80% 标本的结果在允许相对百分偏倚范围内时，说明故障前检测结果未受影响；否则，再向前分批检测部分标本（每批至少 5 份标本）并进行分析，找出所有可能受影响的标本。重测所有这些标本或只重测当中结果在生物参考区间两端和医学决定水平附近的标本。<br />
+        &nbsp;&nbsp;&nbsp;&nbsp;c) 当故障仪器有检测相同项目的另一相同型号仪器时，在确认其仪器性能正常的条件下，可以短时间内用其来进行仪器故障发生前标本的检测。<br />
+        &nbsp;&nbsp;&nbsp;&nbsp;d) 当故障仪器唯一时，根据故障排除时间的长短，对故障前的标本做适当保存，确保标本的稳定性，待故障仪器的性能经确认正常后进行仪器故障发生前标本的检测。<br />
+        &nbsp;&nbsp;3.3 经评估确认故障前检测结果未受影响，检验报告无须作任何处理；假如仪器设备故障会对之前的检测结果造成影响，当其影响到临床疾病诊断或治疗时，收回或适当标识已发出的不符合检验结果，重新发布正确报告，填写《不符合检测报告评审记录表》。
+      </div>
+      <template #footer>
+        <el-button @click="repairOpen = false">关闭</el-button>
+        <template v-if="auth.canWrite('instruments')">
+          <el-button v-if="repairEditingId" @click="resetRepairForm">取消编辑</el-button>
+          <el-button type="primary" :loading="repairSubmitting" @click="submitRepair">{{ repairEditingId ? '保存修改' : '添加记录' }}</el-button>
+        </template>
       </template>
     </el-dialog>
 
@@ -244,6 +348,7 @@ import {
   uploadInstrumentArchive, getInstrumentArchiveInfo, downloadInstrumentArchive,
   deleteInstrumentArchive, getArchivesStatus, importArchivesFolder,
   getInstrumentTestItems, getInstrumentDocuments, getInstrumentSopDocuments,
+  listRepairs, createRepair, updateRepair, deleteRepair,
 } from '../../api/instruments'
 import { fetchDocumentBlob, downloadBlob, previewBlob } from '../../api/documents'
 import { useAuthStore } from '../../store/auth'
@@ -477,6 +582,103 @@ async function delCalib(row) {
   ElMessage.success('已删除')
   await loadCalibs(calibInstrument.value.id)
   crud.value?.refresh()
+}
+
+// ---------------- 维修记录（BG-KS-CZ-909） ----------------
+const repairOpen = ref(false)
+const repairInstrument = ref(null)
+const repairs = ref([])
+const repairLoading = ref(false)
+const repairSubmitting = ref(false)
+const repairEditingId = ref(null)
+const defaultSigner = computed(() => auth.user?.full_name || auth.user?.username || '')
+const repairForm = reactive({
+  fault_desc: '',
+  affected_items: '',
+  finder: '',
+  found_at: '',
+  notify_repair_at: '',
+  handled_at: '',
+  cause_process: '',
+  repairer: '',
+  qc_verification: '',
+  restored_at: '',
+  signer: '',
+})
+function resetRepairForm() {
+  repairEditingId.value = null
+  Object.assign(repairForm, {
+    fault_desc: '', affected_items: '', finder: '', found_at: '',
+    notify_repair_at: '', handled_at: '', cause_process: '', repairer: '',
+    qc_verification: '', restored_at: '', signer: defaultSigner.value,
+  })
+}
+async function loadRepairs(instrumentId) {
+  repairLoading.value = true
+  try {
+    const data = await listRepairs(instrumentId)
+    repairs.value = data || []
+  } finally {
+    repairLoading.value = false
+  }
+}
+async function openRepair(row) {
+  repairInstrument.value = row
+  repairOpen.value = true
+  resetRepairForm()
+  await loadRepairs(row.id)
+}
+function editRepairRow(r) {
+  repairEditingId.value = r.id
+  Object.assign(repairForm, {
+    fault_desc: r.fault_desc || '',
+    affected_items: r.affected_items || '',
+    finder: r.finder || '',
+    found_at: r.found_at || '',
+    notify_repair_at: r.notify_repair_at || '',
+    handled_at: r.handled_at || '',
+    cause_process: r.cause_process || '',
+    repairer: r.repairer || '',
+    qc_verification: r.qc_verification || '',
+    restored_at: r.restored_at || '',
+    signer: r.signer || defaultSigner.value,
+  })
+}
+async function delRepairRow(r) {
+  await ElMessageBox.confirm('确认删除该维修记录？', '提示', { type: 'warning' })
+  await deleteRepair(repairInstrument.value.id, r.id)
+  ElMessage.success('已删除')
+  await loadRepairs(repairInstrument.value.id)
+  crud.value?.refresh()
+}
+async function submitRepair() {
+  if (!repairForm.fault_desc && !repairForm.affected_items) {
+    ElMessage.warning('请至少填写故障描述或影响项目')
+    return
+  }
+  repairSubmitting.value = true
+  try {
+    const payload = { ...repairForm, signer: repairForm.signer || defaultSigner.value }
+    if (repairEditingId.value) {
+      await updateRepair(repairInstrument.value.id, repairEditingId.value, payload)
+      ElMessage.success('已保存修改')
+    } else {
+      await createRepair(repairInstrument.value.id, payload)
+      ElMessage.success('已添加维修记录')
+    }
+    repairEditingId.value = null
+    Object.assign(repairForm, {
+      fault_desc: '', affected_items: '', finder: '', found_at: '',
+      notify_repair_at: '', handled_at: '', cause_process: '', repairer: '',
+      qc_verification: '', restored_at: '', signer: defaultSigner.value,
+    })
+    await loadRepairs(repairInstrument.value.id)
+    crud.value?.refresh()
+  } catch (e) {
+    ElMessage.error('保存失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    repairSubmitting.value = false
+  }
 }
 
 function pickReportFile(row) {
@@ -809,6 +1011,25 @@ function formatTime(v) {
 <style scoped>
 .page {
   height: 100%;
+}
+.repair-meta {
+  background: #f5f7fa;
+  border-left: 3px solid #409eff;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #303133;
+}
+.repair-tip {
+  background: #fafafa;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #606266;
+  margin-top: 10px;
 }
 /* 仪器列表：允许单元格内容换行（最多两行），避免横向拖拉 */
 .page :deep(.el-table .cell) {

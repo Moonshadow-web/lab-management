@@ -1,0 +1,1 @@
+import{p as t}from"./index-CTtpWGnV.js";function i(n){return t.get("/api/v1/nonconformities",{params:n})}function r(n){return t.post("/api/v1/nonconformities",n)}function s(n,e){return t.put(`/api/v1/nonconformities/${n}`,e)}function u(n){return t.delete(`/api/v1/nonconformities/${n}`)}export{r as c,u as d,i as l,s as u};

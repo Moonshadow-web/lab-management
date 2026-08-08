@@ -3,7 +3,7 @@ from .audit_log import AuditLog
 from .document import Document, DocumentVersion
 from .document_instrument import DocumentInstrument
 from .file_change_log import FileChangeLog
-from .instrument import CalibrationRecord, Instrument
+from .instrument import CalibrationRecord, Instrument, InstrumentRepair
 from .instrument_archive import InstrumentArchive
 from .instrument_family import InstrumentFamily, InstrumentFamilyMember
 from .nonconformity import Nonconformity
@@ -50,6 +50,7 @@ __all__ = [
     "DocumentVersion",
     "DocumentInstrument",
     "Instrument",
+    "InstrumentRepair",
     "InstrumentArchive",
     "InstrumentFamily",
     "InstrumentFamilyMember",

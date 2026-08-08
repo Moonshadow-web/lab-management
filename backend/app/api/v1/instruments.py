@@ -12,7 +12,7 @@ from ...core.database import get_db
 from ...core.security import get_current_user
 from ...core.storage import storage
 from ...core.doc_convert import convert_doc_bytes_to_docx
-from ...models.instrument import CalibrationRecord, Instrument
+from ...models.instrument import CalibrationRecord, Instrument, InstrumentRepair
 from ...models.instrument_archive import InstrumentArchive
 from ...models.document import Document
 from ...models.document_instrument import DocumentInstrument
@@ -28,6 +28,9 @@ from ...schemas import (
     CalibrationRecordRead,
     InstrumentCreate,
     InstrumentRead,
+    InstrumentRepairCreate,
+    InstrumentRepairRead,
+    InstrumentRepairUpdate,
     InstrumentUpdate,
     TestItemRead,
 )
@@ -238,6 +241,95 @@ def delete_calibration(
     db.commit()
     refresh_calibration_notifications(db)
     write_audit(db, user, "delete", "calibration_records", rec_id, "", request.client.host if request.client else None)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# 仪器维修记录（BG-KS-CZ-909 仪器维修记录表）
+# 字段：故障描述 / 影响项目 / 发现人 / 发现时间 / 通知维修时间 / 处理时间 /
+#       故障原因及维修过程 / 维修人 / 排查后质控验证结果 / 恢复使用时间 / 签字
+# ---------------------------------------------------------------------------
+
+@router.get("/{instrument_id}/repairs", response_model=list[InstrumentRepairRead])
+def list_repairs(
+    instrument_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """按仪器列出维修记录（按 id 倒序，最新在前）。"""
+    return (
+        db.query(InstrumentRepair)
+        .filter(InstrumentRepair.instrument_id == instrument_id)
+        .order_by(InstrumentRepair.id.desc())
+        .all()
+    )
+
+
+@router.post("/{instrument_id}/repairs", response_model=InstrumentRepairRead, status_code=201)
+def create_repair(
+    instrument_id: int,
+    item: InstrumentRepairCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """新增一条维修记录。签字默认登录人（前端已填，但服务端兜底）。"""
+    if not db.get(Instrument, instrument_id):
+        raise HTTPException(status_code=404, detail="未找到仪器")
+    data = item.model_dump(exclude={"instrument_id"})
+    if not data.get("signer"):
+        data["signer"] = user.full_name or user.username
+    data["created_by_id"] = user.id
+    if not data.get("signer_id"):
+        data["signer_id"] = user.id
+    rec = InstrumentRepair(instrument_id=instrument_id, **data)
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    write_audit(db, user, "create", "instrument_repairs", rec.id, item.model_dump(), request.client.host if request.client else None)
+    return rec
+
+
+@router.put("/{instrument_id}/repairs/{rec_id}", response_model=InstrumentRepairRead)
+def update_repair(
+    instrument_id: int,
+    rec_id: int,
+    item: InstrumentRepairUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """编辑维修记录（场景：故障仍在处理中、后续补充维修过程/质控验证）。"""
+    rec = db.get(InstrumentRepair, rec_id)
+    if not rec or rec.instrument_id != instrument_id:
+        raise HTTPException(status_code=404, detail="未找到维修记录")
+    data = item.model_dump(exclude_unset=True, exclude={"instrument_id"})
+    if not data.get("signer"):
+        data["signer"] = user.full_name or user.username
+    if not data.get("signer_id"):
+        data["signer_id"] = user.id
+    for k, v in data.items():
+        setattr(rec, k, v)
+    db.commit()
+    db.refresh(rec)
+    write_audit(db, user, "update", "instrument_repairs", rec.id, item.model_dump(), request.client.host if request.client else None)
+    return rec
+
+
+@router.delete("/{instrument_id}/repairs/{rec_id}")
+def delete_repair(
+    instrument_id: int,
+    rec_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    rec = db.get(InstrumentRepair, rec_id)
+    if not rec or rec.instrument_id != instrument_id:
+        raise HTTPException(status_code=404, detail="未找到维修记录")
+    db.delete(rec)
+    db.commit()
+    write_audit(db, user, "delete", "instrument_repairs", rec_id, "", request.client.host if request.client else None)
     return {"ok": True}
 
 
