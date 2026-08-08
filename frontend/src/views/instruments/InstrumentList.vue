@@ -103,6 +103,7 @@
     <el-dialog v-model="repairOpen" :title="`维修记录 - ${repairInstrument?.name || ''}`" width="900px" top="3vh">
       <div class="repair-meta">
         <b>设备名称：</b>{{ repairInstrument?.name || '—' }}　<b>设备编号：</b>{{ repairInstrument?.dept_no || '—' }}　<b>规格型号：</b>{{ repairInstrument?.model || '—' }}
+        <el-button v-if="auth.canWrite('instruments')" size="small" type="warning" style="float:right" @click="openRepairQR">生成二维码</el-button>
       </div>
       <el-table :data="repairs" border stripe v-loading="repairLoading">
         <el-table-column type="index" label="序号" width="55" align="center" />
@@ -199,6 +200,20 @@
           <el-button v-if="repairEditingId" @click="resetRepairForm">取消编辑</el-button>
           <el-button type="primary" :loading="repairSubmitting" @click="submitRepair">{{ repairEditingId ? '保存修改' : '添加记录' }}</el-button>
         </template>
+      </template>
+    </el-dialog>
+
+    <!-- 扫码填写二维码 -->
+    <el-dialog v-model="qrVisible" :title="`扫码填写维修记录 - ${qrInstrument?.name || ''}`" width="440px" top="8vh">
+      <div style="text-align:center">
+        <div v-if="qrImg"><img :src="qrImg" style="width:230px;height:230px" alt="二维码" /></div>
+        <div v-else v-loading="true" style="height:230px" />
+        <div class="qr-tip">工程师用微信 / 相机扫码即可<b>免登录</b>填写本仪器维修记录（链接 30 天内有效）</div>
+        <div class="qr-url">{{ qrUrl }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="qrVisible = false">关闭</el-button>
+        <el-button type="primary" @click="copyQrUrl">复制链接</el-button>
       </template>
     </el-dialog>
 
@@ -348,8 +363,9 @@ import {
   uploadInstrumentArchive, getInstrumentArchiveInfo, downloadInstrumentArchive,
   deleteInstrumentArchive, getArchivesStatus, importArchivesFolder,
   getInstrumentTestItems, getInstrumentDocuments, getInstrumentSopDocuments,
-  listRepairs, createRepair, updateRepair, deleteRepair,
+  listRepairs, createRepair, updateRepair, deleteRepair, createRepairInvite,
 } from '../../api/instruments'
+import QRCode from 'qrcode'
 import { fetchDocumentBlob, downloadBlob, previewBlob } from '../../api/documents'
 import { useAuthStore } from '../../store/auth'
 
@@ -678,6 +694,35 @@ async function submitRepair() {
     ElMessage.error('保存失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
   } finally {
     repairSubmitting.value = false
+  }
+}
+
+// ---------------- 扫码填写二维码 ----------------
+const qrVisible = ref(false)
+const qrImg = ref('')
+const qrUrl = ref('')
+const qrInstrument = ref(null)
+async function openRepairQR() {
+  if (!repairInstrument.value) return
+  qrInstrument.value = repairInstrument.value
+  qrVisible.value = true
+  qrImg.value = ''
+  qrUrl.value = ''
+  try {
+    const res = await createRepairInvite(repairInstrument.value.id)
+    const url = `${window.location.origin}/repair-fill?token=${res.token}`
+    qrUrl.value = url
+    qrImg.value = await QRCode.toDataURL(url, { width: 240, margin: 1 })
+  } catch (e) {
+    ElMessage.error('生成二维码失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  }
+}
+async function copyQrUrl() {
+  try {
+    await navigator.clipboard.writeText(qrUrl.value)
+    ElMessage.success('链接已复制')
+  } catch (e) {
+    ElMessage.error('复制失败，请手动复制链接')
   }
 }
 
@@ -1030,6 +1075,21 @@ function formatTime(v) {
   line-height: 1.8;
   color: #606266;
   margin-top: 10px;
+}
+.qr-tip {
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 10px;
+}
+.qr-url {
+  margin-top: 8px;
+  color: #909399;
+  font-size: 12px;
+  word-break: break-all;
+  background: #f5f7fa;
+  border-radius: 4px;
+  padding: 6px 10px;
 }
 /* 仪器列表：允许单元格内容换行（最多两行），避免横向拖拉 */
 .page :deep(.el-table .cell) {

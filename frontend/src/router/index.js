@@ -11,6 +11,13 @@ const routes = [
     meta: { public: true },
   },
   {
+    // 工程师扫码免登录填写维修记录（需带 token 参数）
+    path: '/repair-fill',
+    name: 'repair-fill',
+    component: () => import('../views/instruments/RepairFill.vue'),
+    meta: { public: true },
+  },
+  {
     path: '/',
     component: AppLayout,
     redirect: '/dashboard',

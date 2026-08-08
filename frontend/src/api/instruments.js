@@ -54,6 +54,10 @@ export function updateRepair(instrumentId, recId, data) {
 export function deleteRepair(instrumentId, recId) {
   return request.delete(`/api/v1/instruments/${instrumentId}/repairs/${recId}`)
 }
+// 生成「扫码免登录填写维修记录」邀请 token
+export function createRepairInvite(instrumentId) {
+  return request.post(`/api/v1/instruments/${instrumentId}/repairs/invite`)
+}
 
 // 仪器档案文件
 export function uploadInstrumentArchive(id, file) {

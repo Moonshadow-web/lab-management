@@ -3,13 +3,16 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 import os
 import re
+from datetime import datetime, timedelta, timezone
 
+from jose import jwt
 from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
+from ...core.config import ALGORITHM, SECRET_KEY
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
-from ...core.security import get_current_user
+from ...core.security import decode_token, get_current_user
 from ...core.storage import storage
 from ...core.doc_convert import convert_doc_bytes_to_docx
 from ...models.instrument import CalibrationRecord, Instrument, InstrumentRepair
@@ -250,6 +253,27 @@ def delete_calibration(
 #       故障原因及维修过程 / 维修人 / 排查后质控验证结果 / 恢复使用时间 / 签字
 # ---------------------------------------------------------------------------
 
+@router.post("/{instrument_id}/repairs/invite")
+def create_repair_invite(
+    instrument_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """生成「维修记录扫码填写」邀请链接 token（有效期 30 天，免登录填写）。
+
+    二维码内容 = 前端拼接：<公网地址>/#/repair-fill?token=<token>
+    """
+    if not db.get(Instrument, instrument_id):
+        raise HTTPException(status_code=404, detail="未找到仪器")
+    exp = datetime.now(timezone.utc) + timedelta(days=30)
+    token = jwt.encode(
+        {"sub": "repair-invite", "type": "invite", "iid": instrument_id, "exp": exp},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+    return {"ok": True, "token": token, "expires_at": exp.isoformat()}
+
+
 @router.get("/{instrument_id}/repairs", response_model=list[InstrumentRepairRead])
 def list_repairs(
     instrument_id: int,
@@ -331,6 +355,62 @@ def delete_repair(
     db.commit()
     write_audit(db, user, "delete", "instrument_repairs", rec_id, "", request.client.host if request.client else None)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# 维修记录「扫码免登录填写」公开端点（工程师无需登录）
+# 校验 invite token（JWT，30 天有效）→ 返回仪器信息 / 提交维修记录
+# ---------------------------------------------------------------------------
+public_router = APIRouter(tags=["public-repairs"])
+
+
+def _decode_repair_invite(token: str) -> int | None:
+    """校验邀请 token，返回 instrument_id；无效/过期返回 None。"""
+    try:
+        payload = decode_token(token, "invite")
+    except Exception:
+        return None
+    if payload.get("sub") != "repair-invite":
+        return None
+    try:
+        return int(payload.get("iid") or 0)
+    except (TypeError, ValueError):
+        return None
+
+
+@public_router.get("/public/repairs/invite/{token}")
+def repair_invite_info(token: str, db: Session = Depends(get_db)):
+    """扫码后免登录读取仪器信息（用于填写页展示设备名称等）。"""
+    iid = _decode_repair_invite(token)
+    if not iid:
+        raise HTTPException(status_code=401, detail="链接无效或已过期，请联系仪器管理员重新生成")
+    inst = db.get(Instrument, iid)
+    if not inst:
+        raise HTTPException(status_code=404, detail="仪器不存在")
+    return {
+        "instrument_id": inst.id,
+        "name": inst.name,
+        "dept_no": inst.dept_no,
+        "model": inst.model,
+        "location": inst.location,
+        "owner": inst.owner,
+    }
+
+
+@public_router.post("/public/repairs/invite/{token}", status_code=201)
+def repair_invite_submit(token: str, item: InstrumentRepairCreate, db: Session = Depends(get_db)):
+    """工程师免登录提交维修记录（instrument_id 取自 token，不允许前端指定）。"""
+    iid = _decode_repair_invite(token)
+    if not iid:
+        raise HTTPException(status_code=401, detail="链接无效或已过期，请联系仪器管理员重新生成")
+    if not db.get(Instrument, iid):
+        raise HTTPException(status_code=404, detail="仪器不存在")
+    data = item.model_dump(exclude={"instrument_id", "signer_id", "created_by_id"})
+    rec = InstrumentRepair(instrument_id=iid, **data)
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    return {"ok": True, "id": rec.id, "instrument_id": iid}
 
 
 def _get_calibration(db: Session, instrument_id: int, rec_id: int):
