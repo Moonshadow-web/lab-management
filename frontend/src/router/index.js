@@ -60,7 +60,8 @@ router.beforeEach((to, from, next) => {
   if (!to.meta.public && !auth.isLoggedIn) {
     next('/login')
   } else if (to.path === '/login' && auth.isLoggedIn) {
-    next('/dashboard')
+    // 已登录却访问 /login：带 redirect 则回跳原页面，否则进工作台
+    next(to.query.redirect || '/dashboard')
   } else if (to.meta.adminOnly) {
     // adminOnly 路由仅管理员可访问
     const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')

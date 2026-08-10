@@ -57,12 +57,13 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../store/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const form = ref({ username: '', password: '' })
 const loading = ref(false)
@@ -89,7 +90,8 @@ async function onSubmit() {
       ElMessage.info('首次登录，请先修改初始密码')
     } else {
       ElMessage.success('登录成功')
-      router.push('/dashboard')
+      // 优先回到被拦截前所在页面（如接收新版本后被踢登录），否则进工作台
+      router.push(route.query.redirect || '/dashboard')
     }
   } catch (e) {
     const detail = e?.response?.data?.detail

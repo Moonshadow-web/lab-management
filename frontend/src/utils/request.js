@@ -28,7 +28,12 @@ function clearAuth() {
 function gotoLogin() {
   import('../router').then((m) => {
     const router = m.default
-    if (router.currentRoute.value.name !== 'login') router.push('/login')
+    const cur = router.currentRoute.value
+    // 已在登录页则不重复跳转，避免循环
+    if (cur.name === 'login') return
+    // 记住当前页面，登录成功后回跳，避免被踢到工作台
+    const redirect = cur.fullPath
+    router.push({ path: '/login', query: redirect && redirect !== '/login' ? { redirect } : {} })
   })
 }
 
