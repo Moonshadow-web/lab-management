@@ -696,6 +696,32 @@ class VerificationReportRead(VerificationReportBase):
     updated_at: datetime | None = None
 
 
+# ---------------- ReportArchive（性能验证报告归档） ----------------
+class ReportArchiveBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    project_name: str = ""
+    report_type: str = ""
+    source_type: str = "uploaded"
+    ref_report_id: int | None = None
+    ref_archive_kind: str = ""
+    original_name: str = ""
+    file_path: str = ""
+    description: str = ""
+
+
+class ReportArchiveCreate(ReportArchiveBase):
+    pass
+
+
+class ReportArchiveUpdate(ReportArchiveBase):
+    pass
+
+
+class ReportArchiveRead(ReportArchiveBase):
+    id: int
+    created_at: datetime | None = None
+
+
 # ---------------- QualityRequirement ----------------
 class QualityRequirementBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)

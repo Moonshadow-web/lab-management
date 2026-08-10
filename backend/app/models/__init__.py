@@ -44,6 +44,7 @@ from .iso15189 import (
 from .cnas_standard import CnasStandard
 from .uncertainty import UncertaintyAssessment
 from .verification_report import VerificationReport, QUALITATIVE_ITEMS, QUANTITATIVE_ITEMS
+from .report_archive import ReportArchive, REPORT_ARCHIVE_SOURCES
 
 __all__ = [
     "User",
@@ -105,4 +106,6 @@ __all__ = [
     "VerificationReport",
     "QUALITATIVE_ITEMS",
     "QUANTITATIVE_ITEMS",
+    "ReportArchive",
+    "REPORT_ARCHIVE_SOURCES",
 ]

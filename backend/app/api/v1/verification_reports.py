@@ -14,6 +14,7 @@ from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user
 from ...core.storage import storage
+from ...models.report_archive import ReportArchive
 from ...models.user import User
 from ...models.verification_report import VerificationReport
 from ...schemas import (
@@ -69,8 +70,22 @@ def generate_report(
     fname = f"{rec.project_name or '项目'}_性能验证_{rec.report_type}.xlsx"
     rel = storage.save("verification_reports", fname, xlsx_bytes)
     rec.report_file_path = rel
+    # 自动归档到 report_archives（生成来源）
+    arch = ReportArchive(
+        project_name=rec.project_name,
+        report_type=rec.report_type,
+        source_type="generated",
+        ref_report_id=rec.id,
+        ref_archive_kind="verification_report",
+        original_name=fname,
+        file_path=rel,
+        description=f"性能验证（{rec.report_type}）",
+        created_by_id=user.id,
+    )
+    db.add(arch)
     db.commit()
-    write_audit(db, user, "generate", "verification_reports", rec.id, {"file": rel}, request.client.host if request.client else None)
+    db.refresh(rec)
+    write_audit(db, user, "generate", "verification_reports", rec.id, {"file": rel, "archive_id": arch.id}, request.client.host if request.client else None)
     return _serialize_report(rec)
 
 
