@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -628,34 +628,19 @@ async def upload_attachments(
 
 
 @router.get("/attachments/{aid}")
-def get_attachment(aid: int, inline: bool = True, token: str = "", request: Request = None,
-                   db: Session = Depends(get_db)):
-    """inline=True（默认）→ 预览；inline=False → 下载。支持 URL token 参数认证（img/iframe 场景）。"""
-    # 手动认证（URL token 参数回退）
+def get_attachment(aid: int, inline: bool = True, token: str = "", db: Session = Depends(get_db)):
+    """inline=True（默认）→ 预览；inline=False → 下载。仅支持 URL token 参数认证
+    （适用于 img/iframe/a 标签直接打开场景；浏览器 fetch Blob 由前端带 Authorization header）。"""
     user = None
-    try:
-        # 尝试 URL token
-        if token:
+    if token:
+        try:
             from jose import jwt as _jwt
             from ...core.security import SECRET_KEY, ALGORITHM
             payload = _jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             uid = int(payload.get("sub"))
             user = db.get(User, uid)
-    except Exception:
-        pass
-    # fallback：Authorization header
-    if not user and request:
-        from ...core.security import _token_from_request
-        t = _token_from_request(request, None)
-        if t:
-            try:
-                from jose import jwt as _jwt
-                from ...core.security import SECRET_KEY, ALGORITHM
-                payload = _jwt.decode(t, SECRET_KEY, algorithms=[ALGORITHM])
-                uid = int(payload.get("sub"))
-                user = db.get(User, uid)
-            except Exception:
-                pass
+        except Exception:
+            pass
     if not user:
         raise HTTPException(401, "认证失败")
     # 原有逻辑继续...

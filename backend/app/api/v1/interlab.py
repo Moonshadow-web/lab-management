@@ -4,7 +4,7 @@ import json
 import os
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -470,31 +470,19 @@ async def upload_interlab_attachments(
 
 
 @router.get("/attachments/{aid}")
-def get_interlab_attachment(aid: int, inline: bool = True, token: str = "", request: Request = None,
+def get_interlab_attachment(aid: int, inline: bool = True, token: str = "",
                             db: Session = Depends(get_db)):
-    """inline=True（默认）→ 预览；inline=False → 下载。支持 URL token 参数认证。"""
+    """inline=True（默认）→ 预览；inline=False → 下载。仅支持 URL token 参数认证。"""
     user = None
-    try:
-        if token:
+    if token:
+        try:
             from jose import jwt as _jwt
             from ...core.security import SECRET_KEY, ALGORITHM
             payload = _jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             uid = int(payload.get("sub"))
             user = db.get(User, uid)
-    except Exception:
-        pass
-    if not user and request:
-        from ...core.security import _token_from_request
-        t = _token_from_request(request, None)
-        if t:
-            try:
-                from jose import jwt as _jwt
-                from ...core.security import SECRET_KEY, ALGORITHM
-                payload = _jwt.decode(t, SECRET_KEY, algorithms=[ALGORITHM])
-                uid = int(payload.get("sub"))
-                user = db.get(User, uid)
-            except Exception:
-                pass
+        except Exception:
+            pass
     if not user:
         raise HTTPException(401, "认证失败")
     a = db.get(InterlabAttachment, aid)
