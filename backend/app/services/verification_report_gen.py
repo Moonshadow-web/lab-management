@@ -290,6 +290,28 @@ def _fill_quantitative(wb, d):
     raw = wb["原始数据"]
     _set(raw, 4, 2, d.get("reagent", ""))        # R4C2 试剂品牌
     _set(raw, 14, 2, d.get("operator", ""))
+
+    # ---- 可报告范围/可报告范围验证 sheet 结论 ----
+    rp = (rs.get("reportable") or {})
+    if rp.get("conclusion") or rp.get("result"):
+        for sn in ("可报告范围", "可报告范围验证"):
+            ws = wb[sn]
+            text = f"{d.get('project_name', '')}可报告范围：{rp.get('result', '')}"
+            _set(ws, 26, 1, text)
+            _set(ws, 27, 1, rp.get("conclusion", ""))
+
+    # ---- 参考区间 sheet 结论 ----
+    ref = (rs.get("reference") or {})
+    if ref.get("conclusion") or ref.get("result"):
+        ws = wb["参考区间"]
+        _set(ws, 59, 1, f"{d.get('project_name', '')}参考区间验证通过，参考区间为：{ref.get('result', '')}")
+
+    # ---- 分析特异性 sheet 结论 ----
+    spec = (rs.get("specificity") or {})
+    if spec.get("conclusion") or spec.get("result"):
+        ws = wb["分析特异性"]
+        _set(ws, 26, 1, f"{d.get('project_name', '')}分析特异性验证：{spec.get('result', '')}")
+        _set(ws, 27, 1, spec.get("conclusion", ""))
     _set(raw, 14, 6, d.get("reviewer", ""))
 
 
