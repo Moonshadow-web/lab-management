@@ -181,7 +181,7 @@
           </div>
 
           <!-- 录入区 -->
-          <div v-if="auth.canWrite('qc')" class="entry">
+          <div v-if="auth.canWrite('qc') && !allAnalytesEstablished" class="entry">
             <el-select v-model="resultForm.analyte" filterable allow-create placeholder="项目/分析物" style="width:200px">
               <el-option-group label="质控品项目">
                 <el-option v-for="a in stats.material_items" :key="'m_' + a" :label="a" :value="a" />
@@ -192,8 +192,13 @@
             </el-select>
             <el-input v-model="resultForm.value" type="number" placeholder="测定值" style="width:140px" @keyup.enter="submitResult" />
             <el-date-picker v-model="resultForm.qc_date" type="date" value-format="YYYY-MM-DD" placeholder="日期" style="width:160px" />
-            <el-button type="primary" :loading="adding" @click="submitResult">录入</el-button>
+            <el-button type="primary" :loading="adding" :disabled="selectedIsEstablished" @click="submitResult">录入</el-button>
+            <el-alert v-if="selectedIsEstablished" type="warning" :closable="false" show-icon
+              :title="`项目「${resultForm.analyte}」已确立靶值，已停止录入（仅查看）`"
+              style="width:100%;margin-top:6px" />
           </div>
+          <el-alert v-else-if="auth.canWrite('qc') && allAnalytesEstablished" type="warning"
+            :closable="false" show-icon title="全部项目已确立靶值，停止录入（仅查看）" style="margin:10px 0" />
 
           <el-alert v-if="lastNote" :type="lastNoteType" :closable="true" show-icon :title="lastNote" style="margin:8px 0" />
 
@@ -357,6 +362,21 @@ function materialItems(name) {
   const m = materials.value.find(x => x.name === name)
   return m && m.items ? m.items : []
 }
+
+// 已确立分析物集合（命中 targets_json 即锁定，停止录入仅查看）
+const establishedAnalytes = computed(() => {
+  const s = new Set()
+  for (const a of (stats.analytes || [])) {
+    if (stats.per_analyte[a] && stats.per_analyte[a].established) s.add(a)
+  }
+  return s
+})
+const allAnalytesEstablished = computed(() =>
+  stats.analytes.length > 0 && stats.analytes.every(a => establishedAnalytes.value.has(a))
+)
+const selectedIsEstablished = computed(() =>
+  !!(resultForm.analyte && establishedAnalytes.value.has(resultForm.analyte))
+)
 
 // ---------------- 新建/编辑 ----------------
 const editVisible = ref(false)
@@ -546,6 +566,10 @@ async function refreshDetail() {
 }
 
 async function submitResult() {
+  if (selectedIsEstablished.value) {
+    ElMessage.warning(`项目「${resultForm.analyte}」已确立靶值，停止录入（仅查看）`)
+    return
+  }
   if (!resultForm.analyte || resultForm.value === '' || resultForm.value === null) {
     ElMessage.warning('请填写项目与测定值')
     return

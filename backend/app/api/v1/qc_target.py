@@ -217,6 +217,17 @@ def add_result(
     analyte = (payload.analyte or "").strip()
     if not analyte:
         raise HTTPException(status_code=400, detail="请填写项目/分析物")
+    # 已确立项目禁止继续录入（仅查看）：batch 确立后，命中 targets_json 的分析物即锁定
+    if batch.established:
+        try:
+            _tg = json.loads(batch.targets_json or "{}")
+        except Exception:
+            _tg = {}
+        if analyte in _tg:
+            raise HTTPException(
+                status_code=400,
+                detail=f"项目「{analyte}」已确立靶值，停止录入（仅查看）",
+            )
     # 该 analyte 现有在控值 + 新值
     active = _active_values(db, batch_id, analyte)
     new_vals = active + [payload.value]

@@ -166,6 +166,7 @@ const receivings = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), l
 const confirmedFilter = ref('')
 const dialogVisible = ref(false), submitting = ref(false), editingId = ref(null)
 const allItems = ref([]), searchSel = ref(''), searchResults = ref([]), searching = ref(false)
+const loadedLib = ref('')
 const form = ref({ receipt_no: '', receipt_date: '', delivery_person: '', receiver: '', remark: '' })
 const items = ref([])
 const printVisible = ref(false), printData = ref({})
@@ -180,6 +181,9 @@ function itemName(id) {
 }
 
 async function refresh() {
+  // 切库/筛选/翻页时清空试剂名映射缓存，避免下次 loadItems 早退导致切库后显示 ID
+  allItems.value = []
+  loadedLib.value = ''
   loading.value = true
   try {
     const params = { library: reagentStore.library, page: page.value, page_size: pageSize.value }
@@ -189,9 +193,11 @@ async function refresh() {
   } catch (e) { ElMessage.error('加载失败：' + errText(e)) } finally { loading.value = false }
 }
 async function loadItems() {
-  if (allItems.value.length) return
+  // 已按当前库加载过则跳过；切库后 loadedLib 已被 refresh 清空，会重新拉取
+  if (allItems.value.length && loadedLib.value === reagentStore.library) return
   const all = await listAllReagentItems({ library: reagentStore.library })
   allItems.value = all
+  loadedLib.value = reagentStore.library
 }
 function onNewReceiving() {
   loadItems()
