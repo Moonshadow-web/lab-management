@@ -1,0 +1,1 @@
+import{s as n}from"./index-WRAsIC9l.js";function e(r){return n.get("/api/v1/training-records",{params:r})}function a(r){return n.post("/api/v1/training-records",r)}function s(r,i){return n.put(`/api/v1/training-records/${r}`,i)}function o(r){return n.delete(`/api/v1/training-records/${r}`)}export{a as c,o as d,e as l,s as u};

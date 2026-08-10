@@ -1,10 +1,13 @@
 <template>
   <div class="uncert-page">
     <div class="uncert-header">
-      <h2>📊 测量不确定度评估</h2>
-      <span>民航总医院检验科生化免疫组 | BG-SM-CZ-072 评定报告生成</span>
+      <h2>测量不确定度评估</h2>
+      <span>民航总医院检验科生化免疫组 | BG-SM-CZ-072 | 支持单项目与批量模式</span>
     </div>
 
+    <el-tabs v-model="uncertTab" type="border-card">
+    <el-tab-pane label="📝 单项目录入" name="single">
+    <!-- 单项目：原有左右布局 -->
     <el-row :gutter="16">
       <!-- 左侧：数据输入 -->
       <el-col :span="13" :xs="24">
@@ -128,6 +131,22 @@
         </el-card>
       </el-col>
     </el-row>
+    </el-tab-pane>
+
+    <!-- 批量导入 tab -->
+    <el-tab-pane label="📦 批量导入" name="bulk">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px" title="粘贴 JSON 数组，每个项目一条记录，必填 project_name/instrument/l1_values/l2_values/ucal。" />
+      <el-input v-model="bulkJson" type="textarea" :rows="8" placeholder='[{"project_name":"ALT","instrument":"AU5800","reagent":"","eval_date":"2026-08-10","prepared_by":"金子铮","reviewed_by":"杨静","l1_values":[50,51,49,...],"l2_values":[150,151,...],"ucal":0.5,"pt_result":"合格"},...]' />
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <el-button type="primary" :loading="bulking" @click="doBatch">批量生成（{{ parsedBulkCount }} 条）</el-button>
+        <el-button :disabled="!bulkSummaryPath" @click="downloadBulkSummary">下载汇总表</el-button>
+      </div>
+      <div v-if="bulkResult" style="margin-top:12px">
+        <el-tag v-for="r in bulkResult" :key="r.id" :type="r.ok ? 'success' : 'danger'" size="small" style="margin:2px">{{ r.name }} U={{ r.l1_u?.toFixed(1) }}%/{{ r.l2_u?.toFixed(1) }}%</el-tag>
+        <div v-if="bulkSummaryPath" style="color:#409eff;font-size:13px;margin-top:8px">汇总表已生成 ✓</div>
+      </div>
+    </el-tab-pane>
+    </el-tabs>
 
     <!-- 报告预览 -->
     <el-dialog v-model="previewOpen" :title="previewTitle" width="86%" top="3vh">
@@ -144,9 +163,12 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listUncertainty, createUncertainty, updateUncertainty, deleteUncertainty } from '../../api/uncertainty'
+import { downloadReportArchive } from '../../api/reportArchives'
+import request from '../../utils/request'
 import { useAuthStore } from '../../store/auth'
 
 const auth = useAuthStore()
+const uncertTab = ref('single')
 const projects = ref([])
 const current = ref(null) // 当前展示结果
 const saving = ref(false)
@@ -425,6 +447,41 @@ function downloadCurrentHtml() {
 }
 
 onMounted(loadProjects)
+
+// ---------------- 批量生成 ----------------
+const bulking = ref(false)
+const bulkJson = ref('')
+const bulkResult = ref(null)
+const bulkSummaryPath = ref('')
+const parsedBulkCount = computed(() => {
+  try { return JSON.parse(bulkJson.value).length } catch { return 0 }
+})
+async function doBatch() {
+  try {
+    const recs = JSON.parse(bulkJson.value)
+    if (!Array.isArray(recs) || !recs.length) { ElMessage.warning('JSON 数组为空'); return }
+    for (const r of recs) { r.l1_values = r.l1_values || []; r.l2_values = r.l2_values || []; r.prepared_by = r.prepared_by || (auth.user?.full_name || auth.user?.username || '金子铮'); r.reviewed_by = r.reviewed_by || '杨静'; r.eval_date = r.eval_date || new Date().toISOString().slice(0, 10) }
+    bulking.value = true
+    const res = await request.post('/api/v1/uncertainty/batch', { records: recs })
+    bulkResult.value = (res.results || []).map(r => ({ ...r, ok: r.l1_passed && r.l2_passed, name: r.project_name }))
+    bulkSummaryPath.value = res.summary_path || ''
+    ElMessage.success(`已生成 ${res.count} 条报告 + 汇总表`)
+    loadProjects()
+  } catch (e) { ElMessage.error('批量生成失败：' + (e?.response?.data?.detail || e?.message)) } finally { bulking.value = false }
+}
+async function downloadBulkSummary() {
+  if (!bulkSummaryPath.value) return
+  try {
+    // summary_path 是相对路径，需要通过 report-archives 下载。查最新汇总归档。
+    const ls = await request.get('/api/v1/report-archives?page_size=10')
+    const items = ls.items || ls
+    const sum = items.find(r => r.ref_archive_kind === 'uncertainty_summary')
+    if (sum) {
+      const blob = await downloadReportArchive(sum.id)
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = '测量不确定度汇总表.html'; a.click(); URL.revokeObjectURL(url)
+    } else { ElMessage.warning('汇总表归档未找到') }
+  } catch (e) { ElMessage.error('下载失败') }
+}
 </script>
 
 <style scoped>
