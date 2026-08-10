@@ -10,7 +10,7 @@
 import json
 from datetime import datetime
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Body, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from ...core.crud_base import make_router, write_audit
@@ -86,7 +86,7 @@ def _calc_record(payload: dict) -> dict:
 @router.post("/batch")
 def batch_uncertainty(
     request: Request,
-    records: list = [...],
+    records: list = Body(..., embed=True),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
