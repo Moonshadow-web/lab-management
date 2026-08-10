@@ -110,7 +110,7 @@
 
         <!-- 精密度数据 -->
         <el-card v-if="form.verify_items.includes('precision')" shadow="never" class="wiz-card">
-          <template #header><b>③ 精密度验证（2 水平 × 5 天 × 3 次）</b></template>
+          <template #header><b>{{ stepNum('precision') }} 精密度验证（2 水平 × 5 天 × 3 次）</b></template>
           <div class="ref-panel">
             <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
               <template v-if="form.report_type==='quantitative'">
@@ -138,7 +138,7 @@
 
         <!-- 符合率（定性） -->
         <el-card v-if="form.report_type==='qualitative' && form.verify_items.includes('conformity')" shadow="never" class="wiz-card">
-          <template #header><b>③ 方法符合率（≥10阴性 + ≥10阳性）</b></template>
+          <template #header><b>{{ stepNum('conformity') }} 方法符合率（≥10阴性 + ≥10阳性）</b></template>
           <div class="ref-panel">
             <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
               <p><b>验证方案：</b>CNAS-GL038:2019《临床免疫学定性检验程序性能验证指南》6.1.2。</p>
@@ -157,7 +157,7 @@
 
         <!-- 检出限（定性） -->
         <el-card v-if="form.report_type==='qualitative' && form.verify_items.includes('lod')" shadow="never" class="wiz-card">
-          <template #header><b>③ 方法检出限（≥20样本）</b></template>
+          <template #header><b>{{ stepNum('lod') }} 方法检出限（≥20样本）</b></template>
           <div class="ref-panel">
             <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
               <p><b>验证方案：</b>CNAS-GL038:2019《临床免疫学定性检验程序性能验证指南》6.1.2。</p>
@@ -176,7 +176,7 @@
 
         <!-- 正确度（定量） -->
         <el-card v-if="form.report_type==='quantitative' && form.verify_items.includes('trueness')" shadow="never" class="wiz-card">
-          <template #header><b>③ 正确度（2水平 × 5天 × 2次）</b></template>
+          <template #header><b>{{ stepNum('trueness') }} 正确度（2水平 × 5天 × 2次）</b></template>
           <div class="ref-panel">
             <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
               <p><b>验证方案：</b>CNAS-GL037:2019《临床化学定量检验程序性能验证指南》6.4；WS/T 492-2016。</p>
@@ -197,7 +197,7 @@
 
         <!-- 线性范围（定量） -->
         <el-card v-if="form.report_type==='quantitative' && form.verify_items.includes('linearity')" shadow="never" class="wiz-card">
-          <template #header><b>③ 线性范围（6点×3次）</b></template>
+          <template #header><b>{{ stepNum('linearity') }} 线性范围（6点×3次）</b></template>
           <div class="ref-panel">
             <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
               <p><b>验证方案：</b>CNAS-GL037:2019《临床化学定量检验程序性能验证指南》6.5；WS/T 408-2024 6。</p>
@@ -212,36 +212,65 @@
           </el-table>
         </el-card>
 
-        <!-- 可报告/参考/特异性 -->
+        <!-- 可报告范围：分低限/高限两组 -->
         <el-card v-if="form.verify_items.includes('reportable')" shadow="never" class="wiz-card">
-          <template #header><b>③ 可报告范围</b></template>
+          <template #header><b>{{ stepNum('reportable') }} 可报告范围（低限 + 高限）</b></template>
           <div class="ref-panel">
             <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
               <p><b>验证方案：</b>CNAS-GL037:2019《临床化学定量检验程序性能验证指南》6.6。</p>
               <p><b>要求：</b>低限 ≤ TEA，高限 ≤ 1/2 TEA。通过稀释或浓缩样品验证超出线性范围的可报告区间。</p>
             </el-collapse-item></el-collapse>
           </div>
-          <el-input v-model="form.data.reportable.note" type="textarea" :rows="2"/>
+          <el-table :data="[{label:'低限 (低浓度端)', key:'low'},{label:'高限 (高浓度端)', key:'high'}]" border size="small">
+            <el-table-column label="验证内容" width="120" />
+            <el-table-column label="靶值" width="120"><template #default="{ row }"><el-input v-model="form.data.reportable[row.key].target" size="small" placeholder="靶值"/></template></el-table-column>
+            <el-table-column label="测量值" width="120"><template #default="{ row }"><el-input v-model="form.data.reportable[row.key].measured" size="small" placeholder="测量值"/></template></el-table-column>
+            <el-table-column label="相对偏倚(%)" width="120"><template #default="{ row }"><el-input v-model="form.data.reportable[row.key].deviation" size="small" placeholder="%"/></template></el-table-column>
+            <el-table-column label="判定" width="100"><template #default="{ row }"><el-select v-model="form.data.reportable[row.key].passed" size="small"><el-option label="符合要求" value="符合要求"/><el-option label="不符合要求" value="不符合要求"/></el-select></template></el-table-column>
+          </el-table>
+          <el-form-item label="稀释倍数/补充说明" style="margin-top:8px"><el-input v-model="form.data.reportable.dilution" placeholder="如 /（不稀释）" /></el-form-item>
+          <el-form-item label="备注"><el-input v-model="form.data.reportable.note" type="textarea" :rows="2" /></el-form-item>
         </el-card>
+        <!-- 参考范围：参考区间描述 + 各组（默认男女两组） -->
         <el-card v-if="form.verify_items.includes('reference')" shadow="never" class="wiz-card">
-          <template #header><b>③ 参考范围/区间</b></template>
+          <template #header><b>{{ stepNum('reference') }} 参考范围/区间</b></template>
           <div class="ref-panel">
             <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
               <p><b>验证方案：</b>CNAS-GL037:2019 / CLSI C28-A3。</p>
               <p><b>要求：</b>选取至少 20 份健康个体标本，≤ 2 个超出参考区间即为参考区间验证通过。</p>
             </el-collapse-item></el-collapse>
           </div>
-          <el-input v-model="form.data.reference.note" type="textarea" :rows="2"/>
+          <el-form-item label="参考区间描述"><el-input v-model="form.data.reference.range_text" placeholder="如：男 45-125 U/L，女（20-49岁）35-100 U/L" /></el-form-item>
+          <el-table :data="form.data.reference.groups" border size="small">
+            <el-table-column label="分组"><template #default="{ row }"><el-input v-model="row.name" size="small" /></template></el-table-column>
+            <el-table-column label="标本数" width="100"><template #default="{ row }"><el-input v-model="row.total" size="small" /></template></el-table-column>
+            <el-table-column label="超出参考区间数" width="140"><template #default="{ row }"><el-input v-model="row.out" size="small" /></template></el-table-column>
+            <el-table-column label="判定" width="100"><template #default="{ row }"><el-select v-model="row.passed" size="small"><el-option label="符合要求" value="符合要求"/><el-option label="不符合要求" value="不符合要求"/></el-select></template></el-table-column>
+            <el-table-column label="" width="60" align="center">
+              <template #default="{ $index }"><el-button size="small" type="danger" plain @click="form.data.reference.groups.splice($index,1)" v-if="form.data.reference.groups.length > 2">删除</el-button></template>
+            </el-table-column>
+          </el-table>
+          <el-button size="small" plain @click="form.data.reference.groups.push({name:'新分组',total:'20',out:'0',passed:'符合要求'})">+ 增加分组</el-button>
         </el-card>
+        <!-- 分析特异性：多行干扰物表 -->
         <el-card v-if="form.verify_items.includes('specificity')" shadow="never" class="wiz-card">
-          <template #header><b>③ 分析特异性</b></template>
+          <template #header><b>{{ stepNum('specificity') }} 分析特异性</b></template>
           <div class="ref-panel">
             <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
               <p><b>验证方案：</b>CNAS-GL037:2019 / 厂家声明。</p>
               <p><b>要求：</b>胆红素、甘油三酯、血红蛋白等常见干扰物在声明浓度范围内的干扰 ≤ 允许偏倚；抗干扰能力符合厂家声明。</p>
             </el-collapse-item></el-collapse>
           </div>
-          <el-input v-model="form.data.specificity.note" type="textarea" :rows="2"/>
+          <el-table :data="form.data.specificity.items" border size="small">
+            <el-table-column label="干扰物"><template #default="{ row }"><el-input v-model="row.name" size="small" /></template></el-table-column>
+            <el-table-column label="声明允许浓度" width="130"><template #default="{ row }"><el-input v-model="row.limit" size="small" placeholder="如 ≤1000μmol/L" /></template></el-table-column>
+            <el-table-column label="实测偏倚/结论" width="180"><template #default="{ row }"><el-input v-model="row.measured" size="small" placeholder="如 ≤允许偏倚" /></template></el-table-column>
+            <el-table-column label="判定" width="100"><template #default="{ row }"><el-select v-model="row.passed" size="small"><el-option label="符合要求" value="符合要求"/><el-option label="不符合要求" value="不符合要求"/></el-select></template></el-table-column>
+            <el-table-column label="" width="60" align="center">
+              <template #default="{ $index }"><el-button size="small" type="danger" plain @click="form.data.specificity.items.splice($index,1)" v-if="form.data.specificity.items.length > 1">删除</el-button></template>
+            </el-table-column>
+          </el-table>
+          <el-button size="small" plain @click="form.data.specificity.items.push({name:'新干扰物',limit:'',measured:'',passed:'符合要求'})">+ 增加干扰物</el-button>
         </el-card>
 
         <!-- 结论预览（验证结论大表） -->
@@ -333,6 +362,11 @@ const itemOptions = computed(() => ({
   ...(form.report_type === 'qualitative' ? { conformity: '方法符合率', lod: '方法检出限' } : { trueness: '正确度', linearity: '线性范围', reportable: '可报告范围' }),
   reference: form.report_type === 'qualitative' ? '参考范围' : '参考区间', specificity: '分析特异性',
 }))
+// 验证项步骤顺序（用于卡片编号 ③ ④ ⑤ ...）
+const ITEM_ORDER = computed(() => form.report_type === 'qualitative'
+  ? ['precision', 'conformity', 'lod', 'reference', 'specificity']
+  : ['precision', 'trueness', 'linearity', 'reportable', 'reference', 'specificity'])
+function stepNum(key) { return ITEM_ORDER.value.indexOf(key) + 3 }
 const form = reactive(defaultForm())
 function defaultForm() {
   return {
@@ -344,7 +378,28 @@ function defaultForm() {
       precision: { levels: mkPrecisionLevels() }, conformity: { samples: mkSamples(20, { name: '', ref: 'N', method: '', mresult: 'N' }) },
       lod: { samples: mkSamples(20, { orig: '', diluted: '', value: '', mresult: 'P' }) },
       trueness: { levels: mkTruenessLevels() }, linearity: { points: mkLinearPoints() },
-      reportable: { note: '' }, reference: { note: '' }, specificity: { note: '' },
+      // 可报告范围：分低限/高限两组
+      reportable: {
+        low: { target: '', measured: '', deviation: '', passed: '' },
+        high: { target: '', measured: '', deviation: '', passed: '' },
+        dilution: '', note: '',
+      },
+      // 参考范围：参考区间描述 + 各组（默认男/女/其他）
+      reference: {
+        range_text: '',
+        groups: [
+          { name: '男性组', total: '20', out: '0', passed: '符合' },
+          { name: '女性组', total: '20', out: '0', passed: '符合' },
+        ],
+      },
+      // 分析特异性：多行干扰物（默认胆红素/甘油三酯/血红蛋白）
+      specificity: {
+        items: [
+          { name: '胆红素', limit: '', measured: '', passed: '符合' },
+          { name: '甘油三酯', limit: '', measured: '', passed: '符合' },
+          { name: '血红蛋白', limit: '', measured: '', passed: '符合' },
+        ],
+      },
     },
   }
 }
