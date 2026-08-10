@@ -35,7 +35,7 @@ MAX_UPLOAD_BYTES = 60 * 1024 * 1024  # 60 MB
 @router.post("/upload")
 async def upload_archive(
     request: Request,
-    project_name: str = Form(...),
+    project_name: str = Form(""),
     report_type: str = Form("qualitative"),
     description: str = Form(""),
     ref_report_id: int = Form(-1),
@@ -43,19 +43,36 @@ async def upload_archive(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """上传性能验证报告 xlsx 归档（关联到归档库）。"""
+    """上传性能验证报告 xlsx 归档，自动解析并创建验证记录（显示在性能验证记录页）。"""
     body = await file.read()
     if len(body) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail=f"文件过大（>{MAX_UPLOAD_BYTES//1024//1024}MB）")
     original = file.filename or "report.xlsx"
     safe = os.path.basename(original)
+
+    # 尝试解析 xlsx → 创建 verification_report
+    parsed_info = None
+    vrep_id = None
+    if original.lower().endswith(('.xlsx', '.xls')):
+        try:
+            from ...services.vrf_parser import parse_and_store
+            host = request.client.host if request.client else ""
+            parsed = parse_and_store(body, db, user, host)
+            vrep_id = parsed.get("id")
+            parsed_info = parsed
+        except Exception:
+            pass  # 非标准格式，退化为普通文件归档
+
+    if parsed_info:
+        project_name = parsed_info.get("project_name") or project_name
+        report_type = parsed_info.get("report_type") or report_type
     rel = storage.save("report_archives", safe, body)
     rec = ReportArchive(
-        project_name=project_name,
+        project_name=project_name or "未命名",
         report_type=report_type,
         source_type="uploaded",
-        ref_report_id=ref_report_id if ref_report_id > 0 else None,
-        ref_archive_kind="verification_report" if ref_report_id > 0 else "",
+        ref_report_id=vrep_id if vrep_id else (ref_report_id if ref_report_id > 0 else None),
+        ref_archive_kind="verification_report" if (vrep_id or ref_report_id > 0) else "",
         original_name=safe,
         file_path=rel,
         description=description,
@@ -64,12 +81,14 @@ async def upload_archive(
     db.add(rec)
     db.commit()
     db.refresh(rec)
-    write_audit(db, user, "upload", "report_archives", rec.id, {"file": rel}, request.client.host if request.client else None)
+    write_audit(db, user, "upload", "report_archives", rec.id, {"file": rel, "parsed": bool(parsed_info)}, request.client.host if request.client else None)
     return {
         "id": rec.id, "project_name": rec.project_name, "report_type": rec.report_type,
         "source_type": rec.source_type, "ref_report_id": rec.ref_report_id,
         "original_name": rec.original_name, "file_path": rec.file_path,
         "description": rec.description, "created_at": rec.created_at,
+        "parsed": bool(parsed_info),
+        "verification_id": vrep_id,
     }
 
 
