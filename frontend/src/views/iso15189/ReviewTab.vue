@@ -577,9 +577,11 @@ async function loadAll() {
   try {
     const r = await listAssignments({ campaign_id: campaignId.value, page_size: 500 })
     assignments.value = r.items || []
+  } catch (e) {
+    // 列表加载失败不阻断界面，保留旧数据
   } finally { loading.value = false }
-  await loadStats()
-  await loadMy()
+  try { await loadStats() } catch (_) {}
+  try { await loadMy() } catch (_) {}
 }
 async function loadMy() {
   if (!campaignId.value) return
@@ -713,6 +715,8 @@ async function downloadRevisedFromReceive() {
 async function submitReceive() {
   const row = assignments.value.find(a => a.id === receiveForm.assignment_id)
   if (!row) return
+  // 保存当前展开状态，刷新后恢复（避免接收后表格折叠/跳变）
+  const savedExpanded = [...expandedRowKeys.value]
   const fd = new FormData()
   fd.append('new_version', receiveForm.new_version)
   fd.append('revision_no', receiveForm.revision_no)
@@ -724,10 +728,16 @@ async function submitReceive() {
   if (receiveForm.final_file) {
     fd.append('file', receiveForm.final_file)
   }
-  const r = await receiveRevision(row.id, fd)
-  ElMessage.success(`已生成新版本 ${r.new_version}`)
-  receiveVisible.value = false
-  await loadAll()
+  try {
+    const r = await receiveRevision(row.id, fd)
+    ElMessage.success(`已生成新版本 ${r.new_version}`)
+    receiveVisible.value = false
+    await loadAll()
+    // 恢复展开状态
+    expandedRowKeys.value = savedExpanded
+  } catch (e) {
+    ElMessage.error('接收失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  }
 }
 async function loadStats() {
   if (!campaignId.value) return

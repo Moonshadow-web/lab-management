@@ -1,1 +1,0 @@
-import{s as e}from"./index-Bf9TLYeS.js";function n(i){return e.get("/api/v1/verification-records",{params:i})}function o(i){return e.post("/api/v1/verification-records",i)}function a(i,r){return e.put(`/api/v1/verification-records/${i}`,r)}function c(i){return e.delete(`/api/v1/verification-records/${i}`)}export{o as c,c as d,n as l,a as u};
