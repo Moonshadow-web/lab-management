@@ -17,6 +17,8 @@
 
 ## 业务模块要点
 - EQA：/api/v1/eqa-plans；北京机构 01110025/4731。
+- **EQA 单位换算豁免(2026-08-08)**：卫健委「骨代谢标志物」组（id 110/111，program=骨代谢标志物）PTH/VD **不换算**、固定原单位 PTH=pg/mL VD=ng/mL（`EQA_NO_CONVERT_UNITS` 不依赖项目库，项目库 PTH=ng/L/VD=µg/L 不可用）；卫健委/北京市「内分泌」组保持换算（PTH→pmol/L、VD→nmol/L）。逻辑：`eqa.py::_no_convert_unit_for/_conversion_for`（后端骨架+回填均走 `_conversion_for(plan, it)`，豁免项目移除旧 conv 并固定单位修正历史数据）+ 前端 `QCList.vue::matchConv(name, plan)` 传计划上下文豁免（`applyGrid`/`addCol` 传 `resultPlan.value`）。前后端豁免规则须同步维护。
+- **评审重新分配(2026-08-07~08)**：ReviewTab.vue 展开行新增「重新分配」按钮（EditDialog+`updateAssignment` 更新原行，不产生重复行）+「待重分」标签；`assignedDocIds` 只统计有 reviewer_id 的行（释放行可重回批量分配弹窗）；`review.py::assign_batch` 用 released_map 复用空审核人行，批量重分配不产生重复行。姚建民(id=8)任务释放后可正常重分配。
 - comparison：权威 WS/T 403—2024 字典 services/comparison_report.py。
 - Westgard 月结 R-4s 归一化(2026-07-25 冻结)：相邻对各自按本水平靶值归一化判 |z差|>4；已失控点冻结不参与后续规则。上传规则列覆盖后端(2026-07-26)，严重度 1-3S>2-2S>R-4S>10-x>1-2S；解析器兼容全角/无连字符(13S/10X)；`_recalc` 可重算。
 - 文档预览：xlsx exceljs / docx mammoth / pdf 直；旧版 .doc(OLE2)存成 .docx 名→按文件头判定。
@@ -54,6 +56,8 @@
   - **正确做法**：`crud_base.py` 已用 `_serialize(obj)`（ORM→dict + 手动 `json.loads`）+ `_to_read(obj)`（`ReadSchema.model_validate(dict)`）绕过；list/get/create/update 全部走 `_to_read`。新增 json_fields 模块时无需再改，但**勿删 `_to_read`**。
 - **API 路径带 router 自带前缀**：auth=`/api/v1/auth/login`、education 各资源=`/api/v1/education/...`（如 new-employee-trains），不是 `/api/v1/login` / `/api/v1/new-employee-trains`。排查 404/405 先 curl `/openapi.json` 核对真实路径（勿被 SPA fallback 的 404/405 误导）。
 - **内网部署生效慢**：tcb deploy 提交后，内网 curl `/api/v1/_diag/build` 往往要 ~5 分钟才翻到新 `_BUILD_MARK`（容器构建+滚动发布），勿提前判定失败。
+- **前端"操作后跳登录/跳走"= 拦截器 401→gotoLogin，try-catch 拦不住**：现象（如 15189 接收新版本后跳到工作台）排查时先 `grep router.push` 确认业务代码无导航；若无，必是 `utils/request.js` 响应拦截器在 401 且 refresh 失败分支调 `gotoLogin()`（先 `clearAuth` 再 `router.push('/login')`，该跳转在 Promise.reject 之前执行，业务层 try-catch 无效）。根因多为 access token(30min) 过期、refresh(7d) 也失效。正确修法不是 try-catch，而是让登录后**回跳原页面**：`gotoLogin()` 把 `currentRoute.fullPath` 作为 `?redirect=` 带入登录页；`Login.vue` 登录成功后 `router.push(route.query.redirect || '/dashboard')`；`router.beforeEach` 中 `to.path==='/login' && isLoggedIn` 时 `next(to.query.redirect || '/dashboard')`。
+- **git 索引文件锁(Windows, 2026-08-07~08)**：`.git/index`、`cloudbaserc.json` 曾被某进程独占锁（读可、写/rename Permission denied；普通 git add/commit 报「unable to write new index file」，tcb 回写 cloudbaserc.json 报 EPERM——不影响部署「submission completed」）。**绕过提交**：`cp .git/index .git/alt_index` → `GIT_INDEX_FILE=.git/alt_index git add <files>` → `git write-tree` → `git commit-tree <tree> -p HEAD -m ...` → `git update-ref refs/heads/main <commit>` → `git push`（全程不写被锁 index）。plumbing 提交后真实 index 未更新，锁释放后须 `git reset --mixed HEAD` 同步。锁约数小时自动释放。
 
 ## docx SOP 标题提取（2026-08-03 已踩坑）
 - **勿用 `python-docx` 的「正文第一段」当标题**：这些 SOP 的大标题是分多段写的（如「AU5800检测系统免疫透射比浊法」+「血清载脂蛋白B测定标准操作程序」），`doc.paragraphs[0].text` 只读第一段 → 截断。且正文起点不统一（「1 承担部门」/「检验目的」/「检测目的」/「检查目的」），全角句号「2．」也会让 `^\d+[.、]` 漏判。
@@ -67,3 +71,40 @@
 - 工具 `scripts/replace_au5800_sop.py`：逐 run 保留格式替换（python-docx 跨 run 重建，rPr 须 `copy.deepcopy` 否则丢格式）；APPLY=1 前先 `shutil.copy2` 备份到 `AU5800_BACKUP/`。
 - 结果：61 份替换（旧引用清零、新引用按各项目真实机器）、文档自身标题「AU5800检测系统…测定标准操作程序」不动。
 - **例外未改**：`SM-SOP-126 N-乙酰-β-D-氨基葡萄糖苷酶`——系统无此 test_item（仪器档案里也无），无法匹配机器，留待用户决定。另注意：尿酸只在 AU58-1/AU58-2（不在 AU5800）；锌只在 AU58-2/AU5800；小而密只在 AU58-2/AU5800；淀粉样蛋白A=血清淀粉样蛋白A只在 AU58-2；腺苷脱氨酶系统仅（胸腹水）/（脑脊液）变体→按 AU5800。
+
+## 软著办理（生免组系统，用户实操）
+- 用户以**个人名义**办理（著作权人：金子铮，不盖章、签字即可），非单位名义。
+- 拆 5 件登记：①检验项目与仪器管理 ②室间质评与比对 ③室内质控与靶值 ④试剂与物料 ⑤综合业务平台。
+- 件①已填表+签章(2026-08-03本人签字)待缴费；件②源码/说明书/主要功能已备，用户自改说明书措辞。
+- **修正(2026-08-04)**：软著各件「开发完成日期/版本号」**不强制一致**（审查不做实质核实）；建议延续件①的 2026-06-30/V1.0 只为省事避疑，非硬性规定。
+- **合规提醒**：件①~②说明书系 AI 起草，用户签「未使用AI」声明前须人工改写措辞；业务代码为本人独立开发。
+
+### 软著各件通用申请表字段（与件①一致，件③~⑤复用）
+- 软件分类：应用软件
+- 发表状态：未发表
+- 开发硬件环境：通用PC（Intel i5/16GB内存/512GB SSD）
+- 运行硬件环境：云服务器（2核4GB内存/100GB SSD）
+- 开发OS：Windows 10/11
+- 开发工具：Python 3.13、VS Code、Node.js 22、Git
+- 运行平台/OS：Linux + Chrome/Edge 浏览器
+- **运行支撑环境(限50字)：MySQL 8.0、Nginx、Python 3.13、腾讯云 CloudBase 容器平台**
+- 编程语言：Python、JavaScript
+- 权利范围：全部权利；开发方式：独立开发
+- 著作权人：金子铮（个人名义，签字不盖章）；版本 V1.0；完成日 2026-06-30（建议延续，非强制）
+
+### 软著各件源程序量（各自填，勿填总数）
+- 件①检验项目与仪器管理软件：3537 行
+- 件②室间质评与比对管理软件：9500 行
+- 件③室内质控与靶值管理软件：6397 行
+- 件④试剂与物料管理软件：3950 行
+- 件⑤综合业务管理平台软件：10673 行
+
+### 软著各件开发目的（各件不同，落点一致）
+- 件①检验项目与仪器管理：实现检验科生化免疫专业组检验项目与仪器档案的信息化管理，支撑 ISO 15189 受控要求
+- 件②室间质评与比对：实现科室室间质评与仪器间/室间比对的信息化管理，规范偏倚判定与上报，支撑 ISO 15189 受控
+- 件③室内质控与靶值：实现科室室内质控数据与累计靶值的信息化管理，自动完成 Westgard 多规则判定与月结，支撑 ISO 15189 受控
+### 软著各件技术特点（100字框，架构一致+各件特有技术点）
+- 件①检验项目与仪器：B/S架构前后端分离，FastAPI+Vue3+MySQL，支持云部署与RBAC权限控制（偏项目主数据与仪器档案）
+- 件②室间质评与比对：B/S架构前后端分离，FastAPI+MySQL+Vue3+Element Plus，支持质评报告自动解析、单位换算校正及按WS/T 403/415自动偏倚判定，云部署+RBAC
+- 件③室内质控与靶值：B/S架构前后端分离，FastAPI+MySQL+Vue3+Element Plus，内置Westgard多规则判定引擎（跨水平R-4S归一化、失控冻结、多源规则冲突消解）与累计靶值（即刻法/常规法）算法，云部署+RBAC
+- 类型勾选：均勾「医疗软件」
