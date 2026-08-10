@@ -715,8 +715,6 @@ async function downloadRevisedFromReceive() {
 async function submitReceive() {
   const row = assignments.value.find(a => a.id === receiveForm.assignment_id)
   if (!row) return
-  // 保存当前展开状态，刷新后恢复（避免接收后表格折叠/跳变）
-  const savedExpanded = [...expandedRowKeys.value]
   const fd = new FormData()
   fd.append('new_version', receiveForm.new_version)
   fd.append('revision_no', receiveForm.revision_no)
@@ -732,9 +730,13 @@ async function submitReceive() {
     const r = await receiveRevision(row.id, fd)
     ElMessage.success(`已生成新版本 ${r.new_version}`)
     receiveVisible.value = false
-    await loadAll()
-    // 恢复展开状态
-    expandedRowKeys.value = savedExpanded
+    // 关键：原地更新这一行，不整表 loadAll 重载，避免已展开行被 el-table 折叠
+    const idx = assignments.value.findIndex(a => a.id === row.id)
+    if (idx >= 0) {
+      assignments.value[idx] = { ...assignments.value[idx], status: r.status, document_new_version: r.new_version }
+    }
+    // 顶部进度统计（chips）单独刷新，不影响展开状态
+    await loadStats()
   } catch (e) {
     ElMessage.error('接收失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
   }
