@@ -111,6 +111,20 @@
         <!-- 精密度数据 -->
         <el-card v-if="form.verify_items.includes('precision')" shadow="never" class="wiz-card">
           <template #header><b>③ 精密度验证（2 水平 × 5 天 × 3 次）</b></template>
+          <div class="ref-panel">
+            <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
+              <template v-if="form.report_type==='quantitative'">
+                <p><b>验证方案：</b>CNAS-GL037:2019《临床化学定量检验程序性能验证指南》6.3；WS/T 492-2016《临床检验定量测定项目精密度与正确度性能验证》3.1-3.3；WS/T 408-2024《定量检验程序分析性能验证指南》5。</p>
+                <p><b>要求：</b>批内 CV ≤ 1/4 TEA，实验室内 CV ≤ 1/3 TEA。若大于规定标准，进行统计学检验判断精密度是否可接受。</p>
+                <p><b>方法：</b>选取至少两个浓度的质控品，每天检测 1 批，每批检测 2 个水平，每个水平重复 3 次，连续检测 5 天，计算批内和实验室内 CV 和 SD。</p>
+              </template>
+              <template v-else>
+                <p><b>验证方案：</b>CNAS-GL038:2019《临床免疫学定性检验程序性能验证指南》6.2。</p>
+                <p><b>要求：</b>批内 CV ≤ 7.5%，实验室内 CV ≤ 10.0%。参考 WS/T 403-2024 或卫健委推荐标准。</p>
+                <p><b>方法：</b>选取至少两个浓度的质控品（阴性+弱阳性），每天 1 批，每批 2 个水平，各重复 3 次，连续 5 天。</p>
+              </template>
+            </el-collapse-item></el-collapse>
+          </div>
           <div v-for="(lv, li) in form.data.precision.levels" :key="li" class="lvl-block">
             <div class="lvl-title">水平{{ li + 1 }}</div>
             <el-row :gutter="8"><el-col :span="8"><el-input v-model="lv.name" size="small" placeholder="水平名称"/></el-col><el-col :span="6"><el-input v-model="lv.target" size="small" placeholder="靶值"/></el-col></el-row>
@@ -125,6 +139,12 @@
         <!-- 符合率（定性） -->
         <el-card v-if="form.report_type==='qualitative' && form.verify_items.includes('conformity')" shadow="never" class="wiz-card">
           <template #header><b>③ 方法符合率（≥10阴性 + ≥10阳性）</b></template>
+          <div class="ref-panel">
+            <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
+              <p><b>验证方案：</b>CNAS-GL038:2019《临床免疫学定性检验程序性能验证指南》6.1.2。</p>
+              <p><b>要求：</b>阴性符合率、阳性符合率均 ≥ 95%。选取已知结果的室间质评样本或厂家参考品，至少 10 份阴性样本 + 10 份阳性样本（含弱阳性及高值阳性）。</p>
+            </el-collapse-item></el-collapse>
+          </div>
           <el-table :data="form.data.conformity.samples" border size="small">
             <el-table-column label="#" width="44" align="center"><template #default="{ $index }">{{ $index+1 }}</template></el-table-column>
             <el-table-column label="样品编号"><template #default="{ row }"><el-input v-model="row.name" size="small"/></template></el-table-column>
@@ -138,6 +158,12 @@
         <!-- 检出限（定性） -->
         <el-card v-if="form.report_type==='qualitative' && form.verify_items.includes('lod')" shadow="never" class="wiz-card">
           <template #header><b>③ 方法检出限（≥20样本）</b></template>
+          <div class="ref-panel">
+            <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
+              <p><b>验证方案：</b>CNAS-GL038:2019《临床免疫学定性检验程序性能验证指南》6.1.2。</p>
+              <p><b>要求：</b>检出限浓度的样品阳性率 ≥ 95%。使用定值标准品梯度稀释至厂商声明的检出限浓度，样本数 ≥ 20 个。</p>
+            </el-collapse-item></el-collapse>
+          </div>
           <el-table :data="form.data.lod.samples" border size="small">
             <el-table-column label="#" width="44" align="center"><template #default="{ $index }">{{ $index+1 }}</template></el-table-column>
             <el-table-column label="原浓度"><template #default="{ row }"><el-input v-model="row.orig" size="small"/></template></el-table-column>
@@ -151,6 +177,12 @@
         <!-- 正确度（定量） -->
         <el-card v-if="form.report_type==='quantitative' && form.verify_items.includes('trueness')" shadow="never" class="wiz-card">
           <template #header><b>③ 正确度（2水平 × 5天 × 2次）</b></template>
+          <div class="ref-panel">
+            <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
+              <p><b>验证方案：</b>CNAS-GL037:2019《临床化学定量检验程序性能验证指南》6.4；WS/T 492-2016。</p>
+              <p><b>要求：</b>相对偏倚 ≤ 1/2 TEA。使用有证参考物质或定值校准品，每天重复检测 2 次，连续 5 天，计算均值与标称值的相对偏倚。</p>
+            </el-collapse-item></el-collapse>
+          </div>
           <div v-for="(lv,li) in form.data.trueness.levels" :key="li" class="lvl-block">
             <div class="lvl-title">水平{{ li+1 }}</div>
             <el-row :gutter="8"><el-col :span="8"><el-input v-model="lv.name" size="small" placeholder="水平名称"/></el-col><el-col :span="6"><el-input v-model="lv.target" size="small" placeholder="靶值"/></el-col></el-row>
@@ -166,6 +198,12 @@
         <!-- 线性范围（定量） -->
         <el-card v-if="form.report_type==='quantitative' && form.verify_items.includes('linearity')" shadow="never" class="wiz-card">
           <template #header><b>③ 线性范围（6点×3次）</b></template>
+          <div class="ref-panel">
+            <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
+              <p><b>验证方案：</b>CNAS-GL037:2019《临床化学定量检验程序性能验证指南》6.5；WS/T 408-2024 6。</p>
+              <p><b>要求：</b>各浓度点相对偏倚 ≤ 1/2 TEA，符合线性或临床可接受的非线性程度。选取 6 个浓度点（含声称线性范围上下限），每个浓度点重复 3 次，进行直线回归与非线性判断。</p>
+            </el-collapse-item></el-collapse>
+          </div>
           <el-table :data="form.data.linearity.points" border size="small">
             <el-table-column label="点" width="44" align="center"><template #default="{ $index }">{{ $index+1 }}</template></el-table-column>
             <el-table-column label="低浓度比例"><template #default="{ row }"><el-input v-model="row.low" size="small"/></template></el-table-column>
@@ -177,14 +215,32 @@
         <!-- 可报告/参考/特异性 -->
         <el-card v-if="form.verify_items.includes('reportable')" shadow="never" class="wiz-card">
           <template #header><b>③ 可报告范围</b></template>
+          <div class="ref-panel">
+            <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
+              <p><b>验证方案：</b>CNAS-GL037:2019《临床化学定量检验程序性能验证指南》6.6。</p>
+              <p><b>要求：</b>低限 ≤ TEA，高限 ≤ 1/2 TEA。通过稀释或浓缩样品验证超出线性范围的可报告区间。</p>
+            </el-collapse-item></el-collapse>
+          </div>
           <el-input v-model="form.data.reportable.note" type="textarea" :rows="2"/>
         </el-card>
         <el-card v-if="form.verify_items.includes('reference')" shadow="never" class="wiz-card">
           <template #header><b>③ 参考范围/区间</b></template>
+          <div class="ref-panel">
+            <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
+              <p><b>验证方案：</b>CNAS-GL037:2019 / CLSI C28-A3。</p>
+              <p><b>要求：</b>选取至少 20 份健康个体标本，≤ 2 个超出参考区间即为参考区间验证通过。</p>
+            </el-collapse-item></el-collapse>
+          </div>
           <el-input v-model="form.data.reference.note" type="textarea" :rows="2"/>
         </el-card>
         <el-card v-if="form.verify_items.includes('specificity')" shadow="never" class="wiz-card">
           <template #header><b>③ 分析特异性</b></template>
+          <div class="ref-panel">
+            <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
+              <p><b>验证方案：</b>CNAS-GL037:2019 / 厂家声明。</p>
+              <p><b>要求：</b>胆红素、甘油三酯、血红蛋白等常见干扰物在声明浓度范围内的干扰 ≤ 允许偏倚；抗干扰能力符合厂家声明。</p>
+            </el-collapse-item></el-collapse>
+          </div>
           <el-input v-model="form.data.specificity.note" type="textarea" :rows="2"/>
         </el-card>
 
@@ -403,4 +459,6 @@ onMounted(loadList)
 .lvl-title { font-weight: 600; color: #4a5568; margin-bottom: 6px; }
 .auto-text { margin-top: 6px; font-size: 13px; color: #409eff; font-weight: 600; }
 .wiz-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.ref-panel { margin-bottom: 8px; }
+.ref-panel p { margin: 4px 0; font-size: 13px; line-height: 1.6; }
 </style>
