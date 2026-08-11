@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
-from ...core.security import auth_with_url_token_fallback
+from ...core.security import get_current_user
 from ...core.storage import storage
 from ...models.report_archive import ReportArchive
 from ...models.user import User
@@ -99,7 +99,18 @@ def download_archive(
     db: Session = Depends(get_db),
 ):
     """支持 URL token 参数认证（window.open/iframe 直接访问）。"""
-    user = auth_with_url_token_fallback(token, db)
+    user = None
+    if token:
+        try:
+            from jose import jwt as _jwt
+            from ...core.security import SECRET_KEY, ALGORITHM
+            payload = _jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            uid = int(payload.get("sub"))
+            user = db.get(User, uid)
+        except Exception:
+            pass
+    if not user:
+        raise HTTPException(status_code=401, detail="认证失败")
     rec = db.get(ReportArchive, aid)
     if not rec or not rec.file_path:
         raise HTTPException(status_code=404, detail="归档不存在")
