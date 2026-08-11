@@ -59,7 +59,7 @@
         <el-table-column prop="reviewer" label="审核人" width="120" />
         <el-table-column label="汇总" min-width="260">
           <template #default="{ row }">
-            共 {{ row.total }} 份 / 已提交 {{ row.submitted }} / 已接收 {{ row.received }} / A-027 {{ row.a027_submitted ? '已交' : '未交' }}
+            共 {{ row.total }} 份 / 已提交 {{ row.submitted }} / 已接收 {{ row.received }} / A-027 {{ a027Submitted(row.reviewer) ? '已交' : '未交' }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="110" fixed="right">
@@ -508,8 +508,9 @@ const reviewerGroups = computed(() => {
       },
       { total: 0, submitted: 0, received: 0 }
     )
-    const ps = progressStats.value.find((s) => s.reviewer === g.reviewer)
-    return { ...g, ...stats, a027_submitted: ps ? ps.a027_submitted : false }
+    // 注意：reviewerGroups 绝不能依赖 progressStats（loadStats 会让其重算→表格数据引用变→展开态丢失）。
+    // a027_submitted 改为模板里调 a027Submitted() 直接读 progressStats，避免本 computed 订阅它。
+    return { ...g, ...stats }
   })
 })
 
@@ -517,6 +518,12 @@ const filteredGroups = computed(() => {
   if (!reviewerFilter.value) return reviewerGroups.value
   return reviewerGroups.value.filter((g) => g.reviewer === reviewerFilter.value)
 })
+
+// 模板直接读取某审核人是否已交 A-027（不依赖 reviewerGroups，避免 loadStats 触发分组重算导致展开丢失）
+function a027Submitted(reviewer) {
+  const ps = progressStats.value.find((s) => s.reviewer === reviewer)
+  return ps ? ps.a027_submitted : false
+}
 
 function toggleExpand(row) {
   const key = row.reviewer
@@ -730,12 +737,13 @@ async function submitReceive() {
     const r = await receiveRevision(row.id, fd)
     ElMessage.success(`已生成新版本 ${r.new_version}`)
     receiveVisible.value = false
-    // 关键：原地更新这一行，不整表 loadAll 重载，避免已展开行被 el-table 折叠
-    const idx = assignments.value.findIndex(a => a.id === row.id)
-    if (idx >= 0) {
-      assignments.value[idx] = { ...assignments.value[idx], status: r.status, document_new_version: r.new_version }
+    // 关键：原地修改该行对象的属性（非替换数组元素），reviewerGroups 不重算→el-table :data 引用不变→已展开行保留。
+    const target = assignments.value.find(a => a.id === row.id)
+    if (target) {
+      target.status = r.status
+      target.document_new_version = r.new_version
     }
-    // 顶部进度统计（chips）单独刷新，不影响展开状态
+    // 顶部进度统计（chips）单独刷新；reviewerGroups 已不再依赖 progressStats，故不会触发分组重算/折叠。
     await loadStats()
   } catch (e) {
     ElMessage.error('接收失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
