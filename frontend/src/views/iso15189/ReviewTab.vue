@@ -59,7 +59,7 @@
         <el-table-column prop="reviewer" label="审核人" width="120" />
         <el-table-column label="汇总" min-width="260">
           <template #default="{ row }">
-            共 {{ row.total }} 份 / 已提交 {{ row.submitted }} / 已接收 {{ row.received }} / A-027 {{ a027Submitted(row.reviewer) ? '已交' : '未交' }}
+            共 {{ groupStats(row).total }} 份 / 已提交 {{ groupStats(row).submitted }} / 已接收 {{ groupStats(row).received }} / A-027 {{ a027Submitted(row.reviewer) ? '已交' : '未交' }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="110" fixed="right">
@@ -490,6 +490,8 @@ const reviewerOptions = computed(() => {
 })
 
 // 按审核人分组，用于折叠式管理员表格
+// 关键：reviewerGroups 只负责「分组结构」，绝不读取 r.status 做统计（否则接收后原地改 status 会触发它重算→
+// 生成全新分组对象→ el-table :data 引用变化→已展开行被折叠）。计数改由模板 groupStats(row) 函数实时读取。
 const reviewerGroups = computed(() => {
   const base = visibleAssignments.value
   const groups = {}
@@ -498,21 +500,19 @@ const reviewerGroups = computed(() => {
     if (!groups[r]) groups[r] = { reviewer: r, rows: [] }
     groups[r].rows.push(a)
   })
-  return Object.values(groups).map((g) => {
-    const stats = g.rows.reduce(
-      (acc, r) => {
-        acc.total++
-        if (['已提交', '管理员已接收', '已完成'].includes(r.status)) acc.submitted++
-        if (['管理员已接收', '已完成'].includes(r.status)) acc.received++
-        return acc
-      },
-      { total: 0, submitted: 0, received: 0 }
-    )
-    // 注意：reviewerGroups 绝不能依赖 progressStats（loadStats 会让其重算→表格数据引用变→展开态丢失）。
-    // a027_submitted 改为模板里调 a027Submitted() 直接读 progressStats，避免本 computed 订阅它。
-    return { ...g, ...stats }
-  })
+  return Object.values(groups)
 })
+
+// 模板读取某分组的总/已提交/已接收计数（在模板层读取 r.status，触发局部重渲染，但不影响 reviewerGroups(:data) 引用）
+function groupStats(row) {
+  let total = 0, submitted = 0, received = 0
+  ;(row.rows || []).forEach((r) => {
+    total++
+    if (['已提交', '管理员已接收', '已完成'].includes(r.status)) submitted++
+    if (['管理员已接收', '已完成'].includes(r.status)) received++
+  })
+  return { total, submitted, received }
+}
 
 const filteredGroups = computed(() => {
   if (!reviewerFilter.value) return reviewerGroups.value
