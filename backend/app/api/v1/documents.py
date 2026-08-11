@@ -391,7 +391,19 @@ def _get_file_bytes(d) -> bytes | None:
 
 
 @router.get("/{doc_id}/download")
-def download(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def download(doc_id: int, token: str = "", db: Session = Depends(get_db)):
+    user = None
+    if token:
+        try:
+            from jose import jwt as _jwt
+            from ...core.security import SECRET_KEY, ALGORITHM
+            payload = _jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            uid = int(payload.get("sub"))
+            user = db.get(User, uid)
+        except Exception:
+            pass
+    if not user:
+        raise HTTPException(401, "认证失败")
     d = db.get(Document, doc_id)
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
@@ -414,7 +426,19 @@ def download(doc_id: int, db: Session = Depends(get_db), user: User = Depends(ge
 
 
 @router.get("/{doc_id}/preview")
-def preview(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def preview(doc_id: int, token: str = "", db: Session = Depends(get_db)):
+    user = None
+    if token:
+        try:
+            from jose import jwt as _jwt
+            from ...core.security import SECRET_KEY, ALGORITHM
+            payload = _jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            uid = int(payload.get("sub"))
+            user = db.get(User, uid)
+        except Exception:
+            pass
+    if not user:
+        raise HTTPException(401, "认证失败")
     d = db.get(Document, doc_id)
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
