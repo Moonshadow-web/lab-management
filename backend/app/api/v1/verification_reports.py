@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
-from ...core.security import get_current_user, auth_with_url_token_fallback
+from ...core.security import get_current_user
 from ...core.storage import storage
 from ...models.report_archive import ReportArchive
 from ...models.user import User
@@ -92,11 +92,9 @@ def generate_report(
 @router.get("/{report_id}/download")
 def download_report(
     report_id: int,
-    token: str = "",
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    """支持 URL token 参数认证。"""
-    user = auth_with_url_token_fallback(token, db)
     rec = db.get(VerificationReport, report_id)
     if not rec or not rec.report_file_path:
         raise HTTPException(status_code=404, detail="报告尚未生成")
