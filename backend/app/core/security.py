@@ -100,6 +100,7 @@ def try_decode_url_token(token: str, db: "Session") -> "User | None":
     浏览器直接打开 URL 时不会发送 Authorization header，需从 URL 参数 `?token=xxx`
     读取 access_token 解码认证。
     """
+    from ...models.user import User
     if not token:
         return None
     try:
@@ -114,27 +115,10 @@ def try_decode_url_token(token: str, db: "Session") -> "User | None":
 
 
 def auth_with_url_token_fallback(token: str, db: "Session") -> "User":
-    """辅助函数：先 URL token 认证，失败再 Authorization header，失败则 401。
-
-    用法：
-        def my_download(..., token: str = "", db: Session = Depends(get_db)):
-            user = auth_with_url_token_fallback(token, db)
-            ...
-    """
+    """辅助函数：先 URL token 认证，失败则 401。"""
     from fastapi import HTTPException
-    from fastapi.security import OAuth2PasswordBearer
+    from ...models.user import User
     user = try_decode_url_token(token, db)
-    if not user:
-        # 再尝试 Authorization header（手动解析避免 Depends 抛 401）
-        try:
-            # 这里仅作回退：实际接口通常已用 Bearer header 走 axios 拦截器
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            uid = int(payload.get("sub"))
-            user = db.get(User, uid)
-            if user and user.is_active:
-                return user
-        except Exception:
-            pass
     if not user:
         raise HTTPException(401, "认证失败")
     return user
