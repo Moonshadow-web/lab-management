@@ -150,7 +150,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Delete, Printer } from '@element-plus/icons-vue'
 import {
   listReagentReceivings, createReagentReceiving, getReagentReceiving,
-  updateReagentReceiving, confirmReagentReceiving, deleteReagentReceiving, listAllReagentItems, listReagentItems,
+  updateReagentReceiving, confirmReagentReceiving, deleteReagentReceiving,
+  listAllReagentItems, listReagentItems, getReagentItem,
 } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
 import { useReagentStore } from '../../store/reagent'
@@ -222,6 +223,16 @@ async function onEdit(row) {
       item_id: it.item_id, batch_no: it.batch_no, expiry_date: it.expiry_date, quantity: it.quantity,
     }))
     await loadItems()
+    // 补充当前库下拉中缺失的试剂（跨库混单或切库后，原明细试剂可能不在当前库）
+    const missingIds = [...new Set(items.value
+      .map(it => it.item_id)
+      .filter(id => id && !allItems.value.some(x => x.id === id)))]
+    if (missingIds.length) {
+      const filled = await Promise.all(missingIds.map(id => getReagentItem(id).catch(() => null)))
+      for (const it of filled) {
+        if (it) allItems.value.push(it)
+      }
+    }
     dialogVisible.value = true
   } catch (e) { ElMessage.error('加载失败：' + errText(e)) }
 }
