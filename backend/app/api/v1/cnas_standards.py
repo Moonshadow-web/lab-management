@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -157,7 +157,7 @@ def upload_standard(
 
 
 @router.get("/{std_id}/preview")
-def preview_standard(std_id: int, token: str = "", db: Session = Depends(get_db)):
+def preview_standard(std_id: int, request: Request, token: str = "", db: Session = Depends(get_db)):
     user = None
     if token:
         try:
@@ -168,6 +168,17 @@ def preview_standard(std_id: int, token: str = "", db: Session = Depends(get_db)
             user = db.get(User, uid)
         except Exception:
             pass
+    if not user:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                from jose import jwt as _jwt
+                from ...core.security import SECRET_KEY, ALGORITHM
+                payload = _jwt.decode(auth[7:], SECRET_KEY, algorithms=[ALGORITHM])
+                uid = int(payload.get("sub"))
+                user = db.get(User, uid)
+            except Exception:
+                pass
     if not user:
         raise HTTPException(401, "认证失败")
     s = db.get(CnasStandard, std_id)
@@ -198,6 +209,17 @@ def download_standard(std_id: int, token: str = "", db: Session = Depends(get_db
             user = db.get(User, uid)
         except Exception:
             pass
+    if not user:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                from jose import jwt as _jwt
+                from ...core.security import SECRET_KEY, ALGORITHM
+                payload = _jwt.decode(auth[7:], SECRET_KEY, algorithms=[ALGORITHM])
+                uid = int(payload.get("sub"))
+                user = db.get(User, uid)
+            except Exception:
+                pass
     if not user:
         raise HTTPException(401, "认证失败")
     s = db.get(CnasStandard, std_id)

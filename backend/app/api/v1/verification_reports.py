@@ -92,6 +92,7 @@ def generate_report(
 @router.get("/{report_id}/download")
 def download_report(
     report_id: int,
+    request: Request,
     token: str = "",
     db: Session = Depends(get_db),
 ):
@@ -105,6 +106,17 @@ def download_report(
             user = db.get(User, uid)
         except Exception:
             pass
+    if not user:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                from jose import jwt as _jwt
+                from ...core.security import SECRET_KEY, ALGORITHM
+                payload = _jwt.decode(auth[7:], SECRET_KEY, algorithms=[ALGORITHM])
+                uid = int(payload.get("sub"))
+                user = db.get(User, uid)
+            except Exception:
+                pass
     if not user:
         raise HTTPException(401, "认证失败")
     rec = db.get(VerificationReport, report_id)

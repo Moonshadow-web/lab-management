@@ -530,9 +530,34 @@ def upload_calibration_report(
 def download_calibration_report(
     instrument_id: int,
     rec_id: int,
+    request: Request,
     token: str = "",
     db: Session = Depends(get_db),
 ):
+    """下载 / 预览校准报告。支持 URL token + Authorization header 双认证。"""
+    user = None
+    if token:
+        try:
+            from jose import jwt as _jwt
+            from ...core.security import SECRET_KEY, ALGORITHM
+            payload = _jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            uid = int(payload.get("sub"))
+            user = db.get(User, uid)
+        except Exception:
+            pass
+    if not user:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                from jose import jwt as _jwt
+                from ...core.security import SECRET_KEY, ALGORITHM
+                payload = _jwt.decode(auth[7:], SECRET_KEY, algorithms=[ALGORITHM])
+                uid = int(payload.get("sub"))
+                user = db.get(User, uid)
+            except Exception:
+                pass
+    if not user:
+        raise HTTPException(status_code=401, detail="认证失败")
     """下载 / 预览校准报告（返回文件流，前端按扩展名决定预览或下载）。
     支持 URL token 参数认证（不依赖 security.py helper，内嵌解码）。"""
     user = None

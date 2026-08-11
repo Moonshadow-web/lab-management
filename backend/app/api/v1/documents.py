@@ -391,7 +391,7 @@ def _get_file_bytes(d) -> bytes | None:
 
 
 @router.get("/{doc_id}/download")
-def download(doc_id: int, token: str = "", db: Session = Depends(get_db)):
+def download(doc_id: int, request: Request, token: str = "", db: Session = Depends(get_db)):
     user = None
     if token:
         try:
@@ -402,6 +402,17 @@ def download(doc_id: int, token: str = "", db: Session = Depends(get_db)):
             user = db.get(User, uid)
         except Exception:
             pass
+    if not user:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                from jose import jwt as _jwt
+                from ...core.security import SECRET_KEY, ALGORITHM
+                payload = _jwt.decode(auth[7:], SECRET_KEY, algorithms=[ALGORITHM])
+                uid = int(payload.get("sub"))
+                user = db.get(User, uid)
+            except Exception:
+                pass
     if not user:
         raise HTTPException(401, "认证失败")
     d = db.get(Document, doc_id)
@@ -426,8 +437,9 @@ def download(doc_id: int, token: str = "", db: Session = Depends(get_db)):
 
 
 @router.get("/{doc_id}/preview")
-def preview(doc_id: int, token: str = "", db: Session = Depends(get_db)):
+def preview(doc_id: int, request: Request, token: str = "", db: Session = Depends(get_db)):
     user = None
+    # 1) URL token 参数
     if token:
         try:
             from jose import jwt as _jwt
@@ -437,6 +449,18 @@ def preview(doc_id: int, token: str = "", db: Session = Depends(get_db)):
             user = db.get(User, uid)
         except Exception:
             pass
+    # 2) Authorization header（前端 axios 自动注入）
+    if not user:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                from jose import jwt as _jwt
+                from ...core.security import SECRET_KEY, ALGORITHM
+                payload = _jwt.decode(auth[7:], SECRET_KEY, algorithms=[ALGORITHM])
+                uid = int(payload.get("sub"))
+                user = db.get(User, uid)
+            except Exception:
+                pass
     if not user:
         raise HTTPException(401, "认证失败")
     d = db.get(Document, doc_id)

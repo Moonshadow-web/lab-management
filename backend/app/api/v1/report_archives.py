@@ -95,10 +95,11 @@ async def upload_archive(
 @router.get("/{aid}/download")
 def download_archive(
     aid: int,
+    request: Request,
     token: str = "",
     db: Session = Depends(get_db),
 ):
-    """支持 URL token 参数认证（window.open/iframe 直接访问）。"""
+    """支持 URL token + Authorization header 双认证。"""
     user = None
     if token:
         try:
@@ -109,6 +110,17 @@ def download_archive(
             user = db.get(User, uid)
         except Exception:
             pass
+    if not user:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                from jose import jwt as _jwt
+                from ...core.security import SECRET_KEY, ALGORITHM
+                payload = _jwt.decode(auth[7:], SECRET_KEY, algorithms=[ALGORITHM])
+                uid = int(payload.get("sub"))
+                user = db.get(User, uid)
+            except Exception:
+                pass
     if not user:
         raise HTTPException(status_code=401, detail="认证失败")
     rec = db.get(ReportArchive, aid)
