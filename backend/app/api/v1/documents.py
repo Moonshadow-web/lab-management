@@ -117,7 +117,11 @@ def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_curr
                         if len(k) < 3 or len(core) < 3:
                             continue
                         k_nh = k.replace("-", "")
-                        if core in k or k in core or core_nh in k_nh or k_nh in core_nh:
+                        # 禁止 k in core（避免短别名被长核心名误含：如「丙氨酸」in「丙氨酸氨基转移酶」）
+                        # 改为要求 k 和 core 长度比例 ≥ 60%，防止短别名污染
+                        if len(k) < len(core) * 0.6 and len(core) < len(k) * 1.5:
+                            continue
+                        if core in k or core_nh in k_nh:
                             best = it
                             break
                     if best:
