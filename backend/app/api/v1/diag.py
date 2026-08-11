@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "cnas-vrf-inline-token-2026-08-11"
+_BUILD_MARK = "calibration-cos-persist-2026-08-12"
 
 
 def get_build_mark() -> str:

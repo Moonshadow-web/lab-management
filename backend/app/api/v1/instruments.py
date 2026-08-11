@@ -15,6 +15,7 @@ from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
 from ...core.security import decode_token, get_current_user
 from ...core.storage import storage
+from ...core.cos_storage import cos_storage
 from ...core.doc_convert import convert_doc_bytes_to_docx
 from ...models.instrument import CalibrationRecord, Instrument, InstrumentRepair
 from ...models.instrument_archive import InstrumentArchive
@@ -472,10 +473,20 @@ def _get_calibration(db: Session, instrument_id: int, rec_id: int):
 
 
 def _report_storage_path(rec: CalibrationRecord) -> Path | None:
+    """本地有限 → COS 兜底获取报告字节。不存在返回 None。"""
     if not rec.report_file_path:
         return None
+    # 1) 本地磁盘
     p = storage.get_path(rec.report_file_path)
-    return p if p.exists() else None
+    if p.exists():
+        return p
+    # 2) COS 兜底：下载字节 → 缓存到本地 → 返回路径
+    content = cos_storage.get_bytes(rec.report_file_path)
+    if content:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(content)
+        return p
+    return None
 
 
 @router.post("/{instrument_id}/calibrations/{rec_id}/report", status_code=201)
@@ -494,7 +505,11 @@ def upload_calibration_report(
     if not content:
         raise HTTPException(status_code=400, detail="文件内容为空")
     content, stored_name, file_ext, original_filename = _maybe_convert_doc(file.filename, content)
-    rel = storage.save("calibration_reports", stored_name, content)
+    # COS 持久化替代本地磁盘（容器重启不丢）
+    if cos_storage.ready:
+        rel = cos_storage.save("calibration_reports", stored_name, content)
+    else:
+        rel = storage.save("calibration_reports", stored_name, content)
     # 替换旧报告文件
     if rec.report_file_path:
         storage.delete(rec.report_file_path)
