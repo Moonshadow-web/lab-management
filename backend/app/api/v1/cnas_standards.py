@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.security import get_current_user, require_roles
+from ...core.security import get_current_user, require_roles, auth_with_url_token_fallback
 from ...core.cos_storage import cos_storage
 from ...models.user import User
 from ...models.cnas_standard import CnasStandard
@@ -157,7 +157,8 @@ def upload_standard(
 
 
 @router.get("/{std_id}/preview")
-def preview_standard(std_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def preview_standard(std_id: int, token: str = "", db: Session = Depends(get_db)):
+    user = auth_with_url_token_fallback(token, db)
     s = db.get(CnasStandard, std_id)
     if not s:
         raise HTTPException(status_code=404, detail="未找到文件")
@@ -175,7 +176,8 @@ def preview_standard(std_id: int, db: Session = Depends(get_db), user: User = De
 
 
 @router.get("/{std_id}/download")
-def download_standard(std_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def download_standard(std_id: int, token: str = "", db: Session = Depends(get_db)):
+    user = auth_with_url_token_fallback(token, db)
     s = db.get(CnasStandard, std_id)
     if not s:
         raise HTTPException(status_code=404, detail="未找到文件")

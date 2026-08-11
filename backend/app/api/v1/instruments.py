@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from ...core.config import ALGORITHM, SECRET_KEY
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
-from ...core.security import decode_token, get_current_user
+from ...core.security import decode_token, get_current_user, auth_with_url_token_fallback
 from ...core.storage import storage
 from ...core.doc_convert import convert_doc_bytes_to_docx
 from ...models.instrument import CalibrationRecord, Instrument, InstrumentRepair
@@ -515,10 +515,11 @@ def upload_calibration_report(
 def download_calibration_report(
     instrument_id: int,
     rec_id: int,
+    token: str = "",
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
-    """下载 / 预览校准报告（返回文件流，前端按扩展名决定预览或下载）。"""
+    """下载 / 预览校准报告（返回文件流，前端按扩展名决定预览或下载）。支持 URL token 参数认证。"""
+    user = auth_with_url_token_fallback(token, db)
     rec = _get_calibration(db, instrument_id, rec_id)
     if not rec:
         raise HTTPException(status_code=404, detail="未找到校准记录")

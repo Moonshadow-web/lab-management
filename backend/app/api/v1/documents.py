@@ -10,7 +10,7 @@ import re
 
 from ...core.crud_base import paginate, write_audit
 from ...core.database import get_db
-from ...core.security import get_current_user, require_roles
+from ...core.security import get_current_user, require_roles, auth_with_url_token_fallback
 from ...core.storage import storage
 from ...core.cos_storage import cos_storage
 from ...core.docmeta import parse_doc_metadata
@@ -391,7 +391,8 @@ def _get_file_bytes(d) -> bytes | None:
 
 
 @router.get("/{doc_id}/download")
-def download(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def download(doc_id: int, token: str = "", db: Session = Depends(get_db)):
+    user = auth_with_url_token_fallback(token, db)
     d = db.get(Document, doc_id)
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
@@ -414,7 +415,8 @@ def download(doc_id: int, db: Session = Depends(get_db), user: User = Depends(ge
 
 
 @router.get("/{doc_id}/preview")
-def preview(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def preview(doc_id: int, token: str = "", db: Session = Depends(get_db)):
+    user = auth_with_url_token_fallback(token, db)
     d = db.get(Document, doc_id)
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
