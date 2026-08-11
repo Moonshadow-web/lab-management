@@ -515,10 +515,23 @@ def upload_calibration_report(
 def download_calibration_report(
     instrument_id: int,
     rec_id: int,
+    token: str = "",
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
-    """下载 / 预览校准报告（返回文件流，前端按扩展名决定预览或下载）。"""
+    """下载 / 预览校准报告（返回文件流，前端按扩展名决定预览或下载）。
+    支持 URL token 参数认证（不依赖 security.py helper，内嵌解码）。"""
+    user = None
+    if token:
+        try:
+            from jose import jwt as _jwt
+            from ...core.security import SECRET_KEY, ALGORITHM
+            payload = _jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            uid = int(payload.get("sub"))
+            user = db.get(User, uid)
+        except Exception:
+            pass
+    if not user:
+        raise HTTPException(status_code=401, detail="认证失败")
     rec = _get_calibration(db, instrument_id, rec_id)
     if not rec:
         raise HTTPException(status_code=404, detail="未找到校准记录")
