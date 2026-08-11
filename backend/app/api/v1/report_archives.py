@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user
-from ...core.storage import storage
+from ...core.storage import storage, persist_save, persist_delete
 from ...models.report_archive import ReportArchive
 from ...models.user import User
 from ...schemas import (
@@ -66,7 +66,7 @@ async def upload_archive(
     if parsed_info:
         project_name = parsed_info.get("project_name") or project_name
         report_type = parsed_info.get("report_type") or report_type
-    rel = storage.save("report_archives", safe, body)
+    rel = persist_save("report_archives", safe, body)
     rec = ReportArchive(
         project_name=project_name or "未命名",
         report_type=report_type,

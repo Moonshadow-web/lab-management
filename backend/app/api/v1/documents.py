@@ -11,7 +11,7 @@ import re
 from ...core.crud_base import paginate, write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
-from ...core.storage import storage
+from ...core.storage import storage, persist_save, persist_delete
 from ...core.cos_storage import cos_storage
 from ...core.docmeta import parse_doc_metadata
 from ...models.document import Document, DocumentVersion, DOC_CATEGORIES
@@ -269,7 +269,7 @@ def upload_document(
     content = file.file.read()
     if not content:
         raise HTTPException(status_code=400, detail="文件内容为空")
-    rel = storage.save("docs", file.filename or title or "file", content)
+    rel = persist_save("docs", file.filename or title or "file", content)
     # 文件字节存 COS 云存储（不占 DB 内存），cloud_key 落库；磁盘仅兜底
     cloud_key = None
     if cos_storage.ready:
@@ -317,7 +317,7 @@ def new_version(
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
     content = file.file.read()
-    rel = storage.save("docs", file.filename or d.title, content)
+    rel = persist_save("docs", file.filename or d.title, content)
     # COS 上传
     cloud_key = None
     if cos_storage.ready:
@@ -624,7 +624,7 @@ def delete_document(
     # 记录作废日志（删除前捕获名称/编码）
     _log_change(db, d, "作废", user.full_name or user.username)
     if d.file_path:
-        storage.delete(d.file_path)
+        persist_delete(d.file_path)
     db.delete(d)
     db.commit()
     write_audit(db, user, "delete", "documents", doc_id, "", request.client.host if request.client else None)

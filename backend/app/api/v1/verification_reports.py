@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user
-from ...core.storage import storage
+from ...core.storage import storage, persist_save, persist_delete
 from ...models.report_archive import ReportArchive
 from ...models.user import User
 from ...models.verification_report import VerificationReport
@@ -68,7 +68,7 @@ def generate_report(
     except Exception as e:  # noqa: BLE001 模板/数据异常向上暴露
         raise HTTPException(status_code=400, detail=f"生成报告失败：{e}")
     fname = f"{rec.project_name or '项目'}_性能验证_{rec.report_type}.xlsx"
-    rel = storage.save("verification_reports", fname, xlsx_bytes)
+    rel = persist_save("verification_reports", fname, xlsx_bytes)
     rec.report_file_path = rel
     # 自动归档到 report_archives（生成来源）
     arch = ReportArchive(

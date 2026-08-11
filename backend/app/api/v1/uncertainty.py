@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user
-from ...core.storage import storage
+from ...core.storage import storage, persist_save, persist_delete
 from ...models.report_archive import ReportArchive
 from ...models.uncertainty import UncertaintyAssessment
 from ...models.user import User
@@ -120,7 +120,7 @@ def batch_uncertainty(
         try:
             html = build_uncertainty_html(payload)
             fname = f"{rec.project_name or '项目'}_测量不确定度_{rec.id}.html"
-            rel = storage.save("uncertainty_reports", fname, html)
+            rel = persist_save("uncertainty_reports", fname, html)
             rec.report_file_path = rel
             arch = ReportArchive(
                 project_name=rec.project_name,
@@ -153,7 +153,7 @@ def batch_uncertainty(
                 "l1_passed": r.l1_passed, "l2_passed": r.l2_passed,
             } for r in valid_records])
             sname = f"测量不确定度汇总表_{datetime.now().strftime('%Y%m%d')}.html"
-            srel = storage.save("uncertainty_reports", sname, summary_html)
+            srel = persist_save("uncertainty_reports", sname, summary_html)
             arch_sum = ReportArchive(
                 project_name="汇总表",
                 report_type="uncertainty",
@@ -195,7 +195,7 @@ def generate_uncertainty(
     payload = {c.name: getattr(rec, c.name) for c in rec.__table__.columns}
     html = build_uncertainty_html(payload)
     fname = f"{rec.project_name or '项目'}_测量不确定度_{rec.id}.html"
-    rel = storage.save("uncertainty_reports", fname, html)
+    rel = persist_save("uncertainty_reports", fname, html)
     rec.report_file_path = rel
     # 归档
     arch = ReportArchive(

@@ -14,7 +14,7 @@ from ...core.config import ALGORITHM, SECRET_KEY
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
 from ...core.security import decode_token, get_current_user
-from ...core.storage import storage
+from ...core.storage import storage, persist_save, persist_delete
 from ...core.cos_storage import cos_storage
 from ...core.doc_convert import convert_doc_bytes_to_docx
 from ...models.instrument import CalibrationRecord, Instrument, InstrumentRepair
@@ -649,10 +649,10 @@ def upload_archive(
     if not content:
         raise HTTPException(status_code=400, detail="文件内容为空")
     content, stored_name, file_ext, original_filename = _maybe_convert_doc(file.filename, content)
-    rel = storage.save("instrument_archives", stored_name, content)
+    rel = persist_save("instrument_archives", stored_name, content)
     old = _get_archive(db, instrument_id)
     if old:
-        storage.delete(old.filename)
+        persist_delete(old.filename)
         db.delete(old)
         db.commit()
     rec = InstrumentArchive(
@@ -770,10 +770,10 @@ def import_archives_folder(
             skipped.append(f"{f}（空文件）")
             continue
         content, stored_name, file_ext, original_filename = _maybe_convert_doc(f, content)
-        rel = storage.save("instrument_archives", stored_name, content)
+        rel = persist_save("instrument_archives", stored_name, content)
         old = _get_archive(db, matched.id)
         if old:
-            storage.delete(old.filename)
+            persist_delete(old.filename)
             db.delete(old)
             db.commit()
         db.add(

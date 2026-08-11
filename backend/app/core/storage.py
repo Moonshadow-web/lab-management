@@ -76,3 +76,51 @@ class LocalStorageBackend(StorageBackend):
 
 # 根据配置选择后端（上云时在此切换为 CloudStorageBackend）
 storage: StorageBackend = LocalStorageBackend(UPLOAD_ROOT)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  持久化安全助手 —— 本地 + COS 双写 / COS 兜底
+#  防止容器重启时本地磁盘清空导致文件丢失（2026-08-11 血泪教训）
+# ═══════════════════════════════════════════════════════════════
+
+def _cos():
+    """按需导入 cos_storage，避免循环引用。"""
+    from .cos_storage import cos_storage
+    return cos_storage
+
+
+def persist_save(module: str, filename: str, content: bytes) -> str:
+    """本地存储 + COS 同步双写。返回本地相对路径。"""
+    rel = storage.save(module, filename, content)
+    cs = _cos()
+    if cs.ready:
+        try:
+            cs.save(module, Path(rel).name, content)
+        except Exception:
+            pass
+    return rel
+
+
+def persist_get_path(relative: str) -> Path:
+    """读取本地路径 → 不存在则从 COS 恢复。"""
+    p = storage.get_path(relative)
+    if p.exists():
+        return p
+    cs = _cos()
+    if cs.ready:
+        content = cs.get_bytes(relative)
+        if content:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(content)
+    return p
+
+
+def persist_delete(relative: str) -> None:
+    """删除本地 + COS 双清。"""
+    storage.delete(relative)
+    cs = _cos()
+    if cs.ready:
+        try:
+            cs.delete(relative)
+        except Exception:
+            pass

@@ -205,7 +205,7 @@ def parse_and_store(file_bytes: bytes, db_session, user, request_ip: str) -> dic
         dict：{id, project_name, archive_id}
     """
     from ...core.crud_base import write_audit
-    from ...core.storage import storage
+    from ...core.storage import storage, persist_save
     from ...models.report_archive import ReportArchive
     from ...models.verification_report import VerificationReport
 
@@ -242,7 +242,7 @@ def parse_and_store(file_bytes: bytes, db_session, user, request_ip: str) -> dic
 
     # 归档
     fname = f"{rec.project_name or '项目'}_性能验证_uploaded.xlsx"
-    rel = storage.save("verification_reports", fname, file_bytes)
+    rel = persist_save("verification_reports", fname, file_bytes)
     rec.report_file_path = rel
     arch = ReportArchive(
         project_name=rec.project_name,
