@@ -101,7 +101,6 @@ def _fill_summary(wb, d):
     _set(s, 8, 2, d.get("qc", ""))
     _set(s, 9, 2, d.get("operator", ""))
     _set(s, 10, 2, d.get("verify_date", ""))
-    _set(s, 11, 2, d.get("verify_date", ""))
     _set(s, 3, 7, d.get("instrument_model", ""))
     _set(s, 4, 7, d.get("instrument_no", ""))
     _set(s, 5, 7, d.get("tea", ""))
@@ -128,26 +127,25 @@ def _fill_summary(wb, d):
     if content:
         _set(s, 14, 2, content + "。")
 
-    # 各验证项结果与结论行（覆盖公式，保证不重算也正确）
-    row_map = {
-        "precision": (17, 18),  # 定量 R17-18 精密度；定性 R17-18 精密度
-        "conformity": (19, 20),  # 定性 符合率
-        "lod": (21, 21),
-        "trueness": (20, 20),
-        "linearity": (21, 21),
-        "reportable": (22, 23),
-        "reference": (24, 25),
-        "specificity": (26, 26),
-    }
-    for key, (r1, r2) in row_map.items():
-        item = rs.get(key) or {}
+    # 各验证项结果与结论行：按行逐一填充（precision1/precision2 由 _auto_fill_result_summary 填入）
+    entries = [
+        (17, "precision1"), (18, "precision2"),  # 精密度 批内/实验室内
+        (19, "conformity1"), (20, "conformity2"), # 定性 符合率
+        (21, "lod"), (21, "trueness"),            # 检出限/正确度 同 R21
+        (21, "linearity"),                        # 线性范围 R21
+        (22, "reportable1"), (23, "reportable2"), # 可报告 低/高
+        (24, "reference"),                        # 参考范围
+        (26, "specificity"),                      # 分析特异性
+    ]
+    for r, sub in entries:
+        item = rs.get(sub) or {}
+        # 回退到自动匹配主键（如 sub="trueness"，和 rs.trueness 一致）
         text = item.get("result", "")
         concl = item.get("conclusion", "")
-        for r in range(r1, r2 + 1):
-            if text:
-                _set(s, r, 6, text)   # F 列（验证结果文本）
-            if concl:
-                _set(s, r, 8, concl)  # H 列（验证结论）
+        if text:
+            _set(s, r, 6, text)   # F 列（验证结果文本）
+        if concl:
+            _set(s, r, 8, concl)  # H 列（验证结论）
     # 评价结论
     if d.get("conclusion"):
         for r in (24, 25):
