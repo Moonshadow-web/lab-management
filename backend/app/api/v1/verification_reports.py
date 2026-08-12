@@ -124,7 +124,10 @@ def generate_report(
     from ...services.verification_report_gen import build_verification_report
     try:
         data = _serialize_report(rec)
-        _auto_fill_result_summary(data)
+        data = _auto_fill_result_summary(data)
+        # 自动填的新字段写回数据库
+        rec.result_summary = json.dumps(data["result_summary"], ensure_ascii=False)
+        db.commit()
         xlsx_bytes = build_verification_report(data)
     except Exception as e:  # noqa: BLE001 模板/数据异常向上暴露
         raise HTTPException(status_code=400, detail=f"生成报告失败：{e}")
