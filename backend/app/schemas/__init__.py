@@ -64,6 +64,7 @@ class TestItemBase(BaseModel):
     calibrator: str = ""
     traceability: str = ""
     brand: str = ""
+    manual_doc_ids: str = ""  # JSON 数组，关联说明书 document ids
     last_update: str = ""
     interference_hemolysis: str = ""
     interference_bilirubin: str = ""

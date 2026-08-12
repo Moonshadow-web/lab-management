@@ -79,9 +79,9 @@ def _manual_core(title: str) -> str:
 def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """返回全部「项目说明书」文档，并归一化匹配到项目查询(test_items)，
     供项目卡片点击预览。每项含 linked_project（关联项目名）与 brand（品牌）。"""
-    items = db.query(TestItem.id, TestItem.name, TestItem.aliases, TestItem.brand).all()
+    items = db.query(TestItem.id, TestItem.name, TestItem.aliases, TestItem.brand, TestItem.manual_doc_ids).all()
     index = []
-    for _tid, name, aliases, brand in items:
+    for _tid, name, aliases, brand, manual_doc_ids in items:
         keys = {_norm(name)}
         for part in re.split(r"[、,，/]", name):
             p = part.strip()
@@ -92,7 +92,7 @@ def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_curr
                 seg = seg.strip()
                 if seg:
                     keys.add(_norm(seg))
-        index.append({"oname": name or "", "nname": _norm(name), "brand": brand or "", "keys": keys})
+        index.append({"oname": name or "", "nname": _norm(name), "brand": brand or "", "keys": keys, "tid": _tid, "mdoc_ids_str": manual_doc_ids or ""})
 
     docs = (
         db.query(Document.id, Document.title, Document.original_filename)
@@ -103,7 +103,18 @@ def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_curr
     for did, title, fn in docs:
         core = _manual_core(title)
         best = None
-        if core:
+        # 0) 优先通过 manual_doc_ids 显式关联（直接按 doc id 匹配）
+        for it in index:
+            mdocs = it.get("mdoc_ids_str", "")
+            if mdocs:
+                try:
+                    mdoc_list = json.loads(mdocs)
+                    if did in mdoc_list:
+                        best = it
+                        break
+                except Exception:
+                    pass
+        if core and not best:
             core_nh = core.replace("-", "")
             # 1) 精确命中 名称/别名（含拆分片段）：如「磷」「pct」「高敏肌钙蛋白I」
             for it in index:

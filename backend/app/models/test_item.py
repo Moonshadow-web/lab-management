@@ -28,6 +28,7 @@ class TestItem(Base):
     calibrator: Mapped[str] = mapped_column(String(100), default="")
     traceability: Mapped[str] = mapped_column(String(200), default="")
     brand: Mapped[str] = mapped_column(String(50), default="")  # 品牌标识（显式存储，优先于从校准品推导）
+    manual_doc_ids: Mapped[str] = mapped_column(Text, default="")  # 关联的项目说明书 document ids（JSON 数组，如 "[94,99]"）
     last_update: Mapped[str] = mapped_column(String(50), default="")
     interference_hemolysis: Mapped[str] = mapped_column(String(100), default="")
     interference_bilirubin: Mapped[str] = mapped_column(String(100), default="")

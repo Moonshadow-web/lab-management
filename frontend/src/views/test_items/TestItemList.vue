@@ -375,6 +375,7 @@ const editingId = ref(null)
 const submitting = ref(false)
 const fileInput = ref(null)
 
+const manualDocOptions = ref([])
 const fields = [
   { prop: 'code', label: '项目编号' },
   { prop: 'name', label: '项目名称' },
@@ -386,6 +387,7 @@ const fields = [
     { label: '其他', value: '其他' },
   ] },
   { prop: 'brand', label: '品牌', placeholder: '如：沃文特、英科新创' },
+  { prop: 'manual_doc_ids', label: '关联说明书', type: 'select', get options() { return manualDocOptions.value }, multiple: true, placeholder: '勾选关联的项目说明书（可多选）' },
   { prop: 'specimen', label: '标本类型', type: 'select', options: [
     { label: '血清', value: '血清' },
     { label: '血浆', value: '血浆' },
@@ -421,12 +423,18 @@ const emptyForm = () => ({
   code: '', name: '', aliases: '', category: '', specimen: '', method: '',
   unit: '', reference: '', fee: '', instrument: '', instrument_group: '',
   linear_range: '', dilution_fold: '', reportable_range: '', diluent: '',
-  calibrator: '', traceability: '', last_update: '',
+  calibrator: '', traceability: '', brand: '', last_update: '',
   interference_hemolysis: '', interference_bilirubin: '', interference_lipemia: '',
+  manual_doc_ids: [],
 })
 const form = reactive(emptyForm())
 
-onMounted(() => {
+onMounted(async () => {
+  // 加载说明书选项供编辑时关联
+  try {
+    const manuals = await listProjectManuals()
+    manualDocOptions.value = manuals.map(m => ({ label: (m.brand||'') + ' ' + m.title, value: m.id }))
+  } catch {}
   // 从仪器档案「对应项目」点击跳转而来：?q=项目名 时自动按关键词搜索定位
   const q = route.query.q
   if (q) query.keyword = String(q)
@@ -710,17 +718,20 @@ function onAdd() {
   dialogVisible.value = true
 }
 function onEdit(row) {
-  Object.assign(form, emptyForm(), row)
+  const r = { ...row }
+  try { if (r.manual_doc_ids && typeof r.manual_doc_ids === 'string') r.manual_doc_ids = JSON.parse(r.manual_doc_ids) } catch { r.manual_doc_ids = [] }
+  Object.assign(form, emptyForm(), r)
   editingId.value = row.id
   dialogVisible.value = true
 }
 async function onSubmit() {
   submitting.value = true
   try {
+    const payload = { ...form, manual_doc_ids: JSON.stringify(form.manual_doc_ids || []) }
     if (editingId.value) {
-      await updateTestItem(editingId.value, { ...form })
+      await updateTestItem(editingId.value, payload)
     } else {
-      await createTestItem({ ...form })
+      await createTestItem(payload)
     }
     ElMessage.success('已保存')
     dialogVisible.value = false
