@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "debug-manuals-v2-2026-08-12"
+_BUILD_MARK = "debug-match-v3-2026-08-12"
 
 
 def get_build_mark() -> str:
@@ -157,18 +157,41 @@ def diag_build():
 
 @router.get("/_debug_manuals")
 def _debug_manuals():
-    """调试：检查 manual_doc_ids 是否真正写入数据库。"""
+    """调试：模拟 listProjectManuals 匹配逻辑。"""
+    import json as _json
     from ...core.database import SessionLocal
     from ...models.test_item import TestItem
+    from ...models.document import Document
     db = SessionLocal()
     try:
         items = db.query(TestItem.id, TestItem.name, TestItem.manual_doc_ids).all()
-        with_mdoc = [(i, n, m) for i, n, m in items if m]
-        return {
-            "total": len(items),
-            "with_manual_count": len(with_mdoc),
-            "with_manual": [{"id": i, "name": n, "mdoc": m} for i, n, m in with_mdoc[:10]],
-        }
+        # 模拟 listProjectManuals 的循环
+        index = []
+        for i, n, m in items:
+            index.append({"tid": i, "oname": n or "", "mdoc_ids_str": m or ""})
+        docs = db.query(Document.id, Document.title, Document.original_filename).filter(Document.category == "项目说明书").all()
+        out = []
+        for did, title, fn in docs:
+            best = None
+            # 优先 manual_doc_ids
+            for it in index:
+                mdocs = it.get("mdoc_ids_str", "")
+                if mdocs:
+                    try:
+                        mdoc_list = _json.loads(mdocs)
+                        if did in mdoc_list:
+                            best = it
+                            break
+                    except Exception:
+                        pass
+            out.append({"doc_id": did, "title": (title or "")[:50], "matched": best["oname"] if best else None})
+        # 找 HIV
+        for o in out:
+            if o["doc_id"] == 534 or '缺陷' in o.get("title",""):
+                print(o)
+        # return only relevant
+        relevant = [o for o in out if o["matched"] or '缺陷' in o.get("title","") or '丙肝' in o.get("title","") or '梅毒' in o.get("title","")]
+        return {"total_docs": len(out), "relevant": relevant[:20]}
     finally:
         db.close()
 
