@@ -433,7 +433,7 @@ onMounted(async () => {
   // 加载说明书选项供编辑时关联
   try {
     const manuals = await listProjectManuals()
-    manualDocOptions.value = manuals.map(m => ({ label: (m.brand||'') + ' ' + m.title, value: m.id }))
+    manualDocOptions.value = manuals.map(m => ({ label: (m.brand||'') + ' ' + m.title, value: m.id, ext: m.ext, is_pdf: m.is_pdf }))
   } catch {}
   // 从仪器档案「对应项目」点击跳转而来：?q=项目名 时自动按关键词搜索定位
   const q = route.query.q
@@ -491,7 +491,7 @@ function rowManuals(row) {
     const ids = typeof row.manual_doc_ids === 'string' ? JSON.parse(row.manual_doc_ids) : (row.manual_doc_ids || [])
     if (Array.isArray(ids)) {
       for (const opt of manualDocOptions.value || []) {
-        if (ids.includes(opt.value)) pushDoc({ id: opt.value, title: opt.label })
+        if (ids.includes(opt.value)) pushDoc({ id: opt.value, title: opt.label, ext: opt.ext, is_pdf: opt.is_pdf })
       }
     }
   } catch {}
