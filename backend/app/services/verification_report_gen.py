@@ -131,7 +131,8 @@ def _fill_summary(wb, d):
     entries = [
         (17, "precision1"), (18, "precision2"),  # 精密度 批内/实验室内
         (19, "conformity1"), (20, "conformity2"), # 定性 符合率
-        (21, "lod"), (21, "trueness"),            # 检出限/正确度 同 R21
+        (20, "trueness"),                         # 正确度 R20
+        (21, "lod"),                              # 检出限
         (21, "linearity"),                        # 线性范围 R21
         (22, "reportable1"), (23, "reportable2"), # 可报告 低/高
         (24, "reference"),                        # 参考范围
