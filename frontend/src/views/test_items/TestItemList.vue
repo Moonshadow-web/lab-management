@@ -735,7 +735,7 @@ async function onSubmit() {
     }
     ElMessage.success('已保存')
     dialogVisible.value = false
-    onSearch()
+    await Promise.all([onSearch(), fetchProjectManuals()])
   } catch (e) {
     ElMessage.error('保存失败')
   } finally {
