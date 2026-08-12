@@ -125,8 +125,14 @@ function conclusionRows(r) {
   const t = r.report_type || 'qualitative'
   const req = requirements[t] || requirements.qualitative
   const items = []
+  // 优先按 subKey 查（如 precision1/precision2/reportable1/2），缺失则按 content 查
   const add = (content, key) => {
-    const item = rs[key] || {}
+    let item = rs[key] || {}
+    if (!item.result && !item.conclusion) {
+      // 回退到 content 对应的 result_summary 项（正确度/线性/参考等单值字段）
+      const m = { '精密度':'precision','正确度':'trueness','线性范围':'linearity','可报告范围':'reportable','参考范围/区间':'reference','分析特异性':'specificity','方法符合率':'conformity','方法检出限':'lod' }
+      item = rs[m[content]] || {}
+    }
     items.push({ content, requirement: req[key] || '—', result: item.result || '', conclusion: item.conclusion || '' })
   }
   if (t === 'qualitative') {

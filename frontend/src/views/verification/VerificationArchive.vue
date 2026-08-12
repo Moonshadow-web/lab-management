@@ -465,7 +465,7 @@ const conclusionPreviewData = computed(() => {
     add('精密度', 'precision1', form.verify_items.includes('precision') ? `低值CV ${p0?.cvText||'—'} 高值CV ${p1?.cvText||'—'}` : '', '—')
     add('精密度', 'precision2', '—', '—')
     if (form.verify_items.includes('trueness')) add('正确度', 'trueness', `低值${form.data.trueness.levels[0]?.biasText||'—'} 高值${form.data.trueness.levels[1]?.biasText||'—'}`, '—')
-    if (form.verify_items.includes('linearity')) add('线性范围', 'linearity', `${form.data.linearity.points.filter(p=>p.v1||p.v2||p.v3).length}个浓度点`, '—')
+    if (form.verify_items.includes('linearity')) add('线性范围', 'linearity', `线性范围${form.linear_low||'—'}-${form.linear_high||'—'}`, '—')
     if (form.verify_items.includes('reportable')) { add('可报告范围', 'reportable1', form.data.reportable.note, '—'); add('可报告范围', 'reportable2', '—', '—') }
   }
   if (form.verify_items.includes('reference')) add('参考范围', 'reference', form.data.reference.note, '—')
@@ -477,7 +477,29 @@ const validationPassed = computed(() => true)
 function buildPayload() {
   computeAll()
   const rs = {}
-  conclusionPreviewData.value.forEach(r => { if (r.result !== '—') { const key = r.content; rs[r.content] = { result: r.result, conclusion: r._concl } } })
+  // 英文 content → key 映射
+  const keyMap = {
+    '精密度': 'precision', '正确度': 'trueness', '线性范围': 'linearity',
+    '可报告范围': 'reportable', '参考范围/区间': 'reference',
+    '参考范围': 'reference', '分析特异性': 'specificity',
+    '方法符合率': 'conformity', '方法检出限': 'lod',
+  }
+  conclusionPreviewData.value.forEach(r => {
+    if (r.result !== '—' || r._concl !== '—') {
+      const key = keyMap[r.content] || r.content
+      // 精密度有两行（precision1/precision2），按 subKey 写
+      if (r.content === '精密度') {
+        // precision1=批内CV; precision2=实验室内CV（暂用相同总体 CV，TODO 改进算法）
+        if (!rs.precision1) rs.precision1 = { result: r.result, conclusion: r._concl }
+        else if (!rs.precision2) rs.precision2 = { result: r.result, conclusion: r._concl }
+      } else if (r.content === '可报告范围') {
+        if (!rs.reportable1) rs.reportable1 = { result: r.result, conclusion: r._concl }
+        else if (!rs.reportable2) rs.reportable2 = { result: r.result, conclusion: r._concl }
+      } else {
+        rs[key] = { result: r.result, conclusion: r._concl }
+      }
+    }
+  })
   return {
     report_type: form.report_type, project_name: form.project_name, project_method: form.project_method, unit: form.unit,
     reagent: form.reagent, reagent_lot: form.reagent_lot, calibrator: form.calibrator, calibrator_lot: form.calibrator_lot,
