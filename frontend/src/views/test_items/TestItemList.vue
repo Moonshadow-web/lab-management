@@ -483,18 +483,29 @@ function rowManuals(row) {
   if (!row) return []
   const seen = new Set()
   const out = []
-  const push = (key) => {
+  const pushDoc = (d) => {
+    if (!seen.has(d.id)) { seen.add(d.id); out.push(d) }
+  }
+  // 1) 显式关联 manual_doc_ids（最高优先级）
+  try {
+    const ids = typeof row.manual_doc_ids === 'string' ? JSON.parse(row.manual_doc_ids) : (row.manual_doc_ids || [])
+    if (Array.isArray(ids)) {
+      for (const opt of manualDocOptions.value || []) {
+        if (ids.includes(opt.value)) pushDoc({ id: opt.value, title: opt.label })
+      }
+    }
+  } catch {}
+  // 2) 自动匹配的 manualMap（按项目名/别名）
+  const pushMap = (key) => {
     const arr = manualMap.value[key]
     if (!arr) return
-    for (const x of arr) {
-      if (!seen.has(x.id)) { seen.add(x.id); out.push(x) }
-    }
+    for (const x of arr) pushDoc(x)
   }
-  push(row.name)
+  pushMap(row.name)
   if (row.aliases) {
     for (const a of String(row.aliases).replace('，', ',').split(',')) {
       const key = a.trim()
-      if (key) push(key)
+      if (key) pushMap(key)
     }
   }
   return out
