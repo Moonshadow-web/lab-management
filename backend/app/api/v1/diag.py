@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "debug-manuals-2026-08-12"
+_BUILD_MARK = "debug-manuals-v2-2026-08-12"
 
 
 def get_build_mark() -> str:
@@ -158,8 +158,8 @@ def diag_build():
 @router.get("/_debug_manuals")
 def _debug_manuals():
     """调试：检查 manual_doc_ids 是否真正写入数据库。"""
-    from ..core.database import SessionLocal
-    from ..models.test_item import TestItem
+    from ...core.database import SessionLocal
+    from ...models.test_item import TestItem
     db = SessionLocal()
     try:
         items = db.query(TestItem.id, TestItem.name, TestItem.manual_doc_ids).all()
