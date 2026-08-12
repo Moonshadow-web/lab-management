@@ -41,7 +41,8 @@ def fill_cover(wb, d):
     """主封面：两模板同坐标（E20-E36）。"""
     cover = wb["主封面"]
     _set(cover, 20, 5, d.get("project_name", ""))
-    _set(cover, 22, 5, d.get("reagent", ""))
+    # R22 试剂厂家 → 厂家名（化学分析仪/试剂厂商通常相同）
+    _set(cover, 22, 5, d.get("instrument_manufacturer") or d.get("reagent", ""))
     _set(cover, 24, 5, d.get("instrument", ""))
     _set(cover, 26, 5, d.get("instrument_manufacturer", ""))
     _set(cover, 28, 5, d.get("instrument_model", ""))
@@ -92,24 +93,30 @@ def _fill_summary(wb, d):
     rtype = d.get("report_type", "qualitative")
     rs = d.get("result_summary") or {}
 
-    # 参数区（B 列左栏 / G 列右栏）
+    # 参数区（按模板实际行号：B/C/D/E/F 列为左栏 + G/H 列为右栏）
+    # R3=项目名称|仪器型号  R4=方法|编号  R5=单位|TEA  R6=试剂|批号
+    # R7=校准品|批号  R8=质控品|批号  R9=线性范围(low+-+high)|稀释倍数
+    # R10=操作人员|审核人员  R11=验证日期
     _set(s, 3, 2, d.get("project_name", ""))
-    _set(s, 4, 2, d.get("project_method", ""))
-    _set(s, 5, 2, d.get("unit", ""))
-    _set(s, 6, 2, d.get("reagent", ""))
-    _set(s, 7, 2, d.get("calibrator", ""))
-    _set(s, 8, 2, d.get("qc", ""))
-    _set(s, 9, 2, d.get("operator", ""))
-    _set(s, 10, 2, d.get("verify_date", ""))
     _set(s, 3, 7, d.get("instrument_model", ""))
+    _set(s, 4, 2, d.get("project_method", ""))
     _set(s, 4, 7, d.get("instrument_no", ""))
+    _set(s, 5, 2, d.get("unit", ""))
     _set(s, 5, 7, d.get("tea", ""))
+    _set(s, 6, 2, d.get("reagent", ""))
     _set(s, 6, 7, d.get("reagent_lot", ""))
+    _set(s, 7, 2, d.get("calibrator", ""))
     _set(s, 7, 7, d.get("calibrator_lot", ""))
+    _set(s, 8, 2, d.get("qc", ""))
     _set(s, 8, 7, d.get("qc_lot", ""))
+    # R9 声称线性范围 low ~ high
+    _set(s, 9, 2, d.get("linear_low", ""))
+    _set(s, 9, 3, "～")
+    _set(s, 9, 4, d.get("linear_high", ""))
     _set(s, 9, 7, d.get("dilution", ""))
+    _set(s, 10, 2, d.get("operator", ""))
     _set(s, 10, 7, d.get("reviewer", ""))
-    _set(s, 11, 7, d.get("verify_date", ""))
+    _set(s, 11, 2, d.get("verify_date", ""))
 
     # 验证内容（R13 标题 + R14 内容）
     items = d.get("verify_items") or []
