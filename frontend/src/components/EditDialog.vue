@@ -17,6 +17,7 @@
           v-if="f.type === 'select'"
           v-model="form[f.prop]"
           :multiple="f.multiple"
+          :filterable="f.filterable !== false"
           :placeholder="f.placeholder || '请选择'"
           style="width: 100%"
         >
