@@ -246,6 +246,10 @@
       <!-- ============ 室间质评 ============ -->
       <template v-if="activeTab === 'eqa'">
         <div class="toolbar">
+          <el-button v-if="auth.canWrite('eqa')" type="success" :disabled="!eqaSelection.length" @click="openBatchReceive">
+            批量收样登记
+            <span v-if="eqaSelection.length" style="margin-left:4px">({{ eqaSelection.length }})</span>
+          </el-button>
           <el-date-picker
             v-model="eqaYear"
             type="year"
@@ -286,7 +290,9 @@
           stripe
           :default-sort="{ prop: 'returned', order: 'ascending' }"
           @sort-change="onEqaSortChange"
+          @selection-change="onEqaSelectionChange"
         >
+          <el-table-column type="selection" width="36" />
           <el-table-column prop="org" label="组织机构" width="132" sortable="custom" />
           <el-table-column label="专业组" width="74">
             <template #default="{ row }">
@@ -296,7 +302,7 @@
           <el-table-column prop="program" label="项目组" width="100" />
           <el-table-column prop="item" label="细项" min-width="110" show-overflow-tooltip />
           <el-table-column prop="round_no" label="轮次" width="62" />
-          <el-table-column prop="sample_date" label="检测日期" width="108" sortable="custom" />
+          <el-table-column prop="sample_date" label="建议检测日期" width="118" sortable="custom" />
           <el-table-column prop="received_at" label="收样时间" width="108" sortable="custom">
             <template #default="{ row }">
               <span v-if="row.received_at">{{ row.received_at }}</span>
@@ -639,7 +645,7 @@
             <el-form-item label="仪器/项目组">
               <span>{{ receiveTarget.org }} · {{ receiveTarget.program }} · {{ receiveTarget.item || '—' }}</span>
             </el-form-item>
-            <el-form-item label="检测日期">
+            <el-form-item label="建议检测日期">
               <span>{{ receiveTarget.sample_date || '—' }}</span>
             </el-form-item>
             <el-form-item label="收样日期" required>
@@ -655,6 +661,28 @@
           <template #footer>
             <el-button @click="receiveDialog = false">取消</el-button>
             <el-button type="primary" :loading="receiveSaving" @click="saveReceive">保存</el-button>
+          </template>
+        </el-dialog>
+
+        <!-- 批量收样登记 -->
+        <el-dialog v-model="batchReceiveDialog" title="批量收样登记" width="460px" append-to-body>
+          <el-form label-width="100px">
+            <el-form-item label="已选计划">
+              <span>共 <b style="color:#409EFF">{{ eqaSelection.length }}</b> 条</span>
+            </el-form-item>
+            <el-form-item label="收样日期" required>
+              <el-date-picker
+                v-model="batchReceiveForm.received_at"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="选择收样日期"
+                style="width:100%"
+              />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="batchReceiveDialog = false">取消</el-button>
+            <el-button type="primary" :loading="batchReceiveSaving" @click="saveBatchReceive">批量保存</el-button>
           </template>
         </el-dialog>
       </template>
@@ -1391,6 +1419,10 @@ const resultSaving = ref(false)
 // 收样登记
 const receiveDialog = ref(false)
 const receiveTarget = ref(null)
+const eqaSelection = ref([])
+const batchReceiveDialog = ref(false)
+const batchReceiveForm = reactive({ received_at: '' })
+const batchReceiveSaving = ref(false)
 const receiveSaving = ref(false)
 const receiveForm = reactive({ received_at: '' })
 const exporting = ref(false)
@@ -1855,6 +1887,52 @@ async function saveReceive() {
     ElMessage.error('保存失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
   } finally {
     receiveSaving.value = false
+  }
+}
+
+function onEqaSelectionChange(rows) {
+  eqaSelection.value = rows || []
+}
+
+function openBatchReceive() {
+  if (!eqaSelection.value.length) {
+    ElMessage.warning('请先勾选要登记的质评计划')
+    return
+  }
+  batchReceiveForm.received_at = new Date().toISOString().slice(0, 10)
+  batchReceiveDialog.value = true
+}
+
+async function saveBatchReceive() {
+  if (!batchReceiveForm.received_at) {
+    ElMessage.warning('请选择收样日期')
+    return
+  }
+  const list = eqaSelection.value
+  if (!list.length) {
+    batchReceiveDialog.value = false
+    return
+  }
+  batchReceiveSaving.value = true
+  try {
+    let ok = 0, fail = 0
+    for (const row of list) {
+      try {
+        await receivePlan(row.id, { received_at: batchReceiveForm.received_at })
+        row.received_at = batchReceiveForm.received_at
+        ok++
+      } catch (e) {
+        fail++
+      }
+    }
+    ElMessage.success(`批量收样完成：成功 ${ok} 条${fail ? `，失败 ${fail} 条` : ''}`)
+    batchReceiveDialog.value = false
+    eqaSelection.value = []
+    await loadEqa()
+  } catch (e) {
+    ElMessage.error('批量收样失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    batchReceiveSaving.value = false
   }
 }
 function applyGrid() {
