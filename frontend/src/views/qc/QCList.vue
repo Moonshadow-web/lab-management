@@ -695,7 +695,7 @@
             </el-select>
             <el-select v-model="batchFilterRound" placeholder="轮次" clearable style="width: 110px">
               <el-option label="全部轮次" value="" />
-              <el-option v-for="r in batchRoundOptions" :key="r" :label="`第${r}次`" :value="r" />
+              <el-option v-for="r in batchRoundOptions" :key="r" :label="r" :value="r" />
             </el-select>
             <el-input
               v-model="batchKeyword"
@@ -712,6 +712,7 @@
           <el-table
             ref="batchTableRef"
             :data="batchFilteredRows"
+            :row-key="(row) => row.id"
             max-height="58vh"
             border
             stripe
@@ -1627,7 +1628,12 @@ const batchRoundOptions = computed(() => {
   for (const r of eqaRows.value || []) {
     if (r.round_no != null && r.round_no !== '') set.add(String(r.round_no))
   }
-  return Array.from(set).sort((a, b) => Number(a) - Number(b))
+  // 按数字排序（"第1次"<"第2次"<...<"第10次"）
+  const num = (s) => {
+    const m = s.match(/\d+/)
+    return m ? parseInt(m[0], 10) : 0
+  }
+  return Array.from(set).sort((a, b) => num(a) - num(b))
 })
 
 const batchFilteredRows = computed(() => {
@@ -2001,11 +2007,12 @@ function openBatchReceive() {
 }
 
 function batchSelectAll() {
-  batchTableRef.value?.clearSelection?.()
-  setTimeout(() => {
-    batchFilteredRows.value.forEach(r => batchTableRef.value?.toggleRowSelection?.(r, true))
-    batchSelection.value = [...batchFilteredRows.value]
-  }, 30)
+  // 用 el-table 内置全选，避免逐行 toggle 触发 O(n) 次 selection-change
+  const tbl = batchTableRef.value
+  if (!tbl) return
+  tbl.clearSelection()
+  tbl.toggleAllSelection()
+  batchSelection.value = [...batchFilteredRows.value]
 }
 
 function batchClear() {
