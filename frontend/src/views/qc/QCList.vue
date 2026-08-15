@@ -680,12 +680,28 @@
               />
             </el-form-item>
           </el-form>
-          <div class="batch-toolbar" style="display:flex; gap:8px; align-items:center; margin-bottom: 8px;">
+          <div class="batch-toolbar" style="display:flex; gap:8px; align-items:center; margin-bottom: 8px; flex-wrap: wrap;">
+            <el-select v-model="batchFilterOrg" placeholder="机构" clearable style="width: 130px">
+              <el-option label="全部机构" value="" />
+              <el-option label="卫健委" value="卫健委" />
+              <el-option label="北京市" value="北京市" />
+            </el-select>
+            <el-select v-model="batchFilterGroup" placeholder="专业组" clearable style="width: 110px">
+              <el-option label="全部专业组" value="" />
+              <el-option label="生化" value="生化" />
+              <el-option label="免疫" value="免疫" />
+              <el-option label="凝血" value="凝血" />
+              <el-option label="其他" value="其他" />
+            </el-select>
+            <el-select v-model="batchFilterRound" placeholder="轮次" clearable style="width: 110px">
+              <el-option label="全部轮次" value="" />
+              <el-option v-for="r in batchRoundOptions" :key="r" :label="`第${r}次`" :value="r" />
+            </el-select>
             <el-input
               v-model="batchKeyword"
-              placeholder="搜索：机构/专业组/项目组/细项/轮次"
+              placeholder="搜索：机构/项目组/细项/轮次"
               clearable
-              style="width: 320px"
+              style="width: 200px"
             />
             <el-button size="small" @click="batchSelectAll">全选当前筛选</el-button>
             <el-button size="small" @click="batchClear">清空选择</el-button>
@@ -1461,6 +1477,9 @@ const receiveDialog = ref(false)
 const receiveTarget = ref(null)
 const eqaKeyword = ref('')
 const batchKeyword = ref('')
+const batchFilterOrg = ref('')
+const batchFilterGroup = ref('')
+const batchFilterRound = ref('')
 const batchSelection = ref([])
 const batchReceiveDialog = ref(false)
 const batchReceiveForm = reactive({ received_at: '' })
@@ -1603,13 +1622,29 @@ const eqaRowsView = computed(() => {
   })
 })
 
+const batchRoundOptions = computed(() => {
+  const set = new Set()
+  for (const r of eqaRows.value || []) {
+    if (r.round_no != null && r.round_no !== '') set.add(String(r.round_no))
+  }
+  return Array.from(set).sort((a, b) => Number(a) - Number(b))
+})
+
 const batchFilteredRows = computed(() => {
   const kw = batchKeyword.value.trim().toLowerCase()
+  const org = batchFilterOrg.value
+  const group = batchFilterGroup.value
+  const round = batchFilterRound.value
   const all = eqaRows.value || []
-  if (!kw) return all
   return all.filter(r => {
-    const s = `${r.org || ''} ${r.program || ''} ${r.item || ''} ${r.round_no || ''} ${r.group || ''}`.toLowerCase()
-    return s.includes(kw)
+    if (org && r.org !== org) return false
+    if (group && r.group !== group) return false
+    if (round && String(r.round_no || '') !== String(round)) return false
+    if (kw) {
+      const s = `${r.org || ''} ${r.program || ''} ${r.item || ''} ${r.round_no || ''} ${r.group || ''}`.toLowerCase()
+      if (!s.includes(kw)) return false
+    }
+    return true
   })
 })
 const pendingScoreCount = computed(() => {
@@ -1957,9 +1992,11 @@ function onBatchSelectionChange(rows) {
 function openBatchReceive() {
   batchSelection.value = []
   batchKeyword.value = ''
+  batchFilterOrg.value = ''
+  batchFilterGroup.value = ''
+  batchFilterRound.value = ''
   batchReceiveForm.received_at = new Date().toISOString().slice(0, 10)
   batchReceiveDialog.value = true
-  // 下一帧清除上一次的勾选残留
   setTimeout(() => batchTableRef.value?.clearSelection?.(), 50)
 }
 
