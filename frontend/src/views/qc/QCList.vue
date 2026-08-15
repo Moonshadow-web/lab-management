@@ -246,10 +246,15 @@
       <!-- ============ 室间质评 ============ -->
       <template v-if="activeTab === 'eqa'">
         <div class="toolbar">
-          <el-button v-if="auth.canWrite('eqa')" type="success" :disabled="!eqaSelection.length" @click="openBatchReceive">
+          <el-button v-if="auth.canWrite('eqa')" type="success" @click="openBatchReceive">
             批量收样登记
-            <span v-if="eqaSelection.length" style="margin-left:4px">({{ eqaSelection.length }})</span>
           </el-button>
+          <el-input
+            v-model="eqaKeyword"
+            placeholder="搜索：机构/项目组/细项/轮次"
+            clearable
+            style="width: 240px"
+          />
           <el-date-picker
             v-model="eqaYear"
             type="year"
@@ -290,9 +295,7 @@
           stripe
           :default-sort="{ prop: 'returned', order: 'ascending' }"
           @sort-change="onEqaSortChange"
-          @selection-change="onEqaSelectionChange"
         >
-          <el-table-column type="selection" width="36" />
           <el-table-column prop="org" label="组织机构" width="132" sortable="custom" />
           <el-table-column label="专业组" width="74">
             <template #default="{ row }">
@@ -665,21 +668,58 @@
         </el-dialog>
 
         <!-- 批量收样登记 -->
-        <el-dialog v-model="batchReceiveDialog" title="批量收样登记" width="460px" append-to-body>
-          <el-form label-width="100px">
-            <el-form-item label="已选计划">
-              <span>共 <b style="color:#409EFF">{{ eqaSelection.length }}</b> 条</span>
-            </el-form-item>
+        <el-dialog v-model="batchReceiveDialog" title="批量收样登记" width="880px" top="5vh" append-to-body>
+          <el-form label-width="100px" style="margin-bottom: 8px">
             <el-form-item label="收样日期" required>
               <el-date-picker
                 v-model="batchReceiveForm.received_at"
                 type="date"
                 value-format="YYYY-MM-DD"
                 placeholder="选择收样日期"
-                style="width:100%"
+                style="width: 200px"
               />
             </el-form-item>
           </el-form>
+          <div class="batch-toolbar" style="display:flex; gap:8px; align-items:center; margin-bottom: 8px;">
+            <el-input
+              v-model="batchKeyword"
+              placeholder="搜索：机构/专业组/项目组/细项/轮次"
+              clearable
+              style="width: 320px"
+            />
+            <el-button size="small" @click="batchSelectAll">全选当前筛选</el-button>
+            <el-button size="small" @click="batchClear">清空选择</el-button>
+            <span style="margin-left: auto; color: #606266">
+              已选 <b style="color:#409EFF">{{ batchSelection.length }}</b> 条 / 当前筛选 <b>{{ batchFilteredRows.length }}</b> 条
+            </span>
+          </div>
+          <el-table
+            ref="batchTableRef"
+            :data="batchFilteredRows"
+            max-height="58vh"
+            border
+            stripe
+            size="small"
+            @selection-change="onBatchSelectionChange"
+          >
+            <el-table-column type="selection" width="42" />
+            <el-table-column prop="org" label="机构" width="120" show-overflow-tooltip />
+            <el-table-column prop="group" label="组" width="64">
+              <template #default="{ row }">
+                <el-tag size="small" :type="groupTagType(row.group)">{{ row.group || '其他' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="program" label="项目组" width="100" show-overflow-tooltip />
+            <el-table-column prop="item" label="细项" min-width="110" show-overflow-tooltip />
+            <el-table-column prop="round_no" label="轮次" width="58" />
+            <el-table-column prop="sample_date" label="建议检测日期" width="118" />
+            <el-table-column prop="received_at" label="已收样" width="100">
+              <template #default="{ row }">
+                <span v-if="row.received_at">{{ row.received_at }}</span>
+                <span v-else style="color:#909399">未登记</span>
+              </template>
+            </el-table-column>
+          </el-table>
           <template #footer>
             <el-button @click="batchReceiveDialog = false">取消</el-button>
             <el-button type="primary" :loading="batchReceiveSaving" @click="saveBatchReceive">批量保存</el-button>
@@ -1419,10 +1459,13 @@ const resultSaving = ref(false)
 // 收样登记
 const receiveDialog = ref(false)
 const receiveTarget = ref(null)
-const eqaSelection = ref([])
+const eqaKeyword = ref('')
+const batchKeyword = ref('')
+const batchSelection = ref([])
 const batchReceiveDialog = ref(false)
 const batchReceiveForm = reactive({ received_at: '' })
 const batchReceiveSaving = ref(false)
+const batchTableRef = ref(null)
 const receiveSaving = ref(false)
 const receiveForm = reactive({ received_at: '' })
 const exporting = ref(false)
@@ -1534,10 +1577,17 @@ function onEqaSortChange({ prop, order }) {
   eqaSortState.value = { prop, order }
 }
 const eqaRowsView = computed(() => {
-  const rows = [...(eqaRows.value || [])]
+  const kw = eqaKeyword.value.trim().toLowerCase()
+  const all = [...(eqaRows.value || [])]
+  const filtered = kw
+    ? all.filter(r => {
+        const s = `${r.org || ''} ${r.program || ''} ${r.item || ''} ${r.round_no || ''} ${r.group || ''}`.toLowerCase()
+        return s.includes(kw)
+      })
+    : all
   const { prop, order } = eqaSortState.value
   const dir = order === 'descending' ? -1 : order === 'ascending' ? 1 : 0
-  return rows.sort((a, b) => {
+  return filtered.sort((a, b) => {
     // 主排序：未上报在前，已上报在后
     if (a.returned !== b.returned) return a.returned ? 1 : -1
     // 次级排序：用户所选列
@@ -1550,6 +1600,16 @@ const eqaRowsView = computed(() => {
       if (av > bv) return 1 * dir
     }
     return 0
+  })
+})
+
+const batchFilteredRows = computed(() => {
+  const kw = batchKeyword.value.trim().toLowerCase()
+  const all = eqaRows.value || []
+  if (!kw) return all
+  return all.filter(r => {
+    const s = `${r.org || ''} ${r.program || ''} ${r.item || ''} ${r.round_no || ''} ${r.group || ''}`.toLowerCase()
+    return s.includes(kw)
   })
 })
 const pendingScoreCount = computed(() => {
@@ -1890,17 +1950,30 @@ async function saveReceive() {
   }
 }
 
-function onEqaSelectionChange(rows) {
-  eqaSelection.value = rows || []
+function onBatchSelectionChange(rows) {
+  batchSelection.value = rows || []
 }
 
 function openBatchReceive() {
-  if (!eqaSelection.value.length) {
-    ElMessage.warning('请先勾选要登记的质评计划')
-    return
-  }
+  batchSelection.value = []
+  batchKeyword.value = ''
   batchReceiveForm.received_at = new Date().toISOString().slice(0, 10)
   batchReceiveDialog.value = true
+  // 下一帧清除上一次的勾选残留
+  setTimeout(() => batchTableRef.value?.clearSelection?.(), 50)
+}
+
+function batchSelectAll() {
+  batchTableRef.value?.clearSelection?.()
+  setTimeout(() => {
+    batchFilteredRows.value.forEach(r => batchTableRef.value?.toggleRowSelection?.(r, true))
+    batchSelection.value = [...batchFilteredRows.value]
+  }, 30)
+}
+
+function batchClear() {
+  batchTableRef.value?.clearSelection?.()
+  batchSelection.value = []
 }
 
 async function saveBatchReceive() {
@@ -1908,9 +1981,9 @@ async function saveBatchReceive() {
     ElMessage.warning('请选择收样日期')
     return
   }
-  const list = eqaSelection.value
+  const list = batchSelection.value
   if (!list.length) {
-    batchReceiveDialog.value = false
+    ElMessage.warning('请在弹窗内勾选至少一条质评计划')
     return
   }
   batchReceiveSaving.value = true
@@ -1927,7 +2000,7 @@ async function saveBatchReceive() {
     }
     ElMessage.success(`批量收样完成：成功 ${ok} 条${fail ? `，失败 ${fail} 条` : ''}`)
     batchReceiveDialog.value = false
-    eqaSelection.value = []
+    batchSelection.value = []
     await loadEqa()
   } catch (e) {
     ElMessage.error('批量收样失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
