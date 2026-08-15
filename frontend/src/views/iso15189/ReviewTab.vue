@@ -550,7 +550,7 @@ function docCat(id) {
 
 async function loadDict() {
   try {
-    const d = await request.get('/api/v1/documents', { params: { page_size: 500, hide_invalid: true } })
+    const d = await request.get('/api/v1/documents', { params: { page_size: 2000 } })
     docs.value = d.items || []
     const m = {}, cm = {}, fm = {}, sm = {}
     d.items.forEach((x) => {
