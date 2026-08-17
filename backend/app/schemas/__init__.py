@@ -618,24 +618,51 @@ class UncertaintyAssessmentBase(BaseModel):
     instrument: str = ""
     reagent: str = ""
     eval_date: str = ""
-    cycle_months: int = 12
+    cycle_months: int = 6  # 评定周期（月，IQC 数据采集周期）
     prepared_by: str = ""
     reviewed_by: str = ""
-    l1_values: list[float] = []
-    l2_values: list[float] = []
+    # 模式：single / multi
+    mode: str = "single"
+    # 校准品不确定度
+    ucal: float = 0
+    ucal_source: str = "厂家"
+    # 单个系统：L1/L2 均值/SD/测试数
     l1_mean: float = 0
     l1_sd: float = 0
-    l1_cv: float = 0
+    l1_n: int = 0
     l2_mean: float = 0
     l2_sd: float = 0
+    l2_n: int = 0
+    # 多个系统：JSON 数组 [{name, l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n}]
+    multi_systems: list = []
+    # 计算结果
+    u_rw: float = 0
+    u_c: float = 0
+    u_extended: float = 0
+    target_bias: float = 0
+    target_bias_text: str = ""
+    target_bias_source: str = ""
+    passed: bool = False
+    # 患者结果（可选）
+    patient_value: float = 0
+    patient_unit: str = ""
+    patient_extended_value: float = 0
+    # 旧字段（兼容）
+    l1_values: list[float] = []
+    l2_values: list[float] = []
+    l1_mean_legacy: float = 0
+    l1_sd_legacy: float = 0
+    l1_cv: float = 0
+    l2_mean_legacy: float = 0
+    l2_sd_legacy: float = 0
     l2_cv: float = 0
     bias_rms: float = 0
-    ucal: float = 0
     pt_result: str = "合格"
     l1_u: float = 0
     l2_u: float = 0
     l1_passed: bool = False
     l2_passed: bool = False
+    report_file_path: str = ""
 
 
 class UncertaintyAssessmentCreate(UncertaintyAssessmentBase):
