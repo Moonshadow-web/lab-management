@@ -262,14 +262,9 @@ def download_report(
     )
 
 
-# ─── 项目维度聚合接口（独立 prefix 避免与 {item_id} 路由冲突）───
-project_archive_router = make_router(
-    VerificationReport, VerificationReportRead, VerificationReportCreate,
-    VerificationReportUpdate,
-    search_fields=["project_name", "instrument", "instrument_model"],
-    prefix="/project-verification-archive",
-    order_by=[VerificationReport.id.desc()],
-)
+# ─── 项目维度聚合接口（独立 APIRouter，避免与 make_router 的 {item_id} 路由冲突）───
+from fastapi import APIRouter
+project_archive_router = APIRouter(prefix="/project-verification-archive", tags=["performance"])
 
 
 @project_archive_router.get("/list-by-project")
