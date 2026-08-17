@@ -27,12 +27,20 @@
       </el-table-column>
       <el-table-column prop="original_name" label="文件名" min-width="200" show-overflow-tooltip />
       <el-table-column prop="description" label="备注" width="150" show-overflow-tooltip />
+      <el-table-column label="关联记录" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.ref_report_id" type="success" size="small">已关联</el-tag>
+          <el-tag v-else type="info" size="small">未解析</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="归档时间" width="150" sortable="custom" prop="created_at">
         <template #default="{ row }">{{ fmtTime(row.created_at) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="180" align="center" fixed="right">
+      <el-table-column label="操作" width="260" align="center" fixed="right">
         <template #default="{ row }">
           <el-button size="small" type="success" plain @click="download(row)">下载</el-button>
+          <el-button v-if="!row.ref_report_id" size="small" type="warning" plain @click="reparse(row)">重新解析</el-button>
+          <el-button v-else size="small" type="info" plain @click="gotoRecord(row)">查看记录</el-button>
           <el-button size="small" type="danger" plain @click="del(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -301,7 +309,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { listReportArchives, deleteReportArchive, downloadReportArchive, uploadReportArchive } from '../../api/reportArchives'
+import { listReportArchives, deleteReportArchive, downloadReportArchive, uploadReportArchive, reparseReportArchive } from '../../api/reportArchives'
 import { listVerificationReports, createVerificationReport, generateVerificationReport, downloadVerificationReport } from '../../api/verificationReports'
 import { useAuthStore } from '../../store/auth'
 
@@ -325,6 +333,22 @@ async function download(row) {
 async function del(row) {
   await ElMessageBox.confirm('确认删除？', '提示', { type: 'warning' })
   await deleteReportArchive(row.id); ElMessage.success('已删除'); await loadList()
+}
+// 老数据回填：重新解析 → 生成 verification_reports
+async function reparse(row) {
+  try {
+    const r = await reparseReportArchive(row.id)
+    if (r.skipped) {
+      ElMessage.info('已有关联记录')
+    } else {
+      ElMessage.success('已生成验证记录，验证记录页可查看')
+    }
+    await loadList()
+  } catch (e) { ElMessage.error('解析失败：' + (e?.response?.data?.detail || e?.message)) }
+}
+function gotoRecord(row) {
+  // 切到「性能验证记录」tab
+  tab.value = 'records'
 }
 
 // ---------------- 上传 ----------------

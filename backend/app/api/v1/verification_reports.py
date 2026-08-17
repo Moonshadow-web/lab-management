@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user
-from ...core.storage import storage, persist_save, persist_delete
+from ...core.storage import persist_get_path, persist_save, persist_delete
 from ...models.report_archive import ReportArchive
 from ...models.user import User
 from ...models.verification_report import VerificationReport
@@ -53,9 +53,11 @@ def _serialize_report(rec: VerificationReport) -> dict:
 def _auto_fill_result_summary(data: dict) -> dict:
     """从 data 自动计算缺失的 result_summary 字段（让结论表无空值）。
 
-    - precision1/precision2：精密度各水平的 CV
+    - precision1：批内 CV（每个水平的天内 3 次重复 SD/均值，再跨天平均；分别按水平报）
+    - precision2：实验室内 CV（每个水平全部数据 SD/均值；分别按水平报）
     - reportable1/reportable2：可报告低/高限靶值
     - reference：参考区间每组超出统计
+    - specificity：从 items 拼出"干扰物 名 ≤限量 实测偏倚"细分（取代笼统的"符合厂家声明"）
     """
     import statistics as _stats
 
@@ -63,26 +65,58 @@ def _auto_fill_result_summary(data: dict) -> dict:
     data_field = data.get("data") or {}
     items = data.get("verify_items") or []
 
-    # 精密度：批内 CV（L1、L2） + 实验室内 CV
+    # ─── 精密度：按水平分别算批内 CV / 实验室内 CV，拼成"低值 X 高值 Y" ───
     if "precision" in items and not rs.get("precision1"):
         prec_levels = (data_field.get("precision") or {}).get("levels") or []
+        runs_in = []   # 水平1 批内CV
+        days_in = []   # 水平1 实验室内CV
+        runs_in2 = []  # 水平2 批内CV
+        days_in2 = []  # 水平2 实验室内CV
         for idx, lv in enumerate(prec_levels[:2]):
-            days = lv.get("days") or []
-            vals = []
+            # 兼容两种字段名：days（解析器）和 rows（前端向导）
+            days = lv.get("days") or lv.get("rows") or []
+            if not days:
+                continue
+            day_means = []
+            day_cv_list = []
             for day in days:
-                for v in day:
-                    try:
-                        vals.append(float(v))
-                    except (TypeError, ValueError):
-                        pass
-            if len(vals) >= 2:
-                m = sum(vals) / len(vals)
-                sd = _stats.pstdev(vals) if len(vals) >= 2 else 0
-                cv = (sd / m * 100) if m else 0
-                rs[f"precision{idx + 1}"] = {
-                    "result": f"CV {cv:.2f}%",
-                    "conclusion": "符合要求",
-                }
+                nums = [float(v) for v in day if v not in (None, "")]
+                if len(nums) >= 2:
+                    m = sum(nums) / len(nums)
+                    sd = _stats.pstdev(nums) if len(nums) >= 2 else 0
+                    if m:
+                        day_cv_list.append(sd / m * 100)
+                    day_means.append(m)
+            all_nums = [float(v) for d in days for v in d if v not in (None, "")]
+            if len(all_nums) >= 2:
+                m_all = sum(all_nums) / len(all_nums)
+                sd_all = _stats.pstdev(all_nums)
+                cv_lab = (sd_all / m_all * 100) if m_all else 0
+            else:
+                cv_lab = 0
+            cv_run = sum(day_cv_list) / len(day_cv_list) if day_cv_list else 0
+            if idx == 0:
+                runs_in.append(cv_run); days_in.append(cv_lab)
+            else:
+                runs_in2.append(cv_run); days_in2.append(cv_lab)
+
+        def _fmt(r1, r2):
+            a = f"低值{r1:.2f}%" if r1 else ""
+            b = f"高值{r2:.2f}%" if r2 else ""
+            if a and b: return f"{a} {b}"
+            return a or b or ""
+
+        # precision1 = 批内 CV；precision2 = 实验室内 CV
+        if runs_in or runs_in2:
+            rs["precision1"] = {
+                "result": _fmt(runs_in[0] if runs_in else 0, runs_in2[0] if runs_in2 else 0),
+                "conclusion": "符合要求",
+            }
+        if days_in or days_in2:
+            rs["precision2"] = {
+                "result": _fmt(days_in[0] if days_in else 0, days_in2[0] if days_in2 else 0),
+                "conclusion": "符合要求",
+            }
 
     # 可报告范围：低限/高限
     if "reportable" in items and not rs.get("reportable1"):
@@ -103,6 +137,28 @@ def _auto_fill_result_summary(data: dict) -> dict:
             txt = "、".join([f"{g.get('name','')}超出{out}" for g, out in zip(groups, outs)])
             rs["reference"] = {
                 "result": f"{txt}，每组≤2个",
+                "conclusion": "符合要求",
+            }
+
+    # ─── 分析特异性：从 items 拼出具体阈值（细到每个干扰物） ───
+    if "specificity" in items and not rs.get("specificity"):
+        spec_items = (data_field.get("specificity") or {}).get("items") or []
+        # 过滤掉空行（只有名字没用）
+        filled = [it for it in spec_items if (it.get("limit") or it.get("measured"))]
+        if filled:
+            parts = []
+            for it in filled:
+                nm = (it.get("name") or "").strip()
+                lm = (it.get("limit") or "").strip()
+                ms = (it.get("measured") or "").strip()
+                seg = nm
+                if lm:
+                    seg += f" {lm}"
+                if ms and ms != "符合要求" and ms != "不符合要求":
+                    seg += f"  实测{ms}"
+                parts.append(seg)
+            rs["specificity"] = {
+                "result": "；".join(parts) or "抗干扰能力符合厂家声明",
                 "conclusion": "符合要求",
             }
 
@@ -186,11 +242,85 @@ def download_report(
     rec = db.get(VerificationReport, report_id)
     if not rec or not rec.report_file_path:
         raise HTTPException(status_code=404, detail="报告尚未生成")
-    path = storage.get_path(rec.report_file_path)
+    # 使用 persist_get_path：本地优先 + COS 兜底（容器重启本地磁盘被清时仍可下载）
+    path = persist_get_path(rec.report_file_path)
     if not path.exists():
-        raise HTTPException(status_code=404, detail="报告文件不存在")
+        raise HTTPException(status_code=404, detail="报告文件不存在（本地+COS 均未找到）")
     return FileResponse(
         path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         filename=f"{rec.project_name or '项目'}_性能验证.xlsx",
     )
+
+
+@router.get("/_project_archive")
+def project_archive(
+    keyword: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """按项目聚合：每个项目（同名）取最新一份验证报告 + 历史次数。
+
+    返回结构：[{ project_name, latest_id, latest_date, latest_instrument,
+                 verify_items, latest_summary, history_count, all_records: [...] }, ...]
+    """
+    from sqlalchemy import func
+
+    q = db.query(VerificationReport)
+    if keyword:
+        kw = f"%{keyword}%"
+        q = q.filter(VerificationReport.project_name.like(kw))
+    rows = q.order_by(VerificationReport.id.desc()).limit(2000).all()
+
+    # 按 project_name 聚合
+    grouped: dict[str, list] = {}
+    for r in rows:
+        key = (r.project_name or "未命名").strip()
+        if not key:
+            key = "未命名"
+        grouped.setdefault(key, []).append(r)
+
+    archive = []
+    for pname, recs in sorted(grouped.items()):
+        recs.sort(key=lambda x: x.id, reverse=True)
+        latest = recs[0]
+        # 解析 latest 的 result_summary 与 verify_items
+        try:
+            v_items = json.loads(latest.verify_items) if latest.verify_items else []
+        except Exception:
+            v_items = []
+        try:
+            r_summary = json.loads(latest.result_summary) if latest.result_summary else {}
+        except Exception:
+            r_summary = {}
+        # 拼成"最近一次验证"摘要（按 verify_items 顺序列）
+        latest_items_summary = []
+        for k in v_items:
+            if k in r_summary and r_summary[k].get("result"):
+                latest_items_summary.append({
+                    "key": k, "result": r_summary[k]["result"],
+                    "conclusion": r_summary[k].get("conclusion", ""),
+                })
+        archive.append({
+            "project_name": pname,
+            "latest_id": latest.id,
+            "latest_date": latest.verify_date,
+            "latest_instrument": f"{latest.instrument_model or ''} {latest.instrument_no or ''}".strip(),
+            "latest_reagent": latest.reagent,
+            "latest_report_type": latest.report_type,
+            "verify_items": v_items,
+            "latest_summary": r_summary,
+            "latest_items_summary": latest_items_summary,
+            "history_count": len(recs),
+            "all_records": [
+                {
+                    "id": r.id, "verify_date": r.verify_date,
+                    "instrument_model": r.instrument_model, "instrument_no": r.instrument_no,
+                    "reagent": r.reagent, "report_type": r.report_type,
+                    "verify_items": json.loads(r.verify_items) if r.verify_items else [],
+                    "result_summary": json.loads(r.result_summary) if r.result_summary else {},
+                }
+                for r in recs
+            ],
+        })
+    return archive

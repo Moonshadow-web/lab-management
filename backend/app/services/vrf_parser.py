@@ -65,17 +65,25 @@ def _read_summary(wb, info: dict) -> dict:
     info["dilution"] = _safe_str(_val(ws, 9, 7))
     # 验证内容（R14）
     r14 = _safe_str(_val(ws, 14, 2)) or _safe_str(_val(ws, 14, 1))
+
     # 验证结论表（R17-R26），跳过 R16 表头行
+    # 关键：必须把每一行都列出来，不能因为某行 cell 为空就跳过
     rows = []
     for r in range(17, 27):
         content = _safe_str(_val(ws, r, 2))
-        # B 列为空时（公式无缓存，常见于模板），从 C 列 requirement 反推 content
+        # B 列为空时（公式无缓存，常见于模板），从 C/D 列 requirement 反推 content
         requirement = _safe_str(_val(ws, r, 3)) or _safe_str(_val(ws, r, 4))
         if not content and requirement:
             content = _content_from_requirement(requirement)
+        # 兜底：模板上 R17-R18=精密度、R19-R20=方法符合率、R21=检出限/线性、R22-R23=可报告范围、R24=参考区间、R26=分析特异性
+        if not content and not requirement:
+            # 用行号硬推导（防止整行空白漏掉）
+            content = _content_from_row(r)
+            # 这时 B/C/D 都空，但 F/G/H (F=验证结果, H=验证结论) 可能还有内容
         result = _safe_str(_val(ws, r, 6)) or _safe_str(_val(ws, r, 7))
         conclusion = _safe_str(_val(ws, r, 8)) or _safe_str(_val(ws, r, 9))
-        if content and (requirement or result or conclusion):
+        # 触发判定条件：content 或 result 或 conclusion 任一非空
+        if content or result or conclusion:
             rows.append({
                 "content": content,
                 "requirement": requirement,
@@ -121,6 +129,38 @@ def _content_from_requirement(req: str) -> str:
     return ""
 
 
+def _content_from_row(r: int) -> str:
+    """按行号硬推导验证内容（当 B/C/D/F/G/H 全空时的兜底）。
+
+    模板 BG-SM-CZ-039（定量）布局：
+        R17,R18 = 精密度（批内/实验室内 CV）
+        R19,R20 = 正确度（低值偏倚 / 高值偏倚）
+        R21     = 线性范围
+        R22,R23 = 可报告范围（低限 / 高限）
+        R24     = 参考范围
+        R25     = 评价结论
+        R26     = 分析特异性
+    模板 BG-SM-CZ-040（定性）布局：R17-R26 是精密度/方法符合率/检出限/干扰等
+    """
+    mapping_qt = {
+        17: "精密度", 18: "精密度",
+        19: "正确度", 20: "正确度",
+        21: "线性范围",
+        22: "可报告范围", 23: "可报告范围",
+        24: "参考范围",
+        26: "分析特异性",
+    }
+    mapping_ql = {
+        17: "精密度", 18: "精密度",
+        19: "方法符合率", 20: "方法符合率",
+        21: "方法检出限",
+        22: "参考范围",
+        26: "分析特异性",
+    }
+    # 默认按定量模板推断（更常见），定性时由 _infer_items 进一步筛选
+    return mapping_qt.get(r) or mapping_ql.get(r) or ""
+
+
 def _fallback_text(wb_cache, sheet_name, row, col):
     """data_only=True 空缺 → data_only=False 补读纯文本"""
     try:
@@ -154,32 +194,46 @@ KEYWORD_MAP = {
 }
 
 
+def _content_to_key(content: str) -> str:
+    """中文 content → 英文 key"""
+    for kw, key in KEYWORD_MAP.items():
+        if kw in content:
+            return key
+    return ""
+
+
 def _infer_items(rt, rows):
     items = set()
     for r in rows:
         content = r.get("content", "")
-        for kw, key in KEYWORD_MAP.items():
-            if kw in content:
-                items.add(key)
+        k = _content_to_key(content)
+        if k:
+            items.add(k)
     return sorted(items)
 
 
 def _build_summary(rows):
+    """按 content + sub 索引构建 result_summary。
+
+    关键修复：精密度/可报告范围/方法符合率等多行项目，按 subKey（precision1/2/reportable1/2）
+    分别存，避免被后面的覆盖丢失。key 用英文 subKey 与前端对齐。
+    """
     rs: dict[str, Any] = {}
-    idx = {}
-    for r in rows:
-        key = r.get("content", "")
-        if not key:
-            key = _content_from_requirement(r.get("requirement", ""))
-        if not key:
-            key = "验证项"
-        if key not in idx:
-            idx[key] = 0
-        idx[key] += 1
-        suffix = f"_{idx[key]}" if idx[key] > 1 else ""
-        rs[key + suffix] = {
-            "result": r.get("result", ""),
-            "conclusion": r.get("conclusion", ""),
+    for idx, row in enumerate(rows):
+        content = row.get("content", "")
+        if not content:
+            continue
+        r = idx + 17  # rows 列表索引对应 R17~R26
+        base = _content_to_key(content) or "其他"
+        sub = ""
+        if base in ("precision", "trueness", "conformity"):
+            sub = "1" if r in (17, 19) else "2"
+        elif base == "reportable":
+            sub = "1" if r == 22 else "2"
+        key = base + sub
+        rs[key] = {
+            "result": row.get("result", ""),
+            "conclusion": row.get("conclusion", ""),
         }
     return rs
 

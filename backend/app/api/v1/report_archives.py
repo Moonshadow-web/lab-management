@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user
-from ...core.storage import storage, persist_save, persist_delete
+from ...core.storage import persist_get_path, persist_save, persist_delete
 from ...models.report_archive import ReportArchive
 from ...models.user import User
 from ...schemas import (
@@ -92,6 +92,52 @@ async def upload_archive(
     }
 
 
+@router.post("/{aid}/reparse")
+def reparse_archive(
+    aid: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """对已上传的归档重新解析 → 新建 verification_reports 记录并关联。
+
+    用于老数据回填（先前上传时未接自动解析逻辑导致性能验证记录页看不到）。
+    """
+    rec = db.get(ReportArchive, aid)
+    if not rec or not rec.file_path:
+        raise HTTPException(status_code=404, detail="归档不存在")
+    if rec.ref_report_id:
+        return {"skipped": True, "ref_report_id": rec.ref_report_id, "msg": "已有关联记录，无需重新解析"}
+    # 从 COS 或本地读回文件
+    path = persist_get_path(rec.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="归档文件本体不存在（本地+COS）")
+    body = path.read_bytes()
+    if not body:
+        raise HTTPException(status_code=400, detail="归档文件为空")
+    try:
+        from ...services.vrf_parser import parse_and_store
+        host = request.client.host if request.client else ""
+        parsed = parse_and_store(body, db, user, host)
+        vrep_id = parsed.get("id")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"解析失败：{e}")
+    if not vrep_id:
+        raise HTTPException(status_code=400, detail="解析未生成 verification_reports 记录")
+    rec.ref_report_id = vrep_id
+    rec.ref_archive_kind = "verification_report"
+    if not rec.project_name or rec.project_name == "未命名":
+        rec.project_name = parsed.get("project_name") or rec.project_name
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    write_audit(db, user, "reparse", "report_archives", rec.id, {"verification_id": vrep_id}, host)
+    return {
+        "ok": True, "ref_report_id": vrep_id, "verification_id": vrep_id,
+        "project_name": parsed.get("project_name"),
+    }
+
+
 @router.get("/{aid}/download")
 def download_archive(
     aid: int,
@@ -126,9 +172,10 @@ def download_archive(
     rec = db.get(ReportArchive, aid)
     if not rec or not rec.file_path:
         raise HTTPException(status_code=404, detail="归档不存在")
-    path = storage.get_path(rec.file_path)
+    # 使用 persist_get_path：本地优先 + COS 兜底（容器重启本地磁盘被清时仍可下载）
+    path = persist_get_path(rec.file_path)
     if not path.exists():
-        raise HTTPException(status_code=404, detail="归档文件不存在")
+        raise HTTPException(status_code=404, detail="归档文件不存在（本地+COS 均未找到）")
     return FileResponse(
         path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -15,3 +15,7 @@ export function uploadReportArchive(formData) {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
+// 老数据回填：重新解析已上传归档 → 新建 verification_reports 记录并关联
+export function reparseReportArchive(id) {
+  return request.post(`/api/v1/report-archives/${id}/reparse`)
+}
