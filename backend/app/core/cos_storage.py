@@ -8,7 +8,6 @@ import io
 import logging
 import os
 import re
-import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -28,9 +27,12 @@ def _safe_filename(name: str) -> str:
 
 
 def _make_key(module: str, safe_name: str) -> str:
-    """生成唯一 COS 对象键：{module}/{uuid8}_{safe_name}"""
-    uid = uuid.uuid4().hex[:8]
-    return f"{module}/{uid}_{safe_name}"
+    """生成 COS 对象键：与 LocalStorageBackend 一致 `{module}/{safe_name}`。
+
+    2026-08-18 修正：之前用 uuid 前缀，导致 persist_get_path 反向查 COS 时找不到。
+    现在用同一文件名，让本地 + COS 双写能用同一 relative key 反查。
+    """
+    return f"{module}/{safe_name}"
 
 
 class CosStorageBackend:

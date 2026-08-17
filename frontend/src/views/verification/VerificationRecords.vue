@@ -37,7 +37,7 @@
           <el-descriptions-item label="仪器型号">{{ r.instrument_model || '—' }}</el-descriptions-item>
           <el-descriptions-item label="仪器编号">{{ r.instrument_no || '—' }}</el-descriptions-item>
           <el-descriptions-item v-if="r.report_type === 'quantitative'" label="允许总误差(TEA)">{{ r.tea || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="试剂">{{ r.reagent || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="试剂厂家">{{ r.reagent || '—' }}</el-descriptions-item>
           <el-descriptions-item label="试剂批号">{{ r.reagent_lot || '—' }}</el-descriptions-item>
           <el-descriptions-item label="校准品">{{ r.calibrator || '—' }}</el-descriptions-item>
           <el-descriptions-item label="校准品批号">{{ r.calibrator_lot || '—' }}</el-descriptions-item>
