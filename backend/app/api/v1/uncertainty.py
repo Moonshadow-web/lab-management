@@ -14,7 +14,7 @@ import re
 from datetime import datetime
 from statistics import pstdev
 
-from fastapi import Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from ...core.crud_base import make_router, write_audit
@@ -41,6 +41,9 @@ router = make_router(
     prefix="/uncertainty",
     order_by=[UncertaintyAssessment.id.desc()],
 )
+
+# ── 独立 APIRouter：避免被 make_router 的 {item_id} 路由抢匹配 ──
+custom_router = APIRouter(prefix="/uncertainty", tags=["uncertainty"])
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -227,7 +230,7 @@ def _calc_backward_compat(payload: dict) -> None:
 # ═══════════════════════════════════════════════════════════════
 
 
-@router.get("/_lookup_target_bias")
+@custom_router.get("/_lookup_target_bias")
 def api_lookup_target_bias(
     project_name: str = "",
     db: Session = Depends(get_db),
@@ -237,7 +240,7 @@ def api_lookup_target_bias(
     return lookup_target_bias(db, project_name)
 
 
-@router.post("/_preview")
+@custom_router.post("/_preview")
 def api_preview(
     payload: dict = Body(...),
     db: Session = Depends(get_db),
