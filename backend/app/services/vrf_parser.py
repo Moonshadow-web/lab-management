@@ -33,14 +33,34 @@ def _type_from_cover(ws) -> str:
 
 
 def _read_cover(wb):
-    """读主封面信息"""
+    """读主封面信息。
+
+    R22 在模板上标"试剂厂家"（如"贝克曼库尔特"），但用户上传时常错填为
+    试剂盒产品名（如"碱性磷酸酶检测试剂盒"）。这里做智能识别：
+    如果 R22 含有"检测试剂盒"/"试剂"/"测定试剂盒"等产品描述关键词，
+    视为产品名，从 R26（仪器厂家）提取品牌覆盖到 reagent 字段。
+    """
     ws = wb["主封面"]
+    reagent_raw = _safe_str(_val(ws, 22, 5))
+    instrument_manufacturer = _safe_str(_val(ws, 26, 5))
+    # 智能品牌提取：含产品描述词的产品名 → 用仪器厂家覆盖
+    if any(kw in reagent_raw for kw in ("检测试剂盒", "测定试剂盒", "试剂", "试剂盒", "诊断试剂")):
+        # 若同时能提取出品牌名（如"贝克曼"）优先；否则用仪器厂家
+        known_brands = ("贝克曼", "贝克曼库尔特", "西门子", "罗氏", "雅培", "迈瑞", "日立", "奥林巴斯", "沃芬", "德赛", "安图", "沃文特", "积水", "柏定", "柏荣", "博源", "思塔高", "景源", "丰华", "亚辉龙", "九强", "迈克生物", "英科新创", "艾博")
+        for b in known_brands:
+            if b in reagent_raw or b in instrument_manufacturer:
+                reagent = b
+                break
+        else:
+            reagent = instrument_manufacturer or reagent_raw
+    else:
+        reagent = reagent_raw
     return {
         "report_type": _type_from_cover(ws),
         "project_name": _safe_str(_val(ws, 20, 5)),
-        "reagent": _safe_str(_val(ws, 22, 5)),
+        "reagent": reagent,
         "instrument": _safe_str(_val(ws, 24, 5)),
-        "instrument_manufacturer": _safe_str(_val(ws, 26, 5)),
+        "instrument_manufacturer": instrument_manufacturer,
         "instrument_model": _safe_str(_val(ws, 28, 5)),
         "instrument_no": _safe_str(_val(ws, 30, 5)),
         "operator": _safe_str(_val(ws, 32, 5)),

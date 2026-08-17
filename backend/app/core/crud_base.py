@@ -121,7 +121,17 @@ def make_router(
     def _json_default(f: str):
         ann = ReadSchema.model_fields.get(f)
         ann = ann.annotation if ann else None
-        return [] if (hasattr(ann, "__origin__") and ann.__origin__ in (list, set)) or str(ann).startswith("list") else {}
+        # 兼容 list / list[X] / Optional[list] / 裸 list
+        origin = getattr(ann, "__origin__", None)
+        ann_str = str(ann or "")
+        if origin in (list, set, tuple) or ann in (list, set, tuple) or ann_str.startswith(("list[", "list ", "List[")):
+            return []
+        if origin is dict or ann is dict or ann_str.startswith(("dict[", "Dict[")):
+            return {}
+        # 含 list/array 关键字的兜底
+        if "list" in ann_str.lower() or "array" in ann_str.lower():
+            return []
+        return {}
 
     def _serialize(obj):
         cols = [c.name for c in obj.__table__.columns]
@@ -133,7 +143,23 @@ def make_router(
                     d[f] = _json_default(f)
                 else:
                     try:
-                        d[f] = json.loads(s)
+                        v = json.loads(s)
+                        # 二次校验：解析结果类型需匹配 schema（避免 list 字段被存为 dict）
+                        ann = ReadSchema.model_fields.get(f)
+                        ann = ann.annotation if ann else None
+                        ann_str = str(ann or "")
+                        is_list_type = (
+                            getattr(ann, "__origin__", None) in (list, set, tuple)
+                            or ann in (list, set, tuple)
+                            or ann_str.startswith(("list[", "list ", "List["))
+                        )
+                        if is_list_type and not isinstance(v, list):
+                            d[f] = _json_default(f)
+                        elif not is_list_type and isinstance(v, dict) is False and not isinstance(v, dict):
+                            # dict 字段 → 若解析非 dict 则重置为空
+                            d[f] = _json_default(f)
+                        else:
+                            d[f] = v
                     except Exception:
                         d[f] = _json_default(f)
         return d
