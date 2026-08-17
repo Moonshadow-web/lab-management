@@ -115,7 +115,7 @@ const totalRecords = computed(() => rows.value.reduce((s, r) => s + r.history_co
 async function reload() {
   loading.value = true
   try {
-    const data = await request.get('/api/v1/verification-reports/_project_archive', { params: { keyword: keyword.value } })
+    const data = await request.get('/api/v1/project-verification-archive/list-by-project', { params: { keyword: keyword.value } })
     rows.value = data || []
   } catch (e) {
     ElMessage.error('加载失败')

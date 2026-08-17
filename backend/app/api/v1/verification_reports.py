@@ -66,7 +66,10 @@ def _auto_fill_result_summary(data: dict) -> dict:
     items = data.get("verify_items") or []
 
     # ─── 精密度：按水平分别算批内 CV / 实验室内 CV，拼成"低值 X 高值 Y" ───
-    if "precision" in items and not rs.get("precision1"):
+    # 重算条件：老格式是"CV X%"开头（解析器写的），新格式以"低值"开头；若已是新格式则跳过
+    _prec_old = rs.get("precision1", {}).get("result", "")
+    _need_prec = "precision" in items and (not _prec_old or _prec_old.startswith("CV "))
+    if _need_prec:
         prec_levels = (data_field.get("precision") or {}).get("levels") or []
         runs_in = []   # 水平1 批内CV
         days_in = []   # 水平1 实验室内CV
@@ -141,7 +144,13 @@ def _auto_fill_result_summary(data: dict) -> dict:
             }
 
     # ─── 分析特异性：从 items 拼出具体阈值（细到每个干扰物） ───
-    if "specificity" in items and not rs.get("specificity"):
+    # 重算条件：当前是兜底"符合厂家声明"或没值时，重算为"物品名 限量 实测"明细
+    _spec_old = rs.get("specificity", {}).get("result", "")
+    _need_spec = (
+        "specificity" in items
+        and (not _spec_old or "符合厂家声明" in _spec_old or "符合" == _spec_old.strip())
+    )
+    if _need_spec:
         spec_items = (data_field.get("specificity") or {}).get("items") or []
         # 过滤掉空行（只有名字没用）
         filled = [it for it in spec_items if (it.get("limit") or it.get("measured"))]
@@ -253,19 +262,27 @@ def download_report(
     )
 
 
-@router.get("/_project_archive")
-def project_archive(
+# ─── 项目维度聚合接口（独立 prefix 避免与 {item_id} 路由冲突）───
+project_archive_router = make_router(
+    VerificationReport, VerificationReportRead, VerificationReportCreate,
+    VerificationReportUpdate,
+    search_fields=["project_name", "instrument", "instrument_model"],
+    prefix="/project-verification-archive",
+    order_by=[VerificationReport.id.desc()],
+)
+
+
+@project_archive_router.get("/list-by-project")
+def list_by_project(
     keyword: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """按项目聚合：每个项目（同名）取最新一份验证报告 + 历史次数。
+    """按项目名聚合：每个项目（同名）取最新一份验证报告 + 历史次数。
 
     返回结构：[{ project_name, latest_id, latest_date, latest_instrument,
                  verify_items, latest_summary, history_count, all_records: [...] }, ...]
     """
-    from sqlalchemy import func
-
     q = db.query(VerificationReport)
     if keyword:
         kw = f"%{keyword}%"
@@ -284,7 +301,6 @@ def project_archive(
     for pname, recs in sorted(grouped.items()):
         recs.sort(key=lambda x: x.id, reverse=True)
         latest = recs[0]
-        # 解析 latest 的 result_summary 与 verify_items
         try:
             v_items = json.loads(latest.verify_items) if latest.verify_items else []
         except Exception:
@@ -293,7 +309,6 @@ def project_archive(
             r_summary = json.loads(latest.result_summary) if latest.result_summary else {}
         except Exception:
             r_summary = {}
-        # 拼成"最近一次验证"摘要（按 verify_items 顺序列）
         latest_items_summary = []
         for k in v_items:
             if k in r_summary and r_summary[k].get("result"):
@@ -324,3 +339,5 @@ def project_archive(
             ],
         })
     return archive
+
+
