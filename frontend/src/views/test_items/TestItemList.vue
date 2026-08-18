@@ -479,6 +479,14 @@ async function fetchProjectManuals() {
     manualMap.value = {}
   }
 }
+function _brandMatch(brand, title) {
+  """doc.title 是否包含项目的品牌关键词（兼容多品牌 /英科/艾博/）。"""
+  if (!brand) return true
+  const b = String(brand).split(/[\/／,，\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean)
+  if (!b.length) return true
+  const t = String(title || '').toLowerCase()
+  return b.some(kw => t.includes(kw))
+}
 function rowManuals(row) {
   if (!row) return []
   const seen = new Set()
@@ -486,7 +494,7 @@ function rowManuals(row) {
   const pushDoc = (d) => {
     if (!seen.has(d.id)) { seen.add(d.id); out.push(d) }
   }
-  // 1) 显式关联 manual_doc_ids（最高优先级）
+  // 1) 显式关联 manual_doc_ids（最高优先级，不做品牌过滤——尊重用户手动选择）
   try {
     const ids = typeof row.manual_doc_ids === 'string' ? JSON.parse(row.manual_doc_ids) : (row.manual_doc_ids || [])
     if (Array.isArray(ids)) {
@@ -495,11 +503,14 @@ function rowManuals(row) {
       }
     }
   } catch {}
-  // 2) 自动匹配的 manualMap（按项目名/别名）
+  // 2) 自动匹配 manualMap（按项目名/别名）—— 按品牌过滤（避免不同品牌的说明书串台）
   const pushMap = (key) => {
     const arr = manualMap.value[key]
     if (!arr) return
-    for (const x of arr) pushDoc(x)
+    for (const x of arr) {
+      if (!_brandMatch(row.brand, x.title)) continue
+      pushDoc(x)
+    }
   }
   pushMap(row.name)
   if (row.aliases) {
