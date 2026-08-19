@@ -87,21 +87,51 @@ def _read_summary(wb, info: dict) -> dict:
     r14 = _safe_str(_val(ws, 14, 2)) or _safe_str(_val(ws, 14, 1))
 
     # 验证结论表（R17-R26），跳过 R16 表头行
-    # 关键：必须把每一行都列出来，不能因为某行 cell 为空就跳过
+    # 关键：不同模板"验证内容/要求/结果/结论"列位置不同（ALP=B 验证内容，ALB=C 验证内容），
+    # 这里按内容智能识别：B/C/D/E 任一列含"精密度/正确度/线性/可报告/参考/特异/检出/符合率"→ content
     rows = []
     for r in range(17, 27):
-        content = _safe_str(_val(ws, r, 2))
-        # B 列为空时（公式无缓存，常见于模板），从 C/D 列 requirement 反推 content
-        requirement = _safe_str(_val(ws, r, 3)) or _safe_str(_val(ws, r, 4))
-        if not content and requirement:
-            content = _content_from_requirement(requirement)
+        # 收集这一行所有非空文本（B/C/D/E/F/G/H/I 9 列）
+        col_texts = []  # [(col, text)]
+        for c in range(2, 10):
+            v = _safe_str(_val(ws, r, c))
+            if v:
+                col_texts.append((c, v))
+        # 找 content（按关键词匹配）
+        content = ''
+        for c, t in col_texts:
+            if _content_to_key(t):
+                content = t
+                break
+        # requirement：B/C/D/E 中（content 之外）的文本
+        req_candidates = [t for c, t in col_texts if c <= 5 and t != content]
+        requirement = req_candidates[0] if req_candidates else ''
+        # result：F/G 中第一个含数字/百分数/具体值的
+        result = ''
+        for c, t in col_texts:
+            if 6 <= c <= 7 and any(ch in t for ch in '0123456789%±'):
+                result = t
+                break
+        if not result:
+            # 退而求其次：F/G 中第一个非空文本
+            for c, t in col_texts:
+                if 6 <= c <= 7:
+                    result = t
+                    break
+        # conclusion：H/I 中
+        conclusion = ''
+        for c, t in col_texts:
+            if 8 <= c <= 9:
+                conclusion = t
+                break
         # 兜底：模板上 R17-R18=精密度、R19-R20=方法符合率、R21=检出限/线性、R22-R23=可报告范围、R24=参考区间、R26=分析特异性
-        if not content and not requirement:
-            # 用行号硬推导（防止整行空白漏掉）
+        if not content and not requirement and (result or conclusion):
             content = _content_from_row(r)
-            # 这时 B/C/D 都空，但 F/G/H (F=验证结果, H=验证结论) 可能还有内容
-        result = _safe_str(_val(ws, r, 6)) or _safe_str(_val(ws, r, 7))
-        conclusion = _safe_str(_val(ws, r, 8)) or _safe_str(_val(ws, r, 9))
+        elif content and not _content_to_key(content):
+            # content 拿到了但不是标准验证项目名（是产品名/项目名等），改用行号推导
+            content = _content_from_row(r) or content
+        # 标准化 content 为简短标签
+        content = _normalize_content(content) if content else ''
         # 触发判定条件：content 或 result 或 conclusion 任一非空
         if content or result or conclusion:
             rows.append({
@@ -222,6 +252,23 @@ def _content_to_key(content: str) -> str:
     return ""
 
 
+KEY_TO_LABEL = {
+    'precision': '精密度', 'trueness': '正确度', 'linearity': '线性范围',
+    'reportable': '可报告范围', 'reference': '参考范围', 'specificity': '分析特异性',
+    'conformity': '方法符合率', 'lod': '方法检出限',
+}
+
+
+def _normalize_content(content: str) -> str:
+    """把识别出的 content 标准化为简洁标签（避免 R21 把"符合线性或临床可接受的非线性程度..."全当 content）。"""
+    if not content:
+        return content
+    k = _content_to_key(content)
+    if k:
+        return KEY_TO_LABEL[k]
+    return content
+
+
 def _infer_items(rt, rows):
     items = set()
     for r in rows:
@@ -243,8 +290,11 @@ def _build_summary(rows):
         content = row.get("content", "")
         if not content:
             continue
-        r = idx + 17  # rows 列表索引对应 R17~R26
-        base = _content_to_key(content) or "其他"
+        r = idx + 17
+        # 关键：content 现在已经是标准化标签（精密度/正确度/线性范围...），直接转 key
+        base = _content_to_key(content)
+        if not base:
+            continue  # 解析不到的验证项直接跳过（不要落"其他"）
         sub = ""
         if base in ("precision", "trueness", "conformity"):
             sub = "1" if r in (17, 19) else "2"
