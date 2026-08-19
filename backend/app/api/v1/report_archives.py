@@ -106,8 +106,13 @@ def reparse_archive(
     rec = db.get(ReportArchive, aid)
     if not rec or not rec.file_path:
         raise HTTPException(status_code=404, detail="归档不存在")
+    # 强制重新解析：删除旧 ref 记录（外键 CASCADE 不会自动删 verification_reports，需要手动）
     if rec.ref_report_id:
-        return {"skipped": True, "ref_report_id": rec.ref_report_id, "msg": "已有关联记录，无需重新解析"}
+        from ...models.verification_report import VerificationReport
+        old_vrep = db.get(VerificationReport, rec.ref_report_id)
+        if old_vrep:
+            db.delete(old_vrep)
+            db.flush()
     # 从 COS 或本地读回文件
     path = persist_get_path(rec.file_path)
     if not path.exists():
@@ -135,6 +140,7 @@ def reparse_archive(
     return {
         "ok": True, "ref_report_id": vrep_id, "verification_id": vrep_id,
         "project_name": parsed.get("project_name"),
+        "msg": "已强制重新解析并替换旧记录",
     }
 
 
