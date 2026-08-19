@@ -650,11 +650,7 @@ class UncertaintyAssessmentBase(BaseModel):
     # 旧字段（兼容）
     l1_values: list[float] = []
     l2_values: list[float] = []
-    l1_mean_legacy: float = 0
-    l1_sd_legacy: float = 0
     l1_cv: float = 0
-    l2_mean_legacy: float = 0
-    l2_sd_legacy: float = 0
     l2_cv: float = 0
     bias_rms: float = 0
     pt_result: str = "合格"
