@@ -11,12 +11,22 @@ from openpyxl import load_workbook
 
 
 def _val(ws, row, col):
-    """安全读取单元格值"""
+    """安全读取单元格值（自动处理合并区，返回左上 cell 的值）"""
     try:
         v = ws.cell(row=row, column=col).value
+        if v is None:
+            # 合并区：找包含 (row, col) 的合并 range，取左上 cell 的值
+            try:
+                for r in ws.merged_cells.ranges:
+                    if r.min_row <= row <= r.max_row and r.min_col <= col <= r.max_col:
+                        mv = ws.cell(r.min_row, r.min_col).value
+                        return mv if mv is not None else ""
+            except Exception:
+                pass
+            return ""
     except Exception:
         return None
-    return v if v is not None else ""
+    return v
 
 
 def _safe_str(v):
