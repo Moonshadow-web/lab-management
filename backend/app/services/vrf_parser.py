@@ -124,7 +124,8 @@ def _read_summary(wb, info: dict) -> dict:
                 conclusion = t
                 break
         # 兜底：模板上 R17-R18=精密度、R19-R20=方法符合率、R21=检出限/线性、R22-R23=可报告范围、R24=参考区间、R26=分析特异性
-        if not content and not requirement and (result or conclusion):
+        # 只要 content 没解析出来（即使 requirement 在）且本行有 result/conclusion，就用行号硬推导
+        if not content and (result or conclusion):
             content = _content_from_row(r)
         elif content and not _content_to_key(content):
             # content 拿到了但不是标准验证项目名（是产品名/项目名等），改用行号推导
