@@ -132,6 +132,10 @@ def _read_summary(wb, info: dict) -> dict:
             content = _content_from_row(r) or content
         # 标准化 content 为简短标签
         content = _normalize_content(content) if content else ''
+        # 跳过表头行（R17 在 ALB 模板是"验证要求/验证结果/验证结论"表头）
+        header_words = ('验证要求', '验证结果', '验证结论', '验证内容')
+        if content in header_words or result in header_words or conclusion in header_words:
+            continue
         # 触发判定条件：content 或 result 或 conclusion 任一非空
         if content or result or conclusion:
             rows.append({
@@ -139,6 +143,7 @@ def _read_summary(wb, info: dict) -> dict:
                 "requirement": requirement,
                 "result": result,
                 "conclusion": _norm_conclusion(conclusion),
+                "row_no": r,  # 记录实际行号，供 _build_summary 精确分配 sub
             })
     # 总结论
     conclusion_text = ""
@@ -286,33 +291,23 @@ def _build_summary(rows, report_type: str = "quantitative"):
     关键修复：精密度/可报告范围/方法符合率等多行项目，按 subKey（precision1/2/reportable1/2）
     分别存，避免被后面的覆盖丢失。key 用英文 subKey 与前端对齐。
 
-    行号分配（按 report_type）：
-    - 定量：R17=精密度1批内、R18=精密度2实验室内；R19=正确度1、R20=正确度2；R22=reportable1低限、R23=reportable2高限
-    - 定性：R17=精密度1批内、R18=精密度2实验室内、R19=方法符合率1阳性、R20=方法符合率2阴性
+    用"出现顺序"分配 sub（不依赖固定行号，兼容 ALP/ALB 不同模板的表头偏移）：
+    - 第 1 个 precision → precision1，第 2 个 → precision2
+    - 第 1 个 trueness → trueness1，第 2 个 → trueness2
+    - 第 1 个 reportable → reportable1，第 2 个 → reportable2
+    - 第 1 个 conformity → conformity1，第 2 个 → conformity2
     """
     rs: dict[str, Any] = {}
-    is_quant = (report_type != "qualitative")
-    for idx, row in enumerate(rows):
+    seq = {}  # base -> 出现次数
+    for row in rows:
         content = row.get("content", "")
         if not content:
             continue
-        r = idx + 17  # rows 列表索引对应 R17~R26
         base = _content_to_key(content)
         if not base:
             continue  # 解析不到的验证项直接跳过
-        sub = ""
-        if is_quant:
-            if base == "precision":
-                sub = "1" if r == 17 else "2"  # R17 批内 / R18 实验室内
-            elif base == "trueness":
-                sub = "1" if r == 19 else "2"  # R19 低值 / R20 高值
-            elif base == "reportable":
-                sub = "1" if r == 22 else "2"  # R22 低限 / R23 高限
-        else:
-            if base == "precision":
-                sub = "1" if r == 17 else "2"  # R17 批内 / R18 实验室内
-            elif base == "conformity":
-                sub = "1" if r == 19 else "2"  # R19 阳性 / R20 阴性
+        seq[base] = seq.get(base, 0) + 1
+        sub = str(seq[base]) if base in ("precision", "trueness", "reportable", "conformity") else ""
         key = base + sub
         rs[key] = {
             "result": row.get("result", ""),
