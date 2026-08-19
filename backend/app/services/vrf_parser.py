@@ -278,10 +278,10 @@ def parse_and_store(file_bytes: bytes, db_session, user, request_ip: str) -> dic
     Returns:
         dict：{id, project_name, archive_id}
     """
-    from ...core.crud_base import write_audit
-    from ...core.storage import storage, persist_save
-    from ...models.report_archive import ReportArchive
-    from ...models.verification_report import VerificationReport
+    from ..core.crud_base import write_audit
+    from ..core.storage import storage, persist_save
+    from ..models.report_archive import ReportArchive
+    from ..models.verification_report import VerificationReport
 
     parsed = parse_verification_xlsx(file_bytes)
 
