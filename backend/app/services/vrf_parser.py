@@ -86,9 +86,9 @@ def _read_summary(wb, info: dict) -> dict:
     # 验证内容（R14）
     r14 = _safe_str(_val(ws, 14, 2)) or _safe_str(_val(ws, 14, 1))
 
-    # 验证结论表（R17-R26），跳过 R16 表头行
     # 关键：不同模板"验证内容/要求/结果/结论"列位置不同（ALP=B 验证内容，ALB=C 验证内容），
     # 这里按内容智能识别：B/C/D/E 任一列含"精密度/正确度/线性/可报告/参考/特异/检出/符合率"→ content
+    import logging
     rows = []
     for r in range(17, 27):
         # 收集这一行所有非空文本（B/C/D/E/F/G/H/I 9 列）
@@ -132,6 +132,7 @@ def _read_summary(wb, info: dict) -> dict:
             content = _content_from_row(r) or content
         # 标准化 content 为简短标签
         content = _normalize_content(content) if content else ''
+        logging.warning(f"[vrf_parser] R{r}: col_texts={col_texts}, content='{content}', result='{result}', conclusion='{conclusion}'")
         # 触发判定条件：content 或 result 或 conclusion 任一非空
         if content or result or conclusion:
             rows.append({
@@ -151,6 +152,9 @@ def _read_summary(wb, info: dict) -> dict:
     rt = info.get("report_type") or "quantitative"
     verify_items = _infer_items(rt, rows)
     result_summary = _build_summary(rows, rt)
+    # 诊断：log rows 数量和 key
+    import logging
+    logging.warning(f"[vrf_parser] rows count={len(rows)}, keys={list(result_summary.keys())}, types={type(rows[0]).__name__ if rows else 'empty'}")
     return {
         "verify_items": verify_items,
         "result_summary": result_summary,

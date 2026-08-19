@@ -92,6 +92,33 @@ async def upload_archive(
     }
 
 
+@custom_router.post("/_debug_parse")
+@router.post("/_debug_parse")
+def debug_parse_archive(
+    request: Request,
+    aid: int = 0,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """临时调试：返回归档文件解析的中间结果（rows）。"""
+    from ...services.vrf_parser import parse_verification_xlsx
+    rec = db.get(ReportArchive, aid)
+    if not rec or not rec.file_path:
+        raise HTTPException(status_code=404, detail="归档不存在")
+    path = persist_get_path(rec.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    body = path.read_bytes()
+    parsed = parse_verification_xlsx(body)
+    return {
+        "report_type": parsed.get("report_type"),
+        "project_name": parsed.get("project_name"),
+        "verify_items": parsed.get("verify_items"),
+        "result_summary": parsed.get("result_summary"),
+        "r14_content": parsed.get("r14_content"),
+    }
+
+
 @router.post("/{aid}/reparse")
 def reparse_archive(
     aid: int,
