@@ -135,12 +135,60 @@
           </div>
           <div v-for="(lv, li) in form.data.precision.levels" :key="li" class="lvl-block">
             <div class="lvl-title">水平{{ li + 1 }}</div>
-            <el-row :gutter="8"><el-col :span="8"><el-input v-model="lv.name" size="small" placeholder="水平名称"/></el-col><el-col :span="6"><el-input v-model="lv.target" size="small" placeholder="靶值"/></el-col></el-row>
+            <el-row :gutter="8"><el-col :span="8"><el-input v-model="lv.name" size="small" placeholder="精密度验证物质" /></el-col></el-row>
             <el-table :data="lv.rows" border size="small" style="margin-top:6px">
               <el-table-column label="天数" width="70" align="center"><template #default="{ $index }">第{{ $index + 1 }}天</template></el-table-column>
               <el-table-column v-for="k in 3" :key="k" :label="'第'+k+'次'"><template #default="{ row }"><el-input v-model="row[k-1]" size="small"/></template></el-table-column>
             </el-table>
-            <div class="auto-text">均值 {{ lv.meanText || '—' }}　CV {{ lv.cvText || '—' }}</div>
+            <div class="auto-text">
+              均值 <b>{{ lv.meanText || '—' }}</b>
+              &nbsp;&nbsp;批内CV% <b>{{ lv.withinCvText || '—' }}</b>
+              &nbsp;&nbsp;批间CV% <b>{{ lv.betweenCvText || '—' }}</b>
+              &nbsp;&nbsp;实验室内CV% <b>{{ lv.totalCvText || '—' }}</b>
+            </div>
+          </div>
+          <!-- 精密度 CV 规定标准输入 -->
+          <div class="ref-panel" style="margin-top:10px">
+            <el-row :gutter="8">
+              <el-col :span="12">
+                <el-form-item label="批内CV要求">
+                  <el-input v-model="form.precision_within_cv_target" size="small" placeholder="默认 1/4 TEA（不填则自动按 TEA/4 判定）" clearable>
+                    <template #append>%</template>
+                  </el-input>
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="实验室内CV要求">
+                  <el-input v-model="form.precision_lab_cv_target" size="small" placeholder="默认 1/3 TEA（不填则自动按 TEA/3 判定）" clearable>
+                    <template #append>%</template>
+                  </el-input>
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </div>
+          <!-- 精密度验证 比较 + 结论 -->
+          <div class="ref-panel" v-if="precisionSummary" style="margin-top:8px">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <tr style="background:#f5f7fa">
+                <th style="border:1px solid #dcdfe6;padding:6px 10px;text-align:left">验证项目</th>
+                <th style="border:1px solid #dcdfe6;padding:6px 10px">估算值</th>
+                <th style="border:1px solid #dcdfe6;padding:6px 10px">规定标准</th>
+                <th style="border:1px solid #dcdfe6;padding:6px 10px">比较结论</th>
+              </tr>
+              <tr v-for="(row, i) in precisionSummary.rows" :key="i">
+                <td style="border:1px solid #dcdfe6;padding:6px 10px">{{ row.item }}</td>
+                <td style="border:1px solid #dcdfe6;padding:6px 10px;text-align:center">{{ row.estimated }}</td>
+                <td style="border:1px solid #dcdfe6;padding:6px 10px;text-align:center">{{ row.target }}</td>
+                <td style="border:1px solid #dcdfe6;padding:6px 10px;text-align:center">
+                  <el-tag :type="row.passed ? 'success' : 'danger'" size="small">{{ row.passed ? '符合要求' : '未达标' }}</el-tag>
+                </td>
+              </tr>
+            </table>
+            <div style="margin-top:8px;font-weight:600">
+              精密度验证结论：<el-tag :type="precisionSummary.passed ? 'success' : 'danger'" size="default">
+                {{ precisionSummary.passed ? '✓ 精密度验证符合要求' : '✗ 精密度验证未达标' }}
+              </el-tag>
+            </div>
           </div>
         </el-card>
 
@@ -397,6 +445,7 @@ function defaultForm() {
     report_type: 'qualitative', project_name: '', project_method: '', unit: '', reagent: '', reagent_lot: '', calibrator: '', calibrator_lot: '', qc: '', qc_lot: '',
     instrument: '', instrument_manufacturer: '', instrument_model: '', instrument_no: '', tea: '', linear_low: '', linear_high: '', dilution: '',
     verify_date: '', operator: me(), reviewer: '杨静', plan_ref: '',
+    precision_within_cv_target: '', precision_lab_cv_target: '',
     verify_items: ['precision'], conclusion: '',
     data: {
       precision: { levels: mkPrecisionLevels() }, conformity: { samples: mkSamples(20, { name: '', ref: 'N', method: '', mresult: 'N' }) },
@@ -447,8 +496,27 @@ function stats(ns) { if (!ns.length) return null; const m = ns.reduce((a, b) => 
 function computeAll() {
   if (form.verify_items.includes('precision')) {
     form.data.precision.levels.forEach((lv, i) => {
-      const vals = []; lv.rows.forEach(r => vals.push(...nums(r)))
-      const st = stats(vals); lv.meanText = st ? st.mean.toFixed(2) : ''; lv.cvText = st ? st.cv.toFixed(2) + '%' : ''
+      // 收集每天3次重复数据
+      const day_vals = lv.rows.map(r => nums(r))
+      const all_vals = []; day_vals.forEach(a => all_vals.push(...a))
+      const st = stats(all_vals)
+      lv.meanText = st ? st.mean.toFixed(2) : ''
+      // 实验室内 CV（总 CV，基于所有 15 个数据）
+      lv.totalCvText = st ? st.cv.toFixed(2) + '%' : ''
+      // 批内 CV：每天3次重复的 SD，再跨天平均
+      const daySds = day_vals.filter(a => a.length >= 2).map(a => {
+        const m = a.reduce((s, v) => s + v, 0) / a.length
+        return Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / (a.length - 1))
+      })
+      const daySdMean = daySds.length ? daySds.reduce((s, v) => s + v, 0) / daySds.length : 0
+      const withinCv = (st && st.mean) ? (daySdMean / st.mean) * 100 : 0
+      lv.withinCvText = withinCv ? withinCv.toFixed(2) + '%' : ''
+      // 批间 CV：√(总方差² - 批内方差²)
+      const totalVar = st ? (st.cv / 100) ** 2 : 0
+      const withinVar = withinCv ? (withinCv / 100) ** 2 : 0
+      const betweenVar = Math.max(totalVar - withinVar, 0)
+      const betweenCv = st && st.mean ? Math.sqrt(betweenVar) * 100 : 0
+      lv.betweenCvText = betweenCv ? betweenCv.toFixed(2) + '%' : ''
     })
   }
   if (form.verify_items.includes('conformity')) {
@@ -496,6 +564,44 @@ const conclusionPreviewData = computed(() => {
   if (form.verify_items.includes('specificity')) add('分析特异性', 'specificity', form.data.specificity.note, '—')
   return items
 })
+const precisionSummary = computed(() => {
+  if (!form.verify_items.includes('precision')) return null
+  const lv0 = form.data.precision.levels[0], lv1 = form.data.precision.levels[1]
+  if (!lv0 && !lv1) return null
+  // 取两个水平的最大值与"实验室内 CV"比较（取严）
+  const parsePct = s => parseFloat(String(s || '').replace('%', '')) || 0
+  // 规定标准：用户填则用，否则默认 1/4 TEA / 1/3 TEA
+  const tea = parseFloat(form.tea) || 0
+  const defaultWithin = tea ? (tea / 4) : 0
+  const defaultLab = tea ? (tea / 3) : 0
+  const userWithin = parsePct(form.precision_within_cv_target)
+  const userLab = parsePct(form.precision_lab_cv_target)
+  const targetWithin = userWithin || defaultWithin
+  const targetLab = userLab || defaultLab
+  // 估算值：取两个水平的"最大值"（更严）
+  const within0 = parsePct(lv0?.withinCvText), within1 = parsePct(lv1?.withinCvText)
+  const total0 = parsePct(lv0?.totalCvText), total1 = parsePct(lv1?.totalCvText)
+  const estWithin = Math.max(within0, within1)
+  const estLab = Math.max(total0, total1)
+  if (estWithin === 0 && estLab === 0) return null
+  const rows = [
+    {
+      item: '批内变异系数（CV%）',
+      estimated: estWithin ? estWithin.toFixed(2) + '%' : '—',
+      target: targetWithin ? '≤ ' + targetWithin.toFixed(2) + '%' : (tea ? '≤ TEA/4 = ' + defaultWithin.toFixed(2) + '%' : '需填 TEA'),
+      passed: estWithin > 0 && targetWithin > 0 ? estWithin < targetWithin : false,
+    },
+    {
+      item: '实验室内变异系数（CV%）',
+      estimated: estLab ? estLab.toFixed(2) + '%' : '—',
+      target: targetLab ? '≤ ' + targetLab.toFixed(2) + '%' : (tea ? '≤ TEA/3 = ' + defaultLab.toFixed(2) + '%' : '需填 TEA'),
+      passed: estLab > 0 && targetLab > 0 ? estLab < targetLab : false,
+    },
+  ]
+  const passed = rows.every(r => r.passed)
+  return { rows, passed }
+})
+
 const validationPassed = computed(() => true)
 
 function buildPayload() {
