@@ -19,6 +19,32 @@
               <el-col :span="12"><el-form-item label="项目编号">
                 <el-input v-model="form.project_code" placeholder="如：SM-SOP-101" />
               </el-form-item></el-col>
+              <el-col :span="24">
+                <el-form-item label="质量目标">
+                  <el-select
+                    v-model="selectedTargetId"
+                    filterable
+                    remote
+                    reserve-keyword
+                    :remote-method="searchTargets"
+                    :loading="targetLoading"
+                    placeholder="输入项目名搜索卫健委 EQA 质量目标（可手动选择）"
+                    style="width:100%"
+                    clearable
+                    @change="onTargetSelect"
+                  >
+                    <el-option
+                      v-for="t in targetOptions"
+                      :key="t.id"
+                      :label="`${t.item_name}（TEa ${t.tea_pct}%）`"
+                      :value="t.id"
+                    />
+                  </el-select>
+                  <div v-if="form.target_bias > 0" class="mode-tip" style="margin-top:4px">
+                    已选质量目标：<b>{{ form.target_bias_source }} = {{ form.target_bias }}%</b>（{{ form.target_bias_text }}）
+                  </div>
+                </el-form-item>
+              </el-col>
               <el-col :span="12"><el-form-item label="检测系统/仪器">
                 <el-input v-model="form.instrument" :placeholder="form.mode === 'multi' ? '如：贝克曼 AU5800（多系统用 A/B/C 区分）' : '如：贝克曼 AU5800'" />
               </el-form-item></el-col>
@@ -226,7 +252,7 @@
             <div class="res-row"><span>扩展不确定度 U (k=2)</span><b class="hl">{{ fmtPct(current.u_extended) }}</b></div>
             <div class="divider"></div>
             <div class="res-row" v-if="current.target_bias">
-              <span>质量目标（允许偏倚）</span>
+              <span>质量目标（允许总误差）</span>
               <b class="hl2">{{ fmtPct(current.target_bias) }}</b>
             </div>
             <div class="res-row" v-if="current.target_bias_source" style="font-size:12px;color:#909399">
@@ -235,7 +261,7 @@
             </div>
             <div class="res-row" v-if="!current.target_bias">
               <span>质量目标</span>
-              <el-tag type="info" size="small">未查到允许偏倚（兜底按 U&lt;15% 判定）</el-tag>
+              <el-tag type="info" size="small">未查到允许总误差（兜底按 U&lt;15% 判定）</el-tag>
             </div>
             <div class="res-row">
               <span>结论</span>
@@ -310,6 +336,11 @@ const editingId = ref(null)
 const previewOpen = ref(false)
 const previewTitle = ref('')
 const previewHtml = ref('')
+// 质量目标搜索选择
+const targetOptions = ref([])
+const targetLoading = ref(false)
+const selectedTargetId = ref(null)
+const targetMap = reactive({})
 
 const todayStr = () => {
   const d = new Date()
@@ -335,6 +366,8 @@ const form = reactive({
   // 室间质评（EQA）偏倚
   pt_result: '合格',
   bias_levels: defaultBiasLevels(),
+  // 质量目标（允许总误差 TEa，手动选择）
+  target_bias: 0, target_bias_text: '', target_bias_source: '',
 })
 
 function defaultMultiSystems() {
@@ -424,21 +457,49 @@ const multiPreview = computed(() => {
   }
 })
 
-// 项目名变更时去查允许偏倚
+// 项目名变更时去搜索卫健委 EQA 质量目标候选（自动选第一个，可手动改选）
 let lookupTimer = null
 async function onProjectChange() {
   clearTimeout(lookupTimer)
   if (!form.project_name || form.project_name.length < 2) return
   lookupTimer = setTimeout(async () => {
     try {
-      const tg = await request.get('/api/v1/uncertainty/_lookup_target_bias', { params: { project_name: form.project_name } })
-      if (tg && tg.bias) {
-        ElMessage.info(`找到目标允许偏倚 ${tg.bias}%（来源：${tg.source}）`)
+      await searchTargets(form.project_name)
+      // 自动选中第一个候选作为默认质量目标
+      if (targetOptions.value.length) {
+        selectedTargetId.value = targetOptions.value[0].id
+        onTargetSelect(selectedTargetId.value)
       } else {
-        ElMessage.warning('未找到该项目的允许偏倚，将兜底按 U<15% 判定')
+        ElMessage.warning('未找到该项目的卫健委 EQA 质量目标，将兜底按 U<15% 判定')
       }
     } catch (e) { /* ignore */ }
   }, 400)
+}
+
+async function searchTargets(query) {
+  if (!query || query.length < 1) { targetOptions.value = []; return }
+  targetLoading.value = true
+  try {
+    const res = await request.get('/api/v1/uncertainty/_search_targets', { params: { q: query } })
+    const items = (res && res.items) || []
+    items.forEach(t => { targetMap[t.id] = t })
+    targetOptions.value = items
+  } finally {
+    targetLoading.value = false
+  }
+}
+
+function onTargetSelect(id) {
+  const t = targetMap[id]
+  if (t) {
+    form.target_bias = t.tea_pct
+    form.target_bias_text = t.tea
+    form.target_bias_source = '卫健委 EQA（允许总误差）'
+  } else {
+    form.target_bias = 0
+    form.target_bias_text = ''
+    form.target_bias_source = ''
+  }
 }
 
 function onModeChange() {
@@ -481,10 +542,13 @@ async function save() {
     patient_unit: form.patient_unit,
     pt_result: form.pt_result || '合格',
     bias_levels: form.pt_result === '不合格' ? form.bias_levels : [],
+    target_bias: form.target_bias,
+    target_bias_text: form.target_bias_text,
+    target_bias_source: form.target_bias_source,
   }
   saving.value = true
   try {
-    // 先调 _preview 拿完整计算结果 + 目标偏倚
+    // 先调 _preview 拿完整计算结果 + 质量目标
     const preview = await request.post('/api/v1/uncertainty/_preview', payload)
     const full = { ...payload, ...preview }
     let rec
@@ -560,6 +624,9 @@ function loadProject(p) {
   form.patient_value = p.patient_value || 0
   form.patient_unit = p.patient_unit || ''
   form.pt_result = p.pt_result || '合格'
+  form.target_bias = p.target_bias || 0
+  form.target_bias_text = p.target_bias_text || ''
+  form.target_bias_source = p.target_bias_source || ''
   try {
     form.bias_levels = (typeof p.bias_levels === 'string') ? JSON.parse(p.bias_levels) : (p.bias_levels || defaultBiasLevels())
     if (!Array.isArray(form.bias_levels)) form.bias_levels = defaultBiasLevels()
@@ -591,7 +658,10 @@ function clearForm() {
     patient_value: 0, patient_unit: '',
     pt_result: '合格',
     bias_levels: defaultBiasLevels(),
+    target_bias: 0, target_bias_text: '', target_bias_source: '',
   })
+  selectedTargetId.value = null
+  targetOptions.value = []
   current.value = null
 }
 
@@ -665,7 +735,7 @@ function buildSingleReport(p) {
 ${pv > 0 ? `<p>患者在该系统的单个测量结果 = ${pv} ${esc(pvUnit)}，则扩展不确定度 = ${pv} × ${uExt.toFixed(2)}% = ${pvExt.toFixed(4)} ${esc(pvUnit)}（k=2），即测量结果 = (${pv} ± ${pvExt.toFixed(4)}) ${esc(pvUnit)}（k=2）。</p>` : '<p>（未填患者结果，跳过报告区间）</p>'}
 <h2>7. 结论</h2>
 <div class="note">
-${targetBias > 0 ? `<p><b>质量目标：</b>目标允许偏倚（来源：${esc(targetSrc)}） = <b>${targetBias.toFixed(2)}%</b>，原始标准：${esc(targetText)}</p>` : '<p>⚠️ 项目质量要求库未找到允许偏倚，临时按 U&lt;15% 兜底判断。</p>'}
+${targetBias > 0 ? `<p><b>质量目标：</b>目标允许总误差 TEa（来源：${esc(targetSrc)}） = <b>${targetBias.toFixed(2)}%</b>，原始标准：${esc(targetText)}</p>` : '<p>⚠️ 项目质量要求库未找到允许总误差，临时按 U&lt;15% 兜底判断。</p>'}
 <p><b>比较结果：</b>U = <b>${uExt.toFixed(2)}%</b> ${passed ? '&lt;' : '≥'} ${targetBias > 0 ? targetBias.toFixed(2) : '15'}% → <strong style="color:${passed ? 'green' : 'red'}">${passed ? '符合要求' : '未达标'}</strong></p>
 <p><b>结论：</b>${passed ? `实验室${esc(p.instrument || '')}测量${esc(p.project_name)}浓度的性能符合要求。` : '扩展不确定度超出质量目标，需改进精密度或校准溯源。'}</p>
 </div>
@@ -717,7 +787,7 @@ ${rsdRows}
 ${pv > 0 ? `<p>患者在该系统的单个测量结果 = ${pv} ${esc(pvUnit)}，则扩展不确定度 = ${pv} × ${(p.u_extended||0).toFixed(2)}% = ${pvExt.toFixed(4)} ${esc(pvUnit)}（k=2），即测量结果 = (${pv} ± ${pvExt.toFixed(4)}) ${esc(pvUnit)}（k=2）。</p>` : '<p>（未填患者结果，跳过报告区间）</p>'}
 <h2>5. 结论</h2>
 <div class="note">
-${targetBias > 0 ? `<p><b>质量目标：</b>目标允许偏倚（来源：${esc(targetSrc)}） = <b>${targetBias.toFixed(2)}%</b>，原始标准：${esc(targetText)}</p>` : '<p>⚠️ 项目质量要求库未找到允许偏倚，临时按 U&lt;15% 兜底判断。</p>'}
+${targetBias > 0 ? `<p><b>质量目标：</b>目标允许总误差 TEa（来源：${esc(targetSrc)}） = <b>${targetBias.toFixed(2)}%</b>，原始标准：${esc(targetText)}</p>` : '<p>⚠️ 项目质量要求库未找到允许总误差，临时按 U&lt;15% 兜底判断。</p>'}
 <p><b>比较结果：</b>U = <b>${(p.u_extended||0).toFixed(2)}%</b> ${passed ? '&lt;' : '≥'} ${targetBias > 0 ? targetBias.toFixed(2) : '15'}% → <strong style="color:${passed ? 'green' : 'red'}">${passed ? '符合要求' : '未达标'}</strong></p>
 <p><b>结论：</b>${passed ? `实验室多个测量系统测定${esc(p.project_name)}的性能符合要求。` : '扩展不确定度超出质量目标，需改进精密度或校准溯源。'}</p>
 </div>
@@ -741,8 +811,8 @@ function buildSummaryReport(list) {
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>测量不确定度评定汇总表</h1>
 <p>表格编号：BG-SM-GL-020 | 编制日期：${todayStr()}</p>
-<table><tr><th>序号</th><th>项目</th><th>检测系统</th><th>U(%)</th><th>目标偏倚(%)</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>编制人</th></tr>${rows}</table>
-<p style="margin-top:14px">目标偏倚优先级：WS/T 403-2024（行标） &gt; 2025 北京市互认 &gt; 1/2 × NCCL EQA 允许总误差。</p>
+<table><tr><th>序号</th><th>项目</th><th>检测系统</th><th>U(%)</th><th>允许总误差 TEa(%)</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>编制人</th></tr>${rows}</table>
+<p style="margin-top:14px">质量目标：卫健委 EQA 允许总误差（NCCL），U &lt; TEa 判为符合要求。</p>
 <div class="sign"><div>编制人签字：____________</div><div>审核人签字：____________</div></div>
 </body></html>`
 }

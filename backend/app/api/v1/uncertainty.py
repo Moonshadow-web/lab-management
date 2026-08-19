@@ -65,6 +65,18 @@ def _parse_bias_to_pct(text: str) -> float:
     return 0.0
 
 
+def _extract_core_name(name: str) -> str:
+    """提取项目名中文主体，去掉括号（全角/半角）及其英文缩写。
+
+    "白蛋白（ALB）" -> "白蛋白"；"丙氨酸氨基转移酶（ALT）" -> "丙氨酸氨基转移酶"
+    便于与卫健委 EQA（nccl-2026）里的纯中文项目名精确匹配。
+    """
+    if not name:
+        return ""
+    core = re.sub(r"[（(][^（）()]{0,12}[）)]", "", name).strip()
+    return core or name.strip()
+
+
 def calc_single_u_rw(l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n):
     """单个测量系统的不精密度 u_Rw(%)（图1公式）。
 
@@ -125,55 +137,37 @@ def calc_multi_u_rw(systems):
 
 
 def lookup_target_bias(db: Session, project_name: str) -> dict:
-    """查找项目的目标允许偏倚。
+    """查找项目的质量目标允许总误差（TEa）——卫健委 EQA（NCCL）。
 
-    优先级：行标（wst403-2024） > 北京市（bj-hr-2025） > EQA（nccl-2026）的 1/2 允许总误差。
-    匹配：模糊匹配 item_name。
+    判定标准：扩展不确定度 U < 允许总误差 TEa。
+    数据源：nccl-2026（国家卫健委临检中心室间质评允许总误差）。
+    匹配：先精确（去括号核心名/原名），再模糊（item_name 含核心名）。
     """
     if not project_name or not project_name.strip():
         return {"bias": 0, "text": "", "source": ""}
     name = project_name.strip()
-    # 1) 行标 wst403-2024
-    row_wst = (
-        db.query(QualityRequirement)
-        .filter(QualityRequirement.source == "wst403-2024")
-        .filter(QualityRequirement.item_name.like(f"%{name}%"))
-        .order_by(QualityRequirement.id)
-        .first()
-    )
-    if row_wst and row_wst.bias:
-        v = _parse_bias_to_pct(row_wst.bias)
-        if v > 0:
-            return {"bias": v, "text": row_wst.bias, "source": "WS/T 403-2024（行标）"}
-    # 2) 北京市 bj-hr-2025
-    row_bj = (
-        db.query(QualityRequirement)
-        .filter(QualityRequirement.source == "bj-hr-2025")
-        .filter(QualityRequirement.item_name.like(f"%{name}%"))
-        .order_by(QualityRequirement.id)
-        .first()
-    )
-    if row_bj and row_bj.bias:
-        v = _parse_bias_to_pct(row_bj.bias)
-        if v > 0:
-            return {"bias": v, "text": row_bj.bias, "source": "2025 北京市互认"}
-    # 3) EQA 1/2 TE
-    row_eqa = (
+    core = _extract_core_name(name)
+    # 1) 精确匹配：核心名 或 原名
+    row = (
         db.query(QualityRequirement)
         .filter(QualityRequirement.source == "nccl-2026")
-        .filter(QualityRequirement.item_name.like(f"%{name}%"))
+        .filter(QualityRequirement.item_name.in_([core, name]))
         .order_by(QualityRequirement.id)
         .first()
     )
-    if row_eqa and row_eqa.tea:
-        v_tea = _parse_bias_to_pct(row_eqa.tea)
-        if v_tea > 0:
-            v = v_tea / 2
-            return {
-                "bias": v,
-                "text": f"1/2 × EQA允许总误差 ({row_eqa.tea})",
-                "source": "2026 NCCL EQA 1/2 TE",
-            }
+    # 2) 模糊匹配：item_name 含核心名
+    if not row and core:
+        row = (
+            db.query(QualityRequirement)
+            .filter(QualityRequirement.source == "nccl-2026")
+            .filter(QualityRequirement.item_name.like(f"%{core}%"))
+            .order_by(QualityRequirement.id)
+            .first()
+        )
+    if row and row.tea:
+        v = _parse_bias_to_pct(row.tea)
+        if v > 0:
+            return {"bias": v, "text": row.tea, "source": "卫健委 EQA（允许总误差）"}
     return {"bias": 0, "text": "", "source": ""}
 
 
@@ -258,8 +252,40 @@ def api_lookup_target_bias(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """根据项目名查找允许偏倚（行标 > 北京市 > 1/2 EQA）。"""
+    """根据项目名查找允许总误差（卫健委 EQA TEa）。"""
     return lookup_target_bias(db, project_name)
+
+
+@custom_router.get("/_search_targets")
+def api_search_targets(
+    q: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """模糊搜索卫健委 EQA 质量目标（项目名 + TEa），供前端手动选择。
+
+    返回 [{id, item_name, tea, tea_pct}]，tea_pct 已解析成数值百分比。
+    """
+    if not q or not q.strip():
+        return {"items": []}
+    core = _extract_core_name(q)
+    rows = (
+        db.query(QualityRequirement)
+        .filter(QualityRequirement.source == "nccl-2026")
+        .filter(QualityRequirement.item_name.like(f"%{core}%"))
+        .order_by(QualityRequirement.id)
+        .limit(20)
+        .all()
+    )
+    items = []
+    for r in rows:
+        items.append({
+            "id": r.id,
+            "item_name": r.item_name,
+            "tea": r.tea,
+            "tea_pct": _parse_bias_to_pct(r.tea),
+        })
+    return {"items": items}
 
 
 @custom_router.post("/_preview")
@@ -271,8 +297,8 @@ def api_preview(
     """实时预览计算（不存库），用于前端实时显示。"""
     p = dict(payload)
     p = compute_record(p)
-    # 自动查找目标偏倚
-    if p.get("project_name"):
+    # 质量目标：前端手动选择优先（已带 target_bias 则不动）；否则自动查卫健委 EQA TEa
+    if p.get("project_name") and not p.get("target_bias"):
         tg = lookup_target_bias(db, p["project_name"])
         p["target_bias"] = tg["bias"]
         p["target_bias_text"] = tg["text"]
