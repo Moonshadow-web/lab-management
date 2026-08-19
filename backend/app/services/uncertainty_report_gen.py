@@ -46,7 +46,8 @@ th{background:#f0f0f0;text-align:center}
 .res{text-align:center;font-size:14pt;font-weight:700;color:#c00}
 .passed{color:green}
 .failed{color:#c00}
-.note{background:#f9f9d0;padding:8px;border-left:4px solid #d6b800;font-size:11pt}
+.note{font-size:11pt;margin:10px 0;line-height:1.7}
+@page{size:A4;margin:18mm 16mm}
 p{line-height:1.7}
 @media print{body{margin:0}}"""
 
@@ -89,7 +90,7 @@ def _report_single_html(v):
 <tr><td><b>表格编号</b></td><td>{REPORT_CODE}</td><td><b>版本号</b></td><td>{REPORT_VERSION}</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">{_esc(v.get('project_name'))}</td></tr>
 <tr><td><b>检测系统</b></td><td>{_esc(v.get('instrument'))}</td><td><b>试剂/校准品</b></td><td>{_esc(v.get('reagent'))}</td></tr>
-<tr><td><b>评定日期</b></td><td>{_esc(v.get('eval_date'))}</td><td><b>评定周期</b></td><td>{int(v.get('cycle_months') or 6)} 个月</td></tr>
+<tr><td><b>评定日期</b></td><td>{_esc(v.get('eval_date'))}</td><td><b>评定周期</b></td><td>{int(v.get('cycle_months') or 12)} 个月</td></tr>
 <tr><td><b>编制人</b></td><td>{_esc(v.get('prepared_by') or '金子铮')}</td><td><b>审核人</b></td><td>{_esc(v.get('reviewed_by') or '杨静')}</td></tr>
 </table>
 <h2>1. 定义被测量</h2>
@@ -100,7 +101,7 @@ def _report_single_html(v):
 </table>
 <p><b>被测量定义为：</b>使用{_esc(v.get('instrument'))}测定{_esc(v.get('project_name'))}（{_esc(pv_unit) or '—'}）。</p>
 <h2>2. 不精密度引入测量不确定度分量</h2>
-<div class="note">💡 一般采用 <b>≥6 个月</b>的室内质控数据（保证长期精密度评估的代表性）。</div>
+<div class="note">一般采用 <b>≥12 个月</b>的室内质控数据（保证长期精密度评估的代表性）。</div>
 <p><b>(1) 该测量系统测量室内质控数据</b></p>
 <table>
 <tr><th>水平</th><th>均值</th><th>标准差</th><th>u<sub>Rw</sub></th><th>相对标准差 RSD</th><th>测试数 n</th></tr>
@@ -122,8 +123,8 @@ def _report_single_html(v):
 {'<p>患者在该系统的单个测量结果 = ' + _fmt(pv) + ' ' + _esc(pv_unit) + '，则扩展不确定度 = ' + _fmt(pv) + ' × ' + _fmt(u_ext) + '% = ' + _fmt(pv_ext, 4) + ' ' + _esc(pv_unit) + '（k=2），即测量结果 = (' + _fmt(pv) + ' ± ' + _fmt(pv_ext, 4) + ') ' + _esc(pv_unit) + '（k=2）。</p>' if pv > 0 else '<p>（未填患者结果，跳过报告区间）</p>'}
 <h2>7. 结论</h2>
 <div class="note">
-<b>质量目标：</b>扩展不确定度 U 与允许偏倚参考比较。
-{'<p>目标允许偏倚（来源：' + _esc(target_src) + '） = <b>' + _fmt(target_bias) + '%</b>，原始标准：' + _esc(target_text) + '</p>' if target_bias > 0 else '<p>⚠️ 项目质量要求库未找到允许偏倚，临时按 U<15% 兜底判断。</p>'}
+<b>质量目标：</b>扩展不确定度 U 与允许总误差 TEa 参考比较。
+{'<p>目标允许总误差 TEa（来源：' + _esc(target_src) + '） = <b>' + _fmt(target_bias) + '%</b>，原始标准：' + _esc(target_text) + '</p>' if target_bias > 0 else '<p>项目质量要求库未找到允许总误差，临时按 U&lt;15% 兜底判断。</p>'}
 <p><b>比较结果：</b>U = <b>{_fmt(u_ext)}%</b> {('&lt;' if passed else '≥')} {(_fmt(target_bias) if target_bias > 0 else '15')}% → <span class="{('passed' if passed else 'failed')}">{('符合要求' if passed else '未达标')}</span></p>
 <p><b>结论：</b>{('实验室' + _esc(v.get('instrument')) + '测量' + _esc(v.get('project_name')) + '浓度的性能符合要求。' if passed else '扩展不确定度超出质量目标，需改进精密度或校准溯源。')}</p>
 </div>
@@ -198,7 +199,7 @@ def _report_multi_html(v):
 <tr><td><b>表格编号</b></td><td>{REPORT_CODE}</td><td><b>版本号</b></td><td>{REPORT_VERSION}</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">{_esc(v.get('project_name'))}</td></tr>
 <tr><td><b>检测系统数</b></td><td>{len(systems)}</td><td><b>系统列表</b></td><td>{_esc('、'.join(s.get('name') or '—' for s in systems))}</td></tr>
-<tr><td><b>评定日期</b></td><td>{_esc(v.get('eval_date'))}</td><td><b>评定周期</b></td><td>{int(v.get('cycle_months') or 6)} 个月</td></tr>
+<tr><td><b>评定日期</b></td><td>{_esc(v.get('eval_date'))}</td><td><b>评定周期</b></td><td>{int(v.get('cycle_months') or 12)} 个月</td></tr>
 <tr><td><b>编制人</b></td><td>{_esc(v.get('prepared_by') or '金子铮')}</td><td><b>审核人</b></td><td>{_esc(v.get('reviewed_by') or '杨静')}</td></tr>
 </table>
 <p>工作量大的临床实验室可使用几个相同的测量系统检测相同的被测量，所以同一个人体样本可能在其中任何一个系统上进行测量。此种情况下，评定单一 u(y) 是有用的，该 u(y) 可以合理地应用于由其中任一系统产生的结果。</p>
@@ -235,8 +236,8 @@ def _report_multi_html(v):
 {'<p>患者在该系统的单个测量结果 = ' + _fmt(pv) + ' ' + _esc(pv_unit) + '，则扩展不确定度 = ' + _fmt(pv) + ' × ' + _fmt(u_ext) + '% = ' + _fmt(pv_ext, 4) + ' ' + _esc(pv_unit) + '（k=2），即测量结果 = (' + _fmt(pv) + ' ± ' + _fmt(pv_ext, 4) + ') ' + _esc(pv_unit) + '（k=2）。</p>' if pv > 0 else '<p>（未填患者结果，跳过报告区间）</p>'}
 <h2>5. 结论</h2>
 <div class="note">
-<b>质量目标：</b>扩展不确定度 U 与允许偏倚参考比较。
-{'<p>目标允许偏倚（来源：' + _esc(target_src) + '） = <b>' + _fmt(target_bias) + '%</b>，原始标准：' + _esc(target_text) + '</p>' if target_bias > 0 else '<p>⚠️ 项目质量要求库未找到允许偏倚，临时按 U<15% 兜底判断。</p>'}
+<b>质量目标：</b>扩展不确定度 U 与允许总误差 TEa 参考比较。
+{'<p>目标允许总误差 TEa（来源：' + _esc(target_src) + '） = <b>' + _fmt(target_bias) + '%</b>，原始标准：' + _esc(target_text) + '</p>' if target_bias > 0 else '<p>项目质量要求库未找到允许总误差，临时按 U&lt;15% 兜底判断。</p>'}
 <p><b>比较结果：</b>U = <b>{_fmt(u_ext)}%</b> {('&lt;' if passed else '≥')} {(_fmt(target_bias) if target_bias > 0 else '15')}% → <span class="{('passed' if passed else 'failed')}">{('符合要求' if passed else '未达标')}</span></p>
 <p><b>结论：</b>{('实验室多个测量系统测定' + _esc(v.get('project_name')) + '的性能符合要求。' if passed else '扩展不确定度超出质量目标，需改进精密度或校准溯源。')}</p>
 </div>

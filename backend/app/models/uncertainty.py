@@ -24,7 +24,7 @@ class UncertaintyAssessment(Base):
     instrument: Mapped[str] = mapped_column(String(200), default="")
     reagent: Mapped[str] = mapped_column(String(300), default="")
     eval_date: Mapped[str] = mapped_column(String(30), default="")
-    cycle_months: Mapped[int] = mapped_column(Integer, default=6)   # 评定周期（月，IQC数据采集周期）
+    cycle_months: Mapped[int] = mapped_column(Integer, default=12)  # 评定周期（月，IQC数据采集周期）
     prepared_by: Mapped[str] = mapped_column(String(100), default="")
     reviewed_by: Mapped[str] = mapped_column(String(100), default="")
     # ── 模式 ──

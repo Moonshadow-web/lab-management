@@ -274,7 +274,7 @@
             </div>
             <div class="btn-row" style="margin-top:10px">
               <el-button size="small" type="primary" @click="previewOne(current)">📄 预览报告</el-button>
-              <el-button size="small" type="success" @click="downloadOne(current)">⬇️ 下载报告</el-button>
+              <el-button size="small" type="success" @click="downloadOne(current)">⬇️ 下载 PDF / 打印</el-button>
             </div>
           </div>
           <el-empty v-else description="暂无计算结果，请在左侧录入并保存" :image-size="70" />
@@ -350,7 +350,7 @@ const todayStr = () => {
 
 const form = reactive({
   project_name: '', project_code: '', instrument: '', reagent: '',
-  eval_date: todayStr(), cycle_months: 6,
+  eval_date: todayStr(), cycle_months: 12,
   prepared_by: auth.user?.full_name || auth.user?.username || '金子铮',
   reviewed_by: '杨静',
   mode: 'single',
@@ -647,7 +647,7 @@ function clearForm() {
   editingId.value = null
   Object.assign(form, {
     project_name: '', project_code: '', instrument: '', reagent: '',
-    eval_date: todayStr(), cycle_months: 6,
+    eval_date: todayStr(), cycle_months: 12,
     prepared_by: auth.user?.full_name || auth.user?.username || '金子铮',
     reviewed_by: '杨静',
     mode: 'single',
@@ -679,9 +679,10 @@ th{background:#f0f0f0;text-align:center}
 .info-table td{width:25%}
 .data-table td,.data-table th{text-align:center}
 .sign{display:flex;justify-content:space-between;margin-top:40px}
-.note{background:#f9f9d0;padding:8px;border-left:4px solid #d6b800;font-size:11pt;margin:10px 0}
+.note{font-size:11pt;margin:10px 0;line-height:1.7}
 p{text-indent:2em;line-height:1.7}
-@media print{body{margin:0}}`
+@page{size:A4;margin:18mm 16mm}
+@media print{body{margin:0} h1{font-size:16pt} h2{page-break-after:avoid}}`
 }
 function buildSingleReport(p) {
   const rsd1 = p.l1_mean > 0 ? p.l1_sd / p.l1_mean * 100 : 0
@@ -834,9 +835,20 @@ function downloadHtml(html, name) {
   a.href = url; a.download = name; a.click()
   URL.revokeObjectURL(url)
 }
+function printOrSavePdf(html, name) {
+  // 浏览器原生：打开新窗口 → 写 HTML → 调 window.print()
+  // 用户在弹窗选"另存为 PDF"或打印机 → A4 排版（依赖 CSS @page）
+  const w = window.open('', '_blank')
+  if (!w) { ElMessage.warning('请允许浏览器弹窗以打印/下载 PDF'); return }
+  w.document.open()
+  w.document.write(html)
+  w.document.close()
+  w.focus()
+  setTimeout(() => { try { w.print() } catch (e) { console.error(e) } }, 400)
+}
 function downloadOne(p) {
   const html = p.mode === 'multi' ? buildMultiReport(p) : buildSingleReport(p)
-  downloadHtml(html, `测量不确定度评定报告_${p.project_name || '项目'}_${todayStr()}.html`)
+  printOrSavePdf(html, `测量不确定度评定报告_${p.project_name || '项目'}_${todayStr()}`)
 }
 function downloadSummary() {
   downloadHtml(buildSummaryReport(projects.value), `测量不确定度评定汇总表_${todayStr()}.html`)
