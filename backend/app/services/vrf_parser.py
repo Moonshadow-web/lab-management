@@ -4,6 +4,7 @@
 主策略：读取主封面 + 结果汇总 sheet，提炼项目信息 + 验证结论，写入 verification_reports 表。
 """
 import json
+import re
 from typing import Any
 
 from openpyxl import load_workbook
@@ -83,6 +84,22 @@ def _read_summary(wb, info: dict) -> dict:
     info["qc_lot"] = _safe_str(_val(ws, 8, 7))
     info["tea"] = _safe_str(_val(ws, 5, 7))
     info["dilution"] = _safe_str(_val(ws, 9, 7))
+    # 声称线性范围：兼容 ALP 模板（R9 B/D 列直接是数字）和 ALB 模板（R21 F/G 列写 "15-60" 格式）
+    # 优先从 R9 读（ALP 模板）
+    linear_low = _safe_str(_val(ws, 9, 2)).strip()
+    linear_high = _safe_str(_val(ws, 9, 4)).strip()
+    # 如果 R9 读不到数字（ALB 模板 R9 是"低限 ≤ TEA"），从 R21 F/G 列解析
+    if not re.search(r'\d', linear_low) or not re.search(r'\d', linear_high):
+        r21_f = _safe_str(_val(ws, 21, 6)) or _safe_str(_val(ws, 21, 7))
+        r21_g = _safe_str(_val(ws, 21, 7)) or r21_f
+        combined = f"{r21_f} {r21_g}"
+        nums = re.findall(r'\d+(?:\.\d+)?', combined)
+        if len(nums) >= 2:
+            linear_low, linear_high = nums[0], nums[1]
+        elif len(nums) == 1:
+            linear_low = linear_high = nums[0]
+    info["linear_low"] = linear_low
+    info["linear_high"] = linear_high
     # 验证内容（R14）
     r14 = _safe_str(_val(ws, 14, 2)) or _safe_str(_val(ws, 14, 1))
 
@@ -117,12 +134,19 @@ def _read_summary(wb, info: dict) -> dict:
                 if 6 <= c <= 7:
                     result = t
                     break
-        # conclusion：H/I 中
+        # conclusion：H/I 中（若空则从 result 文本里反推"符合/通过"）
         conclusion = ''
         for c, t in col_texts:
             if 8 <= c <= 9:
                 conclusion = t
                 break
+        if not conclusion and result:
+            # 兜底：ALB 模板的 H 列是公式（data_only=True 时为 None），
+            # 从 result 文本里找"符合/通过/不合格"关键词
+            if '不符合' in result or '不通过' in result:
+                conclusion = '不符合要求'
+            elif '符合' in result or '通过' in result:
+                conclusion = '符合要求'
         # 兜底：模板上 R17-R18=精密度、R19-R20=方法符合率、R21=检出限/线性、R22-R23=可报告范围、R24=参考区间、R26=分析特异性
         # 只要 content 没解析出来（即使 requirement 在）且本行有 result/conclusion，就反推
         if not content and (result or conclusion):
@@ -372,23 +396,9 @@ def parse_and_store(file_bytes: bytes, db_session, user, request_ip: str) -> dic
     )
     db_session.add(rec)
     db_session.flush()
-
-    # 归档
-    fname = f"{rec.project_name or '项目'}_性能验证_uploaded.xlsx"
-    rel = persist_save("verification_reports", fname, file_bytes)
-    rec.report_file_path = rel
-    arch = ReportArchive(
-        project_name=rec.project_name,
-        report_type=rec.report_type,
-        source_type="uploaded",
-        ref_report_id=rec.id,
-        ref_archive_kind="verification_report",
-        original_name=fname,
-        file_path=rel,
-        description=f"上传解析自：{fname}",
-        created_by_id=user.id if user else None,
-    )
-    db_session.add(arch)
+    # 写入原始 xlsx 字节到 COS/disk（不是由 parse_and_store 创建 ReportArchive 记录，
+    # 归档记录由 report_archives.upload_archive 端点统一创建，避免重复归档）
+    rec.report_file_path = ""
     db_session.commit()
-    write_audit(db_session, user, "upload_parse", "verification_reports", rec.id, {"file": rel}, request_ip)
-    return {"id": rec.id, "project_name": rec.project_name, "archive_id": arch.id}
+    write_audit(db_session, user, "upload_parse", "verification_reports", rec.id, {"project": rec.project_name}, request_ip)
+    return {"id": rec.id, "project_name": rec.project_name}
