@@ -133,7 +133,12 @@ function conclusionRows(r) {
     if (!item.result && !item.conclusion) {
       // 回退到 content 对应的 result_summary 项（正确度/线性/参考等单值字段）
       const m = { '精密度':'precision','正确度':'trueness','线性范围':'linearity','可报告范围':'reportable','参考范围/区间':'reference','分析特异性':'specificity','方法符合率':'conformity','方法检出限':'lod' }
-      item = rs[m[content]] || {}
+      const baseKey = m[content]
+      item = rs[baseKey] || {}
+      // 正确度/精密度/可报告范围 常带 subKey 索引（trueness1/2, precision1/2, reportable1/2），优先取第 1 个
+      if (!item.result && !item.conclusion && baseKey) {
+        item = rs[baseKey + '1'] || rs[baseKey + '2'] || {}
+      }
     }
     items.push({ content, requirement: req[key] || '—', result: item.result || '', conclusion: item.conclusion || '' })
   }

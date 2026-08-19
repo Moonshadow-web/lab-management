@@ -108,6 +108,22 @@ def _read_summary(wb, info: dict) -> dict:
             linear_low, linear_high = nums[0], nums[1]
         elif len(nums) == 1:
             linear_low = linear_high = nums[0]
+        # 还读不到：扫 R8-R10 / R21-R23 各列找 "线性" 标注附近的数字
+        if not re.search(r'\d', linear_low) or not re.search(r'\d', linear_high):
+            for r in (8, 9, 10, 21, 22, 23):
+                for c in range(2, 12):
+                    v = _safe_str(_val(ws, r, c))
+                    if '线性' in v or 'linear' in v.lower():
+                        row_text = ' '.join(_safe_str(_val(ws, r, cc)) for cc in range(2, 12))
+                        row_nums = re.findall(r'\d+(?:\.\d+)?', row_text)
+                        if len(row_nums) >= 2:
+                            linear_low, linear_high = row_nums[0], row_nums[1]
+                            break
+                        elif len(row_nums) == 1:
+                            linear_low = linear_high = row_nums[0]
+                            break
+                if re.search(r'\d', linear_low) and re.search(r'\d', linear_high):
+                    break
     info["linear_low"] = linear_low
     info["linear_high"] = linear_high
     # 验证内容（R14）
