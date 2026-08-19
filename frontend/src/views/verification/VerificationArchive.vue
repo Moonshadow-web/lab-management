@@ -118,7 +118,7 @@
 
         <!-- 精密度数据 -->
         <el-card v-if="form.verify_items.includes('precision')" shadow="never" class="wiz-card">
-          <template #header><b>{{ stepNum('precision') }} 精密度验证（2 水平 × 5 天 × 3 次）</b></template>
+          <template #header><b>{{ stepNum('precision') }} 精密度验证（2 水平 × 3 次 × 5 天）</b></template>
           <div class="ref-panel">
             <el-collapse><el-collapse-item title="📖 验证方案与标准（展开查看）">
               <template v-if="form.report_type==='quantitative'">
@@ -578,26 +578,32 @@ const precisionSummary = computed(() => {
   const userLab = parsePct(form.precision_lab_cv_target)
   const targetWithin = userWithin || defaultWithin
   const targetLab = userLab || defaultLab
-  // 估算值：取两个水平的"最大值"（更严）
+  // 估算值：取两个水平各自的值
   const within0 = parsePct(lv0?.withinCvText), within1 = parsePct(lv1?.withinCvText)
   const total0 = parsePct(lv0?.totalCvText), total1 = parsePct(lv1?.totalCvText)
-  const estWithin = Math.max(within0, within1)
-  const estLab = Math.max(total0, total1)
-  if (estWithin === 0 && estLab === 0) return null
-  const rows = [
-    {
-      item: '批内变异系数（CV%）',
-      estimated: estWithin ? estWithin.toFixed(2) + '%' : '—',
-      target: targetWithin ? '≤ ' + targetWithin.toFixed(2) + '%' : (tea ? '≤ TEA/4 = ' + defaultWithin.toFixed(2) + '%' : '需填 TEA'),
-      passed: estWithin > 0 && targetWithin > 0 ? estWithin < targetWithin : false,
-    },
-    {
-      item: '实验室内变异系数（CV%）',
-      estimated: estLab ? estLab.toFixed(2) + '%' : '—',
-      target: targetLab ? '≤ ' + targetLab.toFixed(2) + '%' : (tea ? '≤ TEA/3 = ' + defaultLab.toFixed(2) + '%' : '需填 TEA'),
-      passed: estLab > 0 && targetLab > 0 ? estLab < targetLab : false,
-    },
-  ]
+  if (within0 === 0 && within1 === 0 && total0 === 0 && total1 === 0) return null
+  // 表格：4 行 — 水平1/水平2 × 批内/实验室内
+  const rows = []
+  for (let li = 0; li < 2; li++) {
+    const w = li === 0 ? within0 : within1
+    const t = li === 0 ? total0 : total1
+    const lvName = li === 0 ? '水平 1' : '水平 2'
+    if (w > 0 || t > 0) {
+      rows.push({
+        item: `批内变异系数（${lvName}）`,
+        estimated: w ? w.toFixed(2) + '%' : '—',
+        target: targetWithin ? '≤ ' + targetWithin.toFixed(2) + '%' : (tea ? '≤ TEA/4 = ' + defaultWithin.toFixed(2) + '%' : '需填 TEA'),
+        passed: w > 0 && targetWithin > 0 ? w < targetWithin : false,
+      })
+      rows.push({
+        item: `实验室内变异系数（${lvName}）`,
+        estimated: t ? t.toFixed(2) + '%' : '—',
+        target: targetLab ? '≤ ' + targetLab.toFixed(2) + '%' : (tea ? '≤ TEA/3 = ' + defaultLab.toFixed(2) + '%' : '需填 TEA'),
+        passed: t > 0 && targetLab > 0 ? t < targetLab : false,
+      })
+    }
+  }
+  if (!rows.length) return null
   const passed = rows.every(r => r.passed)
   return { rows, passed }
 })
