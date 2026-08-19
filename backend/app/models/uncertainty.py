@@ -70,6 +70,9 @@ class UncertaintyAssessment(Base):
     l2_passed: Mapped[bool] = mapped_column(Boolean, default=False)
     bias_rms: Mapped[float] = mapped_column(Float, default=0)
     pt_result: Mapped[str] = mapped_column(String(10), default="合格")
+    # ── 室间质评偏倚数据（5 水平：靶值 + 测量值）──
+    # 结构：[{ target, measured }, ...]，EQA 不合格时用于算 RMS 偏倚
+    bias_levels: Mapped[str] = mapped_column(Text, default="[]")
     # ── 报告文件路径 ──
     report_file_path: Mapped[str] = mapped_column(String(500), default="")
     # ── 元数据 ──

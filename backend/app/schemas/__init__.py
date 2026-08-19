@@ -654,6 +654,7 @@ class UncertaintyAssessmentBase(BaseModel):
     l2_cv: float = 0
     bias_rms: float = 0
     pt_result: str = "合格"
+    bias_levels: list = []
     l1_u: float = 0
     l2_u: float = 0
     l1_passed: bool = False

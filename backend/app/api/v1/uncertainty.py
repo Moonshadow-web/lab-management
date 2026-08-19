@@ -37,7 +37,7 @@ router = make_router(
     UncertaintyAssessmentCreate,
     UncertaintyAssessmentUpdate,
     search_fields=["project_name", "project_code", "instrument"],
-    json_fields=["l1_values", "l2_values", "multi_systems"],
+    json_fields=["l1_values", "l2_values", "multi_systems", "bias_levels"],
     prefix="/uncertainty",
     order_by=[UncertaintyAssessment.id.desc()],
 )
@@ -199,7 +199,29 @@ def compute_record(payload: dict) -> dict:
                 systems = []
         u_rw = calc_multi_u_rw(systems)
     payload["u_rw"] = round(u_rw, 4)
-    u_c = (u_rw ** 2 + ucal ** 2) ** 0.5
+    # 室间质评偏倚：EQA 合格 → 偏倚已含于精密度，bias_rms=0；
+    # EQA 不合格 → 用 5 水平（靶值/测量值）算 RMS 相对偏倚，纳入合成不确定度。
+    pt_result = payload.get("pt_result") or "合格"
+    bias_levels = payload.get("bias_levels") or []
+    if isinstance(bias_levels, str):
+        try:
+            bias_levels = json.loads(bias_levels)
+        except Exception:
+            bias_levels = []
+    bias_rms = 0.0
+    if pt_result == "不合格" and isinstance(bias_levels, list) and bias_levels:
+        sq = []
+        for lv in bias_levels:
+            if not isinstance(lv, dict):
+                continue
+            target = float(lv.get("target") or 0)
+            measured = float(lv.get("measured") or 0)
+            if target > 0:
+                sq.append(((measured - target) / target * 100.0) ** 2)
+        if sq:
+            bias_rms = (sum(sq) / len(sq)) ** 0.5
+    payload["bias_rms"] = round(bias_rms, 4)
+    u_c = (u_rw ** 2 + ucal ** 2 + bias_rms ** 2) ** 0.5
     payload["u_c"] = round(u_c, 4)
     u_ext = 2 * u_c
     payload["u_extended"] = round(u_ext, 4)
@@ -426,7 +448,7 @@ def generate_uncertainty(
     from ...services.uncertainty_report_gen import build_uncertainty_html
     payload = {c.name: getattr(rec, c.name) for c in rec.__table__.columns}
     # JSON 字段还原
-    for f in ("l1_values", "l2_values", "multi_systems"):
+    for f in ("l1_values", "l2_values", "multi_systems", "bias_levels"):
         try:
             payload[f] = json.loads(payload.get(f) or "[]")
         except Exception:

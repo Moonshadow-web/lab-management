@@ -152,6 +152,55 @@
               </el-form-item>
             </div>
 
+            <!-- 室间质评偏倚 -->
+            <div class="data-block">
+              <div class="data-block-title">🧪 室间质评（EQA）偏倚</div>
+              <el-form-item label="EQA 成绩">
+                <el-radio-group v-model="form.pt_result">
+                  <el-radio value="合格">合格</el-radio>
+                  <el-radio value="不合格">不合格</el-radio>
+                </el-radio-group>
+              </el-form-item>
+
+              <div v-if="form.pt_result === '合格'" class="mode-tip">
+                ✅ EQA 成绩合格，偏倚已含于精密度，<b>不需填写偏倚数据</b>（bias = 0）。
+              </div>
+
+              <div v-else>
+                <div class="mode-tip" style="margin-bottom:8px">
+                  ⚠️ EQA 成绩不合格，请填写 <b>5 个水平</b>的靶值与测量值，系统按 RMS（均方根）计算偏倚：
+                  bias<sub>RMS</sub> = √(Σ((测量值-靶值)/靶值×100%)² / n)，并纳入合成不确定度。
+                </div>
+                <el-table :data="form.bias_levels" border size="small" style="margin-bottom:8px">
+                  <el-table-column label="水平" width="70" align="center">
+                    <template #default="{ $index }">第{{ $index + 1 }}水平</template>
+                  </el-table-column>
+                  <el-table-column label="靶值（参考值）">
+                    <template #default="{ row }">
+                      <el-input-number v-model="row.target" :min="0" :precision="4" :controls="false" style="width:100%" placeholder="靶值" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="测量值">
+                    <template #default="{ row }">
+                      <el-input-number v-model="row.measured" :min="0" :precision="4" :controls="false" style="width:100%" placeholder="测量值" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="偏倚 %" width="100" align="center">
+                    <template #default="{ row }">
+                      <span v-if="Number(row.target) > 0 && Number(row.measured) > 0">
+                        {{ (((Number(row.measured) - Number(row.target)) / Number(row.target)) * 100).toFixed(2) }}%
+                      </span>
+                      <span v-else style="color:#c0c4cc">—</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div class="formula" v-if="rmsBias > 0">
+                  bias<sub>RMS</sub> = √(Σ bias<sub>i</sub>² / {{ biasRows.length }})
+                  = <b>{{ rmsBias.toFixed(2) }}%</b>
+                </div>
+              </div>
+            </div>
+
             <div class="btn-row">
               <el-button type="primary" :loading="saving" @click="save">💾 保存并计算</el-button>
               <el-button @click="clearForm">🔄 清空</el-button>
@@ -283,6 +332,9 @@ const form = reactive({
   ucal: 0, ucal_source: '厂家',
   // 患者
   patient_value: 0, patient_unit: '',
+  // 室间质评（EQA）偏倚
+  pt_result: '合格',
+  bias_levels: defaultBiasLevels(),
 })
 
 function defaultMultiSystems() {
@@ -293,10 +345,38 @@ function defaultMultiSystems() {
   ]
 }
 
+function defaultBiasLevels() {
+  return [
+    { target: 0, measured: 0 },
+    { target: 0, measured: 0 },
+    { target: 0, measured: 0 },
+    { target: 0, measured: 0 },
+    { target: 0, measured: 0 },
+  ]
+}
+
 function fmtPct(v) {
   if (v == null || v === '' || isNaN(Number(v))) return '—'
   return Number(v).toFixed(2) + '%'
 }
+
+// ───────── 室间质评偏倚（5 水平 → RMS 相对偏倚） ─────────
+const biasLevelsValid = computed(() =>
+  form.bias_levels.filter(lv => Number(lv.target) > 0 && Number(lv.measured) > 0)
+)
+const biasRows = computed(() =>
+  biasLevelsValid.value.map(lv => {
+    const t = Number(lv.target), m = Number(lv.measured)
+    const b = (m - t) / t * 100
+    return { target: t, measured: m, bias: b }
+  })
+)
+const rmsBias = computed(() => {
+  const rows = biasRows.value
+  if (!rows.length) return 0
+  const sq = rows.reduce((s, r) => s + r.bias ** 2, 0)
+  return Math.sqrt(sq / rows.length)
+})
 
 // ───────── 实时预览（前端计算 + 后端 _preview） ─────────
 const singlePreview = computed(() => {
@@ -399,6 +479,8 @@ async function save() {
     multi_systems: form.mode === 'multi' ? form.multi_systems : [],
     patient_value: form.patient_value,
     patient_unit: form.patient_unit,
+    pt_result: form.pt_result || '合格',
+    bias_levels: form.pt_result === '不合格' ? form.bias_levels : [],
   }
   saving.value = true
   try {
@@ -407,8 +489,18 @@ async function save() {
     const full = { ...payload, ...preview }
     let rec
     if (editingId.value) {
-      rec = await request.put(`/api/v1/uncertainty/${editingId.value}`, full)
-      ElMessage.success('已保存修改')
+      try {
+        rec = await request.put(`/api/v1/uncertainty/${editingId.value}`, full)
+        ElMessage.success('已保存修改')
+      } catch (putErr) {
+        // 编辑的记录可能已被删除（404 未找到记录）→ 降级为新建，避免卡死
+        if (putErr?.response?.status === 404) {
+          rec = await request.post('/api/v1/uncertainty', full)
+          ElMessage.warning('原记录已不存在，已转为新建保存')
+        } else {
+          throw putErr
+        }
+      }
     } else {
       rec = await request.post('/api/v1/uncertainty', full)
       ElMessage.success('保存成功')
@@ -467,6 +559,12 @@ function loadProject(p) {
   } catch (e) { form.multi_systems = defaultMultiSystems() }
   form.patient_value = p.patient_value || 0
   form.patient_unit = p.patient_unit || ''
+  form.pt_result = p.pt_result || '合格'
+  try {
+    form.bias_levels = (typeof p.bias_levels === 'string') ? JSON.parse(p.bias_levels) : (p.bias_levels || defaultBiasLevels())
+    if (!Array.isArray(form.bias_levels)) form.bias_levels = defaultBiasLevels()
+    while (form.bias_levels.length < 5) form.bias_levels.push({ target: 0, measured: 0 })
+  } catch (e) { form.bias_levels = defaultBiasLevels() }
   current.value = p
   ElMessage.info('已载入，可修改后保存')
 }
@@ -491,6 +589,8 @@ function clearForm() {
     multi_systems: defaultMultiSystems(),
     ucal: 0, ucal_source: '厂家',
     patient_value: 0, patient_unit: '',
+    pt_result: '合格',
+    bias_levels: defaultBiasLevels(),
   })
   current.value = null
 }
