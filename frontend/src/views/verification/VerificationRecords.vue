@@ -52,7 +52,9 @@
 
         <!-- 验证结论大表（截图2样式） -->
         <el-table :data="conclusionRows(r)" border stripe size="small">
-          <el-table-column label="验证内容" width="140" />
+          <el-table-column label="验证内容" width="140">
+            <template #default="{ row }">{{ row.content }}</template>
+          </el-table-column>
           <el-table-column label="验证要求" min-width="220">
             <template #default="{ row }">{{ row.requirement }}</template>
           </el-table-column>
