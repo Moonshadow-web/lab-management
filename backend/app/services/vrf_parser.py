@@ -148,8 +148,9 @@ def _read_summary(wb, info: dict) -> dict:
             conclusion_text = t
             break
     # 提炼 verify_items 和 result_summary
-    verify_items = _infer_items(info["report_type"], rows)
-    result_summary = _build_summary(rows)
+    rt = info.get("report_type") or "quantitative"
+    verify_items = _infer_items(rt, rows)
+    result_summary = _build_summary(rows, rt)
     return {
         "verify_items": verify_items,
         "result_summary": result_summary,
@@ -279,27 +280,39 @@ def _infer_items(rt, rows):
     return sorted(items)
 
 
-def _build_summary(rows):
+def _build_summary(rows, report_type: str = "quantitative"):
     """按 content + sub 索引构建 result_summary。
 
     关键修复：精密度/可报告范围/方法符合率等多行项目，按 subKey（precision1/2/reportable1/2）
     分别存，避免被后面的覆盖丢失。key 用英文 subKey 与前端对齐。
+
+    行号分配（按 report_type）：
+    - 定量：R17=精密度1批内、R18=精密度2实验室内；R19=正确度1、R20=正确度2；R22=reportable1低限、R23=reportable2高限
+    - 定性：R17=精密度1批内、R18=精密度2实验室内、R19=方法符合率1阳性、R20=方法符合率2阴性
     """
     rs: dict[str, Any] = {}
+    is_quant = (report_type != "qualitative")
     for idx, row in enumerate(rows):
         content = row.get("content", "")
         if not content:
             continue
-        r = idx + 17
-        # 关键：content 现在已经是标准化标签（精密度/正确度/线性范围...），直接转 key
+        r = idx + 17  # rows 列表索引对应 R17~R26
         base = _content_to_key(content)
         if not base:
-            continue  # 解析不到的验证项直接跳过（不要落"其他"）
+            continue  # 解析不到的验证项直接跳过
         sub = ""
-        if base in ("precision", "trueness", "conformity"):
-            sub = "1" if r in (17, 19) else "2"
-        elif base == "reportable":
-            sub = "1" if r == 22 else "2"
+        if is_quant:
+            if base == "precision":
+                sub = "1" if r == 17 else "2"  # R17 批内 / R18 实验室内
+            elif base == "trueness":
+                sub = "1" if r == 19 else "2"  # R19 低值 / R20 高值
+            elif base == "reportable":
+                sub = "1" if r == 22 else "2"  # R22 低限 / R23 高限
+        else:
+            if base == "precision":
+                sub = "1" if r == 17 else "2"  # R17 批内 / R18 实验室内
+            elif base == "conformity":
+                sub = "1" if r == 19 else "2"  # R19 阳性 / R20 阴性
         key = base + sub
         rs[key] = {
             "result": row.get("result", ""),
