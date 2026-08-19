@@ -124,12 +124,13 @@ def _read_summary(wb, info: dict) -> dict:
                 conclusion = t
                 break
         # 兜底：模板上 R17-R18=精密度、R19-R20=方法符合率、R21=检出限/线性、R22-R23=可报告范围、R24=参考区间、R26=分析特异性
-        # 只要 content 没解析出来（即使 requirement 在）且本行有 result/conclusion，就用行号硬推导
+        # 只要 content 没解析出来（即使 requirement 在）且本行有 result/conclusion，就反推
         if not content and (result or conclusion):
-            content = _content_from_row(r)
+            # 优先用 requirement 关键词反推（更准，能区分"实验室内CV→精密度"/"相对偏倚→正确度"）
+            content = _content_from_requirement(requirement) if requirement else _content_from_row(r)
         elif content and not _content_to_key(content):
             # content 拿到了但不是标准验证项目名（是产品名/项目名等），改用行号推导
-            content = _content_from_row(r) or content
+            content = _content_from_requirement(requirement) if requirement else (_content_from_row(r) or content)
         # 标准化 content 为简短标签
         content = _normalize_content(content) if content else ''
         # 跳过表头行（R17 在 ALB 模板是"验证要求/验证结果/验证结论"表头）
