@@ -411,6 +411,8 @@ def parse_and_store(file_bytes: bytes, db_session, user, request_ip: str) -> dic
         instrument_no=parsed.get("instrument_no", ""),
         tea=parsed.get("tea", ""),
         dilution=parsed.get("dilution", ""),
+        linear_low=parsed.get("linear_low", ""),
+        linear_high=parsed.get("linear_high", ""),
         verify_items=json.dumps(parsed.get("verify_items", []), ensure_ascii=False),
         data=json.dumps({}, ensure_ascii=False),
         result_summary=json.dumps(parsed.get("result_summary", {}), ensure_ascii=False),
