@@ -419,7 +419,20 @@ async function save() {
     try { await request.post(`/api/v1/uncertainty/${rec.id}/generate`) } catch (e) {}
     await loadProjects()
   } catch (e) {
-    ElMessage.error('保存失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+    // 正确序列化后端返回的 detail（可能是字符串/数组/对象），避免显示成 [object Object]
+    let msg = '未知错误'
+    const detail = e?.response?.data?.detail
+    if (typeof detail === 'string') {
+      msg = detail
+    } else if (Array.isArray(detail)) {
+      msg = detail.map(d => d?.msg || JSON.stringify(d)).join('；')
+    } else if (detail) {
+      msg = JSON.stringify(detail)
+    } else if (e?.message) {
+      msg = e.message
+    }
+    console.error('[uncertainty save] 完整错误：', e)
+    ElMessage.error('保存失败：' + msg)
   } finally {
     saving.value = false
   }
