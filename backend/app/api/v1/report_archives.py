@@ -1,4 +1,5 @@
 """性能验证报告归档（独立文件库）。来源：generated（由新建验证生成）/ uploaded（手动上传）。"""
+import json
 import os
 
 from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
