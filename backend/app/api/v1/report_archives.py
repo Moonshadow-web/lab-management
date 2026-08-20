@@ -89,9 +89,11 @@ async def upload_archive(
                         db.add(gen_arch)
                         db.commit()
                 except Exception as ge:
-                    print(f"[upload] auto generate failed: {ge}")
+                    # 自动生成报告失败不阻塞上传，但 raise 出去以便 _diag/last-errors 记录排查
+                    print(f"[upload auto-generate] {type(ge).__name__}: {ge}")
                     try: db.rollback()
                     except: pass
+                    raise
         except Exception:
             pass  # 非标准格式，退化为普通文件归档
 
