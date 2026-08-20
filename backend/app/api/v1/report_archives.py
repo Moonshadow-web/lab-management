@@ -60,44 +60,44 @@ async def upload_archive(
             parsed = parse_and_store(body, db, user, host)
             vrep_id = parsed.get("id")
             parsed_info = parsed
-            # 上传即生成报告：自动生成模板化 xlsx 报告，用户无需手动点"生成报告"
-            if vrep_id:
-                print(f"[upload] auto generate entering, vrep_id={vrep_id}, type(rec) check")
-                try:
-                    from ...models.verification_report import VerificationReport
-                    from ...services.verification_report_gen import build_verification_report
-                    from .verification_reports import _serialize_report, _auto_fill_result_summary
-                    rec = db.get(VerificationReport, vrep_id)
-                    print(f"[upload] got rec={rec is not None}, project={rec.project_name if rec else None}")
-                    if rec:
-                        data = _serialize_report(rec)
-                        data = _auto_fill_result_summary(data)
-                        rec.result_summary = json.dumps(data["result_summary"], ensure_ascii=False)
-                        xlsx_bytes = build_verification_report(data)
-                        fname = f"{rec.project_name or '项目'}_性能验证_{rec.report_type}.xlsx"
-                        gen_rel = persist_save("verification_reports", fname, xlsx_bytes)
-                        rec.report_file_path = gen_rel
-                        gen_arch = ReportArchive(
-                            project_name=rec.project_name,
-                            report_type=rec.report_type,
-                            source_type="generated",
-                            ref_report_id=rec.id,
-                            ref_archive_kind="verification_report",
-                            original_name=fname,
-                            file_path=gen_rel,
-                            description="性能验证报告（自动生成）",
-                            created_by_id=user.id,
-                        )
-                        db.add(gen_arch)
-                        db.commit()
-                except Exception as ge:
-                    # 自动生成报告失败不阻塞上传，但 raise 出去以便 _diag/last-errors 记录排查
-                    print(f"[upload auto-generate] {type(ge).__name__}: {ge}")
-                    try: db.rollback()
-                    except: pass
-                    raise
         except Exception:
             pass  # 非标准格式，退化为普通文件归档
+
+    # 上传即生成报告：自动生成模板化 xlsx 报告（独立 try，不影响上传本身）
+    if vrep_id:
+        try:
+            from ...models.verification_report import VerificationReport
+            from ...services.verification_report_gen import build_verification_report
+            from .verification_reports import _serialize_report, _auto_fill_result_summary
+            rec = db.get(VerificationReport, vrep_id)
+            if rec:
+                data = _serialize_report(rec)
+                data = _auto_fill_result_summary(data)
+                rec.result_summary = json.dumps(data["result_summary"], ensure_ascii=False)
+                xlsx_bytes = build_verification_report(data)
+                fname = f"{rec.project_name or '项目'}_性能验证_{rec.report_type}.xlsx"
+                gen_rel = persist_save("verification_reports", fname, xlsx_bytes)
+                rec.report_file_path = gen_rel
+                gen_arch = ReportArchive(
+                    project_name=rec.project_name,
+                    report_type=rec.report_type,
+                    source_type="generated",
+                    ref_report_id=rec.id,
+                    ref_archive_kind="verification_report",
+                    original_name=fname,
+                    file_path=gen_rel,
+                    description="性能验证报告（自动生成）",
+                    created_by_id=user.id,
+                )
+                db.add(gen_arch)
+                db.commit()
+        except Exception as ge:
+            # 自动生成报告失败仅记日志，不影响上传归档
+            print(f"[upload auto-generate] {type(ge).__name__}: {ge}")
+            import traceback
+            print(traceback.format_exc())
+            try: db.rollback()
+            except: pass
 
     if parsed_info:
         project_name = parsed_info.get("project_name") or project_name
