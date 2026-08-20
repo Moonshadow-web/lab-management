@@ -71,6 +71,7 @@ async def upload_archive(
             from .verification_reports import _serialize_report, _auto_fill_result_summary
             rec = db.get(VerificationReport, vrep_id)
             if rec:
+                db.refresh(rec)  # 强制从 db 加载最新字段（避免 parse_and_store commit 后的 stale ORM）
                 data = _serialize_report(rec)
                 data = _auto_fill_result_summary(data)
                 rec.result_summary = json.dumps(data["result_summary"], ensure_ascii=False)
