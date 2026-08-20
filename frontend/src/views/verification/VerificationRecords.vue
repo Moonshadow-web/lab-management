@@ -126,6 +126,9 @@ function conclusionRows(r) {
   const rs = r.result_summary || {}
   const t = r.report_type || 'qualitative'
   const req = requirements[t] || requirements.qualitative
+  // 本地副本：每个 record 单独算 TEA 倍数（避免污染模块级 requirements）
+  const reqLocal = {}
+  for (const k in req) reqLocal[k] = expandTea(req[k], r.tea)
   const items = []
   // 优先按 subKey 查（如 precision1/precision2/reportable1/2），缺失则按 content 查
   const add = (content, key) => {
@@ -138,9 +141,7 @@ function conclusionRows(r) {
         item = rs[baseKey + '1'] || rs[baseKey + '2'] || {}
       }
     }
-    // 验证要求文本后加（计算结果）：把 "≤ 1/4 TEA" 替换成 "≤ 1/4 TEA（5%）"
-    if (item.requirement) item.requirement = expandTea(item.requirement, r.tea)
-    items.push({ content, requirement: req[key] || '—', result: item.result || '', conclusion: item.conclusion || '' })
+    items.push({ content, requirement: reqLocal[key] || '—', result: item.result || '', conclusion: item.conclusion || '' })
   }
   if (t === 'qualitative') {
     add('精密度', 'precision1')
