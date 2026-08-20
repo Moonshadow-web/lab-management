@@ -20,8 +20,8 @@ class UncertaintyAssessment(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     # ── 项目基本信息 ──
     project_name: Mapped[str] = mapped_column(String(200), index=True, default="")
-    project_code: Mapped[str] = mapped_column(String(100), default="")
-    instrument: Mapped[str] = mapped_column(String(200), default="")
+    sample_type: Mapped[str] = mapped_column(String(20), default="血清")  # 标本类型：血清/血浆/尿液/其他
+    analyte: Mapped[str] = mapped_column(String(200), default="")  # 被测量 = 项目 + 浓度/活性
     reagent: Mapped[str] = mapped_column(String(300), default="")
     eval_date: Mapped[str] = mapped_column(String(30), default="")
     cycle_months: Mapped[int] = mapped_column(Integer, default=12)  # 评定周期（月，IQC数据采集周期）

@@ -16,8 +16,32 @@
               <el-col :span="12"><el-form-item label="项目名称" required>
                 <el-input v-model="form.project_name" placeholder="如：ALT（丙氨酸氨基转移酶）" @blur="onProjectChange" />
               </el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="项目编号">
-                <el-input v-model="form.project_code" placeholder="如：SM-SOP-101" />
+              <el-col :span="12"><el-form-item label="测量方法" required>
+                <el-select
+                  v-model="form.project_method"
+                  filterable
+                  remote
+                  reserve-keyword
+                  :remote-method="searchMethod"
+                  :loading="methodLoading"
+                  placeholder="输入项目名模糊搜索测量方法（可手动输入）"
+                  style="width:100%"
+                  allow-create
+                  clearable
+                >
+                  <el-option v-for="m in methodOptions" :key="m" :label="m" :value="m" />
+                </el-select>
+              </el-form-item></el-col>
+              <el-col :span="12"><el-form-item label="样本类型">
+                <el-radio-group v-model="form.sample_type">
+                  <el-radio value="血清">血清</el-radio>
+                  <el-radio value="血浆">血浆</el-radio>
+                  <el-radio value="尿液">尿液</el-radio>
+                  <el-radio value="其他">其他</el-radio>
+                </el-radio-group>
+              </el-form-item></el-col>
+              <el-col :span="12"><el-form-item label="被测量">
+                <el-input v-model="form.analyte" placeholder="如：葡萄糖浓度 / ALT 活性（默认自动按方法推断，可改）" />
               </el-form-item></el-col>
               <el-col :span="24">
                 <el-form-item label="质量目标">
@@ -45,9 +69,6 @@
                   </div>
                 </el-form-item>
               </el-col>
-              <el-col :span="12"><el-form-item label="检测系统/仪器">
-                <el-input v-model="form.instrument" :placeholder="form.mode === 'multi' ? '如：贝克曼 AU5800（多系统用 A/B/C 区分）' : '如：贝克曼 AU5800'" />
-              </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="试剂/校准品">
                 <el-input v-model="form.reagent" placeholder="如：贝克曼原装试剂" />
               </el-form-item></el-col>
@@ -131,22 +152,23 @@
                   <span class="sys-title">系统 {{ String.fromCharCode(65 + idx) }}</span>
                   <el-button v-if="form.multi_systems.length > 2" size="small" type="danger" plain @click="form.multi_systems.splice(idx, 1)">删除</el-button>
                 </div>
-                <el-row :gutter="8">
-                  <el-col :span="6"><el-form-item label="名称" label-width="48px"><el-input v-model="s.name" :placeholder="'系统' + String.fromCharCode(65+idx)" /></el-form-item></el-col>
-                  <el-col :span="6"><el-form-item label="L1 均值" label-width="60px"><el-input-number v-model="s.l1_mean" :min="0" :precision="4" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="6"><el-form-item label="L1 SD" label-width="48px"><el-input-number v-model="s.l1_sd" :min="0" :precision="4" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="6"><el-form-item label="L1 n" label-width="48px"><el-input-number v-model="s.l1_n" :min="0" :precision="0" style="width:100%" /></el-form-item></el-col>
+                <el-row :gutter="12">
+                  <el-col :span="3"><el-form-item label="名称" label-width="42px"><el-input v-model="s.name" :placeholder="'系统' + String.fromCharCode(65+idx)" /></el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L1 均值" label-width="60px"><el-input-number v-model="s.l1_mean" :min="0" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="4"><el-form-item label="L1 SD" label-width="48px"><el-input-number v-model="s.l1_sd" :min="0" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="3"><el-form-item label="L1 n" label-width="40px"><el-input-number v-model="s.l1_n" :min="0" :precision="0" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L1 RSD%" label-width="65px">
+                    <el-input :value="s.l1_mean > 0 ? ((s.l1_sd / s.l1_mean) * 100).toFixed(2) + '%' : ''" readonly />
+                  </el-form-item></el-col>
                 </el-row>
-                <el-row :gutter="8">
-                  <el-col :span="6"><el-form-item label="L2 均值" label-width="60px"><el-input-number v-model="s.l2_mean" :min="0" :precision="4" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="6"><el-form-item label="L2 SD" label-width="48px"><el-input-number v-model="s.l2_sd" :min="0" :precision="4" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="6"><el-form-item label="L2 n" label-width="48px"><el-input-number v-model="s.l2_n" :min="0" :precision="0" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="6">
-                    <div class="sys-cov" v-if="s.l1_mean > 0 && s.l2_mean > 0">
-                      L1 RSD {{ ((s.l1_sd / s.l1_mean) * 100).toFixed(2) }}%<br/>
-                      L2 RSD {{ ((s.l2_sd / s.l2_mean) * 100).toFixed(2) }}%
-                    </div>
-                  </el-col>
+                <el-row :gutter="12">
+                  <el-col :span="3"><el-form-item label="&nbsp;" label-width="42px">&nbsp;</el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L2 均值" label-width="60px"><el-input-number v-model="s.l2_mean" :min="0" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="4"><el-form-item label="L2 SD" label-width="48px"><el-input-number v-model="s.l2_sd" :min="0" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="3"><el-form-item label="L2 n" label-width="40px"><el-input-number v-model="s.l2_n" :min="0" :precision="0" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L2 RSD%" label-width="65px">
+                    <el-input :value="s.l2_mean > 0 ? ((s.l2_sd / s.l2_mean) * 100).toFixed(2) + '%' : ''" readonly />
+                  </el-form-item></el-col>
                 </el-row>
               </div>
               <el-button size="small" plain @click="addSystem">+ 增加测量系统</el-button>
@@ -168,7 +190,7 @@
               <div class="data-block-title">🎯 校准品不确定度</div>
               <el-form-item label="u_cal (%)">
                 <el-input-number v-model="form.ucal" :min="0" :precision="2" :step="0.1" style="width:180px" />
-                <span style="margin-left:8px;color:#909399;font-size:12px">厂家提供相对标准不确定度（%），填 0 表示厂家未提供</span>
+                <span style="margin-left:8px;color:#909399;font-size:12px">多个校准品时，保守选择相对标准不确定度最大的</span>
               </el-form-item>
               <el-form-item label="来源">
                 <el-radio-group v-model="form.ucal_source">
@@ -341,6 +363,9 @@ const targetOptions = ref([])
 const targetLoading = ref(false)
 const selectedTargetId = ref(null)
 const targetMap = reactive({})
+// 测量方法下拉选项（从 test_items 模糊搜索得到）
+const methodOptions = ref([])
+const methodLoading = ref(false)
 
 const todayStr = () => {
   const d = new Date()
@@ -349,7 +374,9 @@ const todayStr = () => {
 }
 
 const form = reactive({
-  project_name: '', project_code: '', instrument: '', reagent: '',
+  project_name: '', project_method: '', reagent: '',
+  sample_type: '血清',  // 血清/血浆/尿液/其他
+  analyte: '',  // 被测量 = 项目 + 浓度/活性（自动推断）
   eval_date: todayStr(), cycle_months: 12,
   prepared_by: auth.user?.full_name || auth.user?.username || '金子铮',
   reviewed_by: '杨静',
@@ -457,15 +484,31 @@ const multiPreview = computed(() => {
   }
 })
 
-// 项目名变更时去搜索卫健委 EQA 质量目标候选（自动选第一个，可手动改选）
+// 项目名变更时：模糊搜索 test_items（自动填方法/单位/被测量）+ 卫健委 EQA 质量目标
 let lookupTimer = null
 async function onProjectChange() {
   clearTimeout(lookupTimer)
   if (!form.project_name || form.project_name.length < 2) return
   lookupTimer = setTimeout(async () => {
     try {
+      // 1) 搜索 test_items 自动填方法/单位/被测量
+      await searchMethod(form.project_name)
+      if (methodOptions.value.length) {
+        // 自动选第一个
+        form.project_method = methodOptions.value[0]
+        // 同步填被测量（项目+浓度/活性，按方法推断）
+        autoFillAnalyte(methodOptions.value[0])
+        // 自动填报告单位
+        const matched = (methodMap.value || {})
+        const hit = matched[methodOptions.value[0]]
+        if (hit && hit.unit) form.patient_unit = hit.unit
+        // 标本类型默认血清
+        if (!form.sample_type) form.sample_type = '血清'
+      } else {
+        ElMessage.warning('未在系统找到该项目，请手动填写测量方法')
+      }
+      // 2) 搜索卫健委 EQA 质量目标
       await searchTargets(form.project_name)
-      // 自动选中第一个候选作为默认质量目标
       if (targetOptions.value.length) {
         selectedTargetId.value = targetOptions.value[0].id
         onTargetSelect(selectedTargetId.value)
@@ -474,6 +517,34 @@ async function onProjectChange() {
       }
     } catch (e) { /* ignore */ }
   }, 400)
+}
+
+// 推断被测量：方法含"酶法"或单位是 U/L → 活性，否则浓度
+function autoFillAnalyte(method) {
+  if (!form.project_name) return
+  const isEnzyme = /酶法|酶/.test(method || '') || (form.patient_unit === 'U/L')
+  form.analyte = isEnzyme ? `${form.project_name} 活性` : `${form.project_name} 浓度`
+}
+
+const methodMap = reactive({})
+
+async function searchMethod(query) {
+  if (!query || query.length < 1) { methodOptions.value = []; return }
+  methodLoading.value = true
+  try {
+    const res = await request.get('/api/v1/test-items', { params: { q: query, page_size: 8 } })
+    const items = (res && (res.items || res)) || []
+    // 收集 method 去重（保留首次出现顺序）
+    const seen = new Set()
+    const methods = []
+    items.forEach(it => {
+      const m = (it.method || '').trim()
+      if (m && !seen.has(m)) { seen.add(m); methods.push(m); methodMap[m] = it }
+    })
+    methodOptions.value = methods
+  } finally {
+    methodLoading.value = false
+  }
 }
 
 async function searchTargets(query) {
@@ -525,8 +596,9 @@ async function save() {
   }
   const payload = {
     project_name: form.project_name.trim(),
-    project_code: form.project_code,
-    instrument: form.instrument,
+    project_method: form.project_method,
+    sample_type: form.sample_type,
+    analyte: form.analyte,
     reagent: form.reagent,
     eval_date: form.eval_date,
     cycle_months: form.cycle_months,
@@ -606,8 +678,9 @@ function loadProject(p) {
   editingId.value = p.id
   form.mode = p.mode || 'single'
   form.project_name = p.project_name || ''
-  form.project_code = p.project_code || ''
-  form.instrument = p.instrument || ''
+  form.project_method = p.project_method || ''
+  form.sample_type = p.sample_type || '血清'
+  form.analyte = p.analyte || ''
   form.reagent = p.reagent || ''
   form.eval_date = p.eval_date || todayStr()
   form.cycle_months = p.cycle_months || 6
@@ -646,7 +719,8 @@ function cancelEdit() { editingId.value = null; clearForm() }
 function clearForm() {
   editingId.value = null
   Object.assign(form, {
-    project_name: '', project_code: '', instrument: '', reagent: '',
+    project_name: '', project_method: '', reagent: '',
+    sample_type: '血清', analyte: '',
     eval_date: todayStr(), cycle_months: 12,
     prepared_by: auth.user?.full_name || auth.user?.username || '金子铮',
     reviewed_by: '杨静',
@@ -698,26 +772,38 @@ function buildSingleReport(p) {
   const pv = p.patient_value || 0
   const pvUnit = p.patient_unit || ''
   const pvExt = p.patient_extended_value || 0
+  const method = p.project_method || '该检测方法'
+  const sample = p.sample_type || '血清'
+  const analyte = p.analyte || (p.project_name || '')
+  // 第一节标题：「方法 测量人 样本 被测量 测量结果不确定度的评定」
+  const section1Title = `第一节 ${method}测量人${sample}${analyte}测量结果不确定度的评定`
+  // 结论：「实验室 方法 测量人 样本 被测量 的性能符合要求」
+  const conclusionText = passed
+    ? `实验室${method}测量人${sample}${analyte}的性能符合要求。`
+    : '扩展不确定度超出质量目标，需改进精密度或校准溯源。'
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>测量不确定度评定报告 - ${esc(p.project_name)}</title><style>${reportStyle()}</style></head><body>
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>测量不确定度评定报告</h1>
-<h2 style="text-align:center">第一节 单个测量系统测量不确定度评定范例</h2>
+<h2 style="text-align:center">${esc(section1Title)}</h2>
 <table class="info-table">
 <tr><td><b>表格编号</b></td><td>BG-SM-CZ-072</td><td><b>版本号</b></td><td>01</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">${esc(p.project_name)}</td></tr>
-<tr><td><b>检测系统</b></td><td>${esc(p.instrument || '-')}</td><td><b>试剂/校准品</b></td><td>${esc(p.reagent || '-')}</td></tr>
-<tr><td><b>评定日期</b></td><td>${esc(p.eval_date || '-')}</td><td><b>评定周期</b></td><td>${p.cycle_months || 6} 个月</td></tr>
+<tr><td><b>测量方法</b></td><td colspan="3">${esc(method)}</td></tr>
+<tr><td><b>样本类型</b></td><td colspan="3">${esc(sample)}</td></tr>
+<tr><td><b>被测量</b></td><td colspan="3">${esc(analyte)}</td></tr>
+<tr><td><b>试剂/校准品</b></td><td colspan="3">${esc(p.reagent || '-')}</td></tr>
+<tr><td><b>评定日期</b></td><td>${esc(p.eval_date || '-')}</td><td><b>评定周期</b></td><td>${p.cycle_months || 12} 个月</td></tr>
 <tr><td><b>编制人</b></td><td>${esc(p.prepared_by || '金子铮')}</td><td><b>审核人</b></td><td>${esc(p.reviewed_by || '杨静')}</td></tr>
 </table>
 <h2>1. 定义被测量</h2>
 <table class="info-table">
-<tr><td><b>系统</b></td><td>血清</td><td><b>被测量</b></td><td>${esc(p.project_name)}</td></tr>
-<tr><td><b>单位</b></td><td colspan="3">${esc(pvUnit) || '—'}</td></tr>
-<tr><td><b>测量方法</b></td><td colspan="3">${esc(p.reagent || '-')}</td></tr>
+<tr><td><b>测量方法</b></td><td colspan="3">${esc(method)}</td></tr>
+<tr><td><b>样本类型</b></td><td>${esc(sample)}</td><td><b>报告单位</b></td><td>${esc(pvUnit) || '—'}</td></tr>
+<tr><td><b>被测量</b></td><td colspan="3">${esc(analyte)}</td></tr>
 </table>
-<p><b>被测量定义为：</b>使用${esc(p.instrument || '该检测系统')}测定${esc(p.project_name)}（${esc(pvUnit) || '—'}）。</p>
+<p><b>被测量定义为：</b>采用${esc(method)}测定${esc(sample)}中${esc(analyte)}（${esc(pvUnit) || '—'}）。</p>
 <h2>2. 不精密度引入测量不确定度分量</h2>
-<div class="note">💡 一般采用 <b>≥6 个月</b>的室内质控数据（保证长期精密度评估的代表性）。</div>
+<div class="note">一般采用 <b>≥12 个月</b>的室内质控数据（保证长期精密度评估的代表性）。</div>
 <p><b>(1) 该测量系统测量室内质控数据</b></p>
 <table class="data-table"><tr><th>水平</th><th>均值</th><th>标准差</th><th>u<sub>Rw</sub></th><th>相对标准差 RSD</th><th>测试数 n</th></tr>
 <tr><td>质控水平 1 (L1)</td><td>${(p.l1_mean || 0).toFixed(2)} ${esc(pvUnit)}</td><td>${(p.l1_sd || 0).toFixed(2)} ${esc(pvUnit)}</td><td>${(p.l1_sd || 0).toFixed(2)} ${esc(pvUnit)}</td><td>${rsd1.toFixed(2)}%</td><td>${p.l1_n || 0}</td></tr>
@@ -725,20 +811,20 @@ function buildSingleReport(p) {
 </table>
 <p><b>(2) 由不精密度引入的总不确定度（合并 L1、L2 RSD）</b></p>
 <p>u<sub>Rw</sub> = √[(RSD<sub>L1</sub>² × (n<sub>L1</sub>-1) + RSD<sub>L2</sub>² × (n<sub>L2</sub>-1)) / (n<sub>L1</sub> + n<sub>L2</sub> - 2)] = √[(${rsd1.toFixed(2)}²×(${(p.l1_n||0)-1}) + ${rsd2.toFixed(2)}²×(${(p.l2_n||0)-1})) / (${(p.l1_n||0)+(p.l2_n||0)}-2)] = <b>${uRw.toFixed(2)}%</b></p>
-<h2>3. 偏倚引入测量不确定度分量</h2>
-<p><b>(1) 校准品定值引入的不确定度（u<sub>cal</sub>）：</b>来源：${esc(p.ucal_source || '厂家')}，相对标准不确定度为 <b>${ucal.toFixed(2)}%</b>。</p>
-<p><b>(2) 室间质评：</b>实验室参加 EQA 成绩合格，偏倚分量不重复计算（已含于精密度）。</p>
+<h2>3. 校准品定值引入测量不确定度分量</h2>
+<p><b>(1) u<sub>cal</sub>：</b>来源：${esc(p.ucal_source || '厂家')}，相对标准不确定度为 <b>${ucal.toFixed(2)}%</b>。</p>
+${pt_result === '不合格' ? '<p><b>(2) 室间质评：</b>EQA 成绩不合格，需填入 5 水平偏倚数据（详见偏倚计算）。</p>' : '<p><b>(2) 室间质评：</b>实验室参加 EQA 成绩合格，偏倚分量不重复计算（已含于精密度）。</p>'}
 <h2>4. 计算合成不确定度</h2>
-<p>u<sub>c</sub> = √(u<sub>Rw</sub>² + u<sub>cal</sub>²) = √(${uRw.toFixed(2)}² + ${ucal.toFixed(2)}²) = <b>${uC.toFixed(2)}%</b></p>
+<p>u<sub>c</sub> = √(u<sub>Rw</sub>² + u<sub>cal</sub>²${p.pt_result === '不合格' ? ' + bias²' : ''}) = <b>${uC.toFixed(2)}%</b></p>
 <h2>5. 计算扩展不确定度</h2>
 <p>U = k × u<sub>c</sub> = 2 × ${uC.toFixed(2)}% = <strong>${uExt.toFixed(2)}%</strong>（k=2，包含概率 P≈95.45%）</p>
 <h2>6. 测量不确定度的报告</h2>
 ${pv > 0 ? `<p>患者在该系统的单个测量结果 = ${pv} ${esc(pvUnit)}，则扩展不确定度 = ${pv} × ${uExt.toFixed(2)}% = ${pvExt.toFixed(4)} ${esc(pvUnit)}（k=2），即测量结果 = (${pv} ± ${pvExt.toFixed(4)}) ${esc(pvUnit)}（k=2）。</p>` : '<p>（未填患者结果，跳过报告区间）</p>'}
 <h2>7. 结论</h2>
 <div class="note">
-${targetBias > 0 ? `<p><b>质量目标：</b>目标允许总误差 TEa（来源：${esc(targetSrc)}） = <b>${targetBias.toFixed(2)}%</b>，原始标准：${esc(targetText)}</p>` : '<p>⚠️ 项目质量要求库未找到允许总误差，临时按 U&lt;15% 兜底判断。</p>'}
+${targetBias > 0 ? `<p><b>质量目标：</b>目标允许总误差 TEa（来源：${esc(targetSrc)}） = <b>${targetBias.toFixed(2)}%</b>，原始标准：${esc(targetText)}</p>` : '<p>项目质量要求库未找到允许总误差，临时按 U&lt;15% 兜底判断。</p>'}
 <p><b>比较结果：</b>U = <b>${uExt.toFixed(2)}%</b> ${passed ? '&lt;' : '≥'} ${targetBias > 0 ? targetBias.toFixed(2) : '15'}% → <strong style="color:${passed ? 'green' : 'red'}">${passed ? '符合要求' : '未达标'}</strong></p>
-<p><b>结论：</b>${passed ? `实验室${esc(p.instrument || '')}测量${esc(p.project_name)}浓度的性能符合要求。` : '扩展不确定度超出质量目标，需改进精密度或校准溯源。'}</p>
+<p><b>结论：</b>${esc(conclusionText)}</p>
 </div>
 <div class="sign"><div>编制人签字：____________</div><div>审核人签字：____________</div></div>
 </body></html>`
@@ -757,20 +843,30 @@ function buildMultiReport(p) {
   const targetBias = p.target_bias || 0
   const targetText = p.target_bias_text || ''
   const targetSrc = p.target_bias_source || ''
+  const method = p.project_method || '该检测方法'
+  const sample = p.sample_type || '血清'
+  const analyte = p.analyte || (p.project_name || '')
+  const sectionTitle = `第二节 ${method}测量人${sample}${analyte}多个测量系统测量结果不确定度的评定`
+  const conclusionText = passed
+    ? `实验室${method}测量人${sample}${analyte}（多测量系统合并评定）的性能符合要求。`
+    : '扩展不确定度超出质量目标，需改进精密度或校准溯源。'
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>测量不确定度评定报告(多系统) - ${esc(p.project_name)}</title><style>${reportStyle()}</style></head><body>
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>测量不确定度评定报告</h1>
-<h2 style="text-align:center">第二节 多个测量系统测量不确定度评定范例</h2>
+<h2 style="text-align:center">${esc(sectionTitle)}</h2>
 <table class="info-table">
 <tr><td><b>表格编号</b></td><td>BG-SM-CZ-072</td><td><b>版本号</b></td><td>01</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">${esc(p.project_name)}</td></tr>
+<tr><td><b>测量方法</b></td><td colspan="3">${esc(method)}</td></tr>
+<tr><td><b>样本类型</b></td><td colspan="3">${esc(sample)}</td></tr>
+<tr><td><b>被测量</b></td><td colspan="3">${esc(analyte)}</td></tr>
 <tr><td><b>系统数</b></td><td>${sys.length}</td><td><b>系统列表</b></td><td>${esc(sys.map(s => s.name).join('、'))}</td></tr>
-<tr><td><b>评定日期</b></td><td>${esc(p.eval_date || '-')}</td><td><b>评定周期</b></td><td>${p.cycle_months || 6} 个月</td></tr>
+<tr><td><b>评定日期</b></td><td>${esc(p.eval_date || '-')}</td><td><b>评定周期</b></td><td>${p.cycle_months || 12} 个月</td></tr>
 <tr><td><b>编制人</b></td><td>${esc(p.prepared_by || '金子铮')}</td><td><b>审核人</b></td><td>${esc(p.reviewed_by || '杨静')}</td></tr>
 </table>
 <p>工作量大的临床实验室可使用几个相同的测量系统检测同一被测量。多个系统通常用同一批次 IQC 同时监控，需将系统内不精密度与系统间均值方差合并后算 u<sub>(pooled)</sub>。</p>
 <h2>1. 定义被测量</h2>
-<p><b>被测量定义为：</b>多系统测定${esc(p.project_name)}（${esc(pvUnit) || '—'}）。</p>
+<p><b>被测量定义为：</b>采用${esc(method)}，${esc(sys.map(s => s.name).join('、'))} 共 ${sys.length} 个测量系统联合测定${esc(sample)}中${esc(analyte)}（${esc(pvUnit) || '—'}）。</p>
 <h2>2. 不精密度引入测量不确定度分量</h2>
 <p><b>(1) ${sys.length} 个测量系统测量室内质控数据</b></p>
 <table class="data-table"><tr><th rowspan="2">测量系统</th><th colspan="4">L1 水平</th><th colspan="4">L2 水平</th></tr>
@@ -788,9 +884,9 @@ ${rsdRows}
 ${pv > 0 ? `<p>患者在该系统的单个测量结果 = ${pv} ${esc(pvUnit)}，则扩展不确定度 = ${pv} × ${(p.u_extended||0).toFixed(2)}% = ${pvExt.toFixed(4)} ${esc(pvUnit)}（k=2），即测量结果 = (${pv} ± ${pvExt.toFixed(4)}) ${esc(pvUnit)}（k=2）。</p>` : '<p>（未填患者结果，跳过报告区间）</p>'}
 <h2>5. 结论</h2>
 <div class="note">
-${targetBias > 0 ? `<p><b>质量目标：</b>目标允许总误差 TEa（来源：${esc(targetSrc)}） = <b>${targetBias.toFixed(2)}%</b>，原始标准：${esc(targetText)}</p>` : '<p>⚠️ 项目质量要求库未找到允许总误差，临时按 U&lt;15% 兜底判断。</p>'}
+${targetBias > 0 ? `<p><b>质量目标：</b>目标允许总误差 TEa（来源：${esc(targetSrc)}） = <b>${targetBias.toFixed(2)}%</b>，原始标准：${esc(targetText)}</p>` : '<p>项目质量要求库未找到允许总误差，临时按 U&lt;15% 兜底判断。</p>'}
 <p><b>比较结果：</b>U = <b>${(p.u_extended||0).toFixed(2)}%</b> ${passed ? '&lt;' : '≥'} ${targetBias > 0 ? targetBias.toFixed(2) : '15'}% → <strong style="color:${passed ? 'green' : 'red'}">${passed ? '符合要求' : '未达标'}</strong></p>
-<p><b>结论：</b>${passed ? `实验室多个测量系统测定${esc(p.project_name)}的性能符合要求。` : '扩展不确定度超出质量目标，需改进精密度或校准溯源。'}</p>
+<p><b>结论：</b>${esc(conclusionText)}</p>
 </div>
 <div class="sign"><div>编制人签字：____________</div><div>审核人签字：____________</div></div>
 </body></html>`

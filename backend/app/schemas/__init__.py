@@ -614,8 +614,9 @@ class EqaSummaryRead(EqaSummaryBase):
 class UncertaintyAssessmentBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     project_name: str = ""
-    project_code: str = ""
-    instrument: str = ""
+    project_method: str = ""
+    sample_type: str = "血清"
+    analyte: str = ""
     reagent: str = ""
     eval_date: str = ""
     cycle_months: int = 6  # 评定周期（月，IQC 数据采集周期）
