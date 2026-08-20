@@ -117,9 +117,6 @@
                   <el-option v-for="(it, idx) in unitOptions" :key="idx" :label="`${it.name} - ${it.unit || '?'}`" :value="it.unit" />
                 </el-select>
               </el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="报告单位">
-                <el-input v-model="form.patient_unit" placeholder="如：U/L、mmol/L、ng/mL" />
-              </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="评定日期">
                 <el-date-picker v-model="form.eval_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
               </el-form-item></el-col>
@@ -132,7 +129,7 @@
               <el-col :span="12"><el-form-item label="审核人">
                 <el-input v-model="form.reviewed_by" />
               </el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="患者结果（1例）">
+              <el-col :span="12"><el-form-item label="患者结果">
                 <el-input-number v-model="form.patient_value" :min="0" :precision="4" :controls="false" style="width:100%" />
               </el-form-item></el-col>
             </el-row>
@@ -671,6 +668,7 @@ async function save() {
     patient_value: form.patient_value,
     patient_unit: form.patient_unit,
     unit: form.patient_unit,
+    project_code: '',
     pt_result: form.pt_result || '合格',
     bias_levels: form.pt_result === '不合格' ? form.bias_levels : [],
     calibrator: form.calibrator,
