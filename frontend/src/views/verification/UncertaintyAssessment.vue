@@ -194,23 +194,19 @@
                   <span class="sys-title">系统 {{ String.fromCharCode(65 + idx) }}</span>
                   <el-button v-if="form.multi_systems.length > 2" size="small" type="danger" plain @click="form.multi_systems.splice(idx, 1)">删除</el-button>
                 </div>
-                <el-row :gutter="12">
-                  <el-col :span="3"><el-form-item label="名称" label-width="42px"><el-input v-model="s.name" :placeholder="'系统' + String.fromCharCode(65+idx)" /></el-form-item></el-col>
-                  <el-col :span="5"><el-form-item label="L1 均值" label-width="60px"><el-input-number v-model="s.l1_mean" :min="0" :controls="false" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="4"><el-form-item label="L1 SD" label-width="48px"><el-input-number v-model="s.l1_sd" :min="0" :controls="false" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="3"><el-form-item label="L1 n" label-width="40px"><el-input-number v-model="s.l1_n" :min="0" :controls="false" :precision="0" controls-position="right" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="5"><el-form-item label="L1 RSD%" label-width="65px">
-                    <el-input :value="s.l1_mean > 0 ? ((s.l1_sd / s.l1_mean) * 100).toFixed(2) + '%' : ''" readonly />
-                  </el-form-item></el-col>
+                <el-row :gutter="16">
+                  <el-col :span="4"><el-form-item label="名称" label-position="top" label-width="0"><el-input v-model="s.name" :placeholder="'系统' + String.fromCharCode(65+idx)" /></el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L1 均值" label-position="top" label-width="0"><el-input-number v-model="s.l1_mean" :min="0" :precision="4" :controls="false" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L1 SD" label-position="top" label-width="0"><el-input-number v-model="s.l1_sd" :min="0" :precision="4" :controls="false" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="4"><el-form-item label="L1 n" label-position="top" label-width="0"><el-input-number v-model="s.l1_n" :min="0" :precision="0" :controls="false" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="6"><el-form-item label="L1 RSD%" label-position="top" label-width="0"><el-input :value="s.l1_mean > 0 ? ((s.l1_sd / s.l1_mean) * 100).toFixed(2) + '%' : ''" readonly /></el-form-item></el-col>
                 </el-row>
-                <el-row :gutter="12">
-                  <el-col :span="3"><el-form-item label="&nbsp;" label-width="42px">&nbsp;</el-form-item></el-col>
-                  <el-col :span="5"><el-form-item label="L2 均值" label-width="60px"><el-input-number v-model="s.l2_mean" :min="0" :controls="false" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="4"><el-form-item label="L2 SD" label-width="48px"><el-input-number v-model="s.l2_sd" :min="0" :controls="false" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="3"><el-form-item label="L2 n" label-width="40px"><el-input-number v-model="s.l2_n" :min="0" :controls="false" :precision="0" controls-position="right" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="5"><el-form-item label="L2 RSD%" label-width="65px">
-                    <el-input :value="s.l2_mean > 0 ? ((s.l2_sd / s.l2_mean) * 100).toFixed(2) + '%' : ''" readonly />
-                  </el-form-item></el-col>
+                <el-row :gutter="16">
+                  <el-col :span="4"><el-form-item label="&nbsp;" label-position="top" label-width="0">&nbsp;</el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L2 均值" label-position="top" label-width="0"><el-input-number v-model="s.l2_mean" :min="0" :precision="4" :controls="false" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L2 SD" label-position="top" label-width="0"><el-input-number v-model="s.l2_sd" :min="0" :precision="4" :controls="false" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="4"><el-form-item label="L2 n" label-position="top" label-width="0"><el-input-number v-model="s.l2_n" :min="0" :precision="0" :controls="false" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="6"><el-form-item label="L2 RSD%" label-position="top" label-width="0"><el-input :value="s.l2_mean > 0 ? ((s.l2_sd / s.l2_mean) * 100).toFixed(2) + '%' : ''" readonly /></el-form-item></el-col>
                 </el-row>
               </div>
               <el-button size="small" plain @click="addSystem">+ 增加测量系统</el-button>
