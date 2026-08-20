@@ -187,12 +187,25 @@ def _read_summary(wb, info: dict) -> dict:
         header_words = ('验证要求', '验证结果', '验证结论', '验证内容')
         if content in header_words or result in header_words or conclusion in header_words:
             continue
-        # 特异性行（R26）：把 C2 的干扰物名列表拼到 result（模板上常列 3 个干扰物名但只填 1 个实测）
-        if r == 26 and content == '分析特异性' and result:
+        # 特异性行（R26-R28 多组干扰物）：每行 6/7/8 = 干扰物名/限量/结论
+        # result 拼成多行：每行 "<干扰物> <限量>"，用换行符连接
+        if r == 26 and content == '分析特异性':
             c2 = _safe_str(_val(ws, 26, 2))
             names = [s.strip() for s in re.split(r'[、，,/\n]', c2) if s.strip() and s.strip() != '抗干扰能力符合厂家声明']
-            if len(names) > 1:
-                result = f"干扰物：{'、'.join(names)}（实测：{result}）"
+            # 读 R26/R27/R28 的 干扰物名/限量
+            multi_lines = []
+            for rr in (26, 27, 28):
+                n = _safe_str(_val(ws, rr, 6)).strip()
+                lim = _safe_str(_val(ws, rr, 7)).strip()
+                if n and lim:
+                    multi_lines.append(f"{n} {lim}")
+            if len(multi_lines) >= 2:
+                result = "\n".join(multi_lines)
+            elif len(multi_lines) == 1 and len(names) >= 1:
+                result = multi_lines[0]
+            elif result:
+                # 兜底：只有 1 个干扰物具体值时用旧逻辑
+                result = f"干扰物：{'、'.join(names) if names else ''}（实测：{result}）"
         # 触发判定条件：content 或 result 或 conclusion 任一非空
         if content or result or conclusion:
             rows.append({

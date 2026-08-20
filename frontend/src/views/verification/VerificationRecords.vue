@@ -169,7 +169,23 @@ function teaPct(t) {
   if (isNaN(v)) return String(t)
   // 0<v<1 视为小数比例（0.18 → 18%）；>=1 直接当百分数
   const pct = v > 0 && v < 1 ? v * 100 : v
-  return pct.toFixed(2) + '%'
+  return pct.toFixed(1) + '%'
+}
+
+// 把 requirement 里的 "≤ 1/4 TEA" 等替换成 "≤ 1/4 TEA（5%）"（按 TEA% 算倍数）
+function expandTea(reqText, teaStr) {
+  if (!reqText || !teaStr) return reqText
+  const s = String(teaStr).trim().replace('%', '')
+  const teaVal = parseFloat(s)
+  if (isNaN(teaVal) || teaVal <= 0) return reqText
+  const pctNum = teaVal > 0 && teaVal < 1 ? teaVal * 100 : teaVal
+  // 匹配 ≤ 1/4 TEA / ≤ 1/3 TEA / ≤ 1/2 TEA / ≤ TEA 四种
+  return reqText.replace(/≤\s*(\d+)(?:\/(\d+))?\s*TEA/g, (m, num, den) => {
+    const n = parseInt(num); const d = den ? parseInt(den) : 1
+    const v = pctNum * n / d
+    const s2 = v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)
+    return `${m}（${s2}%）`
+  })
 }
 
 async function loadList() {
