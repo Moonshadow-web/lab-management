@@ -92,6 +92,10 @@ def _auto_fill_result_summary(data: dict, db: Session = None) -> dict:
     items = data.get("verify_items") or []
     report_type = data.get("report_type", "qualitative")
 
+    # 上传解析（vrf_parser）的记录：data 为空，result_summary 已由解析器算好，勿重算覆盖
+    if not data_field:
+        return data
+
     # 用户自定义判定标准（向导填写，存在 data._meta 中）
     meta = data_field.get("_meta") or {}
     tea = data.get("tea") or ""
