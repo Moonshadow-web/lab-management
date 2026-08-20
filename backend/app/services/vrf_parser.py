@@ -187,6 +187,12 @@ def _read_summary(wb, info: dict) -> dict:
         header_words = ('验证要求', '验证结果', '验证结论', '验证内容')
         if content in header_words or result in header_words or conclusion in header_words:
             continue
+        # 特异性行（R26）：把 C2 的干扰物名列表拼到 result（模板上常列 3 个干扰物名但只填 1 个实测）
+        if r == 26 and content == '分析特异性' and result:
+            c2 = _safe_str(_val(ws, 26, 2))
+            names = [s.strip() for s in re.split(r'[、，,/\n]', c2) if s.strip() and s.strip() != '抗干扰能力符合厂家声明']
+            if len(names) > 1:
+                result = f"干扰物：{'、'.join(names)}（实测：{result}）"
         # 触发判定条件：content 或 result 或 conclusion 任一非空
         if content or result or conclusion:
             rows.append({

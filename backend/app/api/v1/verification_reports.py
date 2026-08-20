@@ -306,11 +306,25 @@ def list_by_project(
             r_summary = {}
         latest_items_summary = []
         for k in v_items:
+            # 优先取 base key（result_summary 里若存的就是 base 名）；否则合并 subKey1+subKey2
             if k in r_summary and r_summary[k].get("result"):
                 latest_items_summary.append({
                     "key": k, "result": r_summary[k]["result"],
                     "conclusion": r_summary[k].get("conclusion", ""),
                 })
+            else:
+                # 找 subKey1 / subKey2，合并展示
+                sub_results, sub_concl = [], ""
+                for sk in (k + "1", k + "2"):
+                    if sk in r_summary and r_summary[sk].get("result"):
+                        sub_results.append(r_summary[sk]["result"])
+                        c = r_summary[sk].get("conclusion", "")
+                        if c and not sub_concl: sub_concl = c
+                if sub_results:
+                    latest_items_summary.append({
+                        "key": k, "result": " / ".join(sub_results),
+                        "conclusion": sub_concl,
+                    })
         archive.append({
             "project_name": pname,
             "latest_id": latest.id,

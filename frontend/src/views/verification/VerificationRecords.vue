@@ -36,7 +36,7 @@
           <el-descriptions-item label="报告单位">{{ r.unit || '—' }}</el-descriptions-item>
           <el-descriptions-item label="仪器型号">{{ r.instrument_model || '—' }}</el-descriptions-item>
           <el-descriptions-item label="仪器编号">{{ r.instrument_no || '—' }}</el-descriptions-item>
-          <el-descriptions-item v-if="r.report_type === 'quantitative'" label="允许总误差(TEA)">{{ r.tea || '—' }}</el-descriptions-item>
+          <el-descriptions-item v-if="r.report_type === 'quantitative'" label="允许总误差(TEA)">{{ teaPct(r.tea) }}</el-descriptions-item>
           <el-descriptions-item label="试剂厂家">{{ r.reagent || '—' }}</el-descriptions-item>
           <el-descriptions-item label="试剂批号">{{ r.reagent_lot || '—' }}</el-descriptions-item>
           <el-descriptions-item label="校准品">{{ r.calibrator || '—' }}</el-descriptions-item>
@@ -160,6 +160,17 @@ function conclusionRows(r) {
 }
 
 function formatData(d) { try { return JSON.stringify(d, null, 2) } catch { return String(d) } }
+
+// 允许总误差：源数据是小数形式（如 0.18 = 18%），显示转为百分数
+function teaPct(t) {
+  if (t == null || t === '' || t === '—') return '—'
+  const s = String(t).trim().replace('%', '')
+  const v = parseFloat(s)
+  if (isNaN(v)) return String(t)
+  // 0<v<1 视为小数比例（0.18 → 18%）；>=1 直接当百分数
+  const pct = v > 0 && v < 1 ? v * 100 : v
+  return pct.toFixed(2) + '%'
+}
 
 async function loadList() {
   loading.value = true
