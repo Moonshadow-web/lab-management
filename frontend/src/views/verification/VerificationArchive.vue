@@ -39,8 +39,7 @@
       <el-table-column label="操作" width="260" align="center" fixed="right">
         <template #default="{ row }">
           <el-button size="small" type="success" plain @click="download(row)">下载</el-button>
-          <el-button v-if="!row.ref_report_id" size="small" type="warning" plain @click="reparse(row)">重新解析</el-button>
-          <el-button v-else size="small" type="info" plain @click="gotoRecord(row)">查看记录</el-button>
+          <el-button v-if="row.ref_report_id" size="small" type="info" plain @click="gotoRecord(row)">查看记录</el-button>
           <el-button size="small" type="danger" plain @click="del(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -357,7 +356,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { listReportArchives, deleteReportArchive, downloadReportArchive, uploadReportArchive, reparseReportArchive } from '../../api/reportArchives'
+import { listReportArchives, deleteReportArchive, downloadReportArchive, uploadReportArchive } from '../../api/reportArchives'
 import { listVerificationReports, createVerificationReport, generateVerificationReport, downloadVerificationReport } from '../../api/verificationReports'
 import { useAuthStore } from '../../store/auth'
 

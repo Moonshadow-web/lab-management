@@ -64,50 +64,7 @@ async def upload_archive(
         except Exception:
             pass  # 非标准格式，退化为普通文件归档
 
-    # 上传即生成报告：自动生成模板化 xlsx 报告（独立 try，不影响上传本身）
-    if vrep_id:
-        try:
-            from ...models.verification_report import VerificationReport
-            from ...services.verification_report_gen import build_verification_report
-            from .verification_reports import _serialize_report, _auto_fill_result_summary
-            rec = db.get(VerificationReport, vrep_id)
-            if rec:
-                db.refresh(rec)  # 强制从 db 加载最新字段（避免 parse_and_store commit 后的 stale ORM）
-                data = _serialize_report(rec)
-                data = _auto_fill_result_summary(data)
-                rec.result_summary = json.dumps(data["result_summary"], ensure_ascii=False)
-                xlsx_bytes = build_verification_report(data)
-                fname = f"{rec.project_name or '项目'}_性能验证_{rec.report_type}.xlsx"
-                gen_rel = persist_save("verification_reports", fname, xlsx_bytes)
-                rec.report_file_path = gen_rel
-                gen_arch = ReportArchive(
-                    project_name=rec.project_name,
-                    report_type=rec.report_type,
-                    source_type="generated",
-                    ref_report_id=rec.id,
-                    ref_archive_kind="verification_report",
-                    original_name=fname,
-                    file_path=gen_rel,
-                    description="性能验证报告（自动生成）",
-                    created_by_id=user.id,
-                )
-                db.add(gen_arch)
-                db.commit()
-        except Exception as ge:
-            # 自动生成报告失败仅记日志，不影响上传归档
-            print(f"[upload auto-generate] {type(ge).__name__}: {ge}")
-            import traceback
-            tb = traceback.format_exc()
-            print(tb)
-            try: db.rollback()
-            except: pass
-            # 写入 _diag/last-errors 方便排查
-            try:
-                from .diag import capture_exception
-                capture_exception(ge, request.url.path if request else "")
-            except Exception:
-                pass
-
+    # 上传的报告：让 record 直接指向原始 xlsx（不生成额外报告），用户在「性能验证记录」点下载即下载原文件
     if parsed_info:
         project_name = parsed_info.get("project_name") or project_name
         report_type = parsed_info.get("report_type") or report_type
@@ -126,6 +83,17 @@ async def upload_archive(
     db.add(rec)
     db.commit()
     db.refresh(rec)
+    # 让 verification_record.report_file_path 直接指向 uploaded xlsx 路径
+    # 用户在「性能验证记录」点下载即下载原始 xlsx（无需生成额外报告）
+    if vrep_id:
+        try:
+            from ...models.verification_report import VerificationReport
+            vrec = db.get(VerificationReport, vrep_id)
+            if vrec and not vrec.report_file_path:
+                vrec.report_file_path = rel
+                db.commit()
+        except Exception:
+            pass
     write_audit(db, user, "upload", "report_archives", rec.id, {"file": rel, "parsed": bool(parsed_info)}, request.client.host if request.client else None)
     return {
         "id": rec.id, "project_name": rec.project_name, "report_type": rec.report_type,
