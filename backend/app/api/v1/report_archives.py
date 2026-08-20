@@ -65,7 +65,7 @@ async def upload_archive(
                 try:
                     from ...models.verification_report import VerificationReport
                     from ...services.verification_report_gen import build_verification_report
-                    from ...api.v1.verification_reports import _serialize_report, _auto_fill_result_summary
+                    from .verification_reports import _serialize_report, _auto_fill_result_summary
                     rec = db.get(VerificationReport, vrep_id)
                     if rec:
                         data = _serialize_report(rec)
