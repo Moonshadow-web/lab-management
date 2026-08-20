@@ -131,15 +131,15 @@ function conclusionRows(r) {
   const add = (content, key) => {
     let item = rs[key] || {}
     if (!item.result && !item.conclusion) {
-      // 回退到 content 对应的 result_summary 项（正确度/线性/参考等单值字段）
       const m = { '精密度':'precision','正确度':'trueness','线性范围':'linearity','可报告范围':'reportable','参考范围/区间':'reference','分析特异性':'specificity','方法符合率':'conformity','方法检出限':'lod' }
       const baseKey = m[content]
       item = rs[baseKey] || {}
-      // 正确度/精密度/可报告范围 常带 subKey 索引（trueness1/2, precision1/2, reportable1/2），优先取第 1 个
       if (!item.result && !item.conclusion && baseKey) {
         item = rs[baseKey + '1'] || rs[baseKey + '2'] || {}
       }
     }
+    // 验证要求文本后加（计算结果）：把 "≤ 1/4 TEA" 替换成 "≤ 1/4 TEA（5%）"
+    if (item.requirement) item.requirement = expandTea(item.requirement, r.tea)
     items.push({ content, requirement: req[key] || '—', result: item.result || '', conclusion: item.conclusion || '' })
   }
   if (t === 'qualitative') {
@@ -152,7 +152,23 @@ function conclusionRows(r) {
     add('精密度', 'precision2')
     if (r.verify_items?.includes('trueness')) add('正确度', 'trueness')
     if (r.verify_items?.includes('linearity')) add('线性范围', 'linearity')
-    if (r.verify_items?.includes('reportable')) { add('可报告范围', 'reportable1'); add('可报告范围', 'reportable2') }
+    if (r.verify_items?.includes('reportable')) {
+      // 稀释倍数 "/" 时不做验证（无验证要求列），但保留显示行
+      if (r.dilution === '/') {
+        const noVerify = { content: '可报告范围', requirement: '低限同线性范围下限', result: '—', conclusion: '无稀释倍数，不做可报告范围验证' }
+        items.push(noVerify)
+        items.push({ ...noVerify, requirement: '高限同线性范围上限' })
+      } else {
+        const r1 = rs['reportable1'] || {}
+        const r2 = rs['reportable2'] || {}
+        if (r1.result) {
+          items.push({ content: '可报告范围', requirement: req['reportable1'] || '—', result: `低限 ${r1.result}`, conclusion: r1.conclusion || '' })
+        }
+        if (r2.result) {
+          items.push({ content: '可报告范围', requirement: req['reportable2'] || '—', result: `高限 ${r2.result}`, conclusion: r2.conclusion || '' })
+        }
+      }
+    }
   }
   if (r.verify_items?.includes('reference')) add('参考范围/区间', 'reference')
   if (r.verify_items?.includes('specificity')) add('分析特异性', 'specificity')
