@@ -236,6 +236,28 @@ def _ensure_missing_columns():
         except Exception as e:  # noqa: BLE001
             logger.warning("修正 scheduling_assignments.post_id 可空失败(忽略): %s", e)
 
+    # 2026-08-20 修正：uncertainty_assessments.project_code 模型/Schema 已删（前端不再传），
+    # 但 MySQL 旧列 NOT NULL 无 default → INSERT 报 "Field 'project_code' doesn't have a default value"。
+    # 把列改可空（保留数据，前端不传/Model 不写，列被忽略）。仅 MySQL，幂等。
+    if engine.dialect.name == "mysql":
+        try:
+            with engine.connect() as c:
+                cols = c.exec_driver_sql(
+                    "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='uncertainty_assessments' "
+                    "AND COLUMN_NAME='project_code'"
+                ).fetchall()
+            for row in cols:
+                if str(row[0]).upper() == "NO":
+                    with engine.begin() as conn:
+                        conn.exec_driver_sql(
+                            "ALTER TABLE uncertainty_assessments MODIFY project_code VARCHAR(100) NULL DEFAULT ''"
+                        )
+                    logger.info("修正 uncertainty_assessments.project_code 为可空")
+                    break
+        except Exception as e:  # noqa: BLE001
+            logger.warning("修正 uncertainty_assessments.project_code 可空失败(忽略): %s", e)
+
     # 2026-07-31 修正：人员继续教育(personnel_edu_exp)的 train_date 存放完整起止区间
     # （如 '2019.11.19-2019.11.23'，21 字符），原 VARCHAR(20) 会触发 MySQL
     # "Data too long" 导致写入 500。扩宽为 VARCHAR(40)。幂等（仅当当前长度 < 40 时改）。
