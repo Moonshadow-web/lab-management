@@ -248,8 +248,6 @@ def _fill_qualitative(wb, d):
 def _fill_quantitative(wb, d):
     data = d.get("data") or {}
     rs = d.get("result_summary") or {}
-
-    # ---- 正确度-偏倚评估：R40-R44（5 天 × C 第1次 + E 第2次）----
     tru = data.get("trueness") or {}
     levels = tru.get("levels") or []
     if levels:
@@ -321,6 +319,81 @@ def _fill_quantitative(wb, d):
     _set(raw, 14, 6, d.get("reviewer", ""))
 
 
+def _fill_static_computed(wb, d, details):
+    """把后端计算引擎算出的核心指标/判定静态写入模板（不依赖 Excel 公式）。
+
+    覆盖的单元格均为模板里原本由公式输出的「展示/判定」格：
+    - 精密度：E58/K58 均值、E59/K59 批内CV、E60/K60 批间CV、E61/K61 实验室内CV、
+      I30/I31 是否满足、K30/K31 批内判定、L30/L31 实验室内判定、A34 结论
+    - 正确度：B28/C28/E28/G28/I28（水平1）、B29/C29/E29/G29/I29（水平2）、A32 结论
+    - 线性范围：G40:G45 各点均值、H40:H45 理论值
+    """
+    details = details or {}
+
+    # ── 精密度（定性/定量坐标一致）──
+    pdet = details.get("precision") or {}
+    levels = pdet.get("levels") or []
+    if levels:
+        ws = wb["精密度"]
+        for i, lv in enumerate(levels[:2]):
+            col = 5 if i == 0 else 11  # E / K
+            mean = lv.get("mean")
+            if mean is not None:
+                _set(ws, 58, col, round(mean, 4))
+            for row, key in ((59, "within_cv"), (60, "between_cv"), (61, "lab_cv")):
+                v = lv.get(key)
+                if v is not None and v:
+                    cell = ws.cell(row=row, column=col)
+                    cell.value = round(v / 100, 6)
+                    cell.number_format = "0.00%"
+        wcv = pdet.get("within_cv_list") or []
+        lcv = pdet.get("lab_cv_list") or []
+        wt, lt = pdet.get("within_target") or 0, pdet.get("lab_target") or 0
+        for i in range(min(2, len(wcv))):
+            row = 30 + i
+            w_ok = wcv[i] < wt
+            l_ok = (i < len(lcv)) and lcv[i] < lt
+            _set(ws, row, 9, "是" if (w_ok and l_ok) else "否")      # I
+            _set(ws, row, 11, "符合要求" if w_ok else "不符合要求")   # K 批内
+            _set(ws, row, 12, "符合要求" if l_ok else "不符合要求")   # L 实验室内
+        _pconcl = (d.get("result_summary") or {}).get("precision1", {}).get("conclusion", "")
+        if _pconcl:
+            _set(ws, 34, 1, _pconcl)
+
+    # ── 正确度（定量）──
+    tdet = details.get("trueness") or {}
+    tlevels = tdet.get("levels") or []
+    if tlevels:
+        ws = wb["正确度-偏倚评估"]
+        limit = tdet.get("limit") or 0
+        for i, lv in enumerate(tlevels[:2]):
+            row = 28 + i
+            mean, bias = lv.get("mean"), lv.get("bias_pct")
+            if mean is not None:
+                _set(ws, row, 2, round(mean, 3))          # B 总均值
+            if bias is not None:
+                _set(ws, row, 3, round(abs(bias), 3))     # C 偏倚绝对值
+                _set(ws, row, 5, round(bias, 3))          # E 相对偏倚
+                ok = abs(bias) <= limit
+                _set(ws, row, 7, "是" if ok else "否")     # G 是否在允许偏倚内
+                _set(ws, row, 9, "可接受" if ok else "不可接受")  # I 正确度验证
+        _tconcl = (d.get("result_summary") or {}).get("trueness", {}).get("conclusion", "")
+        if _tconcl:
+            _set(ws, 32, 1, _tconcl)
+
+    # ── 线性范围（定量）──
+    ldet = details.get("linearity") or {}
+    llevels = ldet.get("levels") or []
+    if llevels and "线性范围" in wb.sheetnames:
+        ws = wb["线性范围"]
+        for i, lv in enumerate(llevels):
+            row = 40 + i
+            if lv.get("mean") is not None:
+                _set(ws, row, 7, round(lv["mean"], 3))    # G 均值
+            if lv.get("theory") is not None:
+                _set(ws, row, 8, round(lv["theory"], 3))  # H 理论值
+
+
 def build_verification_report(d: dict) -> bytes:
     """根据记录数据生成 xlsx 报告（模板驱动），返回字节。"""
     rtype = d.get("report_type", "qualitative")
@@ -328,6 +401,17 @@ def build_verification_report(d: dict) -> bytes:
     if not template.exists():
         raise FileNotFoundError(f"模板缺失：{template}")
     wb = load_workbook(template)  # data_only=False，公式保留
+    # 后端计算引擎：算出核心指标/判定，供静态写入（报告不依赖 Excel 公式重算）
+    from .verification_calc import compute_verification, _extract_first_pct
+    meta = (d.get("data") or {}).get("_meta") or {}
+    within_target = _extract_first_pct(meta.get("precision_within_cv_target") or "") or None
+    lab_target = _extract_first_pct(meta.get("precision_lab_cv_target") or "") or None
+    _calc = compute_verification(
+        d.get("data") or {}, d.get("verify_items") or [],
+        report_type=d.get("report_type", "qualitative"), tea=d.get("tea"),
+        within_cv_target=within_target, lab_cv_target=lab_target,
+        linear_low=d.get("linear_low"), linear_high=d.get("linear_high"),
+    )
     fill_cover(wb, d)
     _fill_precision_data(wb, d)
     _fill_summary(wb, d)
@@ -335,6 +419,7 @@ def build_verification_report(d: dict) -> bytes:
         _fill_qualitative(wb, d)
     else:
         _fill_quantitative(wb, d)
+    _fill_static_computed(wb, d, _calc["details"])
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()

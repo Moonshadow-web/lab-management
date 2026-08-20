@@ -636,6 +636,12 @@ function buildPayload() {
       }
     }
   })
+  const dataClone = JSON.parse(JSON.stringify(form.data))
+  // 自定义判定标准（批内/实验室内 CV 要求）随 data 传给后端计算引擎
+  dataClone._meta = {
+    precision_within_cv_target: form.precision_within_cv_target || '',
+    precision_lab_cv_target: form.precision_lab_cv_target || '',
+  }
   return {
     report_type: form.report_type, project_name: form.project_name, project_method: form.project_method, unit: form.unit,
     reagent: form.reagent, reagent_lot: form.reagent_lot, calibrator: form.calibrator, calibrator_lot: form.calibrator_lot,
@@ -643,7 +649,7 @@ function buildPayload() {
     instrument_model: form.instrument_model, instrument_no: form.instrument_no,
     tea: form.tea, linear_low: form.linear_low, linear_high: form.linear_high, dilution: form.dilution,
     verify_date: form.verify_date, operator: form.operator, reviewer: form.reviewer,
-    verify_items: form.verify_items, data: JSON.parse(JSON.stringify(form.data)), result_summary: rs,
+    verify_items: form.verify_items, data: dataClone, result_summary: rs,
     conclusion: form.conclusion,
   }
 }

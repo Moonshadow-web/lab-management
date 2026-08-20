@@ -50,127 +50,65 @@ def _serialize_report(rec: VerificationReport) -> dict:
     return d
 
 
-def _auto_fill_result_summary(data: dict) -> dict:
-    """从 data 自动计算缺失的 result_summary 字段（让结论表无空值）。
+def _lookup_tea(db: Session, project_name: str) -> str:
+    """按项目名从质量要求库（QualityRequirement）查 TEa，WS/T 403-2024 优先。
 
-    - precision1：批内 CV（每个水平的天内 3 次重复 SD/均值，再跨天平均；分别按水平报）
-    - precision2：实验室内 CV（每个水平全部数据 SD/均值；分别按水平报）
-    - reportable1/reportable2：可报告低/高限靶值
-    - reference：参考区间每组超出统计
-    - specificity：从 items 拼出"干扰物 名 ≤限量 实测偏倚"细分（取代笼统的"符合厂家声明"）
+    返回首个干净百分比（如 "10"），未命中返回空串（由用户手填 TEA）。
     """
-    import statistics as _stats
+    if not db or not project_name:
+        return ""
+    from sqlalchemy import or_
+    from ...models.quality_requirement import QualityRequirement
+    from ...services.verification_calc import _extract_first_pct
+    try:
+        rows = db.query(QualityRequirement).filter(
+            or_(
+                QualityRequirement.item_name == project_name,
+                QualityRequirement.item_name.like(f"%{project_name}%"),
+            )
+        ).all()
+    except Exception:
+        return ""
+    for src in ("wst403-2024", "bj-hr-2025", "nccl-2026"):
+        for r in rows:
+            if r.source == src and r.tea:
+                pct = _extract_first_pct(r.tea)
+                if pct is not None:
+                    return f"{pct:g}"
+    return ""
+
+
+def _auto_fill_result_summary(data: dict, db: Session = None) -> dict:
+    """用后端计算引擎（services/verification_calc.py）自动计算各验证项结果与结论。
+
+    引擎覆盖：精密度 CV、正确度偏倚、线性范围、方法符合率、检出限、
+    可报告范围、参考区间、分析特异性。TEA 未填时从质量要求库联动获取。
+    计算出的 result_summary 写回 data，供报告生成器静态写入模板单元格。
+    """
+    from ...services.verification_calc import compute_verification, _extract_first_pct
 
     rs = data.get("result_summary") or {}
     data_field = data.get("data") or {}
     items = data.get("verify_items") or []
+    report_type = data.get("report_type", "qualitative")
 
-    # ─── 精密度：按水平分别算批内 CV / 实验室内 CV，拼成"低值 X 高值 Y" ───
-    # 重算条件：老格式是"CV X%"开头（解析器写的），新格式以"低值"开头；若已是新格式则跳过
-    _prec_old = rs.get("precision1", {}).get("result", "")
-    _need_prec = "precision" in items and (not _prec_old or _prec_old.startswith("CV "))
-    if _need_prec:
-        prec_levels = (data_field.get("precision") or {}).get("levels") or []
-        runs_in = []   # 水平1 批内CV
-        days_in = []   # 水平1 实验室内CV
-        runs_in2 = []  # 水平2 批内CV
-        days_in2 = []  # 水平2 实验室内CV
-        for idx, lv in enumerate(prec_levels[:2]):
-            # 兼容两种字段名：days（解析器）和 rows（前端向导）
-            days = lv.get("days") or lv.get("rows") or []
-            if not days:
-                continue
-            day_means = []
-            day_cv_list = []
-            for day in days:
-                nums = [float(v) for v in day if v not in (None, "")]
-                if len(nums) >= 2:
-                    m = sum(nums) / len(nums)
-                    sd = _stats.pstdev(nums) if len(nums) >= 2 else 0
-                    if m:
-                        day_cv_list.append(sd / m * 100)
-                    day_means.append(m)
-            all_nums = [float(v) for d in days for v in d if v not in (None, "")]
-            if len(all_nums) >= 2:
-                m_all = sum(all_nums) / len(all_nums)
-                sd_all = _stats.pstdev(all_nums)
-                cv_lab = (sd_all / m_all * 100) if m_all else 0
-            else:
-                cv_lab = 0
-            cv_run = sum(day_cv_list) / len(day_cv_list) if day_cv_list else 0
-            if idx == 0:
-                runs_in.append(cv_run); days_in.append(cv_lab)
-            else:
-                runs_in2.append(cv_run); days_in2.append(cv_lab)
+    # 用户自定义判定标准（向导填写，存在 data._meta 中）
+    meta = data_field.get("_meta") or {}
+    tea = data.get("tea") or ""
+    if not tea:
+        tea = _lookup_tea(db, data.get("project_name", ""))
+        if tea:
+            data["tea"] = tea  # 联动质量目标库写回，报告封面/汇总可见
 
-        def _fmt(r1, r2):
-            a = f"低值{r1:.2f}%" if r1 else ""
-            b = f"高值{r2:.2f}%" if r2 else ""
-            if a and b: return f"{a} {b}"
-            return a or b or ""
+    within_target = _extract_first_pct(meta.get("precision_within_cv_target") or "") or None
+    lab_target = _extract_first_pct(meta.get("precision_lab_cv_target") or "") or None
 
-        # precision1 = 批内 CV；precision2 = 实验室内 CV
-        if runs_in or runs_in2:
-            rs["precision1"] = {
-                "result": _fmt(runs_in[0] if runs_in else 0, runs_in2[0] if runs_in2 else 0),
-                "conclusion": "符合要求",
-            }
-        if days_in or days_in2:
-            rs["precision2"] = {
-                "result": _fmt(days_in[0] if days_in else 0, days_in2[0] if days_in2 else 0),
-                "conclusion": "符合要求",
-            }
-
-    # 可报告范围：低限/高限
-    if "reportable" in items and not rs.get("reportable1"):
-        rep = data_field.get("reportable") or {}
-        low = (rep.get("low") or {}).get("target", "")
-        high = (rep.get("high") or {}).get("target", "")
-        if low:
-            rs["reportable1"] = {"result": f"低限 {low}", "conclusion": "符合要求"}
-        if high:
-            rs["reportable2"] = {"result": f"高限 {high}", "conclusion": "符合要求"}
-
-    # 参考区间：每组超出统计
-    if "reference" in items and not rs.get("reference"):
-        ref = data_field.get("reference") or {}
-        groups = ref.get("groups") or []
-        if groups:
-            outs = [g.get("out", "0") for g in groups]
-            txt = "、".join([f"{g.get('name','')}超出{out}" for g, out in zip(groups, outs)])
-            rs["reference"] = {
-                "result": f"{txt}，每组≤2个",
-                "conclusion": "符合要求",
-            }
-
-    # ─── 分析特异性：从 items 拼出具体阈值（细到每个干扰物） ───
-    # 重算条件：当前是兜底"符合厂家声明"或没值时，重算为"物品名 限量 实测"明细
-    _spec_old = rs.get("specificity", {}).get("result", "")
-    _need_spec = (
-        "specificity" in items
-        and (not _spec_old or "符合厂家声明" in _spec_old or "符合" == _spec_old.strip())
+    res = compute_verification(
+        data_field, items, report_type=report_type, tea=tea,
+        within_cv_target=within_target, lab_cv_target=lab_target,
+        linear_low=data.get("linear_low"), linear_high=data.get("linear_high"),
     )
-    if _need_spec:
-        spec_items = (data_field.get("specificity") or {}).get("items") or []
-        # 过滤掉空行（只有名字没用）
-        filled = [it for it in spec_items if (it.get("limit") or it.get("measured"))]
-        if filled:
-            parts = []
-            for it in filled:
-                nm = (it.get("name") or "").strip()
-                lm = (it.get("limit") or "").strip()
-                ms = (it.get("measured") or "").strip()
-                seg = nm
-                if lm:
-                    seg += f" {lm}"
-                if ms and ms != "符合要求" and ms != "不符合要求":
-                    seg += f"  实测{ms}"
-                parts.append(seg)
-            rs["specificity"] = {
-                "result": "；".join(parts) or "抗干扰能力符合厂家声明",
-                "conclusion": "符合要求",
-            }
-
+    rs.update(res["result_summary"])
     data["result_summary"] = rs
     return data
 
@@ -189,9 +127,11 @@ def generate_report(
     from ...services.verification_report_gen import build_verification_report
     try:
         data = _serialize_report(rec)
-        data = _auto_fill_result_summary(data)
+        data = _auto_fill_result_summary(data, db)
         # 自动填的新字段写回数据库
         rec.result_summary = json.dumps(data["result_summary"], ensure_ascii=False)
+        if data.get("tea"):
+            rec.tea = data["tea"]
         db.commit()
         xlsx_bytes = build_verification_report(data)
     except Exception as e:  # noqa: BLE001 模板/数据异常向上暴露
