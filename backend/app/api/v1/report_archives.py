@@ -96,9 +96,16 @@ async def upload_archive(
             # 自动生成报告失败仅记日志，不影响上传归档
             print(f"[upload auto-generate] {type(ge).__name__}: {ge}")
             import traceback
-            print(traceback.format_exc())
+            tb = traceback.format_exc()
+            print(tb)
             try: db.rollback()
             except: pass
+            # 写入 _diag/last-errors 方便排查
+            try:
+                from .diag import capture_exception
+                capture_exception(ge, request.url.path if request else "")
+            except Exception:
+                pass
 
     if parsed_info:
         project_name = parsed_info.get("project_name") or project_name
