@@ -62,11 +62,13 @@ async def upload_archive(
             parsed_info = parsed
             # 上传即生成报告：自动生成模板化 xlsx 报告，用户无需手动点"生成报告"
             if vrep_id:
+                print(f"[upload] auto generate entering, vrep_id={vrep_id}, type(rec) check")
                 try:
                     from ...models.verification_report import VerificationReport
                     from ...services.verification_report_gen import build_verification_report
                     from .verification_reports import _serialize_report, _auto_fill_result_summary
                     rec = db.get(VerificationReport, vrep_id)
+                    print(f"[upload] got rec={rec is not None}, project={rec.project_name if rec else None}")
                     if rec:
                         data = _serialize_report(rec)
                         data = _auto_fill_result_summary(data)
