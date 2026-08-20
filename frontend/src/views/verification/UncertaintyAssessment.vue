@@ -29,7 +29,7 @@
                   allow-create
                   clearable
                 >
-                  <el-option v-for="m in methodOptions" :key="m" :label="m" :value="m" />
+                  <el-option v-for="m in methodOptions" :key="m" :label="methodLabel(m)" :value="m" />
                 </el-select>
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="样本类型">
@@ -69,8 +69,53 @@
                   </div>
                 </el-form-item>
               </el-col>
-              <el-col :span="12"><el-form-item label="试剂/校准品">
-                <el-input v-model="form.reagent" placeholder="如：贝克曼原装试剂" />
+              <el-col :span="12"><el-form-item label="试剂">
+                <el-select
+                  v-model="form.reagent"
+                  filterable
+                  remote
+                  reserve-keyword
+                  :remote-method="(q) => searchItemField(q, 'reagent')"
+                  :loading="reagentLoading"
+                  placeholder="输入项目名/试剂名搜索（可手动输入）"
+                  style="width:100%"
+                  allow-create
+                  clearable
+                >
+                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="`${it.name} - ${it.reagent || '?'}`" :value="it.reagent" />
+                </el-select>
+              </el-form-item></el-col>
+              <el-col :span="12"><el-form-item label="校准品">
+                <el-select
+                  v-model="form.calibrator"
+                  filterable
+                  remote
+                  reserve-keyword
+                  :remote-method="(q) => searchItemField(q, 'calibrator')"
+                  :loading="calibratorLoading"
+                  placeholder="输入项目名/校准品搜索（可手动输入）"
+                  style="width:100%"
+                  allow-create
+                  clearable
+                >
+                  <el-option v-for="(it, idx) in calibratorOptions" :key="idx" :label="`${it.name} - ${it.calibrator || '?'}`" :value="it.calibrator" />
+                </el-select>
+              </el-form-item></el-col>
+              <el-col :span="12"><el-form-item label="报告单位">
+                <el-select
+                  v-model="form.patient_unit"
+                  filterable
+                  remote
+                  reserve-keyword
+                  :remote-method="(q) => searchItemField(q, 'unit')"
+                  :loading="unitLoading"
+                  placeholder="输入项目名/单位搜索（可手动输入）"
+                  style="width:100%"
+                  allow-create
+                  clearable
+                >
+                  <el-option v-for="(it, idx) in unitOptions" :key="idx" :label="`${it.name} - ${it.unit || '?'}`" :value="it.unit" />
+                </el-select>
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="报告单位">
                 <el-input v-model="form.patient_unit" placeholder="如：U/L、mmol/L、ng/mL" />
@@ -87,8 +132,8 @@
               <el-col :span="12"><el-form-item label="审核人">
                 <el-input v-model="form.reviewed_by" />
               </el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="患者结果(可选)">
-                <el-input-number v-model="form.patient_value" :min="0" :precision="4" style="width:100%" />
+              <el-col :span="12"><el-form-item label="患者结果（1例）">
+                <el-input-number v-model="form.patient_value" :min="0" :precision="4" :controls="false" style="width:100%" />
               </el-form-item></el-col>
             </el-row>
 
@@ -114,25 +159,25 @@
                 <el-col :span="12">
                   <div class="level-tag" style="background:#67c23a">L1 水平</div>
                   <el-form-item label="均值" label-width="60px">
-                    <el-input-number v-model="form.l1_mean" :min="0" :precision="4" style="width:100%" />
+                    <el-input-number v-model="form.l1_mean" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                   <el-form-item label="标准差" label-width="60px">
-                    <el-input-number v-model="form.l1_sd" :min="0" :precision="4" style="width:100%" />
+                    <el-input-number v-model="form.l1_sd" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                   <el-form-item label="测试数 n" label-width="60px">
-                    <el-input-number v-model="form.l1_n" :min="0" :precision="0" style="width:100%" />
+                    <el-input-number v-model="form.l1_n" :min="0" :controls="false" :precision="0" style="width:100%" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
                   <div class="level-tag" style="background:#e6a23c">L2 水平</div>
                   <el-form-item label="均值" label-width="60px">
-                    <el-input-number v-model="form.l2_mean" :min="0" :precision="4" style="width:100%" />
+                    <el-input-number v-model="form.l2_mean" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                   <el-form-item label="标准差" label-width="60px">
-                    <el-input-number v-model="form.l2_sd" :min="0" :precision="4" style="width:100%" />
+                    <el-input-number v-model="form.l2_sd" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                   <el-form-item label="测试数 n" label-width="60px">
-                    <el-input-number v-model="form.l2_n" :min="0" :precision="0" style="width:100%" />
+                    <el-input-number v-model="form.l2_n" :min="0" :controls="false" :precision="0" style="width:100%" />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -154,18 +199,18 @@
                 </div>
                 <el-row :gutter="12">
                   <el-col :span="3"><el-form-item label="名称" label-width="42px"><el-input v-model="s.name" :placeholder="'系统' + String.fromCharCode(65+idx)" /></el-form-item></el-col>
-                  <el-col :span="5"><el-form-item label="L1 均值" label-width="60px"><el-input-number v-model="s.l1_mean" :min="0" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="4"><el-form-item label="L1 SD" label-width="48px"><el-input-number v-model="s.l1_sd" :min="0" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="3"><el-form-item label="L1 n" label-width="40px"><el-input-number v-model="s.l1_n" :min="0" :precision="0" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L1 均值" label-width="60px"><el-input-number v-model="s.l1_mean" :min="0" :controls="false" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="4"><el-form-item label="L1 SD" label-width="48px"><el-input-number v-model="s.l1_sd" :min="0" :controls="false" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="3"><el-form-item label="L1 n" label-width="40px"><el-input-number v-model="s.l1_n" :min="0" :controls="false" :precision="0" controls-position="right" style="width:100%" /></el-form-item></el-col>
                   <el-col :span="5"><el-form-item label="L1 RSD%" label-width="65px">
                     <el-input :value="s.l1_mean > 0 ? ((s.l1_sd / s.l1_mean) * 100).toFixed(2) + '%' : ''" readonly />
                   </el-form-item></el-col>
                 </el-row>
                 <el-row :gutter="12">
                   <el-col :span="3"><el-form-item label="&nbsp;" label-width="42px">&nbsp;</el-form-item></el-col>
-                  <el-col :span="5"><el-form-item label="L2 均值" label-width="60px"><el-input-number v-model="s.l2_mean" :min="0" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="4"><el-form-item label="L2 SD" label-width="48px"><el-input-number v-model="s.l2_sd" :min="0" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
-                  <el-col :span="3"><el-form-item label="L2 n" label-width="40px"><el-input-number v-model="s.l2_n" :min="0" :precision="0" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L2 均值" label-width="60px"><el-input-number v-model="s.l2_mean" :min="0" :controls="false" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="4"><el-form-item label="L2 SD" label-width="48px"><el-input-number v-model="s.l2_sd" :min="0" :controls="false" :precision="4" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="3"><el-form-item label="L2 n" label-width="40px"><el-input-number v-model="s.l2_n" :min="0" :controls="false" :precision="0" controls-position="right" style="width:100%" /></el-form-item></el-col>
                   <el-col :span="5"><el-form-item label="L2 RSD%" label-width="65px">
                     <el-input :value="s.l2_mean > 0 ? ((s.l2_sd / s.l2_mean) * 100).toFixed(2) + '%' : ''" readonly />
                   </el-form-item></el-col>
@@ -189,7 +234,7 @@
             <div class="data-block">
               <div class="data-block-title">🎯 校准品不确定度</div>
               <el-form-item label="u_cal (%)">
-                <el-input-number v-model="form.ucal" :min="0" :precision="2" :step="0.1" style="width:180px" />
+                <el-input-number v-model="form.ucal" :min="0" :controls="false" :precision="2" :step="0.1" style="width:180px" />
                 <span style="margin-left:8px;color:#909399;font-size:12px">多个校准品时，保守选择相对标准不确定度最大的</span>
               </el-form-item>
               <el-form-item label="来源">
@@ -366,6 +411,13 @@ const targetMap = reactive({})
 // 测量方法下拉选项（从 test_items 模糊搜索得到）
 const methodOptions = ref([])
 const methodLoading = ref(false)
+// 试剂/校准品/单位下拉选项
+const reagentOptions = ref([])
+const reagentLoading = ref(false)
+const calibratorOptions = ref([])
+const calibratorLoading = ref(false)
+const unitOptions = ref([])
+const unitLoading = ref(false)
 
 const todayStr = () => {
   const d = new Date()
@@ -491,19 +543,26 @@ async function onProjectChange() {
   if (!form.project_name || form.project_name.length < 2) return
   lookupTimer = setTimeout(async () => {
     try {
-      // 1) 搜索 test_items 自动填方法/单位/被测量
+      // 1) 搜索 test_items 自动填方法/单位/试剂/校准品
       await searchMethod(form.project_name)
       if (methodOptions.value.length) {
-        // 自动选第一个
+        // 自动选第一个方法
         form.project_method = methodOptions.value[0]
-        // 同步填被测量（项目+浓度/活性，按方法推断）
+        // 同步填被测量（按方法推断）
         autoFillAnalyte(methodOptions.value[0])
-        // 自动填报告单位
-        const matched = (methodMap.value || {})
-        const hit = matched[methodOptions.value[0]]
-        if (hit && hit.unit) form.patient_unit = hit.unit
+        // 从第一个匹配项填报告单位/试剂/校准品
+        const hit = methodMap[methodOptions.value[0]]
+        if (hit) {
+          if (hit.unit) form.patient_unit = hit.unit
+          if (hit.reagent && !form.reagent) form.reagent = hit.reagent
+          if (hit.calibrator && !form.calibrator) form.calibrator = hit.calibrator
+        }
         // 标本类型默认血清
         if (!form.sample_type) form.sample_type = '血清'
+        // 同时搜 reagent/calibrator/unit 候选下拉
+        await searchItemField(form.project_name, 'reagent')
+        await searchItemField(form.project_name, 'calibrator')
+        await searchItemField(form.project_name, 'unit')
       } else {
         ElMessage.warning('未在系统找到该项目，请手动填写测量方法')
       }
@@ -519,11 +578,10 @@ async function onProjectChange() {
   }, 400)
 }
 
-// 推断被测量：方法含"酶法"或单位是 U/L → 活性，否则浓度
+// 推断被测量：单位是 U/L → 活性，否则浓度（浓度/活性最终用户可手动改）
 function autoFillAnalyte(method) {
   if (!form.project_name) return
-  const isEnzyme = /酶法|酶/.test(method || '') || (form.patient_unit === 'U/L')
-  form.analyte = isEnzyme ? `${form.project_name} 活性` : `${form.project_name} 浓度`
+  form.analyte = (form.patient_unit === 'U/L') ? `${form.project_name} 活性` : `${form.project_name} 浓度`
 }
 
 const methodMap = reactive({})
@@ -612,8 +670,10 @@ async function save() {
     multi_systems: form.mode === 'multi' ? form.multi_systems : [],
     patient_value: form.patient_value,
     patient_unit: form.patient_unit,
+    unit: form.patient_unit,
     pt_result: form.pt_result || '合格',
     bias_levels: form.pt_result === '不合格' ? form.bias_levels : [],
+    calibrator: form.calibrator,
     target_bias: form.target_bias,
     target_bias_text: form.target_bias_text,
     target_bias_source: form.target_bias_source,
@@ -681,6 +741,7 @@ function loadProject(p) {
   form.project_method = p.project_method || ''
   form.sample_type = p.sample_type || '血清'
   form.analyte = p.analyte || ''
+  form.calibrator = p.calibrator || ''
   form.reagent = p.reagent || ''
   form.eval_date = p.eval_date || todayStr()
   form.cycle_months = p.cycle_months || 6
@@ -720,7 +781,7 @@ function clearForm() {
   editingId.value = null
   Object.assign(form, {
     project_name: '', project_method: '', reagent: '',
-    sample_type: '血清', analyte: '',
+    sample_type: '血清', analyte: '', calibrator: '',
     eval_date: todayStr(), cycle_months: 12,
     prepared_by: auth.user?.full_name || auth.user?.username || '金子铮',
     reviewed_by: '杨静',

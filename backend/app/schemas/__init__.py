@@ -618,6 +618,8 @@ class UncertaintyAssessmentBase(BaseModel):
     sample_type: str = "血清"
     analyte: str = ""
     reagent: str = ""
+    calibrator: str = ""
+    unit: str = ""
     eval_date: str = ""
     cycle_months: int = 6  # 评定周期（月，IQC 数据采集周期）
     prepared_by: str = ""
