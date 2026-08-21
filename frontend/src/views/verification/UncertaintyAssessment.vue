@@ -41,7 +41,11 @@
                 </el-radio-group>
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="被测量">
-                <el-input v-model="form.analyte" placeholder="如：葡萄糖浓度 / ALT 活性（默认自动按方法推断，可改）" />
+                <el-radio-group v-model="analyteKind" @change="updateAnalyte">
+                  <el-radio value="浓度">浓度</el-radio>
+                  <el-radio value="活性">活性</el-radio>
+                </el-radio-group>
+                <el-input v-model="form.analyte" size="small" style="margin-top:6px;width:100%" placeholder="自动拼接，也可手动微调" />
               </el-form-item></el-col>
               <el-col :span="24">
                 <el-form-item label="质量目标">
@@ -69,7 +73,7 @@
                   </div>
                 </el-form-item>
               </el-col>
-              <el-col :span="12"><el-form-item label="试剂">
+              <el-col :span="12"><el-form-item label="试剂品牌">
                 <el-select
                   v-model="form.reagent"
                   filterable
@@ -77,12 +81,12 @@
                   reserve-keyword
                   :remote-method="(q) => searchItemField(q, 'reagent')"
                   :loading="reagentLoading"
-                  placeholder="输入项目名/试剂名搜索（可手动输入）"
+                  placeholder="选择或输入试剂品牌"
                   style="width:100%"
                   allow-create
                   clearable
                 >
-                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="`${it.name} - ${it.reagent || '?'}`" :value="it.reagent" />
+                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="`${it.reagent || '?'}（${it.name}）`" :value="it.reagent" />
                 </el-select>
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="校准品">
@@ -411,6 +415,8 @@ const calibratorOptions = ref([])
 const calibratorLoading = ref(false)
 const unitOptions = ref([])
 const unitLoading = ref(false)
+// 被测量类型：浓度 / 活性（像样本类型一样点选）
+const analyteKind = ref('浓度')
 
 const todayStr = () => {
   const d = new Date()
@@ -567,14 +573,20 @@ async function onProjectChange() {
       } else {
         ElMessage.warning('未找到该项目的卫健委 EQA 质量目标，将兜底按 U<15% 判定')
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { console.error('[onProjectChange]', e) }
   }, 400)
 }
 
-// 推断被测量：单位是 U/L → 活性，否则浓度（浓度/活性最终用户可手动改）
+// 推断被测量：单位是 U/L → 活性，否则浓度（浓度/活性可点选，也可手动微调）
 function autoFillAnalyte(method) {
   if (!form.project_name) return
-  form.analyte = (form.patient_unit === 'U/L') ? `${form.project_name} 活性` : `${form.project_name} 浓度`
+  analyteKind.value = (form.patient_unit === 'U/L') ? '活性' : '浓度'
+  updateAnalyte()
+}
+
+function updateAnalyte() {
+  if (!form.project_name) return
+  form.analyte = `${form.project_name} ${analyteKind.value}`
 }
 
 const methodMap = reactive({})
@@ -621,6 +633,37 @@ function onTargetSelect(id) {
     form.target_bias = 0
     form.target_bias_text = ''
     form.target_bias_source = ''
+  }
+}
+
+// 试剂 / 校准品 / 报告单位候选搜索（按项目名搜 test_items，分别取对应字段）
+async function searchItemField(query, field) {
+  if (!query || query.length < 1) {
+    if (field === 'reagent') reagentOptions.value = []
+    else if (field === 'calibrator') calibratorOptions.value = []
+    else if (field === 'unit') unitOptions.value = []
+    return
+  }
+  const loadingRef = field === 'reagent' ? reagentLoading : field === 'calibrator' ? calibratorLoading : unitLoading
+  const optionsRef = field === 'reagent' ? reagentOptions : field === 'calibrator' ? calibratorOptions : unitOptions
+  loadingRef.value = true
+  try {
+    const res = await request.get('/api/v1/test-items', { params: { q: query, page_size: 20 } })
+    const items = (res && (res.items || res)) || []
+    // 试剂品牌按品牌值去重，避免同一品牌多条重复
+    if (field === 'reagent') {
+      const seen = new Set()
+      optionsRef.value = items.filter(it => {
+        const v = (it.reagent || '').trim()
+        if (!v || seen.has(v)) return false
+        seen.add(v)
+        return true
+      })
+    } else {
+      optionsRef.value = items
+    }
+  } finally {
+    loadingRef.value = false
   }
 }
 
@@ -735,6 +778,7 @@ function loadProject(p) {
   form.project_method = p.project_method || ''
   form.sample_type = p.sample_type || '血清'
   form.analyte = p.analyte || ''
+  analyteKind.value = (form.analyte.includes('活性')) ? '活性' : '浓度'
   form.calibrator = p.calibrator || ''
   form.reagent = p.reagent || ''
   form.eval_date = p.eval_date || todayStr()
@@ -791,6 +835,7 @@ function clearForm() {
   })
   selectedTargetId.value = null
   targetOptions.value = []
+  analyteKind.value = '浓度'
   current.value = null
 }
 

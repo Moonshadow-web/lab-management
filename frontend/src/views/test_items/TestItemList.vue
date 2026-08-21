@@ -480,7 +480,7 @@ async function fetchProjectManuals() {
   }
 }
 function _brandMatch(brand, title) {
-  """doc.title 是否包含项目的品牌关键词（兼容多品牌 /英科/艾博/）。"""
+  // doc.title 是否包含项目的品牌关键词（兼容多品牌 /英科/艾博/）
   if (!brand) return true
   const b = String(brand).split(/[\/／,，\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean)
   if (!b.length) return true
