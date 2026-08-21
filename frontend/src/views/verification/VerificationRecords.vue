@@ -163,10 +163,10 @@ function conclusionRows(r) {
         const r1 = rs['reportable1'] || {}
         const r2 = rs['reportable2'] || {}
         if (r1.result) {
-          items.push({ content: '可报告范围', requirement: req['reportable1'] || '—', result: `低限 ${r1.result}`, conclusion: r1.conclusion || '' })
+          items.push({ content: '可报告范围', requirement: reqLocal['reportable1'] || '—', result: `低限 ${r1.result}`, conclusion: r1.conclusion || '' })
         }
         if (r2.result) {
-          items.push({ content: '可报告范围', requirement: req['reportable2'] || '—', result: `高限 ${r2.result}`, conclusion: r2.conclusion || '' })
+          items.push({ content: '可报告范围', requirement: reqLocal['reportable2'] || '—', result: `高限 ${r2.result}`, conclusion: r2.conclusion || '' })
         }
       }
     }
@@ -189,18 +189,19 @@ function teaPct(t) {
   return pct.toFixed(1) + '%'
 }
 
-// 把 requirement 里的 "≤ 1/4 TEA" 等替换成 "≤ 1/4 TEA（5%）"（按 TEA% 算倍数）
+// 把 requirement 里的 "≤ 1/4 TEA" / "≤ TEA" 等替换成 "≤ 1/4 TEA（5%）"（按 TEA% 算倍数）
 function expandTea(reqText, teaStr) {
   if (!reqText || !teaStr) return reqText
   const s = String(teaStr).trim().replace('%', '')
   const teaVal = parseFloat(s)
   if (isNaN(teaVal) || teaVal <= 0) return reqText
   const pctNum = teaVal > 0 && teaVal < 1 ? teaVal * 100 : teaVal
-  // 匹配 ≤ 1/4 TEA / ≤ 1/3 TEA / ≤ 1/2 TEA / ≤ TEA 四种
-  return reqText.replace(/≤\s*(\d+)(?:\/(\d+))?\s*TEA/g, (m, num, den) => {
-    const n = parseInt(num); const d = den ? parseInt(den) : 1
+  // 匹配 ≤ 1/4 TEA / ≤ 1/3 TEA / ≤ 1/2 TEA / ≤ TEA（无分数，即整倍 TEA）
+  return reqText.replace(/≤\s*(\d+)?\s*(?:\/\s*(\d+))?\s*TEA/g, (m, num, den) => {
+    const n = num ? parseInt(num) : 1
+    const d = den ? parseInt(den) : 1
     const v = pctNum * n / d
-    const s2 = v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)
+    const s2 = String(parseFloat(v.toFixed(2)))
     return `${m}（${s2}%）`
   })
 }
