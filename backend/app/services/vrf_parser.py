@@ -206,6 +206,13 @@ def _read_summary(wb, info: dict) -> dict:
             elif result:
                 # 兜底：只有 1 个干扰物具体值时用旧逻辑
                 result = f"干扰物：{'、'.join(names) if names else ''}（实测：{result}）"
+        # 参考区间行（R24）：把 requirement（B 列）里的"参考区间：137-147"拼入 result
+        if content in ('参考范围', '参考区间') and requirement:
+            m = re.search(r'参考(?:范围|区间)[:：]?\s*([^\n]+)', requirement)
+            seg = (m.group(1).strip() if m else requirement.split('\n')[0].strip())
+            seg = re.sub(r'^参考(?:范围|区间)[:：]?\s*', '', seg)
+            if seg and seg not in result:
+                result = f"参考区间：{seg}；{result}"
         # 触发判定条件：content 或 result 或 conclusion 任一非空
         if content or result or conclusion:
             rows.append({
