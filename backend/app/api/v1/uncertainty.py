@@ -85,6 +85,28 @@ def _norm(s: str) -> str:
     return re.sub(r"[\s\-‐—()（）\[\]【】　]", "", s).lower()
 
 
+def _expand_query_names(q: str):
+    """把查询词扩展为一组候选标准名（含同义词正向 + 反向）。
+
+    _SYNONYMS 是"项目库名 → 标准源同义叫法"的单向映射；当用户直接敲缩写
+    （如 CK-MB / BNP / TSH）时，需反向查到所属项目名，再并入该项目的全部同义词，
+    才能匹配到标准源里的 "肌酸激酶-MB(μg/L)" 等条目。
+    """
+    core = _extract_core_name(q)
+    terms = {q, core}
+    # 正向：查询词/核心名 的同义词
+    for t in list(terms):
+        for s in _SYNONYMS.get(t, []):
+            terms.add(s)
+    # 反向：若查询词本身就是某项目名的同义词（如 CK-MB），并入该项目名及其全部同义词
+    for key, syns in _SYNONYMS.items():
+        if q == key or core == key or q in syns or core in syns:
+            terms.add(key)
+            for s in syns:
+                terms.add(s)
+    return terms
+
+
 def _search_nccl_targets(db, q: str):
     """模糊搜索卫健委 EQA 质量目标（搜索即输即筛）。
 
@@ -97,7 +119,7 @@ def _search_nccl_targets(db, q: str):
     if not q or not q.strip():
         return []
     core = _extract_core_name(q)
-    candidates = [q, core] + _SYNONYMS.get(q, []) + _SYNONYMS.get(core, [])
+    candidates = list(_expand_query_names(q))
     norm_cands = {_norm(c) for c in candidates if c}
     rows = (
         db.query(QualityRequirement)
@@ -143,7 +165,7 @@ def _find_best_nccl(db, name: str):
     if not name or not name.strip():
         return None
     core = _extract_core_name(name)
-    candidates = [name, core] + _SYNONYMS.get(name, []) + _SYNONYMS.get(core, [])
+    candidates = list(_expand_query_names(name))
     rows = (
         db.query(QualityRequirement)
         .filter(QualityRequirement.source == "nccl-2026")
