@@ -18,7 +18,7 @@ from ...models.report_archive import ReportArchive
 from ...models.user import User
 from ...models.verification_report import VerificationReport
 from ...core.crud_base import paginate
-from ...services.verification_calc import compute_verification, _extract_first_pct
+from ...services.verification_calc import compute_verification, normalize_conclusion_summary, _extract_first_pct
 from ...schemas import (
     VerificationReportCreate,
     VerificationReportRead,
@@ -313,8 +313,14 @@ def list_by_project(
             r_summary = json.loads(latest.result_summary) if latest.result_summary else {}
         except Exception:
             r_summary = {}
-        # 用最新计算引擎重算（不落库），保证老记录也按最新格式/顺序展示
+        # 用最新计算引擎重算（不落库），再规范化为统一展示格式
+        # （兼容后端计算格式与 vrf_parser 上传解析格式），保证老记录也按最新格式/顺序展示
         r_summary = _recompute_summary(latest, db)
+        r_summary = normalize_conclusion_summary(
+            r_summary, unit=latest.unit or "", dilution=latest.dilution,
+            linear_low=latest.linear_low, linear_high=latest.linear_high,
+            report_type=latest.report_type,
+        )
         latest_items_summary = _build_ordered_conclusion(v_items, r_summary, latest.unit or "")
         archive.append({
             "project_name": pname,
@@ -361,7 +367,12 @@ def conclusion_records(
     items = []
     for o in res["items"]:
         d = _serialize_report(o)
-        d["result_summary"] = _recompute_summary(o, db)
+        raw = _recompute_summary(o, db)
+        d["result_summary"] = normalize_conclusion_summary(
+            raw, unit=o.unit or "", dilution=o.dilution,
+            linear_low=o.linear_low, linear_high=o.linear_high,
+            report_type=o.report_type,
+        )
         items.append(d)
     res["items"] = items
     return res

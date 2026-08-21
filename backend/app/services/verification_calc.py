@@ -537,6 +537,90 @@ def compute_verification(data_field, verify_items, report_type="quantitative",
     return {"result_summary": rs, "details": details}
 
 
+def normalize_conclusion_summary(rs, unit="", dilution=None, linear_low=None, linear_high=None, report_type="quantitative"):
+    """把存储/计算得到的 result_summary 规范化为统一展示格式。
+
+    兼容两种来源，输出完全一致，供「性能验证记录」与「验证报告归档」两页复用：
+    - 后端 compute_verification 输出（已带前缀/单位/合并范围，本函数幂等）；
+    - vrf_parser 上传解析输出（precision/trueness 为「低值X% 高值Y%」无前缀，
+      linearity 含判定文字无单位，reportable 拆为 reportable1/2 纯数字）。
+
+    统一输出：
+      precision1/2 → 「批内CV / 实验室内CV」前缀；
+      trueness     → 「相对偏倚 低值X% 高值Y%」；
+      linearity    → 「范围+单位」（去判定文字）；
+      reportable   → 合并「low-high+单位」；dilution='/' 时等同线性范围、结论「无」。
+    """
+    out = {}
+    unit_suffix = f" {unit}" if unit else ""
+
+    def _ensure_prefix(text, prefix):
+        if not text:
+            return text
+        return text if text.startswith(prefix) else f"{prefix} {text}"
+
+    # 精密度
+    for sk, prefix in (("precision1", "批内CV"), ("precision2", "实验室内CV")):
+        it = rs.get(sk)
+        if it and it.get("result"):
+            out[sk] = {"result": _ensure_prefix(it["result"], prefix), "conclusion": it.get("conclusion", "")}
+
+    # 正确度（parser 用 trueness1/2；后端用 trueness）
+    if rs.get("trueness") and rs["trueness"].get("result"):
+        out["trueness"] = {"result": _ensure_prefix(rs["trueness"]["result"], "相对偏倚"),
+                           "conclusion": rs["trueness"].get("conclusion", "")}
+    else:
+        t1 = rs.get("trueness1") or {}
+        t2 = rs.get("trueness2") or {}
+        base = (t1.get("result") or t2.get("result") or "").strip()
+        if base:
+            out["trueness"] = {"result": _ensure_prefix(base, "相对偏倚"),
+                               "conclusion": t1.get("conclusion") or t2.get("conclusion") or ""}
+
+    # 线性范围：提取「范围」+ 单位（去掉判定文字/换行）
+    it = rs.get("linearity")
+    if it and it.get("result"):
+        raw = it["result"]
+        m = re.search(r"(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)", raw)
+        if m and unit:
+            out["linearity"] = {"result": f"{m.group(1)}-{m.group(2)}{unit_suffix}",
+                                "conclusion": it.get("conclusion", "")}
+        else:
+            out["linearity"] = {"result": raw.replace("\n", " ").strip(),
+                                "conclusion": it.get("conclusion", "")}
+
+    # 可报告范围：合并 low-high + 单位；dilution='/' → 等同线性范围、结论「无」
+    rep = rs.get("reportable")
+    if rep and rep.get("result"):
+        out["reportable"] = {"result": rep["result"], "conclusion": rep.get("conclusion", "")}
+    else:
+        if dilution == "/":
+            out["reportable"] = {
+                "result": f"{linear_low}-{linear_high}{unit_suffix}" if (linear_low and linear_high) else "",
+                "conclusion": "无",
+            }
+        else:
+            low = ((rs.get("reportable1") or {}).get("result") or "").strip()
+            high = ((rs.get("reportable2") or {}).get("result") or "").strip()
+            c1 = (rs.get("reportable1") or {}).get("conclusion") or ""
+            c2 = (rs.get("reportable2") or {}).get("conclusion") or ""
+            if low and high:
+                out["reportable"] = {"result": f"{low}-{high}{unit_suffix}",
+                                     "conclusion": c1 if c1 == c2 else (f"{c1}/{c2}" if (c1 and c2) else (c1 or c2))}
+            elif low:
+                out["reportable"] = {"result": f"{low}{unit_suffix}", "conclusion": c1}
+            elif high:
+                out["reportable"] = {"result": f"{high}{unit_suffix}", "conclusion": c2}
+
+    # 其余项（参考区间/分析特异性/方法符合率/检出限）原样保留（去换行）
+    for k in ("reference", "specificity", "conformity1", "conformity2", "lod"):
+        it = rs.get(k)
+        if it and (it.get("result") or it.get("conclusion")):
+            out[k] = {"result": (it.get("result") or "").replace("\n", " ").strip(),
+                      "conclusion": it.get("conclusion", "")}
+    return out
+
+
 def _fmt_pair_from(vals):
     a = f"低值{vals[0]:.2f}%" if len(vals) > 0 and vals[0] else ""
     b = f"高值{vals[1]:.2f}%" if len(vals) > 1 and vals[1] else ""
