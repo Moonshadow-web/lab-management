@@ -150,8 +150,10 @@ function conclusionRows(r) {
     if (r.verify_items?.includes('trueness')) addRow('正确度', 'trueness')
     if (r.verify_items?.includes('linearity')) addRow('线性', 'linearity')
     if (r.verify_items?.includes('reportable')) {
+      // 糖化血红蛋白（高效液相法仪器）：稀释="/" 也按标准可报告范围要求 + 单位「出峰面积」显示
+      const isHba1c = (r.project_name || '').includes('糖化') || (r.project_name || '').includes('HbA1c')
       const rep = rs['reportable'] || {}
-      const reqText = (r.dilution === '/') ? '等同线性范围' : `${reqLocal['reportable1'] || '—'} / ${reqLocal['reportable2'] || '—'}`
+      const reqText = (r.dilution === '/' && !isHba1c) ? '等同线性范围' : `${reqLocal['reportable1'] || '—'} / ${reqLocal['reportable2'] || '—'}`
       if (rep.result || rep.conclusion) {
         addRow('可报告范围', 'reportable', reqText)
       } else {
@@ -161,12 +163,14 @@ function conclusionRows(r) {
         const high = (r2.result || '').replace(/^高限\s*/, '').trim()
         let result = '', cons = ''
         if (low && high) {
-          result = `${low}-${high}${unitSuffix}`
+          result = isHba1c ? `${low}-${high}（出峰面积）` : `${low}-${high}${unitSuffix}`
           cons = (r1.conclusion && r2.conclusion) ? (r1.conclusion === r2.conclusion ? r1.conclusion : `${r1.conclusion}/${r2.conclusion}`) : (r1.conclusion || r2.conclusion || '')
         } else if (low) {
-          result = `${low}${unitSuffix}`; cons = r1.conclusion || ''
+          result = isHba1c ? `${low}（出峰面积）` : `${low}${unitSuffix}`
+          cons = r1.conclusion || ''
         } else if (high) {
-          result = `${high}${unitSuffix}`; cons = r2.conclusion || ''
+          result = isHba1c ? `${high}（出峰面积）` : `${high}${unitSuffix}`
+          cons = r2.conclusion || ''
         } else if (r.dilution === '/') {
           result = `${r.linear_low || ''}-${r.linear_high || ''}${unitSuffix}`; cons = '无'
         }

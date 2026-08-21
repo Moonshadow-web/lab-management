@@ -322,23 +322,41 @@ def list_by_project(
             report_type=latest.report_type,
         )
         latest_items_summary = _build_ordered_conclusion(v_items, r_summary, latest.unit or "")
-        # 可报告范围：稀释倍数 "/" 或为空（不稀释）→ 等同线性范围，结论为"无"
+        # 可报告范围：稀释倍数 "/" 或为空（不稀释）→ 一般等同线性范围；糖化血红蛋白特殊按报告值显示
         try:
             data_field = json.loads(latest.data) if latest.data else {}
             rep_dilution = (data_field.get("reportable") or {}).get("dilution") or ""
+            is_hba1c = ('糖化' in (latest.project_name or '')) or ('HbA1c' in (latest.project_name or ''))
             if rep_dilution.strip() in ("/", ""):
-                lo = (latest.linear_low or "").strip()
-                hi = (latest.linear_high or "").strip()
-                unit_suffix = f" {latest.unit.strip()}" if (latest.unit or "").strip() else ""
-                if lo and hi:
-                    latest_items_summary = [
-                        {
-                            "key": "reportable",
-                            "result": f"等同线性范围{lo}-{hi}{unit_suffix}",
-                            "conclusion": "无",
-                        } if r["key"] == "reportable" else r
-                        for r in latest_items_summary
-                    ]
+                if is_hba1c:
+                    # 糖化血红蛋白（高效液相法）：稀释=不稀释也按报告值显示，单位「出峰面积」
+                    r1 = (r_summary or {}).get("reportable1") or {}
+                    r2 = (r_summary or {}).get("reportable2") or {}
+                    low = (r1.get("result") or "").replace("低限", "", 1).strip()
+                    high = (r2.get("result") or "").replace("高限", "", 1).strip()
+                    if low and high:
+                        cons = r1.get("conclusion") if r1.get("conclusion") == r2.get("conclusion") else (r1.get("conclusion") or r2.get("conclusion") or "")
+                        latest_items_summary = [
+                            {
+                                "key": "reportable",
+                                "result": f"{low}-{high}（出峰面积）",
+                                "conclusion": cons or "符合要求",
+                            } if r["key"] == "reportable" else r
+                            for r in latest_items_summary
+                        ]
+                else:
+                    lo = (latest.linear_low or "").strip()
+                    hi = (latest.linear_high or "").strip()
+                    unit_suffix = f" {latest.unit.strip()}" if (latest.unit or "").strip() else ""
+                    if lo and hi:
+                        latest_items_summary = [
+                            {
+                                "key": "reportable",
+                                "result": f"等同线性范围{lo}-{hi}{unit_suffix}",
+                                "conclusion": "无",
+                            } if r["key"] == "reportable" else r
+                            for r in latest_items_summary
+                        ]
         except Exception:
             pass
         archive.append({
