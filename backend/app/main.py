@@ -344,6 +344,31 @@ def _ensure_missing_columns():
             logger.warning("清理测试收货单失败(忽略): %s", e)
 
 
+def _drop_legacy_columns():
+    """MySQL 专属：物理删除已废弃的列（仅 DROP，绝不新增/修改）。
+
+    2026-08-21 收口：用户确认「试剂」即「品牌」(brand)，reagent 列不应独立存在，
+    故在模型/Schema 移除后，于此安全 DROP test_items.reagent 物理列以免残留。
+    幂等：先查 information_schema 确认列存在才 DROP；失败仅记日志，绝不阻断启动。
+    """
+    if engine.dialect.name != "mysql":
+        return
+    try:
+        with engine.connect() as c:
+            row = c.exec_driver_sql(
+                "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='test_items' "
+                "AND COLUMN_NAME='reagent' LIMIT 1"
+            ).fetchone()
+        if not row:
+            return
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE test_items DROP COLUMN reagent")
+        logger.info("已物理删除废弃列 test_items.reagent")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("删除废弃列 test_items.reagent 失败(忽略): %s", e)
+
+
 def _migrate_schema():
     """为已存在的表补齐新增列（create_all 不会 ALTER 旧表）。
 
@@ -352,6 +377,7 @@ def _migrate_schema():
     """
     # 通用补列（MySQL/SQLite 均适用）：先按模型补齐所有缺失列，
     # 再执行下方 SQLite 专属的 PRAGMA 补列与数据回填（MySQL 下 PRAGMA 会被跳过）。
+    _drop_legacy_columns()
     _ensure_missing_columns()
     alters = {
         "qc_monthly_summaries": {

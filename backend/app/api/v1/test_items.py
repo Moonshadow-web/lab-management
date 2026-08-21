@@ -20,7 +20,7 @@ router = make_router(
     TestItemRead,
     TestItemCreate,
     TestItemUpdate,
-    search_fields=["code", "name", "aliases", "category", "method", "instrument", "instrument_group", "brand", "reagent"],
+    search_fields=["code", "name", "aliases", "category", "method", "instrument", "instrument_group", "brand"],
     filter_fields=["category", "brand", "specimen", "method", "instrument"],
     prefix="/test-items",
     write_roles=("admin",),
@@ -133,7 +133,6 @@ async def export_test_items(
                 TestItem.method.ilike(like),
                 TestItem.instrument.ilike(like),
                 TestItem.instrument_group.ilike(like),
-                TestItem.reagent.ilike(like),
             )
         )
     if category:

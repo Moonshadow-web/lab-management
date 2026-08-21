@@ -79,15 +79,15 @@
                   filterable
                   remote
                   reserve-keyword
-                  :remote-method="(q) => searchItemField(q, 'reagent')"
+                  :remote-method="(q) => searchItemField(q, 'brand')"
                   :loading="reagentLoading"
-                  placeholder="选择或输入试剂/试剂盒"
+                  placeholder="选择或输入试剂品牌"
                   style="width:100%"
                   allow-create
                   clearable
-                  @focus="searchItemField('', 'reagent')"
+                  @focus="searchItemField('', 'brand')"
                 >
-                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="`${it.reagent || '?'}${it.brand ? '（' + it.brand + '）' : ''}`" :value="it.reagent" />
+                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="it.brand || '?'" :value="it.brand" />
                 </el-select>
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="校准品">
@@ -559,14 +559,13 @@ async function onProjectChange() {
         const hit = methodMap[methodOptions.value[0]]
         if (hit) {
           if (hit.unit) form.patient_unit = hit.unit
-          if (hit.reagent && !form.reagent) form.reagent = hit.reagent
-          else if (hit.brand && !form.reagent) form.reagent = hit.brand
+          if (hit.brand && !form.reagent) form.reagent = hit.brand
           if (hit.calibrator && !form.calibrator) form.calibrator = hit.calibrator
         }
         // 标本类型默认血清
         if (!form.sample_type) form.sample_type = '血清'
         // 同时搜 reagent/calibrator/unit 候选下拉
-        await searchItemField(form.project_name, 'reagent')
+        await searchItemField(form.project_name, 'brand')
         await searchItemField(form.project_name, 'calibrator')
         await searchItemField(form.project_name, 'unit')
       } else {
@@ -645,8 +644,8 @@ function onTargetSelect(id) {
 
 // 试剂 / 校准品 / 报告单位候选搜索（按项目名搜 test_items，分别取对应字段）
 async function searchItemField(query, field) {
-  const loadingRef = field === 'reagent' ? reagentLoading : field === 'calibrator' ? calibratorLoading : unitLoading
-  const optionsRef = field === 'reagent' ? reagentOptions : field === 'calibrator' ? calibratorOptions : unitOptions
+  const loadingRef = field === 'brand' ? reagentLoading : field === 'calibrator' ? calibratorLoading : unitLoading
+  const optionsRef = field === 'brand' ? reagentOptions : field === 'calibrator' ? calibratorOptions : unitOptions
   loadingRef.value = true
   try {
     const params = { page_size: 50 }
@@ -654,11 +653,10 @@ async function searchItemField(query, field) {
     const res = await request.get('/api/v1/test-items', { params })
     const items = (res && (res.items || res)) || []
     // 试剂品牌从 test_items.brand 取（按品牌去重）；空查询时列出库内全部已知品牌
-    if (field === 'reagent') {
-      // 优先用 test_items.reagent（试剂盒/试剂品名）做候选，按品名去重
+    if (field === 'brand') {
       const seen = new Set()
       const dbOpts = items.filter(it => {
-        const v = (it.reagent || '').trim()
+        const v = (it.brand || '').trim()
         if (!v || seen.has(v)) return false
         seen.add(v)
         return true
@@ -666,10 +664,10 @@ async function searchItemField(query, field) {
       if (dbOpts.length) {
         optionsRef.value = dbOpts
       } else {
-        // 库内无试剂品名数据时，给出常用试剂品牌兜底，保证下拉有候选
+        // 库内无品牌数据时，给出常用试剂品牌兜底，保证下拉有候选
         const q = (query || '').trim()
-        let fb = COMMON_REAGENTS.filter(b => !q || b.includes(q)).map(b => ({ reagent: b, brand: b }))
-        if (!fb.length) fb = COMMON_REAGENTS.map(b => ({ reagent: b, brand: b }))
+        let fb = COMMON_REAGENTS.filter(b => !q || b.includes(q)).map(b => ({ brand: b, name: b }))
+        if (!fb.length) fb = COMMON_REAGENTS.map(b => ({ brand: b, name: b }))
         optionsRef.value = fb
       }
     } else {
