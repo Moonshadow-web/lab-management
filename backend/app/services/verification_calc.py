@@ -403,12 +403,15 @@ def calc_reference(data):
                 passed = False
     if not groups:
         passed = False
+    range_text = ((data or {}).get("reference") or {}).get("range_text") or ""
     parts = [f"{g.get('name', '')}超出{outs[i]}" for i, g in enumerate(groups) if outs[i] is not None]
+    main = "、".join(parts) + ("，每组≤2个" if parts else "")
+    text = f"参考区间：{range_text}；{main}" if range_text else main
     return {
-        "result": "、".join(parts) + ("，每组≤2个" if parts else ""),
+        "result": text,
         "conclusion": "符合要求" if passed else "不符合要求",
         "passed": passed,
-        "detail": {"outs": outs},
+        "detail": {"outs": outs, "range_text": range_text},
     }
 
 

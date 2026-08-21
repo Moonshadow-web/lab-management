@@ -26,9 +26,7 @@
                 </template>
               </el-table-column>
             </el-table>
-            <div v-if="row.latest_conclusion" class="vpa-summary-note">
-              <b>总结论：</b>{{ row.latest_conclusion }}
-            </div>
+            <!-- 总结论已彻底移除（不再展示） -->
 
             <div class="vpa-detail-title" style="margin-top:14px">历史验证记录（{{ row.history_count }} 次）</div>
             <el-table :data="row.all_records" border size="small">

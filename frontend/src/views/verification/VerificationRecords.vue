@@ -73,10 +73,7 @@
           </el-table-column>
         </el-table>
 
-        <!-- 总结论（排除 parser 误把模板段落标题"四、评价结论"等当正文的情况） -->
-        <div v-if="conclusionText(r)" class="vrec-footer-note">
-          <b>总结论：</b>{{ conclusionText(r) }}
-        </div>
+        <!-- 总结论行已彻底移除（不再展示） -->
 
         <!-- 原始数据折叠 -->
         <el-collapse style="margin-top:8px" v-if="r.data">
@@ -185,13 +182,7 @@ function conclusionRows(r) {
 
 function formatData(d) { try { return JSON.stringify(d, null, 2) } catch { return String(d) } }
 
-// 总结论：parser 偶发把模板段落标题"四、评价结论"等当正文存进去，统一过滤
-function conclusionText(r) {
-  const t = (r?.conclusion || '').trim()
-  if (!t) return ''
-  if (/^[一二三四五六七八九十]+、/.test(t)) return ''
-  return t
-}
+// 总结论已彻底移除（此前过滤"四、评价结论"等模板标题的函数已移除）
 
 // 允许总误差：源数据是小数形式（如 0.18 = 18%），显示转为百分数
 function teaPct(t) {
