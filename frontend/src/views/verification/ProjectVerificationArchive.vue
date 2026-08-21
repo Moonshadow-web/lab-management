@@ -20,7 +20,7 @@
               <el-table-column label="验证结果" min-width="220" prop="result" />
               <el-table-column label="结论" width="100" align="center">
                 <template #default="{ row: r }">
-                  <el-tag :type="(r.conclusion || '').includes('符合') ? 'success' : 'danger'" size="small">
+                  <el-tag :type="r.conclusion === '无' ? 'info' : ((r.conclusion || '').includes('符合') ? 'success' : 'danger')" size="small">
                     {{ r.conclusion || '—' }}
                   </el-tag>
                 </template>

@@ -322,6 +322,25 @@ def list_by_project(
             report_type=latest.report_type,
         )
         latest_items_summary = _build_ordered_conclusion(v_items, r_summary, latest.unit or "")
+        # 可报告范围：稀释倍数 "/" 或为空（不稀释）→ 等同线性范围，结论为"无"
+        try:
+            data_field = json.loads(latest.data) if latest.data else {}
+            rep_dilution = (data_field.get("reportable") or {}).get("dilution") or ""
+            if rep_dilution.strip() in ("/", ""):
+                lo = (latest.linear_low or "").strip()
+                hi = (latest.linear_high or "").strip()
+                unit_suffix = f" {latest.unit.strip()}" if (latest.unit or "").strip() else ""
+                if lo and hi:
+                    latest_items_summary = [
+                        {
+                            "key": "reportable",
+                            "result": f"等同线性范围{lo}-{hi}{unit_suffix}",
+                            "conclusion": "无",
+                        } if r["key"] == "reportable" else r
+                        for r in latest_items_summary
+                    ]
+        except Exception:
+            pass
         archive.append({
             "project_name": pname,
             "latest_id": latest.id,
