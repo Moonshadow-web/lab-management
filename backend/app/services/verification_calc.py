@@ -453,9 +453,23 @@ def calc_specificity(data):
 # ──────────────────────────────────────────────────────────────────
 def compute_verification(data_field, verify_items, report_type="quantitative",
                          tea=None, within_cv_target=None, lab_cv_target=None,
-                         linear_low=None, linear_high=None):
+                         linear_low=None, linear_high=None, dilution=None, unit=None):
     items = verify_items or []
     rs, details = {}, {}
+
+    def _fmt_num(v):
+        """数值友好显示：整数去小数，其余保留 2 位。"""
+        if v is None:
+            return ""
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return str(v)
+        if f == int(f):
+            return str(int(f))
+        return str(round(f, 2))
+
+    unit_suffix = f" {unit}" if unit else ""
     if "precision" in items:
         r = calc_precision(data_field, report_type, tea, within_cv_target, lab_cv_target)
         rs["precision1"] = {"result": f"批内CV {_fmt_pair_from(r['detail']['within_cv_list'])}",
@@ -465,11 +479,14 @@ def compute_verification(data_field, verify_items, report_type="quantitative",
         details["precision"] = r["detail"]
     if report_type == "quantitative" and "trueness" in items:
         r = calc_trueness(data_field, tea)
-        rs["trueness"] = {"result": r["result"], "conclusion": r["conclusion"]}
+        biases = r["detail"]["bias_list"]
+        rs["trueness"] = {"result": f"相对偏倚 {_fmt_pair_from(biases)}", "conclusion": r["conclusion"]}
         details["trueness"] = r["detail"]
     if report_type == "quantitative" and "linearity" in items:
         r = calc_linearity(data_field, tea, linear_low, linear_high)
-        rs["linearity"] = {"result": r["result"], "conclusion": r["conclusion"]}
+        # 验证结果展示为「声称线性范围 + 单位」，而非偏倚判定文字
+        lin_txt = f"{linear_low}-{linear_high}{unit_suffix}" if (linear_low and linear_high) else r["result"]
+        rs["linearity"] = {"result": lin_txt, "conclusion": r["conclusion"]}
         details["linearity"] = r["detail"]
     if report_type == "qualitative" and "conformity" in items:
         r = calc_conformity(data_field)
@@ -484,10 +501,30 @@ def compute_verification(data_field, verify_items, report_type="quantitative",
         details["lod"] = r["detail"]
     if "reportable" in items:
         r = calc_reportable(data_field, tea)
-        rs["reportable1"] = {"result": f"低限 {r['detail']['low']['target'] if r['detail']['low']['target'] is not None else ''}",
-                             "conclusion": r["conclusion"]}
-        rs["reportable2"] = {"result": f"高限 {r['detail']['high']['target'] if r['detail']['high']['target'] is not None else ''}",
-                             "conclusion": r["conclusion"]}
+        lo = r["detail"]["low"]["target"]
+        hi = r["detail"]["high"]["target"]
+        if dilution == "/":
+            # 无稀释倍数：可报告范围等同于线性范围，不做验证
+            lin_lo = linear_low
+            lin_hi = linear_high
+            rs["reportable"] = {
+                "result": f"{lin_lo}-{lin_hi}{unit_suffix}" if (lin_lo and lin_hi) else "",
+                "conclusion": "无",
+            }
+        else:
+            lo_s = _fmt_num(lo)
+            hi_s = _fmt_num(hi)
+            rs["reportable"] = {
+                "result": f"{lo_s}-{hi_s}{unit_suffix}" if (lo_s and hi_s) else "",
+                "conclusion": r["conclusion"],
+            }
+        # 保留 subKey 供 Excel 模板（低限/高限分列）使用
+        if dilution == "/":
+            rs["reportable1"] = {"result": "等同线性范围", "conclusion": "无"}
+            rs["reportable2"] = {"result": "", "conclusion": "无"}
+        else:
+            rs["reportable1"] = {"result": f"低限 {lo_s}", "conclusion": rs["reportable"]["conclusion"]}
+            rs["reportable2"] = {"result": f"高限 {hi_s}", "conclusion": rs["reportable"]["conclusion"]}
         details["reportable"] = r["detail"]
     if "reference" in items:
         r = calc_reference(data_field)

@@ -17,6 +17,8 @@ from ...core.storage import persist_get_path, persist_save, persist_delete
 from ...models.report_archive import ReportArchive
 from ...models.user import User
 from ...models.verification_report import VerificationReport
+from ...core.crud_base import paginate
+from ...services.verification_calc import compute_verification, _extract_first_pct
 from ...schemas import (
     VerificationReportCreate,
     VerificationReportRead,
@@ -78,6 +80,68 @@ def _lookup_tea(db: Session, project_name: str) -> str:
     return ""
 
 
+def _recompute_summary(rec: VerificationReport, db: Session) -> dict:
+    """用最新计算引擎重算 result_summary（不落库），保证老记录也按最新格式展示。
+
+    上传解析的记录 data 为空，直接用已存的 result_summary。
+    """
+    d = _serialize_report(rec)
+    d = _auto_fill_result_summary(d, db)
+    return d.get("result_summary") or {}
+
+
+# 验证项展示顺序：定量 精密度→正确度→线性→可报告→参考区间→分析特异性；
+# 定性 精密度→方法符合率→检出限→参考区间→分析特异性
+_CONCLUSION_ORDER = {
+    "precision": 0, "trueness": 1, "linearity": 2, "reportable": 3,
+    "reference": 4, "specificity": 5, "conformity": 6, "lod": 7,
+}
+
+
+def _build_ordered_conclusion(v_items, r_summary, unit=""):
+    """按固定顺序构建「验证结论」行（与性能验证记录页一致）。
+
+    返回 [{key, result, conclusion}]；precision/conformity 拆两行，
+    reportable 合并为单行（含稀释倍数/单位/单位换算）。
+    """
+    ordered = sorted(v_items, key=lambda k: _CONCLUSION_ORDER.get(k, 99))
+    rows = []
+    unit_suffix = f" {unit}" if unit else ""
+    for k in ordered:
+        if k == "precision":
+            for sk in ("precision1", "precision2"):
+                it = r_summary.get(sk)
+                if it and (it.get("result") or it.get("conclusion")):
+                    rows.append({"key": k, "result": it.get("result", ""), "conclusion": it.get("conclusion", "")})
+        elif k == "conformity":
+            for sk in ("conformity1", "conformity2"):
+                it = r_summary.get(sk)
+                if it and (it.get("result") or it.get("conclusion")):
+                    rows.append({"key": k, "result": it.get("result", ""), "conclusion": it.get("conclusion", "")})
+        elif k == "reportable":
+            it = r_summary.get("reportable")
+            if it and (it.get("result") or it.get("conclusion")):
+                rows.append({"key": k, "result": it.get("result", ""), "conclusion": it.get("conclusion", "")})
+            else:
+                # 旧数据回退：合并 reportable1/reportable2（去掉 低限/高限 前缀）
+                r1 = r_summary.get("reportable1") or {}
+                r2 = r_summary.get("reportable2") or {}
+                low = (r1.get("result") or "").replace("低限", "", 1).strip()
+                high = (r2.get("result") or "").replace("高限", "", 1).strip()
+                if low and high:
+                    cons = r1.get("conclusion") if r1.get("conclusion") == r2.get("conclusion") else f"{r1.get('conclusion','')}/{r2.get('conclusion','')}"
+                    rows.append({"key": k, "result": f"{low}-{high}{unit_suffix}", "conclusion": cons})
+                elif low:
+                    rows.append({"key": k, "result": f"{low}{unit_suffix}", "conclusion": r1.get("conclusion", "")})
+                elif high:
+                    rows.append({"key": k, "result": f"{high}{unit_suffix}", "conclusion": r2.get("conclusion", "")})
+        else:
+            it = r_summary.get(k)
+            if it and (it.get("result") or it.get("conclusion")):
+                rows.append({"key": k, "result": it.get("result", ""), "conclusion": it.get("conclusion", "")})
+    return rows
+
+
 def _auto_fill_result_summary(data: dict, db: Session = None) -> dict:
     """用后端计算引擎（services/verification_calc.py）自动计算各验证项结果与结论。
 
@@ -85,8 +149,6 @@ def _auto_fill_result_summary(data: dict, db: Session = None) -> dict:
     可报告范围、参考区间、分析特异性。TEA 未填时从质量要求库联动获取。
     计算出的 result_summary 写回 data，供报告生成器静态写入模板单元格。
     """
-    from ...services.verification_calc import compute_verification, _extract_first_pct
-
     rs = data.get("result_summary") or {}
     data_field = data.get("data") or {}
     items = data.get("verify_items") or []
@@ -111,6 +173,7 @@ def _auto_fill_result_summary(data: dict, db: Session = None) -> dict:
         data_field, items, report_type=report_type, tea=tea,
         within_cv_target=within_target, lab_cv_target=lab_target,
         linear_low=data.get("linear_low"), linear_high=data.get("linear_high"),
+        dilution=data.get("dilution"), unit=data.get("unit"),
     )
     rs.update(res["result_summary"])
     data["result_summary"] = rs
@@ -244,31 +307,15 @@ def list_by_project(
             v_items = json.loads(latest.verify_items) if latest.verify_items else []
         except Exception:
             v_items = []
+        # 验证项按固定顺序展示（精密度→正确度→线性→可报告→参考区间→分析特异性…）
+        v_items = sorted(v_items, key=lambda k: _CONCLUSION_ORDER.get(k, 99))
         try:
             r_summary = json.loads(latest.result_summary) if latest.result_summary else {}
         except Exception:
             r_summary = {}
-        latest_items_summary = []
-        for k in v_items:
-            # 优先取 base key（result_summary 里若存的就是 base 名）；否则合并 subKey1+subKey2
-            if k in r_summary and r_summary[k].get("result"):
-                latest_items_summary.append({
-                    "key": k, "result": r_summary[k]["result"],
-                    "conclusion": r_summary[k].get("conclusion", ""),
-                })
-            else:
-                # 找 subKey1 / subKey2，合并展示
-                sub_results, sub_concl = [], ""
-                for sk in (k + "1", k + "2"):
-                    if sk in r_summary and r_summary[sk].get("result"):
-                        sub_results.append(r_summary[sk]["result"])
-                        c = r_summary[sk].get("conclusion", "")
-                        if c and not sub_concl: sub_concl = c
-                if sub_results:
-                    latest_items_summary.append({
-                        "key": k, "result": " / ".join(sub_results),
-                        "conclusion": sub_concl,
-                    })
+        # 用最新计算引擎重算（不落库），保证老记录也按最新格式/顺序展示
+        r_summary = _recompute_summary(latest, db)
+        latest_items_summary = _build_ordered_conclusion(v_items, r_summary, latest.unit or "")
         archive.append({
             "project_name": pname,
             "latest_id": latest.id,
@@ -292,5 +339,31 @@ def list_by_project(
             ],
         })
     return archive
+
+
+@project_archive_router.get("/conclusion-records")
+def conclusion_records(
+    request: Request,
+    page: int = 1, page_size: int = 300,
+    q: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """按「记录」维度的验证列表（结构同 /verification-reports），但 result_summary 用最新引擎重算。
+
+    用于「性能验证记录」页，保证老记录也按最新格式（前缀/单位/合并范围/稀释逻辑）展示。
+    """
+    query = db.query(VerificationReport)
+    if q:
+        query = query.filter(VerificationReport.project_name.ilike(f"%{q}%"))
+    query = query.order_by(VerificationReport.id.desc())
+    res = paginate(query, page, page_size)
+    items = []
+    for o in res["items"]:
+        d = _serialize_report(o)
+        d["result_summary"] = _recompute_summary(o, db)
+        items.append(d)
+    res["items"] = items
+    return res
 
 
