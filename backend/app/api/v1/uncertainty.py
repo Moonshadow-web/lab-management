@@ -30,6 +30,9 @@ from ...schemas import (
     UncertaintyAssessmentRead,
     UncertaintyAssessmentUpdate,
 )
+# 质量目标模糊匹配：复用"项目质量要求"模块的归一化/同义词/安全包含逻辑
+from ...api.v1.quality_requirements import _SYNONYMS
+from ...services.quality_requirements_seed import contains_same_item
 
 router = make_router(
     UncertaintyAssessment,
@@ -75,6 +78,103 @@ def _extract_core_name(name: str) -> str:
         return ""
     core = re.sub(r"[（(][^（）()]{0,12}[）)]", "", name).strip()
     return core or name.strip()
+
+
+def _norm(s: str) -> str:
+    """归一化：去空格/连字符/括号/全角后统一小写，打通"葡萄糖"↔"葡萄 糖"↔"C-肽"↔"C肽"等写法差异。"""
+    return re.sub(r"[\s\-‐—()（）\[\]【】　]", "", s).lower()
+
+
+def _search_nccl_targets(db, q: str):
+    """模糊搜索卫健委 EQA 质量目标（搜索即输即筛）。
+
+    匹配策略（宽松，用于搜索下拉）：
+      1) 归一化精确匹配（项目名/同义词/核心名）；
+      2) 归一化子串匹配（支持前缀/片段搜索，如"葡萄"→"葡萄糖"）；
+      3) 安全包含匹配 contains_same_item（处理缩写/英文代码，如 CK-MB ↔ 肌酸激酶同工酶）。
+    返回匹配到的 QualityRequirement 行（去重，按'精确优先'排序）。
+    """
+    if not q or not q.strip():
+        return []
+    core = _extract_core_name(q)
+    candidates = [q, core] + _SYNONYMS.get(q, []) + _SYNONYMS.get(core, [])
+    norm_cands = {_norm(c) for c in candidates if c}
+    rows = (
+        db.query(QualityRequirement)
+        .filter(QualityRequirement.source == "nccl-2026")
+        .all()
+    )
+    exact, fuzzy = [], []
+    seen = set()
+    for r in rows:
+        item = r.item_name or ""
+        rn = _norm(item)
+        if rn in norm_cands:
+            if r.id not in seen:
+                seen.add(r.id)
+                exact.append(r)
+            continue
+        hit = False
+        for nc in norm_cands:
+            if nc and (nc in rn or rn in nc):
+                hit = True
+                break
+        if not hit:
+            for c in candidates:
+                if c and contains_same_item(c, item):
+                    hit = True
+                    break
+        if hit and r.id not in seen:
+            seen.add(r.id)
+            fuzzy.append(r)
+    return exact + fuzzy
+
+
+def _find_best_nccl(db, name: str):
+    """精确匹配某项目名到卫健委 EQA 质量目标（用于选中项目后自动取 TEa）。
+
+    匹配策略（严格，避免误匹配），沿用"项目质量要求"模块的 5 级匹配：
+      1) 候选（项目名/核心名/同义词）精确匹配；
+      2) 候选与标准名双向安全包含（修饰性差异视为同一项目）；
+      3) 归一化精确匹配；
+      4) 归一化同义词精确匹配；
+      5) 归一化安全包含兜底。
+    """
+    if not name or not name.strip():
+        return None
+    core = _extract_core_name(name)
+    candidates = [name, core] + _SYNONYMS.get(name, []) + _SYNONYMS.get(core, [])
+    rows = (
+        db.query(QualityRequirement)
+        .filter(QualityRequirement.source == "nccl-2026")
+        .all()
+    )
+    qr_maps = {r.item_name: r for r in rows}
+    qr_norm = {_norm(r.item_name): r for r in rows}
+    # 1) 精确匹配
+    for c in candidates:
+        if c in qr_maps:
+            return qr_maps[c]
+    # 2) 双向安全包含
+    for c in candidates:
+        for r in rows:
+            if contains_same_item(c, r.item_name):
+                return r
+    # 3) 归一化精确匹配
+    n_name = _norm(name)
+    if n_name in qr_norm:
+        return qr_norm[n_name]
+    for c in candidates:
+        nc = _norm(c)
+        if nc in qr_norm:
+            return qr_norm[nc]
+    # 4) 归一化安全包含兜底
+    for c in candidates:
+        nc = _norm(c)
+        for nk, r in qr_norm.items():
+            if contains_same_item(nc, nk):
+                return r
+    return None
 
 
 def calc_single_u_rw(l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n):
@@ -141,29 +241,11 @@ def lookup_target_bias(db: Session, project_name: str) -> dict:
 
     判定标准：扩展不确定度 U < 允许总误差 TEa。
     数据源：nccl-2026（国家卫健委临检中心室间质评允许总误差）。
-    匹配：先精确（去括号核心名/原名），再模糊（item_name 含核心名）。
+    匹配：沿用"项目质量要求"模块的严格匹配（精确→安全包含→归一化→同义词）。
     """
     if not project_name or not project_name.strip():
         return {"bias": 0, "text": "", "source": ""}
-    name = project_name.strip()
-    core = _extract_core_name(name)
-    # 1) 精确匹配：核心名 或 原名
-    row = (
-        db.query(QualityRequirement)
-        .filter(QualityRequirement.source == "nccl-2026")
-        .filter(QualityRequirement.item_name.in_([core, name]))
-        .order_by(QualityRequirement.id)
-        .first()
-    )
-    # 2) 模糊匹配：item_name 含核心名
-    if not row and core:
-        row = (
-            db.query(QualityRequirement)
-            .filter(QualityRequirement.source == "nccl-2026")
-            .filter(QualityRequirement.item_name.like(f"%{core}%"))
-            .order_by(QualityRequirement.id)
-            .first()
-        )
+    row = _find_best_nccl(db, project_name.strip())
     if row and row.tea:
         v = _parse_bias_to_pct(row.tea)
         if v > 0:
@@ -264,19 +346,14 @@ def api_search_targets(
 ):
     """模糊搜索卫健委 EQA 质量目标（项目名 + TEa），供前端手动选择。
 
+    复用"项目质量要求"模块的模糊检索（归一化 + 同义词 + 安全包含），
+    支持前缀/片段/缩写搜索，如"葡萄"→"葡萄糖"、"CK-MB"→"肌酸激酶同工酶"。
+
     返回 [{id, item_name, tea, tea_pct}]，tea_pct 已解析成数值百分比。
     """
     if not q or not q.strip():
         return {"items": []}
-    core = _extract_core_name(q)
-    rows = (
-        db.query(QualityRequirement)
-        .filter(QualityRequirement.source == "nccl-2026")
-        .filter(QualityRequirement.item_name.like(f"%{core}%"))
-        .order_by(QualityRequirement.id)
-        .limit(20)
-        .all()
-    )
+    rows = _search_nccl_targets(db, q)[:20]
     items = []
     for r in rows:
         items.append({

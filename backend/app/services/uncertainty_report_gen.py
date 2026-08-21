@@ -85,11 +85,12 @@ def _report_single_html(v):
 <style>{_style()}</style></head><body>
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>测量不确定度评定报告</h1>
-<h1 class="s">第一节 单个测量系统测量不确定度评定范例</h1>
+<h1 class="s">单个测量系统测量不确定度评定范例</h1>
 <table class="info">
 <tr><td><b>表格编号</b></td><td>{REPORT_CODE}</td><td><b>版本号</b></td><td>{REPORT_VERSION}</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">{_esc(v.get('project_name'))}</td></tr>
-<tr><td><b>检测系统</b></td><td>{_esc(v.get('instrument'))}</td><td><b>试剂/校准品</b></td><td>{_esc(v.get('reagent'))}</td></tr>
+<tr><td><b>检测系统</b></td><td colspan="3">{_esc(v.get('instrument'))}</td></tr>
+<tr><td><b>试剂</b></td><td>{_esc(v.get('reagent'))}</td><td><b>校准品</b></td><td>{_esc(v.get('calibrator') or '-')}</td></tr>
 <tr><td><b>评定日期</b></td><td>{_esc(v.get('eval_date'))}</td><td><b>评定周期</b></td><td>{int(v.get('cycle_months') or 12)} 个月</td></tr>
 <tr><td><b>编制人</b></td><td>{_esc(v.get('prepared_by') or '金子铮')}</td><td><b>审核人</b></td><td>{_esc(v.get('reviewed_by') or '杨静')}</td></tr>
 </table>
@@ -101,7 +102,7 @@ def _report_single_html(v):
 </table>
 <p><b>被测量定义为：</b>使用{_esc(v.get('instrument'))}测定{_esc(v.get('project_name'))}（{_esc(pv_unit) or '—'}）。</p>
 <h2>2. 不精密度引入测量不确定度分量</h2>
-<div class="note">一般采用 <b>≥12 个月</b>的室内质控数据（保证长期精密度评估的代表性）。</div>
+<div class="note">一般采用 <b>≥6 个月</b>的室内质控数据（保证长期精密度评估的代表性）。</div>
 <p><b>(1) 该测量系统测量室内质控数据</b></p>
 <table>
 <tr><th>水平</th><th>均值</th><th>标准差</th><th>u<sub>Rw</sub></th><th>相对标准差 RSD</th><th>测试数 n</th></tr>
