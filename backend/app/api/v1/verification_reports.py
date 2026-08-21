@@ -316,6 +316,8 @@ def list_by_project(
         # 用最新计算引擎重算（不落库），再规范化为统一展示格式
         # （兼容后端计算格式与 vrf_parser 上传解析格式），保证老记录也按最新格式/顺序展示
         r_summary = _recompute_summary(latest, db)
+        # 保留一份原始 r_summary：normalize 会丢 reportable1/2，糖化血红蛋白特例读取它们
+        _orig_rs = r_summary
         r_summary = normalize_conclusion_summary(
             r_summary, unit=latest.unit or "", dilution=latest.dilution,
             linear_low=latest.linear_low, linear_high=latest.linear_high,
@@ -330,8 +332,8 @@ def list_by_project(
             if rep_dilution.strip() in ("/", ""):
                 if is_hba1c:
                     # 糖化血红蛋白（高效液相法）：稀释=不稀释也按报告值显示，单位「出峰面积」
-                    r1 = (r_summary or {}).get("reportable1") or {}
-                    r2 = (r_summary or {}).get("reportable2") or {}
+                    r1 = (_orig_rs.get("reportable1") or {}) if isinstance(_orig_rs, dict) else {}
+                    r2 = (_orig_rs.get("reportable2") or {}) if isinstance(_orig_rs, dict) else {}
                     low = (r1.get("result") or "").replace("低限", "", 1).strip()
                     high = (r2.get("result") or "").replace("高限", "", 1).strip()
                     if low and high:
