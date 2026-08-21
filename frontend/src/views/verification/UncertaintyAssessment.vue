@@ -81,13 +81,13 @@
                   reserve-keyword
                   :remote-method="(q) => searchItemField(q, 'reagent')"
                   :loading="reagentLoading"
-                  placeholder="选择或输入试剂品牌"
+                  placeholder="选择或输入试剂/试剂盒"
                   style="width:100%"
                   allow-create
                   clearable
                   @focus="searchItemField('', 'reagent')"
                 >
-                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="`${it.brand || '?'}${it.name ? '（' + it.name + '）' : ''}`" :value="it.brand" />
+                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="`${it.reagent || '?'}${it.brand ? '（' + it.brand + '）' : ''}`" :value="it.reagent" />
                 </el-select>
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="校准品">
@@ -559,7 +559,8 @@ async function onProjectChange() {
         const hit = methodMap[methodOptions.value[0]]
         if (hit) {
           if (hit.unit) form.patient_unit = hit.unit
-          if (hit.brand && !form.reagent) form.reagent = hit.brand
+          if (hit.reagent && !form.reagent) form.reagent = hit.reagent
+          else if (hit.brand && !form.reagent) form.reagent = hit.brand
           if (hit.calibrator && !form.calibrator) form.calibrator = hit.calibrator
         }
         // 标本类型默认血清
@@ -592,7 +593,7 @@ function autoFillAnalyte(method) {
 
 function updateAnalyte() {
   if (!form.project_name) return
-  form.analyte = `${form.project_name} ${analyteKind.value}`
+  form.analyte = `${form.project_name}${analyteKind.value}`
 }
 
 const methodMap = reactive({})
@@ -654,9 +655,10 @@ async function searchItemField(query, field) {
     const items = (res && (res.items || res)) || []
     // 试剂品牌从 test_items.brand 取（按品牌去重）；空查询时列出库内全部已知品牌
     if (field === 'reagent') {
+      // 优先用 test_items.reagent（试剂盒/试剂品名）做候选，按品名去重
       const seen = new Set()
       const dbOpts = items.filter(it => {
-        const v = (it.brand || '').trim()
+        const v = (it.reagent || '').trim()
         if (!v || seen.has(v)) return false
         seen.add(v)
         return true
@@ -664,10 +666,10 @@ async function searchItemField(query, field) {
       if (dbOpts.length) {
         optionsRef.value = dbOpts
       } else {
-        // 库内无品牌数据时，给出常用试剂品牌兜底，保证下拉有候选
+        // 库内无试剂品名数据时，给出常用试剂品牌兜底，保证下拉有候选
         const q = (query || '').trim()
-        let fb = COMMON_REAGENTS.filter(b => !q || b.includes(q)).map(b => ({ brand: b, name: '' }))
-        if (!fb.length) fb = COMMON_REAGENTS.map(b => ({ brand: b, name: '' }))
+        let fb = COMMON_REAGENTS.filter(b => !q || b.includes(q)).map(b => ({ reagent: b, brand: b }))
+        if (!fb.length) fb = COMMON_REAGENTS.map(b => ({ reagent: b, brand: b }))
         optionsRef.value = fb
       }
     } else {
@@ -886,8 +888,8 @@ function buildSingleReport(p) {
   const method = p.project_method || '该检测方法'
   const sample = p.sample_type || '血清'
   const analyte = p.analyte || (p.project_name || '')
-  // 第一节标题：「方法 测量人 样本 被测量 测量结果不确定度的评定」
-  const section1Title = `第一节 ${method}测量人${sample}${analyte}测量结果不确定度的评定`
+  // 报告标题：「方法 测量人 样本 被测量 测量结果不确定度的评定」（不再加"第一节"）
+  const section1Title = `${method}测量人${sample}${analyte}测量结果不确定度的评定`
   // 结论：「实验室 方法 测量人 样本 被测量 的性能符合要求」
   const conclusionText = passed
     ? `实验室${method}测量人${sample}${analyte}的性能符合要求。`
@@ -899,10 +901,7 @@ function buildSingleReport(p) {
 <table class="info-table">
 <tr><td><b>表格编号</b></td><td>BG-SM-CZ-072</td><td><b>版本号</b></td><td>01</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">${esc(p.project_name)}</td></tr>
-<tr><td><b>测量方法</b></td><td colspan="3">${esc(method)}</td></tr>
-<tr><td><b>样本类型</b></td><td colspan="3">${esc(sample)}</td></tr>
-<tr><td><b>被测量</b></td><td colspan="3">${esc(analyte)}</td></tr>
-<tr><td><b>试剂/校准品</b></td><td colspan="3">${esc(p.reagent || '-')}</td></tr>
+<tr><td><b>试剂</b></td><td>${esc(p.reagent || '-')}</td><td><b>校准品</b></td><td>${esc(p.calibrator || '-')}</td></tr>
 <tr><td><b>评定日期</b></td><td>${esc(p.eval_date || '-')}</td><td><b>评定周期</b></td><td>${p.cycle_months || 12} 个月</td></tr>
 <tr><td><b>编制人</b></td><td>${esc(p.prepared_by || '金子铮')}</td><td><b>审核人</b></td><td>${esc(p.reviewed_by || '杨静')}</td></tr>
 </table>
@@ -914,7 +913,7 @@ function buildSingleReport(p) {
 </table>
 <p><b>被测量定义为：</b>采用${esc(method)}测定${esc(sample)}中${esc(analyte)}（${esc(pvUnit) || '—'}）。</p>
 <h2>2. 不精密度引入测量不确定度分量</h2>
-<div class="note">一般采用 <b>≥12 个月</b>的室内质控数据（保证长期精密度评估的代表性）。</div>
+<div class="note">一般采用 <b>≥6 个月</b>的室内质控数据（保证长期精密度评估的代表性）。</div>
 <p><b>(1) 该测量系统测量室内质控数据</b></p>
 <table class="data-table"><tr><th>水平</th><th>均值</th><th>标准差</th><th>u<sub>Rw</sub></th><th>相对标准差 RSD</th><th>测试数 n</th></tr>
 <tr><td>质控水平 1 (L1)</td><td>${(p.l1_mean || 0).toFixed(2)} ${esc(pvUnit)}</td><td>${(p.l1_sd || 0).toFixed(2)} ${esc(pvUnit)}</td><td>${(p.l1_sd || 0).toFixed(2)} ${esc(pvUnit)}</td><td>${rsd1.toFixed(2)}%</td><td>${p.l1_n || 0}</td></tr>
@@ -968,9 +967,6 @@ function buildMultiReport(p) {
 <table class="info-table">
 <tr><td><b>表格编号</b></td><td>BG-SM-CZ-072</td><td><b>版本号</b></td><td>01</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">${esc(p.project_name)}</td></tr>
-<tr><td><b>测量方法</b></td><td colspan="3">${esc(method)}</td></tr>
-<tr><td><b>样本类型</b></td><td colspan="3">${esc(sample)}</td></tr>
-<tr><td><b>被测量</b></td><td colspan="3">${esc(analyte)}</td></tr>
 <tr><td><b>系统数</b></td><td>${sys.length}</td><td><b>系统列表</b></td><td>${esc(sys.map(s => s.name).join('、'))}</td></tr>
 <tr><td><b>评定日期</b></td><td>${esc(p.eval_date || '-')}</td><td><b>评定周期</b></td><td>${p.cycle_months || 12} 个月</td></tr>
 <tr><td><b>编制人</b></td><td>${esc(p.prepared_by || '金子铮')}</td><td><b>审核人</b></td><td>${esc(p.reviewed_by || '杨静')}</td></tr>
@@ -1058,7 +1054,7 @@ function downloadOne(p) {
   printOrSavePdf(html, `测量不确定度评定报告_${p.project_name || '项目'}_${todayStr()}`)
 }
 function downloadSummary() {
-  downloadHtml(buildSummaryReport(projects.value), `测量不确定度评定汇总表_${todayStr()}.html`)
+  printOrSavePdf(buildSummaryReport(projects.value), `测量不确定度评定汇总表_${todayStr()}`)
 }
 function downloadCurrentHtml() {
   if (previewHtml.value) downloadHtml(previewHtml.value, `${previewTitle.value || '测量不确定度报告'}_${todayStr()}.html`)

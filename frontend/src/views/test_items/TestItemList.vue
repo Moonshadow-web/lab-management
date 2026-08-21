@@ -218,6 +218,10 @@
             <span class="info-value" v-html="highlight(row.calibrator) || '—'"></span>
           </div>
           <div class="info-row">
+            <span class="info-label">试剂</span>
+            <span class="info-value" v-html="highlight(row.reagent) || '—'"></span>
+          </div>
+          <div class="info-row">
             <span class="info-label">溯源性</span>
             <span class="info-value trace" v-html="highlight(row.traceability) || '—'"></span>
           </div>
@@ -408,6 +412,7 @@ const fields = [
   { prop: 'reportable_range', label: '可报告范围' },
   { prop: 'diluent', label: '稀释液' },
   { prop: 'calibrator', label: '校准品' },
+  { prop: 'reagent', label: '试剂' },
   { prop: 'traceability', label: '溯源性' },
   { prop: 'last_update', label: '最近更新' },
   { prop: 'interference_hemolysis', label: '溶血干扰' },
@@ -423,7 +428,7 @@ const emptyForm = () => ({
   code: '', name: '', aliases: '', category: '', specimen: '', method: '',
   unit: '', reference: '', fee: '', instrument: '', instrument_group: '',
   linear_range: '', dilution_fold: '', reportable_range: '', diluent: '',
-  calibrator: '', traceability: '', brand: '', last_update: '',
+  calibrator: '', reagent: '', traceability: '', brand: '', last_update: '',
   interference_hemolysis: '', interference_bilirubin: '', interference_lipemia: '',
   manual_doc_ids: [],
 })
