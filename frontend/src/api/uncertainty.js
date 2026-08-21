@@ -1,6 +1,6 @@
 import request from '../utils/request'
 
-// 测量不确定度评估（BG-SM-CZ-072）
+// 测量不确定度评定（BG-SM-CZ-072）
 export function listUncertainty(params) {
   return request.get('/api/v1/uncertainty', { params })
 }

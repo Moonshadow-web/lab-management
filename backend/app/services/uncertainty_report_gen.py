@@ -184,6 +184,11 @@ def _report_multi_html(v):
     pv_unit = v.get("patient_unit") or ""
     pv_ext = pv * u_ext / 100 if pv > 0 else 0
     today = datetime.now().strftime("%Y年%m月%d日")
+    # 多系统报告标题：按「多系统<方法>测量人<样本><被测量>测量结果不确定度的评定」格式（与前端一致）
+    _method = v.get("project_method") or "该检测方法"
+    _sample = v.get("sample_type") or "血清"
+    _analyte = v.get("analyte") or v.get("project_name") or ""
+    multi_title = f"多系统{_method}测量人{_sample}{_analyte}测量结果不确定度的评定"
     # 系统表
     sys_rows_html = "".join([
         f"<tr><td>{_esc(name)}</td><td>{n1}</td><td>{_fmt(m1)}</td><td>{_fmt(sd1)}</td><td>{_fmt(rsd1)}%</td>"
@@ -194,7 +199,7 @@ def _report_multi_html(v):
 <style>{_style()}</style></head><body>
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>测量不确定度评定报告</h1>
-<h1 class="s">第二节 多个测量系统测量不确定度评定范例</h1>
+<h1 class="s">{_esc(multi_title)}</h1>
 <table class="info">
 <tr><td><b>表格编号</b></td><td>{REPORT_CODE}</td><td><b>版本号</b></td><td>{REPORT_VERSION}</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">{_esc(v.get('project_name'))}</td></tr>
@@ -258,7 +263,7 @@ def _summary_html(rows):
     for i, p in enumerate(rows, 1):
         v = p if isinstance(p, dict) else {c.name: getattr(p, c.name) for c in p.__table__.columns}
         items.append(
-            f'<tr><td>{i}</td><td>{_esc(v.get("project_name"))}</td><td>{_esc(v.get("instrument"))}</td>'
+            f'<tr><td>{i}</td><td>{_esc(v.get("project_name"))}</td><td>{_esc(v.get("project_method") or v.get("instrument"))}</td>'
             f'<td>{_fmt(v.get("u_extended"))}</td><td>{_fmt(v.get("target_bias"))}</td>'
             f'<td>{_esc(v.get("target_bias_source"))}</td>'
             f'<td>{"符合" if v.get("passed") else "未达标"}</td><td>{_esc(v.get("eval_date"))}</td></tr>'
@@ -268,7 +273,7 @@ def _summary_html(rows):
         f'<style>{_style()}</style></head><body>'
         f'<h1>民航总医院检验科生化免疫组</h1><h1>测量不确定度评定汇总表</h1>'
         f'<p>表格编号：BG-SM-GL-020 | 编制日期：{datetime.now().strftime("%Y年%m月%d日")}</p>'
-        f'<table><tr><th>序号</th><th>项目名称</th><th>仪器/系统</th><th>U(%)</th><th>目标偏倚(%)</th><th>目标来源</th><th>判定</th><th>评定日期</th></tr>'
+        f'<table><tr><th>序号</th><th>项目名称</th><th>测量方法</th><th>U(%)</th><th>目标偏倚(%)</th><th>目标来源</th><th>判定</th><th>评定日期</th></tr>'
         f'{"".join(items)}</table>'
         f'<p style="margin-top:14px">目标偏倚优先级：WS/T 403-2024（行标） &gt; 2025 北京市互认 &gt; 1/2 × NCCL EQA 允许总误差。</p>'
         f'</body></html>'

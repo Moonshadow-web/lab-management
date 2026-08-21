@@ -10,7 +10,7 @@
       <el-tab-pane label="验证报告归档" name="reports">
         <ProjectVerificationArchive />
       </el-tab-pane>
-      <el-tab-pane label="测量不确定度评估" name="uncertainty">
+      <el-tab-pane label="测量不确定度评定" name="uncertainty">
         <UncertaintyAssessment />
       </el-tab-pane>
     </el-tabs>

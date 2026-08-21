@@ -1,7 +1,7 @@
 <template>
   <div class="uncert-page">
     <div class="uncert-header">
-      <h2>测量不确定度评估</h2>
+      <h2>测量不确定度评定</h2>
       <span>民航总医院检验科生化免疫组 | BG-SM-CZ-072 | 2026-08-18 重构版</span>
     </div>
 
@@ -86,7 +86,7 @@
                   allow-create
                   clearable
                 >
-                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="`${it.reagent || '?'}（${it.name}）`" :value="it.reagent" />
+                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="`${it.reagent || '?'}${it.name ? '（' + it.name + '）' : ''}`" :value="it.reagent" />
                 </el-select>
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="校准品">
@@ -103,6 +103,7 @@
                   clearable
                 >
                   <el-option v-for="(it, idx) in calibratorOptions" :key="idx" :label="`${it.name} - ${it.calibrator || '?'}`" :value="it.calibrator" />
+                  <template #label="{ value }">{{ value }}</template>
                 </el-select>
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="报告单位">
@@ -119,6 +120,7 @@
                   clearable
                 >
                   <el-option v-for="(it, idx) in unitOptions" :key="idx" :label="`${it.name} - ${it.unit || '?'}`" :value="it.unit" />
+                  <template #label="{ value }">{{ value }}</template>
                 </el-select>
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="评定日期">
@@ -392,6 +394,9 @@ import request from '../../utils/request'
 import { downloadReportArchive } from '../../api/reportArchives'
 import { useAuthStore } from '../../store/auth'
 
+// 常用试剂品牌兜底（项目库 reagent 字段普遍为空，保证下拉有候选可选）
+const COMMON_REAGENTS = ['贝克曼', '罗氏', '西门子', '雅培', '迈瑞', '积水', '柏定', '德赛', '九强', '安图', '奥森多', '强生', '迈克', '中生北控']
+
 const auth = useAuthStore()
 const projects = ref([])
 const current = ref(null)
@@ -653,12 +658,21 @@ async function searchItemField(query, field) {
     // 试剂品牌按品牌值去重，避免同一品牌多条重复
     if (field === 'reagent') {
       const seen = new Set()
-      optionsRef.value = items.filter(it => {
+      const dbOpts = items.filter(it => {
         const v = (it.reagent || '').trim()
         if (!v || seen.has(v)) return false
         seen.add(v)
         return true
       })
+      if (dbOpts.length) {
+        optionsRef.value = dbOpts
+      } else {
+        // 项目库 reagent 字段普遍为空 → 给出常用试剂品牌兜底，保证下拉有候选
+        const q = (query || '').trim()
+        let fb = COMMON_REAGENTS.filter(b => !q || b.includes(q)).map(b => ({ reagent: b, name: '' }))
+        if (!fb.length) fb = COMMON_REAGENTS.map(b => ({ reagent: b, name: '' }))
+        optionsRef.value = fb
+      }
     } else {
       optionsRef.value = items
     }
@@ -913,7 +927,7 @@ function buildSingleReport(p) {
 <p>u<sub>Rw</sub> = √[(RSD<sub>L1</sub>² × (n<sub>L1</sub>-1) + RSD<sub>L2</sub>² × (n<sub>L2</sub>-1)) / (n<sub>L1</sub> + n<sub>L2</sub> - 2)] = √[(${rsd1.toFixed(2)}²×(${(p.l1_n||0)-1}) + ${rsd2.toFixed(2)}²×(${(p.l2_n||0)-1})) / (${(p.l1_n||0)+(p.l2_n||0)}-2)] = <b>${uRw.toFixed(2)}%</b></p>
 <h2>3. 校准品定值引入测量不确定度分量</h2>
 <p><b>(1) u<sub>cal</sub>：</b>来源：${esc(p.ucal_source || '厂家')}，相对标准不确定度为 <b>${ucal.toFixed(2)}%</b>。</p>
-${pt_result === '不合格' ? '<p><b>(2) 室间质评：</b>EQA 成绩不合格，需填入 5 水平偏倚数据（详见偏倚计算）。</p>' : '<p><b>(2) 室间质评：</b>实验室参加 EQA 成绩合格，偏倚分量不重复计算（已含于精密度）。</p>'}
+${p.pt_result === '不合格' ? '<p><b>(2) 室间质评：</b>EQA 成绩不合格，需填入 5 水平偏倚数据（详见偏倚计算）。</p>' : '<p><b>(2) 室间质评：</b>实验室参加 EQA 成绩合格，偏倚分量不重复计算（已含于精密度）。</p>'}
 <h2>4. 计算合成不确定度</h2>
 <p>u<sub>c</sub> = √(u<sub>Rw</sub>² + u<sub>cal</sub>²${p.pt_result === '不合格' ? ' + bias²' : ''}) = <b>${uC.toFixed(2)}%</b></p>
 <h2>5. 计算扩展不确定度</h2>
@@ -946,7 +960,7 @@ function buildMultiReport(p) {
   const method = p.project_method || '该检测方法'
   const sample = p.sample_type || '血清'
   const analyte = p.analyte || (p.project_name || '')
-  const sectionTitle = `第二节 ${method}测量人${sample}${analyte}多个测量系统测量结果不确定度的评定`
+  const sectionTitle = `多系统${method}测量人${sample}${analyte}测量结果不确定度的评定`
   const conclusionText = passed
     ? `实验室${method}测量人${sample}${analyte}（多测量系统合并评定）的性能符合要求。`
     : '扩展不确定度超出质量目标，需改进精密度或校准溯源。'
@@ -996,7 +1010,7 @@ function buildSummaryReport(list) {
     return `<tr>
     <td>${i + 1}</td>
     <td>${esc(p.project_name)}${p.mode === 'multi' ? ' <span style="color:#e6a23c;font-size:11px">[多系统]</span>' : ''}</td>
-    <td>${esc(p.instrument || '-')}</td>
+    <td>${esc(p.project_method || p.instrument || '-')}</td>
     <td>${(p.u_extended || 0).toFixed(2)}</td>
     <td>${(p.target_bias || 0).toFixed(2)}</td>
     <td>${esc(p.target_bias_source || '-')}</td>
@@ -1008,7 +1022,7 @@ function buildSummaryReport(list) {
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>测量不确定度评定汇总表</h1>
 <p>表格编号：BG-SM-GL-020 | 编制日期：${todayStr()}</p>
-<table><tr><th>序号</th><th>项目</th><th>检测系统</th><th>U(%)</th><th>允许总误差 TEa(%)</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>编制人</th></tr>${rows}</table>
+<table><tr><th>序号</th><th>项目</th><th>测量方法</th><th>U(%)</th><th>允许总误差 TEa(%)</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>编制人</th></tr>${rows}</table>
 <p style="margin-top:14px">质量目标：卫健委 EQA 允许总误差（NCCL），U &lt; TEa 判为符合要求。</p>
 <div class="sign"><div>编制人签字：____________</div><div>审核人签字：____________</div></div>
 </body></html>`
