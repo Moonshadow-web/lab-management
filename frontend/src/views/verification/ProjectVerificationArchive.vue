@@ -26,8 +26,8 @@
                 </template>
               </el-table-column>
             </el-table>
-            <div v-if="row.latest_summary?.conclusion || (row.latest_summary && Object.values(row.latest_summary)[0] && Object.values(row.latest_summary)[0].result)" class="vpa-summary-note">
-              <b>总结论：</b>{{ row.latest_summary?.conclusion || '—' }}
+            <div v-if="row.latest_conclusion" class="vpa-summary-note">
+              <b>总结论：</b>{{ row.latest_conclusion }}
             </div>
 
             <div class="vpa-detail-title" style="margin-top:14px">历史验证记录（{{ row.history_count }} 次）</div>

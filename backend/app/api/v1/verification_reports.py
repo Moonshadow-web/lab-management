@@ -350,6 +350,7 @@ def list_by_project(
             "latest_report_type": latest.report_type,
             "verify_items": v_items,
             "latest_summary": r_summary,
+            "latest_conclusion": latest.conclusion or "",
             "latest_items_summary": latest_items_summary,
             "history_count": len(recs),
             "all_records": [
