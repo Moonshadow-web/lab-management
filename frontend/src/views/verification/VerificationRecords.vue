@@ -46,7 +46,7 @@
           <el-descriptions-item label="操作人员">{{ r.operator || '—' }}</el-descriptions-item>
           <el-descriptions-item label="审核人员">{{ r.reviewer || '—' }}</el-descriptions-item>
           <el-descriptions-item label="验证日期">{{ r.verify_date || '—' }}</el-descriptions-item>
-          <el-descriptions-item v-if="r.report_type === 'quantitative'" label="声称线性范围">{{ r.linear_low || '—' }} ~ {{ r.linear_high || '—' }}</el-descriptions-item>
+          <el-descriptions-item v-if="r.report_type === 'quantitative'" label="声称线性范围">{{ r.linear_low || '—' }} ~ {{ r.linear_high || '—' }}{{ r.unit ? ' ' + r.unit : '' }}</el-descriptions-item>
           <el-descriptions-item v-if="r.report_type === 'quantitative'" label="稀释倍数">{{ r.dilution || '—' }}</el-descriptions-item>
         </el-descriptions>
 
@@ -131,52 +131,71 @@ function conclusionRows(r) {
   for (const k in req) reqLocal[k] = expandTea(req[k], r.tea)
   const items = []
   // 优先按 subKey 查（如 precision1/precision2/reportable1/2），缺失则按 content 查
-  const add = (content, key) => {
+  const add = (content, key, opts = {}) => {
     let item = rs[key] || {}
     if (!item.result && !item.conclusion) {
-      const m = { '精密度':'precision','正确度':'trueness','线性范围':'linearity','可报告范围':'reportable','参考范围/区间':'reference','分析特异性':'specificity','方法符合率':'conformity','方法检出限':'lod' }
+      const m = { '精密度':'precision','正确度':'trueness','线性':'linearity','线性范围':'linearity','可报告':'reportable','可报告范围':'reportable','参考范围':'reference','参考范围/区间':'reference','参考区间':'reference','分析特异性':'specificity','方法符合率':'conformity','方法检出限':'lod' }
       const baseKey = m[content]
       item = rs[baseKey] || {}
       if (!item.result && !item.conclusion && baseKey) {
         item = rs[baseKey + '1'] || rs[baseKey + '2'] || {}
       }
     }
-    items.push({ content, requirement: reqLocal[key] || '—', result: item.result || '', conclusion: item.conclusion || '' })
+    const prefix = opts.resultPrefix ? opts.resultPrefix + ' ' : ''
+    const raw = item.result || ''
+    const result = raw ? (prefix + (opts.resultTransform ? opts.resultTransform(raw) : raw)) : ''
+    items.push({ content, requirement: reqLocal[key] || '—', result, conclusion: item.conclusion || '' })
   }
+  const unitSuffix = r.unit ? ' ' + r.unit : ''
   if (t === 'qualitative') {
-    add('精密度', 'precision1')
-    add('精密度', 'precision2')
+    add('精密度', 'precision1', { resultPrefix: '批内CV' })
+    add('精密度', 'precision2', { resultPrefix: '实验室内CV' })
     if (r.verify_items?.includes('conformity')) { add('方法符合率', 'conformity1'); add('方法符合率', 'conformity2') }
     if (r.verify_items?.includes('lod')) add('方法检出限', 'lod')
   } else {
-    add('精密度', 'precision1')
-    add('精密度', 'precision2')
-    if (r.verify_items?.includes('trueness')) add('正确度', 'trueness')
-    if (r.verify_items?.includes('linearity')) add('线性范围', 'linearity')
+    add('精密度', 'precision1', { resultPrefix: '批内CV' })
+    add('精密度', 'precision2', { resultPrefix: '实验室内CV' })
+    if (r.verify_items?.includes('trueness')) add('正确度', 'trueness', { resultPrefix: '相对偏倚' })
+    if (r.verify_items?.includes('linearity')) add('线性', 'linearity', { resultTransform: (s) => withUnitRange(s, r.unit) })
     if (r.verify_items?.includes('reportable')) {
-      // 稀释倍数 "/" 时不做验证（无验证要求列），但保留显示行
-      if (r.dilution === '/') {
-        const noVerify = { content: '可报告范围', requirement: '低限同线性范围下限', result: '—', conclusion: '无稀释倍数，不做可报告范围验证' }
-        items.push(noVerify)
-        items.push({ ...noVerify, requirement: '高限同线性范围上限' })
-      } else {
-        const r1 = rs['reportable1'] || {}
-        const r2 = rs['reportable2'] || {}
-        if (r1.result) {
-          items.push({ content: '可报告范围', requirement: reqLocal['reportable1'] || '—', result: `低限 ${r1.result}`, conclusion: r1.conclusion || '' })
-        }
-        if (r2.result) {
-          items.push({ content: '可报告范围', requirement: reqLocal['reportable2'] || '—', result: `高限 ${r2.result}`, conclusion: r2.conclusion || '' })
-        }
+      const r1 = rs['reportable1'] || {}
+      const r2 = rs['reportable2'] || {}
+      const low = (r1.result || '').trim()
+      const high = (r2.result || '').trim()
+      if (low && high) {
+        // 合并为单一范围行：5-1200（单位），要求列并列两条
+        const cons = (r1.conclusion && r2.conclusion)
+          ? (r1.conclusion === r2.conclusion ? r1.conclusion : `${r1.conclusion}/${r2.conclusion}`)
+          : (r1.conclusion || r2.conclusion || '')
+        items.push({
+          content: '可报告范围',
+          requirement: `${reqLocal['reportable1'] || '—'} / ${reqLocal['reportable2'] || '—'}`,
+          result: `${low}-${high}${unitSuffix}`,
+          conclusion: cons,
+        })
+      } else if (low) {
+        items.push({ content: '可报告范围', requirement: reqLocal['reportable1'] || '—', result: `${low}${unitSuffix}`, conclusion: r1.conclusion || '' })
+      } else if (high) {
+        items.push({ content: '可报告范围', requirement: reqLocal['reportable2'] || '—', result: `${high}${unitSuffix}`, conclusion: r2.conclusion || '' })
+      } else if (r.dilution === '/') {
+        // 无稀释倍数且无具体数值：保留"不做验证"占位行
+        items.push({ content: '可报告范围', requirement: '低限同线性范围下限', result: '—', conclusion: '无稀释倍数，不做可报告范围验证' })
+        items.push({ content: '可报告范围', requirement: '高限同线性范围上限', result: '—', conclusion: '' })
       }
     }
   }
-  if (r.verify_items?.includes('reference')) add('参考范围/区间', 'reference')
+  if (r.verify_items?.includes('reference')) add('参考区间', 'reference')
   if (r.verify_items?.includes('specificity')) add('分析特异性', 'specificity')
   return items
 }
 
 function formatData(d) { try { return JSON.stringify(d, null, 2) } catch { return String(d) } }
+
+// 给形如 "1-15" 的数字范围追加单位（避免对已带单位的重复追加）
+function withUnitRange(text, unit) {
+  if (!text || !unit) return text
+  return text.replace(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)(?![A-Za-z%/．·])/g, (m, a, b) => `${a}-${b} ${unit}`)
+}
 
 // 允许总误差：源数据是小数形式（如 0.18 = 18%），显示转为百分数
 function teaPct(t) {
