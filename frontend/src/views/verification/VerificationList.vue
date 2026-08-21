@@ -13,6 +13,9 @@
       <el-tab-pane label="测量不确定度评定" name="uncertainty">
         <UncertaintyAssessment />
       </el-tab-pane>
+      <el-tab-pane label="不确定度汇总" name="summary">
+        <UncertaintySummary />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -20,6 +23,7 @@
 <script setup>
 import { ref } from 'vue'
 import UncertaintyAssessment from './UncertaintyAssessment.vue'
+import UncertaintySummary from './UncertaintySummary.vue'
 import VerificationArchive from './VerificationArchive.vue'
 import VerificationRecords from './VerificationRecords.vue'
 import ProjectVerificationArchive from './ProjectVerificationArchive.vue'
