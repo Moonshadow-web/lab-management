@@ -175,9 +175,9 @@ export function buildSummaryReport(list) {
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>测量不确定度评定汇总表</h1>
 <p>表格编号：BG-SM-GL-020 | 编制日期：${todayStr()}</p>
-<table><tr><th>序号</th><th>项目</th><th>测量方法</th><th>U(%)</th><th>允许总误差 TEa(%)</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>编制人</th></tr>${rows}</table>
+<table><tr><th>序号</th><th>项目</th><th>测量方法</th><th>U(%)</th><th>允许总误差 TEa(%)</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>评定人</th></tr>${rows}</table>
 <p style="margin-top:14px">质量目标：卫健委 EQA 允许总误差（NCCL），U &lt; TEa 判为符合要求。</p>
-<div class="sign"><div>编制人签字：____________</div><div>审核人签字：____________</div></div>
+<div class="sign"><div>评定人签字：____________</div><div>审核人签字：____________</div></div>
 </body></html>`
 }
 

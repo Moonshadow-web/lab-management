@@ -30,14 +30,14 @@
 
     <!-- 汇总列表（所有已生成报告） -->
     <el-table :data="paged" stripe border class="sum-table" v-loading="loading">
-      <el-table-column type="index" label="序号" width="60" :index="indexMethod" />
-      <el-table-column prop="project_name" label="项目名称" min-width="160">
+      <el-table-column type="index" label="序号" width="60" align="center" :index="indexMethod" />
+      <el-table-column prop="project_name" label="项目名称" min-width="160" align="center">
         <template #default="{ row }">
           {{ row.project_name }}
           <el-tag v-if="row.mode === 'multi'" size="small" type="warning" style="margin-left:4px">多系统</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="测量方法" min-width="140">
+      <el-table-column label="测量方法" min-width="140" align="center">
         <template #default="{ row }">{{ row.project_method || row.instrument || '-' }}</template>
       </el-table-column>
       <el-table-column label="U(%)" width="90" align="center">
@@ -46,14 +46,14 @@
       <el-table-column label="目标偏倚(%)" width="110" align="center">
         <template #default="{ row }">{{ fmtPct(row.target_bias) }}</template>
       </el-table-column>
-      <el-table-column prop="target_bias_source" label="目标来源" min-width="160" show-overflow-tooltip />
+      <el-table-column prop="target_bias_source" label="目标来源" min-width="160" align="center" show-overflow-tooltip />
       <el-table-column label="判定" width="90" align="center">
         <template #default="{ row }">
           <span :class="row.passed ? 'judge-ok' : 'judge-fail'">{{ row.passed ? '符合' : '未达标' }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="eval_date" label="评定日期" width="120" align="center" />
-      <el-table-column prop="prepared_by" label="编制人" width="100" align="center" />
+      <el-table-column prop="prepared_by" label="评定人" width="100" align="center" />
       <el-table-column label="操作" width="160" align="center" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="previewOne(row)">报告</el-button>
