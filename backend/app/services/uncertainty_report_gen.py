@@ -192,7 +192,7 @@ def _report_multi_html(v):
     # 系统表
     sys_rows_html = "".join([
         f"<tr><td>{_esc(name)}</td><td>{n1}</td><td>{_fmt(m1)}</td><td>{_fmt(sd1)}</td><td>{_fmt(rsd1)}%</td>"
-        f"<td>{n2}</td><td>{_fmt(m2)}</td><td>{_fmt(sd2)}</td><td>{_fmt(rsd2)}%</td><td>{_fmt(u_sys):.4f}</td></tr>"
+        f"<td>{n2}</td><td>{_fmt(m2)}</td><td>{_fmt(sd2)}</td><td>{_fmt(rsd2)}%</td><td>{_fmt(u_sys, 4)}</td></tr>"
         for (name, n1, m1, sd1, rsd1, m2, sd2, rsd2, u_sys) in rows_sys
     ])
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>测量不确定度评定报告(多系统) - {_esc(v.get('project_name'))}</title>
