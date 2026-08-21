@@ -85,8 +85,9 @@
                   style="width:100%"
                   allow-create
                   clearable
+                  @focus="searchItemField('', 'reagent')"
                 >
-                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="`${it.reagent || '?'}${it.name ? '（' + it.name + '）' : ''}`" :value="it.reagent" />
+                  <el-option v-for="(it, idx) in reagentOptions" :key="idx" :label="`${it.brand || '?'}${it.name ? '（' + it.name + '）' : ''}`" :value="it.brand" />
                 </el-select>
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="校准品">
@@ -558,7 +559,7 @@ async function onProjectChange() {
         const hit = methodMap[methodOptions.value[0]]
         if (hit) {
           if (hit.unit) form.patient_unit = hit.unit
-          if (hit.reagent && !form.reagent) form.reagent = hit.reagent
+          if (hit.brand && !form.reagent) form.reagent = hit.brand
           if (hit.calibrator && !form.calibrator) form.calibrator = hit.calibrator
         }
         // 标本类型默认血清
@@ -643,23 +644,19 @@ function onTargetSelect(id) {
 
 // 试剂 / 校准品 / 报告单位候选搜索（按项目名搜 test_items，分别取对应字段）
 async function searchItemField(query, field) {
-  if (!query || query.length < 1) {
-    if (field === 'reagent') reagentOptions.value = []
-    else if (field === 'calibrator') calibratorOptions.value = []
-    else if (field === 'unit') unitOptions.value = []
-    return
-  }
   const loadingRef = field === 'reagent' ? reagentLoading : field === 'calibrator' ? calibratorLoading : unitLoading
   const optionsRef = field === 'reagent' ? reagentOptions : field === 'calibrator' ? calibratorOptions : unitOptions
   loadingRef.value = true
   try {
-    const res = await request.get('/api/v1/test-items', { params: { q: query, page_size: 20 } })
+    const params = { page_size: 50 }
+    if (query && query.length >= 1) params.q = query
+    const res = await request.get('/api/v1/test-items', { params })
     const items = (res && (res.items || res)) || []
-    // 试剂品牌按品牌值去重，避免同一品牌多条重复
+    // 试剂品牌从 test_items.brand 取（按品牌去重）；空查询时列出库内全部已知品牌
     if (field === 'reagent') {
       const seen = new Set()
       const dbOpts = items.filter(it => {
-        const v = (it.reagent || '').trim()
+        const v = (it.brand || '').trim()
         if (!v || seen.has(v)) return false
         seen.add(v)
         return true
@@ -667,10 +664,10 @@ async function searchItemField(query, field) {
       if (dbOpts.length) {
         optionsRef.value = dbOpts
       } else {
-        // 项目库 reagent 字段普遍为空 → 给出常用试剂品牌兜底，保证下拉有候选
+        // 库内无品牌数据时，给出常用试剂品牌兜底，保证下拉有候选
         const q = (query || '').trim()
-        let fb = COMMON_REAGENTS.filter(b => !q || b.includes(q)).map(b => ({ reagent: b, name: '' }))
-        if (!fb.length) fb = COMMON_REAGENTS.map(b => ({ reagent: b, name: '' }))
+        let fb = COMMON_REAGENTS.filter(b => !q || b.includes(q)).map(b => ({ brand: b, name: '' }))
+        if (!fb.length) fb = COMMON_REAGENTS.map(b => ({ brand: b, name: '' }))
         optionsRef.value = fb
       }
     } else {

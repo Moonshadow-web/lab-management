@@ -20,7 +20,7 @@ router = make_router(
     TestItemRead,
     TestItemCreate,
     TestItemUpdate,
-    search_fields=["code", "name", "aliases", "category", "method", "instrument", "instrument_group"],
+    search_fields=["code", "name", "aliases", "category", "method", "instrument", "instrument_group", "brand"],
     filter_fields=["category", "brand", "specimen", "method", "instrument"],
     prefix="/test-items",
     write_roles=("admin",),
