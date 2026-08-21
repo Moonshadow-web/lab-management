@@ -26,6 +26,7 @@ class TestItem(Base):
     reportable_range: Mapped[str] = mapped_column(String(100), default="")
     diluent: Mapped[str] = mapped_column(String(100), default="")
     calibrator: Mapped[str] = mapped_column(String(100), default="")
+    reagent: Mapped[str] = mapped_column(String(200), default="")  # 试剂（试剂盒/试剂品名，区别于品牌 brand）
     traceability: Mapped[str] = mapped_column(String(200), default="")
     brand: Mapped[str] = mapped_column(String(50), default="")  # 品牌标识（显式存储，优先于从校准品推导）
     manual_doc_ids: Mapped[str] = mapped_column(Text, default="")  # 关联的项目说明书 document ids（JSON 数组，如 "[94,99]"）

@@ -62,6 +62,7 @@ class TestItemBase(BaseModel):
     reportable_range: str = ""
     diluent: str = ""
     calibrator: str = ""
+    reagent: str = ""
     traceability: str = ""
     brand: str = ""
     manual_doc_ids: str = ""  # JSON 数组，关联说明书 document ids
