@@ -215,11 +215,11 @@ def _read_summary(wb, info: dict) -> dict:
                 "conclusion": _norm_conclusion(conclusion),
                 "row_no": r,  # 记录实际行号，供 _build_summary 精确分配 sub
             })
-    # 总结论
+    # 总结论：跳过模板段落标题（"一、…"、"二、…"、"四、评价结论"等），取 R23-25 中首个正文段
     conclusion_text = ""
     for r in (23, 24, 25):
         t = _safe_str(_val(ws, r, 1))
-        if t and len(t) > 5:
+        if t and not re.match(r"^[一二三四五六七八九十]+、", t.strip()):
             conclusion_text = t
             break
     # 提炼 verify_items 和 result_summary
