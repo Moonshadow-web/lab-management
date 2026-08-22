@@ -92,7 +92,7 @@ def _report_single_html(v):
 <tr><td><b>检测系统</b></td><td colspan="3">{_esc(v.get('instrument'))}</td></tr>
 <tr><td><b>试剂</b></td><td>{_esc(v.get('reagent'))}</td><td><b>校准品</b></td><td>{_esc(v.get('calibrator') or '-')}</td></tr>
 <tr><td><b>评定日期</b></td><td>{_esc(v.get('eval_date'))}</td><td><b>评定周期</b></td><td>{int(v.get('cycle_months') or 12)} 个月</td></tr>
-<tr><td><b>编制人</b></td><td>{_esc(v.get('prepared_by') or '金子铮')}</td><td><b>审核人</b></td><td>{_esc(v.get('reviewed_by') or '杨静')}</td></tr>
+<tr><td><b>评定人</b></td><td>{_esc(v.get('prepared_by') or '金子铮')}</td><td><b>审核人</b></td><td>{_esc(v.get('reviewed_by') or '杨静')}</td></tr>
 </table>
 <h2>1. 定义被测量</h2>
 <table class="info">
@@ -129,7 +129,7 @@ def _report_single_html(v):
 <p><b>比较结果：</b>U = <b>{_fmt(u_ext)}%</b> {('&lt;' if passed else '≥')} {(_fmt(target_bias) if target_bias > 0 else '15')}% → <span class="{('passed' if passed else 'failed')}">{('符合要求' if passed else '未达标')}</span></p>
 <p><b>结论：</b>{('实验室' + _esc(v.get('instrument')) + '测量' + _esc(v.get('project_name')) + '浓度的性能符合要求。' if passed else '扩展不确定度超出质量目标，需改进精密度或校准溯源。')}</p>
 </div>
-<div style="margin-top:30px">编制人：____________　审核人：____________　日期：{today}</div>
+<div style="margin-top:30px">评定人：____________　审核人：____________　日期：{today}</div>
 </body></html>"""
 
 
@@ -206,7 +206,7 @@ def _report_multi_html(v):
 <tr><td><b>项目名称</b></td><td colspan="3">{_esc(v.get('project_name'))}</td></tr>
 <tr><td><b>检测系统数</b></td><td>{len(systems)}</td><td><b>系统列表</b></td><td>{_esc('、'.join(s.get('name') or '—' for s in systems))}</td></tr>
 <tr><td><b>评定日期</b></td><td>{_esc(v.get('eval_date'))}</td><td><b>评定周期</b></td><td>{int(v.get('cycle_months') or 12)} 个月</td></tr>
-<tr><td><b>编制人</b></td><td>{_esc(v.get('prepared_by') or '金子铮')}</td><td><b>审核人</b></td><td>{_esc(v.get('reviewed_by') or '杨静')}</td></tr>
+<tr><td><b>评定人</b></td><td>{_esc(v.get('prepared_by') or '金子铮')}</td><td><b>审核人</b></td><td>{_esc(v.get('reviewed_by') or '杨静')}</td></tr>
 </table>
 <p>工作量大的临床实验室可使用几个相同的测量系统检测相同的被测量，所以同一个人体样本可能在其中任何一个系统上进行测量。此种情况下，评定单一 u(y) 是有用的，该 u(y) 可以合理地应用于由其中任一系统产生的结果。</p>
 <p>多个测量系统通常用同一批次的 IQC 同时监控。分别计算每个测量系统的 u<sub>Rw</sub> 值。对于相同的 IQC 批次，每个系统可能得到不同的 IQC 均值。因此，必须计算多个测量系统该 IQC 批次的相对标准不确定度平均值，并用于计算合成平均不确定度。</p>
@@ -247,7 +247,7 @@ def _report_multi_html(v):
 <p><b>比较结果：</b>U = <b>{_fmt(u_ext)}%</b> {('&lt;' if passed else '≥')} {(_fmt(target_bias) if target_bias > 0 else '15')}% → <span class="{('passed' if passed else 'failed')}">{('符合要求' if passed else '未达标')}</span></p>
 <p><b>结论：</b>{('实验室多个测量系统测定' + _esc(v.get('project_name')) + '的性能符合要求。' if passed else '扩展不确定度超出质量目标，需改进精密度或校准溯源。')}</p>
 </div>
-<div style="margin-top:30px">编制人：____________　审核人：____________　日期：{today}</div>
+<div style="margin-top:30px">评定人：____________　审核人：____________　日期：{today}</div>
 </body></html>"""
 
 

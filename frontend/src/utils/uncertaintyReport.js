@@ -61,7 +61,7 @@ export function buildSingleReport(p) {
 <tr><td><b>项目名称</b></td><td colspan="3">${esc(p.project_name)}</td></tr>
 <tr><td><b>试剂</b></td><td>${esc(p.reagent || '-')}</td><td><b>校准品</b></td><td>${esc(p.calibrator || '-')}</td></tr>
 <tr><td><b>评定日期</b></td><td>${esc(p.eval_date || '-')}</td><td><b>评定周期</b></td><td>${p.cycle_months || 12} 个月</td></tr>
-<tr><td><b>编制人</b></td><td>${esc(p.prepared_by || '金子铮')}</td><td><b>审核人</b></td><td>${esc(p.reviewed_by || '杨静')}</td></tr>
+<tr><td><b>评定人</b></td><td>${esc(p.prepared_by || '金子铮')}</td><td><b>审核人</b></td><td>${esc(p.reviewed_by || '杨静')}</td></tr>
 </table>
 <h2>1. 定义被测量</h2>
 <table class="info-table">
@@ -94,7 +94,7 @@ ${targetBias > 0 ? `<p><b>质量目标：</b>目标允许总误差 TEa（来源�
 <p><b>比较结果：</b>U = <b>${uExt.toFixed(2)}%</b> ${passed ? '&lt;' : '≥'} ${targetBias > 0 ? targetBias.toFixed(2) : '15'}% → <strong style="color:${passed ? 'green' : 'red'}">${passed ? '符合要求' : '未达标'}</strong></p>
 <p><b>结论：</b>${esc(conclusionText)}</p>
 </div>
-<div class="sign"><div>编制人签字：____________</div><div>审核人签字：____________</div></div>
+<div class="sign"><div>评定人签字：____________</div><div>审核人签字：____________</div></div>
 </body></html>`
 }
 
@@ -128,7 +128,7 @@ export function buildMultiReport(p) {
 <tr><td><b>项目名称</b></td><td colspan="3">${esc(p.project_name)}</td></tr>
 <tr><td><b>系统数</b></td><td>${sys.length}</td><td><b>系统列表</b></td><td>${esc(sys.map(s => s.name).join('、'))}</td></tr>
 <tr><td><b>评定日期</b></td><td>${esc(p.eval_date || '-')}</td><td><b>评定周期</b></td><td>${p.cycle_months || 12} 个月</td></tr>
-<tr><td><b>编制人</b></td><td>${esc(p.prepared_by || '金子铮')}</td><td><b>审核人</b></td><td>${esc(p.reviewed_by || '杨静')}</td></tr>
+<tr><td><b>评定人</b></td><td>${esc(p.prepared_by || '金子铮')}</td><td><b>审核人</b></td><td>${esc(p.reviewed_by || '杨静')}</td></tr>
 </table>
 <p>工作量大的临床实验室可使用几个相同的测量系统检测同一被测量。多个系统通常用同一批次 IQC 同时监控，需将系统内不精密度与系统间均值方差合并后算 u<sub>(pooled)</sub>。</p>
 <h2>1. 定义被测量</h2>
@@ -154,7 +154,7 @@ ${targetBias > 0 ? `<p><b>质量目标：</b>目标允许总误差 TEa（来源�
 <p><b>比较结果：</b>U = <b>${(p.u_extended||0).toFixed(2)}%</b> ${passed ? '&lt;' : '≥'} ${targetBias > 0 ? targetBias.toFixed(2) : '15'}% → <strong style="color:${passed ? 'green' : 'red'}">${passed ? '符合要求' : '未达标'}</strong></p>
 <p><b>结论：</b>${esc(conclusionText)}</p>
 </div>
-<div class="sign"><div>编制人签字：____________</div><div>审核人签字：____________</div></div>
+<div class="sign"><div>评定人签字：____________</div><div>审核人签字：____________</div></div>
 </body></html>`
 }
 

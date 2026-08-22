@@ -130,7 +130,7 @@
               <el-col :span="12"><el-form-item label="评定周期(月)">
                 <el-input-number v-model="form.cycle_months" :min="1" :max="36" style="width:100%" />
               </el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="编制人">
+              <el-col :span="12"><el-form-item label="评定人">
                 <el-input v-model="form.prepared_by" />
               </el-form-item></el-col>
               <el-col :span="12"><el-form-item label="审核人">
