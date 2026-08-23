@@ -226,9 +226,10 @@ def list_documents(
     # 隐藏作废文件：仅保留非「作废」状态
     if hide_invalid:
         query = query.filter(Document.status != "作废")
-    # 作废状态排到最后，其余按编号自然序（作废在末、同状态下仍按编号从小到大）
+    # 默认排序：作废状态排最后；其余按分类优先级（通用SOP→项目SOP→仪器SOP→记录表格→项目说明书），同类内按编号升序
     query = query.order_by(
         case((Document.status == "作废", 1), else_=0),
+        case(*[(Document.category == c, i) for i, c in enumerate(DOC_CATEGORIES)], else_=99),
         Document.doc_number,
     )
     return paginate(query, page, page_size)
