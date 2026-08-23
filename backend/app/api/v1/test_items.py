@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import case, or_
 from io import BytesIO
 import io
 import openpyxl
@@ -15,6 +15,14 @@ from ...core.database import get_db
 from ...core.security import get_current_user
 from ...core.brand import extract_brand, resolve_brand
 
+# 默认排序：常见项目分类在前（生化→免疫→凝血→其他），同类内按项目名升序
+_CATEGORY_RANK = case(
+    (TestItem.category == "生化", 0),
+    (TestItem.category == "免疫", 1),
+    (TestItem.category == "凝血", 2),
+    else_=3,
+)
+
 router = make_router(
     TestItem,
     TestItemRead,
@@ -24,6 +32,7 @@ router = make_router(
     filter_fields=["category", "brand", "specimen", "method", "instrument"],
     prefix="/test-items",
     write_roles=("admin",),
+    order_by=[_CATEGORY_RANK, TestItem.name],
 )
 
 # 中文表头 -> 英文字段名（与导出模板一致，忽略表头尾部 * 号）
@@ -139,7 +148,7 @@ async def export_test_items(
         query = query.filter(TestItem.category == category)
     if brand:
         query = query.filter(or_(TestItem.brand == brand, TestItem.calibrator.ilike(f"%{brand}%")))
-    rows = query.order_by(TestItem.category, TestItem.name).all()
+    rows = query.order_by(_CATEGORY_RANK, TestItem.name).all()
 
     wb = openpyxl.Workbook()
     ws = wb.active
