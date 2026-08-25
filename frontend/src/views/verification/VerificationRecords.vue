@@ -151,7 +151,22 @@ function conclusionRows(r) {
       const isHba1c = (r.project_name || '').includes('糖化') || (r.project_name || '').includes('HbA1c')
       const rep = rs['reportable'] || {}
       const reqText = (r.dilution === '/' && !isHba1c) ? '等同线性范围' : `${reqLocal['reportable1'] || '—'} / ${reqLocal['reportable2'] || '—'}`
-      if (rep.result || rep.conclusion) {
+      // 糖化血红蛋白：不论 rep.result 是否存在，都从 reportable1/reportable2 拼 +「出峰面积」
+      if (isHba1c) {
+        const r1 = rs['reportable1'] || {}, r2 = rs['reportable2'] || {}
+        const low = (r1.result || '').replace(/^低限\s*/, '').trim()
+        const high = (r2.result || '').replace(/^高限\s*/, '').trim()
+        if (low && high) {
+          items.push({
+            content: '可报告范围',
+            requirement: reqText,
+            result: `${low}-${high}（出峰面积）`,
+            conclusion: r1.conclusion || r2.conclusion || '符合要求',
+          })
+        } else {
+          addRow('可报告范围', 'reportable', reqText)
+        }
+      } else if (rep.result || rep.conclusion) {
         addRow('可报告范围', 'reportable', reqText)
       } else {
         // 旧数据回退：合并 reportable1/reportable2（去掉 低限/高限 前缀）
@@ -160,14 +175,12 @@ function conclusionRows(r) {
         const high = (r2.result || '').replace(/^高限\s*/, '').trim()
         let result = '', cons = ''
         if (low && high) {
-          result = isHba1c ? `${low}-${high}（出峰面积）` : `${low}-${high}${unitSuffix}`
+          result = `${low}-${high}${unitSuffix}`
           cons = (r1.conclusion && r2.conclusion) ? (r1.conclusion === r2.conclusion ? r1.conclusion : `${r1.conclusion}/${r2.conclusion}`) : (r1.conclusion || r2.conclusion || '')
         } else if (low) {
-          result = isHba1c ? `${low}（出峰面积）` : `${low}${unitSuffix}`
-          cons = r1.conclusion || ''
+          result = `${low}${unitSuffix}`; cons = r1.conclusion || ''
         } else if (high) {
-          result = isHba1c ? `${high}（出峰面积）` : `${high}${unitSuffix}`
-          cons = r2.conclusion || ''
+          result = `${high}${unitSuffix}`; cons = r2.conclusion || ''
         } else if (r.dilution === '/') {
           result = `${r.linear_low || ''}-${r.linear_high || ''}${unitSuffix}`; cons = '无'
         }
