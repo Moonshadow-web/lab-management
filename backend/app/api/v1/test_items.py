@@ -15,12 +15,35 @@ from ...core.database import get_db
 from ...core.security import get_current_user
 from ...core.brand import extract_brand, resolve_brand
 
-# 默认排序：常见项目分类在前（生化→免疫→凝血→其他），同类内按项目名升序
+# 默认排序：常见项目分类在前（生化→免疫→凝血→其他）；同类内临床常用项目在前（命中常规组合关键词），其余排后；最后按项目名升序
 _CATEGORY_RANK = case(
     (TestItem.category == "生化", 0),
     (TestItem.category == "免疫", 1),
     (TestItem.category == "凝血", 2),
     else_=3,
+)
+# 临床常规/常用项目关键词（参照生化全套·急诊组合、免疫常规、凝血常规）：命中即"常用"，排前
+_COMMON_KEYWORDS = [
+    # 生化常规：电解质/血糖/肾功/肝功/血脂/心肌酶/胰腺/炎症/铁代谢
+    "钠", "钾", "氯", "钙", "镁", "磷", "葡萄糖", "尿素", "肌酐", "尿酸",
+    "丙氨酸氨基转移酶", "天冬氨酸氨基转移酶", "γ-谷氨酰", "谷氨酰", "碱性磷酸酶",
+    "乳酸脱氢酶", "总蛋白", "白蛋白", "前白蛋白", "总胆红素", "直接胆红素",
+    "总胆汁酸", "胆碱酯酶", "甘油三酯", "总胆固醇", "高密度脂蛋白", "低密度脂蛋白",
+    "载脂蛋白", "脂蛋白", "淀粉酶", "脂肪酶", "肌酸激酶", "羟丁酸",
+    "C反应蛋白", "糖化血红蛋白", "同型半胱氨酸", "胱抑素", "转铁蛋白",
+    "β2-微球蛋白", "腺苷脱氨酶", "铁蛋白", "铁", "二氧化碳",
+    # 免疫常规：传染病/甲功/肿瘤标志物/性激素/糖尿病/自身抗体
+    "乙肝", "丙肝", "艾滋", "梅毒", "甲胎蛋白", "癌胚抗原", "癌抗原", "前列腺特异",
+    "促甲状腺", "甲状腺", "三碘", "胰岛素", "C肽", "皮质醇", "降钙素原", "叶酸",
+    "维生素B12", "生长激素", "醛固酮", "肾素", "孕酮", "雌二醇", "睾酮",
+    "促卵泡", "促黄体", "泌乳素", "免疫球蛋白", "补体", "类风湿因子", "抗链球菌",
+    # 凝血常规
+    "凝血酶原", "活化部分凝血活酶", "凝血酶时间", "纤维蛋白原", "纤维蛋白降解产物",
+    "D-二聚体", "抗凝血酶", "蛋白C", "蛋白S", "狼疮抗凝物", "血管性血友病", "凝血因子",
+]
+_COMMON_CASE = case(
+    *[(TestItem.name.ilike(f"%{kw}%"), 0) for kw in _COMMON_KEYWORDS],
+    else_=1,
 )
 
 router = make_router(
@@ -32,7 +55,7 @@ router = make_router(
     filter_fields=["category", "brand", "specimen", "method", "instrument"],
     prefix="/test-items",
     write_roles=("admin",),
-    order_by=[_CATEGORY_RANK, TestItem.name],
+    order_by=[_CATEGORY_RANK, _COMMON_CASE, TestItem.name],
 )
 
 # 中文表头 -> 英文字段名（与导出模板一致，忽略表头尾部 * 号）
@@ -148,7 +171,7 @@ async def export_test_items(
         query = query.filter(TestItem.category == category)
     if brand:
         query = query.filter(or_(TestItem.brand == brand, TestItem.calibrator.ilike(f"%{brand}%")))
-    rows = query.order_by(_CATEGORY_RANK, TestItem.name).all()
+    rows = query.order_by(_CATEGORY_RANK, _COMMON_CASE, TestItem.name).all()
 
     wb = openpyxl.Workbook()
     ws = wb.active
