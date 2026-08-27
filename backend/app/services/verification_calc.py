@@ -540,6 +540,21 @@ def compute_verification(data_field, verify_items, report_type="quantitative",
     return {"result_summary": rs, "details": details}
 
 
+def _to_pct(text: str) -> str:
+    """把文本中 0<v<1 的无%小数转为百分数（如 0.0059 -> 0.59%）；已带%或非纯小数不动。"""
+    if not text or '%' in text:
+        return text
+
+    def _repl(m):
+        v = float(m.group(0))
+        if 0 < v < 1:
+            s = f"{v * 100:.4f}".rstrip('0').rstrip('.')
+            return f"{s}%"
+        return m.group(0)
+
+    return re.sub(r'\d+\.\d+', _repl, text)
+
+
 def normalize_conclusion_summary(rs, unit="", dilution=None, linear_low=None, linear_high=None, report_type="quantitative"):
     """把存储/计算得到的 result_summary 规范化为统一展示格式。
 
@@ -570,14 +585,14 @@ def normalize_conclusion_summary(rs, unit="", dilution=None, linear_low=None, li
 
     # 正确度（parser 用 trueness1/2；后端用 trueness）
     if rs.get("trueness") and rs["trueness"].get("result"):
-        out["trueness"] = {"result": _ensure_prefix(rs["trueness"]["result"], "相对偏倚"),
+        out["trueness"] = {"result": _to_pct(_ensure_prefix(rs["trueness"]["result"], "相对偏倚")),
                            "conclusion": rs["trueness"].get("conclusion", "")}
     else:
         t1 = rs.get("trueness1") or {}
         t2 = rs.get("trueness2") or {}
         base = (t1.get("result") or t2.get("result") or "").strip()
         if base:
-            out["trueness"] = {"result": _ensure_prefix(base, "相对偏倚"),
+            out["trueness"] = {"result": _to_pct(_ensure_prefix(base, "相对偏倚")),
                                "conclusion": t1.get("conclusion") or t2.get("conclusion") or ""}
 
     # 线性范围：提取「范围」+ 单位（去掉判定文字/换行）
