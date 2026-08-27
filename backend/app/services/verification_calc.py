@@ -560,7 +560,15 @@ def _auto_conclusion(result_text: str, tea) -> str:
 
     典型场景：1号机 vs 靶机比对的正确度/精密度（vrf_parser 未提取到"符合"文字，结果文本只有数字百分比）。
     """
-    if not result_text or not isinstance(tea, (int, float)) or tea <= 0:
+    if not result_text:
+        return ""
+    if tea is None or tea == "":
+        return ""
+    try:
+        tea = float(tea)
+    except (TypeError, ValueError):
+        return ""
+    if tea <= 0:
         return ""
     nums = []
     for m in re.finditer(r"(\d+(?:\.\d+)?)%", result_text):
