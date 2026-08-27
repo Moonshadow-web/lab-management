@@ -283,14 +283,16 @@ def _is_target(model: str, no: str) -> bool:
     return ((model or "").strip() in _TARGET_MODELS) or ((no or "").strip() in _TARGET_NOS)
 
 
-# 申请 CNAS 认可的项目（认可能力范围 AC 28 项，用 project_name 括号缩写判定；统一大写比较）
+# 申请 CNAS 认可的项目（认可能力范围：AC临床化学 28 项 + AD临床免疫学传染病项目；统一大写比较）
 _CNAS_ABBR = {
     "NA", "K", "CL", "GLU", "UREA", "CREZ", "UA", "CA", "MG", "P",
     "ALT", "AST", "TP", "ALB", "TBIL", "DBIL", "ALP", "GGT",
     "TRIG", "CHO", "HDL-C", "LDL-C", "AMY", "LIP", "LPS", "CK", "LDH",
     "HBA1C", "CRPHS",
+    # 免疫（AD临床免疫学）：乙肝五项 / 丙肝 / 艾滋 / 梅毒
+    "HBSAG", "HBEAG", "HBEAB", "HBCAB",
 }
-_CNAS_NAME_KEYWORDS = ("C反应蛋白",)  # 无括号缩写项目
+_CNAS_NAME_KEYWORDS = ("C反应蛋白", "表面抗体", "肝炎病毒抗体", "HIV", "梅毒")  # 无括号缩写项目
 
 
 def _is_cnas(project_name: str) -> bool:
