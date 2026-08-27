@@ -282,6 +282,24 @@ def _is_target(model: str, no: str) -> bool:
     return ((model or "").strip() in _TARGET_MODELS) or ((no or "").strip() in _TARGET_NOS)
 
 
+# 申请 CNAS 认可的项目（认可能力范围 AC 28 项，用 project_name 括号缩写判定）
+_CNAS_ABBR = {
+    "NA", "K", "CL", "GLU", "UREA", "CREZ", "UA", "CA", "MG", "P",
+    "ALT", "AST", "TP", "ALB", "TBIL", "DBIL", "ALP", "GGT",
+    "TRIG", "CHO", "HDL-C", "LDL-C", "AMY", "LIP", "CK", "LDH",
+    "HbA1c", "CRPHS",
+}
+_CNAS_NAME_KEYWORDS = ("C反应蛋白",)  # 无括号缩写项目
+
+
+def _is_cnas(project_name: str) -> bool:
+    pn = project_name or ""
+    m = re.search(r"[（(]([^）)]+)[）)]", pn)
+    if m and m.group(1).strip().upper() in _CNAS_ABBR:
+        return True
+    return any(k in pn for k in _CNAS_NAME_KEYWORDS)
+
+
 def _compute_items_summary(rec, db):
     """计算一条验证记录的结论汇总（含正常化、糖化特例等），返回 (verify_items, items_summary)。"""
     try:
@@ -414,6 +432,7 @@ def list_by_project(
         )
         archive.append({
             "project_name": pname,
+            "is_cnas": _is_cnas(pname),
             "latest_id": latest.id,
             "latest_date": latest.verify_date,
             "latest_instrument": f"{latest.instrument_model or ''} {latest.instrument_no or ''}".strip(),
