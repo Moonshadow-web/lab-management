@@ -33,8 +33,11 @@
               <el-table-column label="#" width="60" type="index" align="center" />
               <el-table-column label="记录ID" prop="id" width="80" />
               <el-table-column label="验证日期" prop="verify_date" width="120" />
-              <el-table-column label="仪器" min-width="140">
-                <template #default="{ row: r }">{{ r.instrument_model }} {{ r.instrument_no }}</template>
+              <el-table-column label="仪器" min-width="150">
+                <template #default="{ row: r }">
+                  <span>{{ r.instrument_model }} {{ r.instrument_no }}</span>
+                  <el-tag v-if="r.is_target" type="danger" size="small" effect="dark" style="margin-left:4px">靶机</el-tag>
+                </template>
               </el-table-column>
               <el-table-column label="试剂" prop="reagent" min-width="120" show-overflow-tooltip />
               <el-table-column label="类型" width="70" align="center">
@@ -64,8 +67,11 @@
 
       <el-table-column label="项目名称" min-width="200" prop="project_name" show-overflow-tooltip />
       <el-table-column label="最近验证" width="120" prop="latest_date" />
-      <el-table-column label="仪器" min-width="140">
-        <template #default="{ row }">{{ row.latest_instrument || '—' }}</template>
+      <el-table-column label="仪器" min-width="150">
+        <template #default="{ row }">
+          <span>{{ row.latest_instrument || '—' }}</span>
+          <el-tag v-if="row.latest_is_target" type="danger" size="small" effect="dark" style="margin-left:4px">靶机</el-tag>
+        </template>
       </el-table-column>
       <el-table-column label="试剂" min-width="120">
         <template #default="{ row }">{{ row.latest_reagent || '—' }}</template>

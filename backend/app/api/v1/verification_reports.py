@@ -273,6 +273,14 @@ def download_report(
 from fastapi import APIRouter
 project_archive_router = APIRouter(prefix="/project-verification-archive", tags=["performance"])
 
+# 靶机判定：同型号多台仪器，指定一台做全套验证为「靶机」，其余只做精密度+正确度-比对
+_TARGET_MODELS = {"AU5821B"}
+_TARGET_NOS = {"MHZYY-JYK-SM-2003"}
+
+
+def _is_target(model: str, no: str) -> bool:
+    return ((model or "").strip() in _TARGET_MODELS) or ((no or "").strip() in _TARGET_NOS)
+
 
 @project_archive_router.get("/list-by-project")
 def list_by_project(
@@ -283,7 +291,8 @@ def list_by_project(
     """按项目名聚合：每个项目（同名）取最新一份验证报告 + 历史次数。
 
     返回结构：[{ project_name, latest_id, latest_date, latest_instrument,
-                 verify_items, latest_summary, history_count, all_records: [...] }, ...]
+                 latest_is_target, verify_items, latest_summary, history_count,
+                 all_records: [{..., is_target}], ...}]
     """
     q = db.query(VerificationReport)
     if keyword:
@@ -366,6 +375,7 @@ def list_by_project(
             "latest_id": latest.id,
             "latest_date": latest.verify_date,
             "latest_instrument": f"{latest.instrument_model or ''} {latest.instrument_no or ''}".strip(),
+            "latest_is_target": _is_target(latest.instrument_model, latest.instrument_no),
             "latest_reagent": latest.reagent,
             "latest_report_type": latest.report_type,
             "verify_items": v_items,
@@ -377,6 +387,7 @@ def list_by_project(
                 {
                     "id": r.id, "verify_date": r.verify_date,
                     "instrument_model": r.instrument_model, "instrument_no": r.instrument_no,
+                    "is_target": _is_target(r.instrument_model, r.instrument_no),
                     "reagent": r.reagent, "report_type": r.report_type,
                     "verify_items": json.loads(r.verify_items) if r.verify_items else [],
                     "result_summary": json.loads(r.result_summary) if r.result_summary else {},
