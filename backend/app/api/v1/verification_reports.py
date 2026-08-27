@@ -310,7 +310,8 @@ def list_by_project(
 
     archive = []
     for pname, recs in sorted(grouped.items()):
-        recs.sort(key=lambda x: x.id, reverse=True)
+        # 排序：靶机优先（靶机的全套结论才是代表该型号的"标准结果"），再按 id desc 取最新
+        recs.sort(key=lambda x: (0 if _is_target(x.instrument_model, x.instrument_no) else 1, -x.id))
         latest = recs[0]
         try:
             v_items = json.loads(latest.verify_items) if latest.verify_items else []
@@ -330,7 +331,7 @@ def list_by_project(
         r_summary = normalize_conclusion_summary(
             r_summary, unit=latest.unit or "", dilution=latest.dilution,
             linear_low=latest.linear_low, linear_high=latest.linear_high,
-            report_type=latest.report_type,
+            report_type=latest.report_type, tea=latest.tea,
         )
         latest_items_summary = _build_ordered_conclusion(v_items, r_summary, latest.unit or "")
         # 可报告范围：稀释倍数 "/" 或为空（不稀释）→ 一般等同线性范围；糖化血红蛋白特殊按报告值显示
@@ -422,7 +423,7 @@ def conclusion_records(
         d["result_summary"] = normalize_conclusion_summary(
             raw, unit=o.unit or "", dilution=o.dilution,
             linear_low=o.linear_low, linear_high=o.linear_high,
-            report_type=o.report_type,
+            report_type=o.report_type, tea=o.tea,
         )
         items.append(d)
     res["items"] = items

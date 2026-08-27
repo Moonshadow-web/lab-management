@@ -555,7 +555,28 @@ def _to_pct(text: str) -> str:
     return re.sub(r'\d+\.\d+', _repl, text)
 
 
-def normalize_conclusion_summary(rs, unit="", dilution=None, linear_low=None, linear_high=None, report_type="quantitative"):
+def _auto_conclusion(result_text: str, tea) -> str:
+    """result 含 % 数字时，按 |最大数字| < 0.5*TEA 兜底「符合要求」。
+
+    典型场景：1号机 vs 靶机比对的正确度/精密度（vrf_parser 未提取到"符合"文字，结果文本只有数字百分比）。
+    """
+    if not result_text or not isinstance(tea, (int, float)) or tea <= 0:
+        return ""
+    nums = []
+    for m in re.finditer(r"(\d+(?:\.\d+)?)%", result_text):
+        try:
+            v = float(m.group(1))
+        except ValueError:
+            continue
+        nums.append(v)
+    if not nums:
+        return ""
+    if max(nums) / 100 < tea * 0.5:
+        return "符合要求"
+    return "不符合要求"
+
+
+def normalize_conclusion_summary(rs, unit="", dilution=None, linear_low=None, linear_high=None, report_type="quantitative", tea=None):
     """把存储/计算得到的 result_summary 规范化为统一展示格式。
 
     兼容两种来源，输出完全一致，供「性能验证记录」与「验证报告归档」两页复用：
@@ -581,19 +602,23 @@ def normalize_conclusion_summary(rs, unit="", dilution=None, linear_low=None, li
     for sk, prefix in (("precision1", "批内CV"), ("precision2", "实验室内CV")):
         it = rs.get(sk)
         if it and it.get("result"):
-            out[sk] = {"result": _ensure_prefix(it["result"], prefix), "conclusion": it.get("conclusion", "")}
+            res_text = _ensure_prefix(it["result"], prefix)
+            cons = it.get("conclusion", "") or _auto_conclusion(res_text, tea)
+            out[sk] = {"result": res_text, "conclusion": cons}
 
     # 正确度（parser 用 trueness1/2；后端用 trueness）
     if rs.get("trueness") and rs["trueness"].get("result"):
-        out["trueness"] = {"result": _to_pct(_ensure_prefix(rs["trueness"]["result"], "相对偏倚")),
-                           "conclusion": rs["trueness"].get("conclusion", "")}
+        tr_res = _to_pct(_ensure_prefix(rs["trueness"]["result"], "相对偏倚"))
+        tr_conc = rs["trueness"].get("conclusion", "") or _auto_conclusion(tr_res, tea)
+        out["trueness"] = {"result": tr_res, "conclusion": tr_conc}
     else:
         t1 = rs.get("trueness1") or {}
         t2 = rs.get("trueness2") or {}
         base = (t1.get("result") or t2.get("result") or "").strip()
         if base:
-            out["trueness"] = {"result": _to_pct(_ensure_prefix(base, "相对偏倚")),
-                               "conclusion": t1.get("conclusion") or t2.get("conclusion") or ""}
+            tr_res = _to_pct(_ensure_prefix(base, "相对偏倚"))
+            tr_conc = t1.get("conclusion") or t2.get("conclusion") or _auto_conclusion(tr_res, tea)
+            out["trueness"] = {"result": tr_res, "conclusion": tr_conc}
 
     # 线性范围：提取「范围」+ 单位（去掉判定文字/换行）
     it = rs.get("linearity")
