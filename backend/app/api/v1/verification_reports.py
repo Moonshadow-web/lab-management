@@ -5,6 +5,7 @@
 """
 import io
 import json
+import re
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response
