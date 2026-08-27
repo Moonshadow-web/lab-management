@@ -282,6 +282,61 @@ def _is_target(model: str, no: str) -> bool:
     return ((model or "").strip() in _TARGET_MODELS) or ((no or "").strip() in _TARGET_NOS)
 
 
+def _compute_items_summary(rec, db):
+    """计算一条验证记录的结论汇总（含正常化、糖化特例等），返回 (verify_items, items_summary)。"""
+    try:
+        v_items = json.loads(rec.verify_items) if rec.verify_items else []
+    except Exception:
+        v_items = []
+    v_items = sorted(v_items, key=lambda k: _CONCLUSION_ORDER.get(k, 99))
+    r_summary = _recompute_summary(rec, db)
+    _orig_rs = r_summary
+    r_summary = normalize_conclusion_summary(
+        r_summary, unit=rec.unit or "", dilution=rec.dilution,
+        linear_low=rec.linear_low, linear_high=rec.linear_high,
+        report_type=rec.report_type, tea=rec.tea,
+    )
+    items_summary = _build_ordered_conclusion(v_items, r_summary, rec.unit or "")
+    # 可报告范围：稀释倍数 "/" 或为空（不稀释）→ 一般等同线性范围；糖化血红蛋白特殊按报告值显示
+    try:
+        data_field = json.loads(rec.data) if rec.data else {}
+        rep_dilution = (data_field.get("reportable") or {}).get("dilution") or ""
+        is_hba1c = ('糖化' in (rec.project_name or '')) or ('HbA1c' in (rec.project_name or ''))
+        if rep_dilution.strip() in ("/", ""):
+            if is_hba1c:
+                # 糖化血红蛋白（高效液相法）：稀释=不稀释也按报告值显示，单位「出峰面积」
+                r1 = (_orig_rs.get("reportable1") or {}) if isinstance(_orig_rs, dict) else {}
+                r2 = (_orig_rs.get("reportable2") or {}) if isinstance(_orig_rs, dict) else {}
+                low = (r1.get("result") or "").replace("低限", "", 1).strip()
+                high = (r2.get("result") or "").replace("高限", "", 1).strip()
+                if low and high:
+                    cons = r1.get("conclusion") if r1.get("conclusion") == r2.get("conclusion") else (r1.get("conclusion") or r2.get("conclusion") or "")
+                    items_summary = [
+                        {
+                            "key": "reportable",
+                            "result": f"{low}-{high}（出峰面积）",
+                            "conclusion": cons or "符合要求",
+                        } if r["key"] == "reportable" else r
+                        for r in items_summary
+                    ]
+            else:
+                lo = (rec.linear_low or "").strip()
+                hi = (rec.linear_high or "").strip()
+                unit_suffix = f" {rec.unit.strip()}" if (rec.unit or "").strip() else ""
+                if lo and hi:
+                    items_summary = [
+                        {
+                            "key": "reportable",
+                            "result": f"等同线性范围{lo}-{hi}{unit_suffix}",
+                            "conclusion": "无",
+                        } if r["key"] == "reportable" else r
+                        for r in items_summary
+                    ]
+    except Exception:
+        pass
+    return v_items, items_summary
+
+
 @project_archive_router.get("/list-by-project")
 def list_by_project(
     keyword: str = "",
@@ -310,67 +365,53 @@ def list_by_project(
 
     archive = []
     for pname, recs in sorted(grouped.items()):
-        # 排序：靶机优先（靶机的全套结论才是代表该型号的"标准结果"），再按 id desc 取最新
-        recs.sort(key=lambda x: (0 if _is_target(x.instrument_model, x.instrument_no) else 1, -x.id))
-        latest = recs[0]
-        try:
-            v_items = json.loads(latest.verify_items) if latest.verify_items else []
-        except Exception:
-            v_items = []
-        # 验证项按固定顺序展示（精密度→正确度→线性→可报告→参考区间→分析特异性…）
-        v_items = sorted(v_items, key=lambda k: _CONCLUSION_ORDER.get(k, 99))
-        try:
-            r_summary = json.loads(latest.result_summary) if latest.result_summary else {}
-        except Exception:
-            r_summary = {}
-        # 用最新计算引擎重算（不落库），再规范化为统一展示格式
-        # （兼容后端计算格式与 vrf_parser 上传解析格式），保证老记录也按最新格式/顺序展示
-        r_summary = _recompute_summary(latest, db)
-        # 保留一份原始 r_summary：normalize 会丢 reportable1/2，糖化血红蛋白特例读取它们
-        _orig_rs = r_summary
-        r_summary = normalize_conclusion_summary(
-            r_summary, unit=latest.unit or "", dilution=latest.dilution,
-            linear_low=latest.linear_low, linear_high=latest.linear_high,
-            report_type=latest.report_type, tea=latest.tea,
+        # 最新在前（分组展示，不再"靶机覆盖其他机器"）
+        recs.sort(key=lambda x: -x.id)
+        # 按仪器（型号+编号）分组：同一台机器多次验证 → 该机最新为 current，更早归历史
+        group_map: dict[str, list] = {}
+        for r in recs:
+            gk = f"{r.instrument_model or ''}|{r.instrument_no or ''}"
+            group_map.setdefault(gk, []).append(r)
+        groups = []
+        for grecs in group_map.values():
+            grecs.sort(key=lambda x: -x.id)
+            cur = grecs[0]
+            model = cur.instrument_model or ''
+            no = cur.instrument_no or ''
+            v_items, items_summary = _compute_items_summary(cur, db)
+            groups.append({
+                "instrument_model": model,
+                "instrument_no": no,
+                "is_target": _is_target(model, no),
+                "current": {
+                    "id": cur.id,
+                    "verify_date": cur.verify_date,
+                    "verify_items": v_items,
+                    "items_summary": items_summary,
+                },
+                "history": [
+                    {
+                        "id": r.id, "verify_date": r.verify_date,
+                        "instrument_model": r.instrument_model, "instrument_no": r.instrument_no,
+                        "is_target": _is_target(r.instrument_model, r.instrument_no),
+                        "reagent": r.reagent, "report_type": r.report_type,
+                        "verify_items": json.loads(r.verify_items) if r.verify_items else [],
+                        "result_summary": json.loads(r.result_summary) if r.result_summary else {},
+                    }
+                    for r in grecs[1:]
+                ],
+            })
+        # 主表格代表：靶机优先，否则最新记录
+        tgt = next((g for g in groups if g["is_target"]), None)
+        if tgt:
+            latest = next((r for r in recs if _is_target(r.instrument_model, r.instrument_no)), recs[0])
+        else:
+            latest = recs[0]
+        # 项目所有验证项（各仪器当前组的并集，按固定顺序）
+        v_items_all = sorted(
+            {it for g in groups for it in g["current"]["verify_items"]},
+            key=lambda k: _CONCLUSION_ORDER.get(k, 99),
         )
-        latest_items_summary = _build_ordered_conclusion(v_items, r_summary, latest.unit or "")
-        # 可报告范围：稀释倍数 "/" 或为空（不稀释）→ 一般等同线性范围；糖化血红蛋白特殊按报告值显示
-        try:
-            data_field = json.loads(latest.data) if latest.data else {}
-            rep_dilution = (data_field.get("reportable") or {}).get("dilution") or ""
-            is_hba1c = ('糖化' in (latest.project_name or '')) or ('HbA1c' in (latest.project_name or ''))
-            if rep_dilution.strip() in ("/", ""):
-                if is_hba1c:
-                    # 糖化血红蛋白（高效液相法）：稀释=不稀释也按报告值显示，单位「出峰面积」
-                    r1 = (_orig_rs.get("reportable1") or {}) if isinstance(_orig_rs, dict) else {}
-                    r2 = (_orig_rs.get("reportable2") or {}) if isinstance(_orig_rs, dict) else {}
-                    low = (r1.get("result") or "").replace("低限", "", 1).strip()
-                    high = (r2.get("result") or "").replace("高限", "", 1).strip()
-                    if low and high:
-                        cons = r1.get("conclusion") if r1.get("conclusion") == r2.get("conclusion") else (r1.get("conclusion") or r2.get("conclusion") or "")
-                        latest_items_summary = [
-                            {
-                                "key": "reportable",
-                                "result": f"{low}-{high}（出峰面积）",
-                                "conclusion": cons or "符合要求",
-                            } if r["key"] == "reportable" else r
-                            for r in latest_items_summary
-                        ]
-                else:
-                    lo = (latest.linear_low or "").strip()
-                    hi = (latest.linear_high or "").strip()
-                    unit_suffix = f" {latest.unit.strip()}" if (latest.unit or "").strip() else ""
-                    if lo and hi:
-                        latest_items_summary = [
-                            {
-                                "key": "reportable",
-                                "result": f"等同线性范围{lo}-{hi}{unit_suffix}",
-                                "conclusion": "无",
-                            } if r["key"] == "reportable" else r
-                            for r in latest_items_summary
-                        ]
-        except Exception:
-            pass
         archive.append({
             "project_name": pname,
             "latest_id": latest.id,
@@ -379,11 +420,10 @@ def list_by_project(
             "latest_is_target": _is_target(latest.instrument_model, latest.instrument_no),
             "latest_reagent": latest.reagent,
             "latest_report_type": latest.report_type,
-            "verify_items": v_items,
-            "latest_summary": r_summary,
-            "latest_conclusion": latest.conclusion or "",
-            "latest_items_summary": latest_items_summary,
+            "verify_items": v_items_all,
+            "latest_items_summary": (tgt["current"]["items_summary"] if tgt else groups[0]["current"]["items_summary"]),
             "history_count": len(recs),
+            "groups": groups,
             "all_records": [
                 {
                     "id": r.id, "verify_date": r.verify_date,
