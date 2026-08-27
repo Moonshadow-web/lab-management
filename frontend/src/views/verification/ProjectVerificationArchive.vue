@@ -126,7 +126,7 @@
       <el-table-column label="项目名称" min-width="200" prop="project_name" show-overflow-tooltip />
       <el-table-column label="认可" width="90" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.is_cnas" type="success" size="small">CNAS认可</el-tag>
+          <el-tag v-if="row.is_cnas" type="success" size="small">申请认可</el-tag>
           <el-tag v-else type="info" size="small" effect="plain">未申请认可</el-tag>
         </template>
       </el-table-column>
