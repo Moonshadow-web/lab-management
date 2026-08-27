@@ -18,6 +18,7 @@ from ...core.crud_base import make_router
 from ...core.config import DATA_DIR
 from ...core.database import get_db
 from ...core.security import get_current_user
+from ...core.cos_storage import cos_storage
 from ...models.eqa import EqaPlan, EqaSummary
 from ...models.user import User
 from ...models.test_item import TestItem
@@ -472,6 +473,56 @@ EQA_REPORT_DIR = DATA_DIR / "eqa_reports"
 os.makedirs(EQA_REPORT_DIR, exist_ok=True)
 
 
+# ── EQA 报告持久化：本地 + COS 双写（根治容器重启/多副本丢失，2026-08-28）──
+def _save_eqa_report(name: str, content: bytes) -> None:
+    """写本地 + 双写 COS。report_file 存 `eqa_reports/<name>` 相对键，COS key 同。"""
+    dest = EQA_REPORT_DIR / name
+    dest.write_bytes(content)
+    if cos_storage.ready:
+        try:
+            cos_storage.save("eqa_reports", name, content)
+        except Exception:
+            pass
+
+
+def _get_eqa_report_path(report_file: str):
+    """返回可读取的本地路径：本地优先；缺失则从 COS 恢复；
+    本地存在时懒迁移到 COS，保护旧文件不被容器重启丢失。"""
+    name = os.path.basename(report_file)
+    local = EQA_REPORT_DIR / name
+    if local.exists():
+        if cos_storage.ready:
+            try:
+                if not cos_storage.exists(f"eqa_reports/{name}"):
+                    cos_storage.save("eqa_reports", name, local.read_bytes())
+            except Exception:
+                pass
+        return local
+    if cos_storage.ready:
+        content = cos_storage.get_bytes(f"eqa_reports/{name}")
+        if content:
+            local.parent.mkdir(parents=True, exist_ok=True)
+            local.write_bytes(content)
+            return local
+    return None
+
+
+def _delete_eqa_report(report_file: str) -> None:
+    """本地 + COS 双清。"""
+    name = os.path.basename(report_file)
+    local = EQA_REPORT_DIR / name
+    if local.exists():
+        try:
+            local.unlink()
+        except Exception:
+            pass
+    if cos_storage.ready:
+        try:
+            cos_storage.delete(f"eqa_reports/{name}")
+        except Exception:
+            pass
+
+
 # 非项目名行：报告标题/页眉页脚/表头/单位等，用于定位「项目名」时跳过
 _NONAME = re.compile(
     r"室间质量评价|实验室编码|实验室名称|测定日期|统计日期|报表打印日期|打印日期|"
@@ -673,24 +724,17 @@ async def upload_eqa_report(
         raise HTTPException(status_code=400, detail="仅支持 PDF 质评报告")
     os.makedirs(EQA_REPORT_DIR, exist_ok=True)
     safe = f"{plan_id}_{int(datetime.utcnow().timestamp())}.pdf"
-    dest = EQA_REPORT_DIR / safe
     content = await file.read()
-    with open(dest, "wb") as f:
-        f.write(content)
+    _save_eqa_report(safe, content)
     # 解析口子：抽取成绩/合格/得分（失败不影响导入）；传入 item 以按子项识别不适用
     parsed = {}
     try:
-        parsed = parse_eqa_report(str(dest), item_text=plan.item)
+        parsed = parse_eqa_report(str(EQA_REPORT_DIR / safe), item_text=plan.item)
     except Exception:
         parsed = {}
-    # 删除该计划旧报告文件
+    # 删除该计划旧报告文件（本地 + COS 双清）
     if plan.report_file:
-        old = EQA_REPORT_DIR / os.path.basename(plan.report_file)
-        if old.exists():
-            try:
-                old.unlink()
-            except Exception:
-                pass
+        _delete_eqa_report(plan.report_file)
     plan.report_file = f"eqa_reports/{safe}"
     # 回填优先级：表单显式输入 > 自动解析；空白字段用解析结果补全
     if score != "":
@@ -784,8 +828,8 @@ def download_eqa_report(
     plan = db.query(EqaPlan).filter(EqaPlan.id == plan_id).first()
     if not plan or not plan.report_file:
         raise HTTPException(status_code=404, detail="未导入报告")
-    path = EQA_REPORT_DIR / os.path.basename(plan.report_file)
-    if not path.exists():
+    path = _get_eqa_report_path(plan.report_file)
+    if path is None or not path.exists():
         raise HTTPException(status_code=404, detail="报告文件缺失")
     return FileResponse(
         str(path),
@@ -805,12 +849,7 @@ def delete_eqa_report(
     if not plan:
         raise HTTPException(status_code=404, detail="计划不存在")
     if plan.report_file:
-        path = EQA_REPORT_DIR / os.path.basename(plan.report_file)
-        if path.exists():
-            try:
-                path.unlink()
-            except Exception:
-                pass
+        _delete_eqa_report(plan.report_file)
         plan.report_file = ""
         db.commit()
     return {"ok": True}
