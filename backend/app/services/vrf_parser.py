@@ -132,6 +132,7 @@ def _read_summary(wb, info: dict) -> dict:
     # 关键：不同模板"验证内容/要求/结果/结论"列位置不同（ALP=B 验证内容，ALB=C 验证内容），
     # 这里按内容智能识别：B/C/D/E 任一列含"精密度/正确度/线性/可报告/参考/特异/检出/符合率"→ content
     rows = []
+    _spec_handled = False  # 分析特异性只处理一次（避免后续被反推行号覆盖）
     for r in range(17, 27):
         # 收集这一行所有非空文本（B/C/D/E/F/G/H/I 9 列）
         col_texts = []  # [(col, text)]
@@ -187,14 +188,17 @@ def _read_summary(wb, info: dict) -> dict:
         header_words = ('验证要求', '验证结果', '验证结论', '验证内容')
         if content in header_words or result in header_words or conclusion in header_words:
             continue
-        # 特异性行（R26-R28 多组干扰物）：每行 6/7/8 = 干扰物名/限量/结论
-        # result 拼成多行：每行 "<干扰物> <限量>"，用换行符连接
-        if r == 26 and content == '分析特异性':
-            c2 = _safe_str(_val(ws, 26, 2))
+        # 特异性行（干扰物逐项列在多行，如 R24-R26 或 R26-R28，取决于模板有无参考区间）：
+        # 从「分析特异性」首行开始向下扫描，每行 6/7 = 干扰物名/限量，一次性合并；
+        # 后续重复行（合并单元格导致 A 列同名）跳过，避免覆盖掉已合并的多项结果。
+        if content == '分析特异性':
+            if _spec_handled:
+                continue
+            _spec_handled = True
+            c2 = _safe_str(_val(ws, r, 2))
             names = [s.strip() for s in re.split(r'[、，,/\n]', c2) if s.strip() and s.strip() != '抗干扰能力符合厂家声明']
-            # 读 R26/R27/R28 的 干扰物名/限量
             multi_lines = []
-            for rr in (26, 27, 28):
+            for rr in range(r, r + 5):
                 n = _safe_str(_val(ws, rr, 6)).strip()
                 lim = _safe_str(_val(ws, rr, 7)).strip()
                 if n and lim:
