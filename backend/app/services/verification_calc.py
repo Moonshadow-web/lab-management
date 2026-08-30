@@ -584,6 +584,21 @@ def _auto_conclusion(result_text: str, tea) -> str:
     return "不符合要求"
 
 
+def _to_rate(text: str) -> str:
+    """符合率/检出限 result 数字转百分数：1 → 100%，0.95 → 95%；已带%不动。"""
+    if not text or "%" in text:
+        return text
+
+    def _repl(m):
+        v = float(m.group(0))
+        if 0 <= v <= 1:
+            s = f"{v * 100:.2f}".rstrip('0').rstrip('.')
+            return f"{s}%"
+        return m.group(0)
+
+    return re.sub(r"\d+(?:\.\d+)?", _repl, text)
+
+
 def normalize_conclusion_summary(rs, unit="", dilution=None, linear_low=None, linear_high=None, report_type="quantitative", tea=None):
     """把存储/计算得到的 result_summary 规范化为统一展示格式。
 
@@ -663,11 +678,16 @@ def normalize_conclusion_summary(rs, unit="", dilution=None, linear_low=None, li
             elif high:
                 out["reportable"] = {"result": f"{high}{unit_suffix}", "conclusion": c2}
 
-    # 其余项（参考区间/分析特异性/方法符合率/检出限）原样保留（去换行）
-    for k in ("reference", "specificity", "conformity1", "conformity2", "lod"):
+    # 其余项（参考区间/分析特异性原样保留；方法符合率 result 数字转百分数；检出限原样）
+    for k in ("reference", "specificity", "lod"):
         it = rs.get(k)
         if it and (it.get("result") or it.get("conclusion")):
             out[k] = {"result": (it.get("result") or "").replace("\n", " ").strip(),
+                      "conclusion": it.get("conclusion", "")}
+    for k in ("conformity1", "conformity2"):
+        it = rs.get(k)
+        if it and (it.get("result") or it.get("conclusion")):
+            out[k] = {"result": _to_rate((it.get("result") or "").replace("\n", " ").strip()),
                       "conclusion": it.get("conclusion", "")}
     return out
 
