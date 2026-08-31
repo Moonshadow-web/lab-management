@@ -369,7 +369,7 @@ def _extract_level_pct(cv_text: str, level=None) -> float | None:
     return _extract_first_pct(cv_text)
 
 
-def _lookup_qr_goal(db: Session, test_item: str, aliases: str, level=None) -> str | None:
+def _lookup_qr_goal(db: Session, test_item: str, aliases: str, level=None, all_qr=None) -> str | None:
     """从 QualityRequirement 表中按项目名查找质量目标。
 
     优先级：wst403-2024.cv > bj-hr-2025.cv > nccl-2026.tea/3。
@@ -406,7 +406,10 @@ def _lookup_qr_goal(db: Session, test_item: str, aliases: str, level=None) -> st
         北京互认 cv（如 APTT 正常6.5%/异常10%）。
         """
         from .quality_requirements_seed import contains_same_item
-        all_qr = db.query(QualityRequirement).all()
+        nonlocal all_qr
+        if all_qr is None:
+            # 全表仅查一次并在本次调用内复用（批量回填时避免 565 行 × 多次重复查询）
+            all_qr = db.query(QualityRequirement).all()
         nname = _norm(name)
         rows: list = []
         seen = set()
@@ -511,22 +514,24 @@ def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None, l
             # canon（规范名）优先于原始 LIS 缩写：缩写可能被别的项目「截胡」
             # （如 "PT" 会被「甲状旁腺激素(PTH)」的括号代码 PT 子串命中）。
             cands = [canon, test_item] if canon != test_item else [test_item]
+            # 全表只查一次，后续所有候选名复用（批量回填 1362 行时的性能关键）
+            all_qr = db.query(QualityRequirement).all()
             # 先用「项目名」匹配（不带别名）：别名串可能命中无关项目，导致 _match 按行序
             # 先取到别家的 cv（如淀粉样蛋白A 被拉入 cv=10.0% 的无关行，掩盖了自身
             # nccl-2026 tea±25%/3=8.3%）。项目名能取到非默认值就直接返回。
             for nm in cands:
-                qr_goal = _lookup_qr_goal(db, nm, "", level)
+                qr_goal = _lookup_qr_goal(db, nm, "", level, all_qr=all_qr)
                 if qr_goal and qr_goal != "10%":
                     return qr_goal
             # 项目名取不到，再用别名兜底
             for nm in cands:
-                qr_goal = _lookup_qr_goal(db, nm, aliases, level)
+                qr_goal = _lookup_qr_goal(db, nm, aliases, level, all_qr=all_qr)
                 if qr_goal and qr_goal != "10%":
                     return qr_goal
             # 兜底：若候选都只能得到默认 10%（确有项目目标即为 10%），取首个有值者
             for nm in cands:
                 for _al in ("", aliases):
-                    qr_goal = _lookup_qr_goal(db, nm, _al, level)
+                    qr_goal = _lookup_qr_goal(db, nm, _al, level, all_qr=all_qr)
                     if qr_goal:
                         return qr_goal
         except Exception:

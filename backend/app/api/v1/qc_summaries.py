@@ -661,6 +661,8 @@ def backfill_quality_goals(db: Session = Depends(get_db), user: User = Depends(g
     rows = db.query(QCMonthlySummary).all()
     updated = 0
     samples = []
+    # 同一「项目+别名+水平」组合只需算一次（1362 行里大量重复），避免网关超时
+    goal_cache: dict[tuple, str] = {}
     for s in rows:
         matched = find_test_item_by_name(db, s.test_item, instrument=s.instrument) if s.test_item else None
         aliases = matched.aliases if matched else ""
@@ -670,7 +672,10 @@ def backfill_quality_goals(db: Session = Depends(get_db), user: User = Depends(g
         elif s.test_item in QC_GOAL_EXACT_OVERRIDES:
             goal = QC_GOAL_EXACT_OVERRIDES[s.test_item]
         else:
-            goal = lookup_quality_goal(s.test_item, aliases, db, level=s.level) or "10%"
+            ck = (s.test_item, aliases, s.level)
+            if ck not in goal_cache:
+                goal_cache[ck] = lookup_quality_goal(s.test_item, aliases, db, level=s.level) or "10%"
+            goal = goal_cache[ck]
         if goal and goal != (s.quality_goal or ""):
             old = s.quality_goal
             s.quality_goal = goal
