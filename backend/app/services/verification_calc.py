@@ -506,7 +506,7 @@ def compute_verification(data_field, verify_items, report_type="quantitative",
         r = calc_reportable(data_field, tea)
         lo = r["detail"]["low"]["target"]
         hi = r["detail"]["high"]["target"]
-        if dilution == "/":
+        if _is_no_dilution(dilution):
             # 无稀释倍数：可报告范围等同于线性范围，不做验证
             lin_lo = linear_low
             lin_hi = linear_high
@@ -522,7 +522,7 @@ def compute_verification(data_field, verify_items, report_type="quantitative",
                 "conclusion": r["conclusion"],
             }
         # 保留 subKey 供 Excel 模板（低限/高限分列）使用
-        if dilution == "/":
+        if _is_no_dilution(dilution):
             rs["reportable1"] = {"result": "等同线性范围", "conclusion": "无"}
             rs["reportable2"] = {"result": "", "conclusion": "无"}
         else:
@@ -582,6 +582,14 @@ def _auto_conclusion(result_text: str, tea) -> str:
     if max(nums) / 100 < tea * 0.5:
         return "符合要求"
     return "不符合要求"
+
+
+# 「不稀释」的等价写法：/、空、不可稀释、不稀释 —— 可报告范围均等同线性范围（结论「无」）
+_NO_DILUTION = {"", "/", "不可稀释", "不稀释"}
+
+
+def _is_no_dilution(dilution) -> bool:
+    return str(dilution or "").strip() in _NO_DILUTION
 
 
 def _to_rate(text: str) -> str:
@@ -660,7 +668,7 @@ def normalize_conclusion_summary(rs, unit="", dilution=None, linear_low=None, li
     if rep and rep.get("result"):
         out["reportable"] = {"result": rep["result"], "conclusion": rep.get("conclusion", "")}
     else:
-        if dilution == "/":
+        if _is_no_dilution(dilution):
             out["reportable"] = {
                 "result": f"{linear_low}-{linear_high}{unit_suffix}" if (linear_low and linear_high) else "",
                 "conclusion": "无",

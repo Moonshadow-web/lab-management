@@ -19,7 +19,7 @@ from ...models.report_archive import ReportArchive
 from ...models.user import User
 from ...models.verification_report import VerificationReport
 from ...core.crud_base import paginate
-from ...services.verification_calc import compute_verification, normalize_conclusion_summary, _extract_first_pct
+from ...services.verification_calc import compute_verification, normalize_conclusion_summary, _extract_first_pct, _is_no_dilution
 from ...schemas import (
     VerificationReportCreate,
     VerificationReportRead,
@@ -321,9 +321,10 @@ def _compute_items_summary(rec, db):
     # 可报告范围：稀释倍数 "/" 或为空（不稀释）→ 一般等同线性范围；糖化血红蛋白特殊按报告值显示
     try:
         data_field = json.loads(rec.data) if rec.data else {}
-        rep_dilution = (data_field.get("reportable") or {}).get("dilution") or ""
+        # 优先用记录字段（上传解析时写入的"不可稀释"等），data 里的同字段兜底
+        rep_dilution = rec.dilution or (data_field.get("reportable") or {}).get("dilution") or ""
         is_hba1c = ('糖化' in (rec.project_name or '')) or ('HbA1c' in (rec.project_name or ''))
-        if rep_dilution.strip() in ("/", ""):
+        if _is_no_dilution(rep_dilution):
             if is_hba1c:
                 # 糖化血红蛋白（高效液相法）：稀释=不稀释也按报告值显示，单位「出峰面积」
                 r1 = (_orig_rs.get("reportable1") or {}) if isinstance(_orig_rs, dict) else {}

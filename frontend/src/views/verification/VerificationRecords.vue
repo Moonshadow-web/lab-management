@@ -149,8 +149,10 @@ function conclusionRows(r) {
     if (r.verify_items?.includes('reportable')) {
       // 糖化血红蛋白（高效液相法仪器）：稀释="/" 也按标准可报告范围要求 + 单位「出峰面积」显示
       const isHba1c = (r.project_name || '').includes('糖化') || (r.project_name || '').includes('HbA1c')
+      // 「不稀释」的等价写法：/、空、不可稀释、不稀释 → 可报告范围等同线性范围
+      const noDil = ['', '/', '不可稀释', '不稀释'].includes((r.dilution || '').trim())
       const rep = rs['reportable'] || {}
-      const reqText = (r.dilution === '/' && !isHba1c) ? '等同线性范围' : `${reqLocal['reportable1'] || '—'} / ${reqLocal['reportable2'] || '—'}`
+      const reqText = (noDil && !isHba1c) ? '等同线性范围' : `${reqLocal['reportable1'] || '—'} / ${reqLocal['reportable2'] || '—'}`
       // 糖化血红蛋白：不论 rep.result 是否存在，都从 reportable1/reportable2 拼 +「出峰面积」
       if (isHba1c) {
         const r1 = rs['reportable1'] || {}, r2 = rs['reportable2'] || {}
@@ -181,7 +183,7 @@ function conclusionRows(r) {
           result = `${low}${unitSuffix}`; cons = r1.conclusion || ''
         } else if (high) {
           result = `${high}${unitSuffix}`; cons = r2.conclusion || ''
-        } else if (r.dilution === '/') {
+        } else if (noDil) {
           result = `${r.linear_low || ''}-${r.linear_high || ''}${unitSuffix}`; cons = '无'
         }
         if (result || cons) items.push({ content: '可报告范围', requirement: reqText, result, conclusion: cons })
