@@ -5,13 +5,22 @@
       search-placeholder="搜索姓名/岗位"
       :can-write="canWrite"
       @add="openForm()" @edit="openForm" @delete="onDelete" ref="tableRef"
-    />
+    >
+      <template #row-extra="{ row }">
+        <el-button link type="primary" :icon="Printer" @click="onPrint(row)">预览打印</el-button>
+      </template>
+    </CrudTable>
     <el-dialog v-model="visible" :title="form.id ? '编辑人员能力评估' : '新增人员能力评估'" width="920px" top="2vh">
       <el-form :model="form" label-width="100px">
         <el-row :gutter="12">
           <el-col :span="6"><el-form-item label="姓名"><el-input v-model="form.name" /></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="所在部门"><el-input v-model="form.department" /></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="岗位"><el-input v-model="form.post" /></el-form-item></el-col>
+          <el-col :span="6"><el-form-item label="岗位">
+            <el-select v-model="postList" multiple collapse-tags collapse-tags-tooltip :max-collapse-tags="2"
+                       placeholder="可多选" style="width:100%">
+              <el-option v-for="p in postOptions" :key="p" :label="p" :value="p" />
+            </el-select>
+          </el-form-item></el-col>
           <el-col :span="6"><el-form-item label="年份"><el-input v-model="form.year" placeholder="如 2026" /></el-form-item></el-col>
         </el-row>
 
@@ -68,26 +77,36 @@
         <el-button type="primary" @click="save">保存</el-button>
       </template>
     </el-dialog>
+
+    <Teleport to="body">
+      <CompetencyAssessmentPrint v-if="printData" :data="printData" />
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check } from '@element-plus/icons-vue'
+import { Check, Printer } from '@element-plus/icons-vue'
 import CrudTable from '../../../components/CrudTable.vue'
-import { listCompetency, createCompetency, updateCompetency, deleteCompetency } from '../../../api/education'
+import { listCompetency, getCompetency, createCompetency, updateCompetency, deleteCompetency } from '../../../api/education'
 import { useAuthStore } from '../../../store/auth'
+import CompetencyAssessmentPrint from './CompetencyAssessmentPrint.vue'
+import {
+  groups, allItems, methodOptions, needsRefId, postOptions,
+  defaultEvidenceMap, defaultEvidence, splitPost, joinPost,
+} from './competencyMeta'
 
 const auth = useAuthStore()
 const canWrite = ref(auth.canWrite('training'))
 const tableRef = ref(null)
+const printData = ref(null)
 
 // ---- 列表列（修复原缺失 columns 的 bug）----
 const columns = [
   { prop: 'name', label: '姓名', width: 100 },
   { prop: 'department', label: '部门', width: 110 },
-  { prop: 'post', label: '岗位', width: 100 },
+  { prop: 'post', label: '岗位', width: 160 },
   { prop: 'year', label: '年份', width: 80 },
   { prop: 'total', label: '总分', width: 80 },
   { prop: 'conclusion', label: '结论', width: 90 },
@@ -95,64 +114,12 @@ const columns = [
   { prop: 'assess_date', label: '评估日期', width: 120 },
 ]
 
-// ---- 评分分组（4 类 20 项，与 BG-KS-PX-808 一致）----
-const groups = [
-  { title: '职业道德', weight: 25, items: ['遵守法律法规情况和医院、科室规章制度情况', '执行体系文件情况', '检验活动公正性执行情况', '工作态度', '保密工作执行情况'] },
-  { title: '专业技术水平', weight: 50, items: ['参加培训和继续教育情况', '观察常规工作现场实际操作情况', '检验特定样品的能力（已检验样品、EQA样品、比对样品）', '核查记录填写情况', '观察设备维护和功能检查情况', '监控检验结果的记录和报告过程', '对检验结果的分析和判断能力', '信息系统使用、新增功能使用、信息安全防护的能力', '执行应急预案的能力', '解决问题的能力'] },
-  { title: '员工的表现', weight: 15, items: ['服务对象满意度情况', '团队合作情况', '个人发展情况'] },
-  { title: '主要工作业绩', weight: 10, items: ['履行职责工作任务完成情况', '对科室的贡献情况'] },
-]
-const allItems = groups.flatMap((g) => g.items)
-
-// ---- 评估方法选项 ----
-const methodOptions = [
-  { value: 'observation', label: '直接观察' },
-  { value: 'blind_sample', label: '盲样/未知样测试' },
-  { value: 'internal_comparison', label: '内部比对/人员间比对' },
-  { value: 'pt_eqa', label: 'PT/EQA 表现' },
-  { value: 'data_analysis', label: '数据分析' },
-]
-// 需要关联编号的方法
-const methodsNeedingRefId = new Set(['blind_sample', 'internal_comparison', 'pt_eqa'])
-function needsRefId(method) { return methodsNeedingRefId.has(method) }
-
 // ---- 评分状态 ----
 const scores = reactive({})
 const evidenceOpen = reactive({})
 const evidences = reactive({})
+const postList = ref([]) // 岗位多选（存库时以顿号连接写入 form.post）
 
-// 各评分项的推荐评估方法 + 依据描述模板：默认直接沿用，个别按实际修改即可
-const defaultEvidenceMap = {
-  // 职业道德（25 分 / 5 项）
-  '遵守法律法规情况和医院、科室规章制度情况': ['observation', '日常考勤、交接班及科室例会记录完整，本年度无违规违纪记录。'],
-  '执行体系文件情况': ['observation', '现场抽查 SOP 与记录表格执行情况，操作与现行体系文件一致，无偏离。'],
-  '检验活动公正性执行情况': ['observation', '未发现影响检验公正性的利益冲突或干预，公正性声明执行到位。'],
-  '工作态度': ['observation', '日常工作主动负责，服从安排，按时完成分配任务，无推诿拖延。'],
-  '保密工作执行情况': ['observation', '患者信息及检验数据按授权范围使用，无泄露或违规外传事件。'],
-  // 专业技术水平（50 分 / 10 项）
-  '参加培训和继续教育情况': ['data_analysis', '本年度参加专业组培训 __ 次、科室培训 __ 次，继教学分达标。'],
-  '观察常规工作现场实际操作情况': ['observation', '20__-__-__ 旁站观察常规操作，流程规范、符合 SOP，无需纠正。'],
-  '检验特定样品的能力（已检验样品、EQA样品、比对样品）': ['pt_eqa', '本年度 EQA/PT 回报 __ 项、合格 __ 项，无不合格项。'],
-  '核查记录填写情况': ['data_analysis', '抽查记录表格 __ 份，填写完整可追溯，修改规范、签字齐全。'],
-  '观察设备维护和功能检查情况': ['observation', '现场观察日常维护与功能检查，按计划执行，记录完整及时。'],
-  '监控检验结果的记录和报告过程': ['data_analysis', '抽查检验结果记录与报告 __ 份，录入准确、审核及时，无差错。'],
-  '对检验结果的分析和判断能力': ['internal_comparison', '人员比对/留样再测 __ 次，结果一致，偏差在允许范围内。'],
-  '信息系统使用、新增功能使用、信息安全防护的能力': ['observation', '熟练使用 LIS 及本年度新增功能，账号与数据安全管理符合要求。'],
-  '执行应急预案的能力': ['observation', '参加应急演练 __ 次（断电/仪器故障/生物安全等），处置流程正确。'],
-  '解决问题的能力': ['observation', '能独立判断并处理常见异常（复检、干扰、危急值、仪器报警等）。'],
-  // 员工的表现（15 分 / 3 项）
-  '服务对象满意度情况': ['data_analysis', '临床/患者满意度调查 __ 分，本年度无有效投诉。'],
-  '团队合作情况': ['observation', '配合组内排班与带教工作，沟通顺畅，无协作问题。'],
-  '个人发展情况': ['data_analysis', '本年度参加继续教育/学术活动 __ 次，取得学分 __ 分。'],
-  // 主要工作业绩（10 分 / 2 项）
-  '履行职责工作任务完成情况': ['data_analysis', '年度岗位职责与工作任务完成率 100%，无延误或漏项。'],
-  '对科室的贡献情况': ['data_analysis', '参与科室质量改进/体系工作 __ 项（内审、SOP 修订、新项目开展等）。'],
-}
-
-function defaultEvidence(it) {
-  const d = defaultEvidenceMap[it]
-  return { method: d ? d[0] : 'observation', evidence: d ? d[1] : '', ref_id: '', assessor: '', date: '' }
-}
 // 仍为推荐默认且未补关联编号 → 视为未专门填写，不打勾、按钮显示"(默认)"
 function isDefault(it) {
   const d = defaultEvidenceMap[it]
@@ -196,6 +163,7 @@ function openForm(row) {
   Object.assign(scores, s)
   Object.assign(evidences, e)
   form.value = row ? { ...row } : blank()
+  postList.value = splitPost(form.value.post)
   visible.value = true
 }
 function recalc() {
@@ -220,12 +188,21 @@ async function save() {
     }
     form.value.scores_json = { ...scores }
     form.value.evidence_json = cleanEv
+    form.value.post = joinPost(postList.value)
     form.value.total = total.value
     form.value.conclusion = total.value >= 80 ? '合格' : '不合格'
     if (form.value.id) await updateCompetency(form.value.id, form.value)
     else await createCompetency(form.value)
     ElMessage.success('已保存'); visible.value = false; tableRef.value?.refresh()
   } catch (e) { ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message)) }
+}
+// 预览打印：拉最新完整记录（含 evidence_json）→ 渲染打印版式 → 调浏览器打印（可另存为 PDF）
+async function onPrint(row) {
+  try {
+    printData.value = await getCompetency(row.id)
+    await nextTick()
+    window.print()
+  } catch (e) { ElMessage.error('打印失败：' + (e.response?.data?.detail || e.message)) }
 }
 async function onDelete(row) {
   try { await ElMessageBox.confirm('确认删除？', '提示', { type: 'warning' }); await deleteCompetency(row.id); ElMessage.success('已删除'); tableRef.value?.refresh() } catch (e) {}
