@@ -204,6 +204,9 @@ class CompetencyAssessment(Base):
 
     # 20 个评分项：{项名: 得分(整数)}；合计 100 分（职业道德25+专业技术50+员工表现15+业绩10）
     scores_json: Mapped[str] = mapped_column(Text, default="{}")
+    # 评估依据：{ 项名: { method, evidence, ref_id, assessor, date } }
+    # method 枚举：observation / blind_sample / internal_comparison / pt_eqa / data_analysis
+    evidence_json: Mapped[str] = mapped_column(Text, default="{}")
     total: Mapped[int] = mapped_column(Integer, default=0)  # 总分
     conclusion: Mapped[str] = mapped_column(String(20), default="")  # 合格(≥80)/不合格
     assessor: Mapped[str] = mapped_column(String(100), default="")  # 评估人

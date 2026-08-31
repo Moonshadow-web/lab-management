@@ -97,7 +97,7 @@ competency_router = make_router(
     search_fields=["name", "post", "department"], filter_fields=["year", "department", "person_id"],
     order_by=[CompetencyAssessment.id.desc()],
     prefix="/competency-assessments", write_roles=("admin", "training_manager"),
-    json_fields=["scores_json"],
+    json_fields=["scores_json", "evidence_json"],
 )
 comparison_router = make_router(
     PersonnelComparison, PersonnelComparisonRead, PersonnelComparisonCreate, PersonnelComparisonUpdate,

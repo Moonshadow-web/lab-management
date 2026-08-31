@@ -263,6 +263,7 @@ class CompetencyAssessmentBase(BaseModel):
     post: str = ""
     year: int = 0
     scores_json: dict = {}
+    evidence_json: dict = {}
     total: int = 0
     conclusion: str = ""
     assessor: str = ""
@@ -273,6 +274,19 @@ class CompetencyAssessmentBase(BaseModel):
     @field_validator("scores_json", mode="before")
     @classmethod
     def _scores_json(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return {}
+            try:
+                return json.loads(v)
+            except Exception:
+                return {}
+        return v
+
+    @field_validator("evidence_json", mode="before")
+    @classmethod
+    def _evidence_json(cls, v):
         if isinstance(v, str):
             v = v.strip()
             if not v:
