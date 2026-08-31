@@ -511,16 +511,24 @@ def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None, l
             # canon（规范名）优先于原始 LIS 缩写：缩写可能被别的项目「截胡」
             # （如 "PT" 会被「甲状旁腺激素(PTH)」的括号代码 PT 子串命中）。
             cands = [canon, test_item] if canon != test_item else [test_item]
-            # 优先返回非默认（非 10%）结果
+            # 先用「项目名」匹配（不带别名）：别名串可能命中无关项目，导致 _match 按行序
+            # 先取到别家的 cv（如淀粉样蛋白A 被拉入 cv=10.0% 的无关行，掩盖了自身
+            # nccl-2026 tea±25%/3=8.3%）。项目名能取到非默认值就直接返回。
+            for nm in cands:
+                qr_goal = _lookup_qr_goal(db, nm, "", level)
+                if qr_goal and qr_goal != "10%":
+                    return qr_goal
+            # 项目名取不到，再用别名兜底
             for nm in cands:
                 qr_goal = _lookup_qr_goal(db, nm, aliases, level)
                 if qr_goal and qr_goal != "10%":
                     return qr_goal
             # 兜底：若候选都只能得到默认 10%（确有项目目标即为 10%），取首个有值者
             for nm in cands:
-                qr_goal = _lookup_qr_goal(db, nm, aliases, level)
-                if qr_goal:
-                    return qr_goal
+                for _al in ("", aliases):
+                    qr_goal = _lookup_qr_goal(db, nm, _al, level)
+                    if qr_goal:
+                        return qr_goal
         except Exception:
             pass  # QR 表查询失败不影响主流程，回退到 JSON 文件
 
