@@ -546,9 +546,10 @@ def lookup_quality_goal(test_item: str, aliases: str = "", db: Session = None, l
                 candidates.append((name, _fmt(val)))
     if candidates:
         non_empty = [c for c in candidates if c[1] not in ("", "/")]
-        pool = non_empty if non_empty else candidates
-        pool.sort(key=lambda c: len(c[0]))
-        return pool[0][1]
+        # 命中候选但目标值为空（如 JSON 里留空条目）→ 不返回空，继续往下走最终默认 10%
+        if non_empty:
+            non_empty.sort(key=lambda c: len(c[0]))
+            return non_empty[0][1]
 
     # Step 3: WST403_2024 TE/3（兜底，通过别名匹配英文代码）
     try:

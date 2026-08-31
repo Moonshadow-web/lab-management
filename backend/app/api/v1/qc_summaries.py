@@ -593,7 +593,7 @@ def upload_qc_summary(
                 spec.get("resolved_test_item", test_item),
                 spec.get("test_item_aliases", ""),
                 db, level=level,
-            )
+            ) or "10%"  # 查不到质量目标时默认 10%，不留空
             # pH(血气)：质量目标 = 0.02 / 靶值（逐水平按靶值算相对值），覆盖查表静态值
             if (test_item == "pH" or spec.get("resolved_test_item") in ("pH", "pH（血气）")) and tm:
                 quality_goal = _ph_relative_goal(tm)
@@ -670,7 +670,7 @@ def backfill_quality_goals(db: Session = Depends(get_db), user: User = Depends(g
         elif s.test_item in QC_GOAL_EXACT_OVERRIDES:
             goal = QC_GOAL_EXACT_OVERRIDES[s.test_item]
         else:
-            goal = lookup_quality_goal(s.test_item, aliases, db, level=s.level)
+            goal = lookup_quality_goal(s.test_item, aliases, db, level=s.level) or "10%"
         if goal and goal != (s.quality_goal or ""):
             old = s.quality_goal
             s.quality_goal = goal
