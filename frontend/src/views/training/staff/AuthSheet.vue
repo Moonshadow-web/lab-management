@@ -15,15 +15,38 @@
       <el-form :model="form" label-width="120px">
         <el-divider content-position="left">基本信息</el-divider>
         <el-row :gutter="12">
-          <el-col :span="8"><el-form-item label="姓名"><el-input v-model="form.name" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="姓名">
+            <el-select v-model="form.name" filterable allow-create default-first-option clearable
+                       placeholder="可下拉选择或自填" style="width:100%" @change="onNameChange">
+              <el-option v-for="p in people" :key="p.id" :label="p.name" :value="p.name" />
+            </el-select>
+          </el-form-item></el-col>
           <el-col :span="8"><el-form-item label="所在部门"><el-input v-model="form.department" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="岗位"><el-input v-model="form.post" placeholder="如 生化流水线岗" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="岗位（可多选）">
+            <el-select v-model="postList" multiple collapse-tags collapse-tags-tooltip :max-collapse-tags="2"
+                       placeholder="可多选" style="width:100%">
+              <el-option v-for="p in postOptions" :key="p" :label="p" :value="p" />
+            </el-select>
+          </el-form-item></el-col>
         </el-row>
 
         <el-divider content-position="left">授权五要素</el-divider>
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="项目·方法"><el-input v-model="form.project" placeholder="如 肝功能 / ALT" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="仪器"><el-input v-model="form.instrument" placeholder="如 罗氏 c701" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="仪器">
+            <el-select v-model="form.instrument" filterable clearable
+                       placeholder="从仪器库选择（含型号）" style="width:100%" @change="onInstrumentChange">
+              <el-option v-for="i in instrumentOptions" :key="i.id"
+                         :label="`${i.name}（${i.model || '—'}）`" :value="i.name" />
+            </el-select>
+          </el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="项目/方法（按仪器过滤）">
+            <el-select v-model="form.project" filterable allow-create default-first-option clearable
+                       placeholder="先选仪器，可下拉或自填" style="width:100%" no-data-text="先选仪器或自行输入">
+              <el-option v-for="t in itemOptions" :key="t.id"
+                         :label="`${t.code || ''} ${t.name || ''}`.trim()"
+                         :value="`${t.code || ''} ${t.name || ''}`.trim()" />
+            </el-select>
+          </el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
           <el-col :span="8">
@@ -96,7 +119,7 @@
         <el-descriptions-item label="姓名">{{ current.name }}</el-descriptions-item>
         <el-descriptions-item label="部门">{{ current.department }}</el-descriptions-item>
         <el-descriptions-item label="岗位" :span="2">{{ current.post }}</el-descriptions-item>
-        <el-descriptions-item label="项目·方法" :span="2">{{ current.project }}</el-descriptions-item>
+        <el-descriptions-item label="项目/方法" :span="2">{{ current.project }}</el-descriptions-item>
         <el-descriptions-item label="仪器" :span="2">{{ current.instrument }}</el-descriptions-item>
         <el-descriptions-item label="权限等级"><el-tag :type="scopeTag(current.auth_scope)" effect="light">{{ current.auth_scope }}</el-tag></el-descriptions-item>
         <el-descriptions-item label="有效期">{{ current.valid_from }} ~ {{ current.valid_until }}</el-descriptions-item>
@@ -128,22 +151,63 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../../components/CrudTable.vue'
 import EducationAttachmentList from '../EducationAttachmentList.vue'
-import { listAuthSheet, createAuthSheet, updateAuthSheet, deleteAuthSheet, getAuthSheet } from '../../../api/education'
+import { listAuthSheet, createAuthSheet, updateAuthSheet, deleteAuthSheet, getAuthSheet, listPersonnel } from '../../../api/education'
+import { listInstruments, getInstrumentTestItems } from '../../../api/instruments'
 import { useAuthStore } from '../../../store/auth'
+import { postOptions, splitPost, joinPost } from './competencyMeta'
 
 const auth = useAuthStore()
 const canWrite = ref(auth.canWrite('training'))
 const tableRef = ref(null)
 
+// 人员档案（下拉选项）
+const people = ref([])
+// 仪器库（下拉选项）
+const instrumentOptions = ref([])
+// 当前仪器对应的项目列表
+const itemOptions = ref([])
+// 岗位多选（编辑时回显用）
+const postList = ref([])
+
+onMounted(async () => {
+  // 人员档案一次拉够（按 name 排序）
+  try {
+    const p = await listPersonnel({ page: 1, page_size: 500 })
+    people.value = (p.items || []).map((x) => ({ id: x.id, name: x.name }))
+  } catch (e) {}
+  // 仪器库（含型号）
+  try {
+    const r = await listInstruments({ page: 1, page_size: 1000 })
+    instrumentOptions.value = (r.items || []).filter((x) => x.status !== '停用')
+  } catch (e) {}
+})
+
+// 姓名变化：从下拉选出的回填 person_id，自填则清空
+function onNameChange(name) {
+  if (!name) { form.value.person_id = null; return }
+  const p = people.value.find((x) => x.name === name)
+  form.value.person_id = p ? p.id : null
+}
+
+// 仪器变化：清空项目，按仪器加载项目列表
+async function onInstrumentChange(name) {
+  form.value.project = ''
+  itemOptions.value = []
+  if (!name) return
+  const inst = instrumentOptions.value.find((x) => x.name === name)
+  if (!inst) return
+  try { itemOptions.value = await getInstrumentTestItems(inst.id) } catch (e) { itemOptions.value = [] }
+}
+
 const columns = [
   { prop: 'name', label: '姓名', width: 90 },
   { prop: 'department', label: '部门', width: 110 },
   { prop: 'post', label: '岗位', width: 110, showOverflowTooltip: true },
-  { prop: 'project', label: '项目·方法', width: 160, showOverflowTooltip: true },
+  { prop: 'project', label: '项目/方法', width: 160, showOverflowTooltip: true },
   { prop: 'instrument', label: '仪器', width: 110, showOverflowTooltip: true },
   { prop: 'auth_scope', label: '权限', width: 80, align: 'center' },
   { prop: 'status', label: '状态', width: 100, align: 'center' },
@@ -181,9 +245,17 @@ function blank() {
     remark: '',
   }
 }
-function openForm(row) { form.value = row ? { ...row } : blank(); visible.value = true }
+function openForm(row) {
+  form.value = row ? { ...row } : blank()
+  postList.value = splitPost(form.value.post)
+  itemOptions.value = []
+  // 编辑时若已有仪器，按仪器回填项目
+  if (form.value.instrument) onInstrumentChange(form.value.instrument)
+  visible.value = true
+}
 async function save() {
   try {
+    form.value.post = joinPost(postList.value)
     if (form.value.id) await updateAuthSheet(form.value.id, form.value)
     else await createAuthSheet(form.value)
     ElMessage.success('已保存'); visible.value = false; tableRef.value?.refresh()
