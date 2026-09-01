@@ -28,6 +28,13 @@ export function createCertAuth(data) { return request.post(`${P}/cert-auths`, da
 export function updateCertAuth(id, data) { return request.put(`${P}/cert-auths/${id}`, data) }
 export function deleteCertAuth(id) { return request.delete(`${P}/cert-auths/${id}`) }
 
+// 授权表（CNAS-CL02:2023 6.2 授权五要素 + 状态机）
+export function listAuthSheet(params) { return request.get(`${P}/auth-sheets`, { params }) }
+export function getAuthSheet(id) { return request.get(`${P}/auth-sheets/${id}`) }
+export function createAuthSheet(data) { return request.post(`${P}/auth-sheets`, data) }
+export function updateAuthSheet(id, data) { return request.put(`${P}/auth-sheets/${id}`, data) }
+export function deleteAuthSheet(id) { return request.delete(`${P}/auth-sheets/${id}`) }
+
 // C. 能力评估 + 人员比对
 export function listCompetency(params) { return request.get(`${P}/competency-assessments`, { params }) }
 export function getCompetency(id) { return request.get(`${P}/competency-assessments/${id}`) }

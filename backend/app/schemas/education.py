@@ -528,3 +528,55 @@ class EducationAttachmentRead(BaseModel):
     size_bytes: int = 0
     uploaded_by: str = ""
     uploaded_at: datetime | None = None
+
+
+# =========================================================================
+# G. 授权表（CNAS-CL02:2023 6.2 授权五要素 + 状态机）
+# =========================================================================
+class AuthSheetBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    person_id: int | None = None
+    name: str = ""
+    department: str = "生化免疫组"
+    post: str = ""
+    # 5 要素
+    project: str = ""
+    instrument: str = ""
+    auth_scope: str = "操作"
+    valid_from: str = ""
+    valid_until: str = ""
+    # 监督期
+    supervised_from: str = ""
+    supervised_until: str = ""
+    supervisor: str = ""
+    # 状态机
+    status: str = "有条件"
+    status_reason: str = ""
+    # 关联评估
+    source_assessment_id: int | None = None
+    source_assessment_text: str = ""
+    # 授权人
+    authorizer: str = ""
+    authorizer_qualification: str = ""
+    auth_date: str = ""
+    # 前置条件勾选
+    has_qualification: bool = False
+    has_assessment_pass: bool = False
+    has_supervised_period: bool = False
+    remark: str = ""
+
+
+class AuthSheetCreate(AuthSheetBase):
+    pass
+
+
+class AuthSheetUpdate(AuthSheetBase):
+    pass
+
+
+class AuthSheetRead(AuthSheetBase):
+    id: int
+    status_changed_at: datetime | None = None
+    created_by: str = ""
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

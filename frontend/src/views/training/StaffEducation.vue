@@ -1,7 +1,7 @@
 <template>
   <div class="staff-education">
     <div class="se-header">
-      <h2>人员继教管理</h2>
+      <h2>人员能力管理</h2>
     </div>
 
     <el-tabs v-model="active" class="se-tabs">
@@ -13,6 +13,9 @@
       </el-tab-pane>
       <el-tab-pane label="独立上岗认证" name="cert_auth">
         <CertAuth />
+      </el-tab-pane>
+      <el-tab-pane label="授权表" name="auth_sheet">
+        <AuthSheet />
       </el-tab-pane>
       <el-tab-pane label="年度能力评估" name="competency">
         <el-tabs v-model="compTab">
@@ -42,6 +45,7 @@ import { ref } from 'vue'
 import PersonnelArchive from './staff/PersonnelArchive.vue'
 import NewEmployeeTrain from './staff/NewEmployeeTrain.vue'
 import CertAuth from './staff/CertAuth.vue'
+import AuthSheet from './staff/AuthSheet.vue'
 import CompetencyAssessment from './staff/CompetencyAssessment.vue'
 import PersonnelComparison from './staff/PersonnelComparison.vue'
 import GroupTraining from './staff/GroupTraining.vue'

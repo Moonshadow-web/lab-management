@@ -1,4 +1,4 @@
-"""人员继教管理接口：六大子功能 CRUD + 通用附件（照片/签到扫描件/课件/通知/考题/效果评价等）。
+"""人员能力管理接口：六大子功能 + 授权表 + 通用附件（rename from 人员继教管理，2026-09-01）。
 
 权限：写（增删改）需 admin 或 training_manager；读对所有登录用户开放。模块 key 沿用 'training'。
 """
@@ -18,6 +18,7 @@ from ...models.education import (
     CompetencyAssessment, PersonnelComparison,
     TrainingPlan, TrainingSession,
     InternshipMentor, InternshipScore,
+    AuthSheet,
     EducationAttachment,
 )
 from ...models.user import User
@@ -39,6 +40,7 @@ from ...schemas.education import (
     TrainingSessionCreate, TrainingSessionUpdate, TrainingSessionRead,
     InternshipMentorCreate, InternshipMentorUpdate, InternshipMentorRead,
     InternshipScoreCreate, InternshipScoreUpdate, InternshipScoreRead,
+    AuthSheetCreate, AuthSheetUpdate, AuthSheetRead,
     EducationAttachmentRead,
 )
 
@@ -89,6 +91,15 @@ cert_auth_router = make_router(
     search_fields=["applicant", "apply_content"], filter_fields=["status", "person_id"],
     order_by=[NewEmployeeCertAuth.id.desc()],
     prefix="/cert-auths", write_roles=("admin", "training_manager"),
+)
+
+# G. 授权表（人员能力评估的输出：5 要素 + 状态机）
+auth_sheet_router = make_router(
+    AuthSheet, AuthSheetRead, AuthSheetCreate, AuthSheetUpdate,
+    search_fields=["name", "project", "instrument", "authorizer", "source_assessment_text"],
+    filter_fields=["status", "auth_scope", "department", "person_id", "authorizer"],
+    order_by=[AuthSheet.id.desc()],
+    prefix="/auth-sheets", write_roles=("admin", "training_manager"),
 )
 
 # C. 能力评估 + 人员比对
@@ -144,6 +155,7 @@ router.include_router(reward_router)
 router.include_router(edu_exp_router)
 router.include_router(new_emp_router)
 router.include_router(cert_auth_router)
+router.include_router(auth_sheet_router)
 router.include_router(competency_router)
 router.include_router(comparison_router)
 router.include_router(plan_router)

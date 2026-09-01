@@ -1,4 +1,4 @@
-"""人员继教管理模块数据模型（ renamed from 旧"继教培训"）。
+"""人员能力管理模块数据模型（rename from 旧"继教培训"，2026-09-01）。
 
 六大子功能：
 A. 人员档案（生免室人员档案，对应 BG-KS-GL-017）：独立人员主表 personnel_master + 5 张子表
@@ -9,6 +9,8 @@ D. 组内培训（BG-KS-PX-804 检验科培训记录表）：年度培训计划 
    课件/通知/考题/效果评价存档）。
 E. 实习/进修带教（BG-SM-PX-003 培训大纲及带教评价表 / BG-SM-PX-004 实操考核成绩单，依据 SM-SOP-025）。
 F. 艾梅乙培训：复用 D 的 training_session，tag='艾梅乙'。
+G. 授权表（人员能力评估的输出：人/项目·方法/仪器/权限等级/有效期 5 要素 + 监督期 +
+   状态机【有效/有条件/暂停/撤销】+ 关联评估单 + 授权人资质）。
 
 所有记录表格需 1:1 复刻原表，故字段严格对齐原始 Word 表单。附件（照片/签到扫描件/课件/通知/考题/
 效果评价等）统一存入 education_attachments（LONGBLOB，复刻 comparison_attachments 模式，
@@ -181,6 +183,70 @@ class NewEmployeeCertAuth(Base):
     group_leader_opinion: Mapped[str] = mapped_column(Text, default="")  # 组长意见
     director_opinion: Mapped[str] = mapped_column(Text, default="")  # 主任意见
     status: Mapped[str] = mapped_column(String(20), default="待审核")  # 待审核/通过/不通过
+    remark: Mapped[str] = mapped_column(String(500), default="")
+    created_by: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# =========================================================================
+# G. 授权表（CNAS-CL02:2023 6.2 授权五要素 + 状态机）
+# =========================================================================
+class AuthSheet(Base):
+    """人员能力评估的输出：授权记录表（覆盖操作/复核/签发三级权限 + 监督期 + 状态机）。
+
+    设计依据：盛京医院《医学实验室的内部培训和能力评估》PPT p54-56
+    - 授权五要素：人 / 项目·方法 / 仪器 / 权限等级 / 有效期·条件
+    - 三级权限：操作（基础执行）→ 复核（结果审核）→ 签发（最终报告）
+    - 状态机：有效 / 有条件（监督期内） / 暂停（PT-EQA 不合格/病产假） / 撤销（连续不通过/严重违规）
+    - 前置条件：资质合规 + 培训与评估合格 + 监督期表现
+    - 撤销/暂停触发：能力与绩效 / 行为与合规 / 人事变动
+    """
+
+    __tablename__ = "auth_sheets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    person_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True, default=None)
+    name: Mapped[str] = mapped_column(String(50), index=True, default="")  # 姓名
+    department: Mapped[str] = mapped_column(String(50), default="生化免疫组")  # 所在部门
+    post: Mapped[str] = mapped_column(String(100), default="")  # 岗位
+
+    # ===== 5 要素 =====
+    project: Mapped[str] = mapped_column(String(200), default="")  # 项目·方法（如"肝功能/ALT"）
+    instrument: Mapped[str] = mapped_column(String(200), default="")  # 仪器（如"罗氏 c701"）
+    auth_scope: Mapped[str] = mapped_column(String(20), default="操作", index=True)
+    # 权限等级：操作（基础执行） / 复核（结果审核） / 签发（最终报告）
+    valid_from: Mapped[str] = mapped_column(String(20), default="")  # 授权生效日期
+    valid_until: Mapped[str] = mapped_column(String(20), default="", index=True)  # 授权到期（CNAS 间隔 ≤ 1 年）
+
+    # ===== 监督期（CNAS "有条件授权"：新员工/转岗先在资深人员全程监督下操作） =====
+    supervised_from: Mapped[str] = mapped_column(String(20), default="")  # 监督期起
+    supervised_until: Mapped[str] = mapped_column(String(20), default="")  # 监督期止
+    supervisor: Mapped[str] = mapped_column(String(50), default="")  # 监督人
+
+    # ===== 状态机 =====
+    status: Mapped[str] = mapped_column(String(20), default="有条件", index=True)
+    # 有效 / 有条件（监督期内） / 暂停 / 撤销
+    status_reason: Mapped[str] = mapped_column(String(500), default="")  # 状态变更原因（如 "PT-EQA 钾不合格"）
+    status_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)  # 状态变更时间
+
+    # ===== 关联评估（评估合格的产出） =====
+    source_assessment_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True, default=None)
+    # 关联的能力评估单 id（competency_assessment.id）
+    source_assessment_text: Mapped[str] = mapped_column(String(200), default="")
+    # 冗余：评估摘要（如"2026年度能力评估-张三-95分"）方便列表展示
+
+    # ===== 授权人（CNAS 要求：中级及以上 + 本领域 ≥3 年） =====
+    authorizer: Mapped[str] = mapped_column(String(50), default="")  # 授权签字人姓名
+    authorizer_qualification: Mapped[str] = mapped_column(String(100), default="")
+    # 授权人资质（如"副主任技师 / 本领域 12 年"）
+    auth_date: Mapped[str] = mapped_column(String(20), default="")  # 授权日期
+
+    # ===== 前置条件勾选 =====
+    has_qualification: Mapped[bool] = mapped_column(Boolean, default=False)  # 资质合规
+    has_assessment_pass: Mapped[bool] = mapped_column(Boolean, default=False)  # 培训与评估合格
+    has_supervised_period: Mapped[bool] = mapped_column(Boolean, default=False)  # 监督期表现
+
     remark: Mapped[str] = mapped_column(String(500), default="")
     created_by: Mapped[str] = mapped_column(String(100), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
