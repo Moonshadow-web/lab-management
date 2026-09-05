@@ -281,7 +281,7 @@ def normalize_stock(
         item_names[iid] = ri.name if ri else f"(id={iid})"
     for key in [k for k in list(resolved.keys()) if k[1] == ""]:
         iid = key[0]
-        qty, keep, _drop = resolved[key]
+        qty, keep, extra_drop = resolved[key]
         d_b, d_e = batch_map.get(iid, ("", None))
         if not d_b:
             continue
@@ -289,7 +289,8 @@ def normalize_stock(
         if target in resolved:
             tq, tkeep, tdrop = resolved[target]
             resolved[target][0] = tq + qty
-            resolved[target][2] = tdrop + [keep]
+            # 待删行 = 目标批号原有待删 + 空批号保留行 + 空批号原有重复行
+            resolved[target][2] = tdrop + [keep] + extra_drop
             plan.append({
                 "action": "merge_empty_batch",
                 "item_id": iid, "item_name": item_names.get(iid, ""),
@@ -301,7 +302,7 @@ def normalize_stock(
             keep.batch_no = d_b
             if d_e:
                 keep.expiry_date = d_e
-            resolved[target] = [qty, keep, []]
+            resolved[target] = [qty, keep, extra_drop]
             del resolved[key]
             plan.append({
                 "action": "fill_batch_no",
@@ -327,6 +328,32 @@ def normalize_stock(
     return {"dry_run": False, "changes": changes, "count": len(changes),
             "rows_before": len(rows), "rows_after": len(resolved),
             "deleted_rows": applied}
+
+
+@router.delete("/stock/rows", response_model=dict)
+def delete_stock_rows(
+    ids: str = Query(..., description="要删除的库存行 id，逗号分隔"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+):
+    """管理员按 id 精确删除 reagent_stock 行（用于清理孤儿/重复行）。
+
+    只删行、不动数量，请确认传入的 id 确属应删除的重复行。
+    """
+    id_list = []
+    for s in (ids or "").split(","):
+        s = s.strip()
+        if s.isdigit():
+            id_list.append(int(s))
+    if not id_list:
+        raise HTTPException(400, "未提供有效的库存行 id")
+    rows = db.query(ReagentStock).filter(ReagentStock.id.in_(id_list)).all()
+    found = [r.id for r in rows]
+    for r in rows:
+        db.delete(r)
+    db.commit()
+    return {"ok": True, "requested": id_list, "deleted": found,
+            "deleted_count": len(found)}
 
 
 @router.get("/inventory-checks", response_model=dict)
@@ -940,9 +967,65 @@ def create_receiving(
     return rec
 
 
+def _find_duplicate_receivings(db: Session, rec) -> list:
+    """找出与给定收货单**疑似重复**的其他收货单。
+
+    判定：收货日期相同 且 送货人相同 且 至少有一行 (物品, 数量) 完全相同。
+    用于确认接收前提醒，避免同一批货被重复录入两次导致库存翻倍。
+    """
+    if not rec or not rec.items:
+        return []
+    mine = {(it.item_id, int(it.quantity or 0)) for it in rec.items}
+    if not mine:
+        return []
+    others = db.query(Receiving).filter(
+        Receiving.id != rec.id,
+        Receiving.receipt_date == rec.receipt_date,
+        Receiving.delivery_person == (rec.delivery_person or ""),
+    ).all()
+    out = []
+    for o in others:
+        same = [(it.item_id, int(it.quantity or 0)) for it in o.items
+                if (it.item_id, int(it.quantity or 0)) in mine]
+        if same:
+            out.append({
+                "receiving_id": o.id,
+                "receipt_no": o.receipt_no,
+                "receipt_date": str(o.receipt_date),
+                "delivery_person": o.delivery_person or "",
+                "created_by": o.created_by or "",
+                "is_confirmed": bool(o.is_confirmed),
+                "confirmed_by": o.confirmed_by or "",
+                "confirmed_at": str(o.confirmed_at)[:19] if o.confirmed_at else "",
+                "match_lines": [
+                    {"item_id": i, "item_name": (
+                        db.query(ReagentItem).get(i).name if db.query(ReagentItem).get(i) else f"(id={i})"),
+                     "quantity": q} for i, q in same
+                ],
+                "match_count": len(same),
+            })
+    out.sort(key=lambda x: (not x["is_confirmed"], -x["match_count"]))
+    return out
+
+
+@router.get("/receivings/{receiving_id}/duplicates", response_model=dict)
+def check_receiving_duplicates(
+    receiving_id: int, db: Session = Depends(get_db), _=Depends(get_current_user),
+):
+    """确认接收前调用：返回与该单疑似重复的其他收货单。"""
+    r = db.query(Receiving).get(receiving_id)
+    if not r:
+        raise HTTPException(404, "收货记录未找到")
+    dups = _find_duplicate_receivings(db, r)
+    return {"receiving_id": receiving_id, "receipt_no": r.receipt_no,
+            "has_duplicate": bool(dups), "matches": dups}
+
+
 @router.post("/receivings/{receiving_id}/confirm", response_model=ReceivingRead)
 def confirm_receiving(
-    receiving_id: int, db: Session = Depends(get_db),
+    receiving_id: int,
+    force: bool = Query(False, description="忽略重复单据提醒，强制确认"),
+    db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     """确认接收：写入实时库存，并记录确认人/确认时间。重复确认不会重复加库存。"""
@@ -951,6 +1034,15 @@ def confirm_receiving(
         raise HTTPException(404, "收货记录未找到")
     if r.is_confirmed:
         raise HTTPException(400, "该收货单已确认接收，无需重复确认")
+    # 重复单据拦截：同日 + 同送货人 + 同行(物品,数量) 已被别的单子录过
+    if not force:
+        dups = _find_duplicate_receivings(db, r)
+        if dups:
+            raise HTTPException(
+                409,
+                {"message": "检测到疑似重复收货单，未执行入库",
+                 "duplicates": dups},
+            )
     # 接收人在「确认接收」时强制填入当前登录人（即便保存时已有人工填值）
     r.receiver = user.full_name or user.username
     for it in r.items:

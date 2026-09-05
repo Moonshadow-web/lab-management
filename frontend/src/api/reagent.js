@@ -124,8 +124,12 @@ export function updateReagentReceiving(id, data) {
   return request.put(`/api/v1/reagent/receivings/${id}`, data)
 }
 
-export function confirmReagentReceiving(id) {
-  return request.post(`/api/v1/reagent/receivings/${id}/confirm`)
+export function confirmReagentReceiving(id, force = false) {
+  return request.post(`/api/v1/reagent/receivings/${id}/confirm`, null, { params: { force } })
+}
+
+export function checkReceivingDuplicates(id) {
+  return request.get(`/api/v1/reagent/receivings/${id}/duplicates`)
 }
 export function deleteReagentReceiving(id) {
   return request.delete(`/api/v1/reagent/receivings/${id}`)

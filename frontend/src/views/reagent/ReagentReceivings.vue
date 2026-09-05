@@ -151,6 +151,7 @@ import { Plus, Refresh, Delete, Printer } from '@element-plus/icons-vue'
 import {
   listReagentReceivings, createReagentReceiving, getReagentReceiving,
   updateReagentReceiving, confirmReagentReceiving, deleteReagentReceiving,
+  checkReceivingDuplicates,
   listAllReagentItems, listReagentItems, getReagentItem,
 } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
@@ -278,11 +279,51 @@ async function onConfirm(row) {
   try {
     await ElMessageBox.confirm(`确认接收「${row.receipt_no}」？确认后试剂将进入实时库存。`, '确认接收', { type: 'warning' })
   } catch (_) { return }
+  // 重复单据提醒：同日期 + 同送货人 + 同行(物品,数量) 已被别的单子录过
+  try {
+    const d = await checkReceivingDuplicates(row.id)
+    if (d?.has_duplicate) {
+      const ms = (d.matches || []).map(m => {
+        const lines = (m.match_lines || [])
+          .map(l => `· ${l.item_name} × ${l.quantity}`).join('<br>')
+        return `<b>${m.receipt_no}</b>（${m.is_confirmed ? '已确认' : '未确认'}，建单人 ${m.created_by || '—'}）共同 ${m.match_count} 行：<br>${lines}`
+      }).join('<br><br>')
+      try {
+        await ElMessageBox.confirm(
+          `检测到疑似重复录入：<br><br>${ms}<br><br>若确为同一批货，请<b>取消</b>并删除重复单；确认两批货都要入库则点「仍要确认」。`,
+          '疑似重复收货单',
+          { dangerouslyUseHTMLString: true, type: 'warning',
+            confirmButtonText: '仍要确认', cancelButtonText: '取消',
+            confirmButtonClass: 'el-button--danger' }
+        )
+      } catch (_) { return }
+      try {
+        await confirmReagentReceiving(row.id, true)
+        ElMessage.success('已确认接收（已忽略重复提醒），库存已更新')
+        refresh()
+      } catch (e) { ElMessage.error('确认失败：' + errText(e)) }
+      return
+    }
+  } catch (e) {
+    if (e?.response?.status === 404) { /* 旧版本无此接口，忽略 */ }
+    else if (!e || e === 'cancel') { return }
+  }
   try {
     await confirmReagentReceiving(row.id)
     ElMessage.success('已确认接收，库存已更新')
     refresh()
-  } catch (e) { ElMessage.error('确认失败：' + errText(e)) }
+  } catch (e) {
+    // 后端兜底拦截（409）
+    const detail = e?.response?.data?.detail
+    if (e?.response?.status === 409 && detail?.duplicates) {
+      const ms = detail.duplicates.map(m =>
+        `${m.receipt_no}（${m.is_confirmed ? '已确认' : '未确认'}，建单人 ${m.created_by || '—'}）共同 ${m.match_count} 行`
+      ).join('；')
+      ElMessage.error(`疑似重复录入，未入库：${ms}`)
+      return
+    }
+    ElMessage.error('确认失败：' + errText(e))
+  }
 }
 async function onView(row) {
   try {
