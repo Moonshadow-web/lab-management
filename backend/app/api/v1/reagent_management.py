@@ -1008,6 +1008,56 @@ def _find_duplicate_receivings(db: Session, rec) -> list:
     return out
 
 
+class _BatchCorrection(BaseModel):
+    item_id: int
+    old_batch_no: str = ""
+    new_batch_no: str
+    new_expiry_date: Optional[date] = None
+    sync_stock: bool = False  # 是否同步改库存行批号（默认否：只改台账）
+
+
+@router.post("/receivings/{receiving_id}/correct-batch", response_model=dict)
+def correct_receiving_batch(
+    receiving_id: int, body: _BatchCorrection,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+):
+    """管理员修正**已确认**收货单里录错的批号/效期（台账纠错）。
+
+    已确认单据走不了普通编辑接口（防止与库存脱节），这里只改台账细项，
+    默认**不动库存**——因为那批货通常早已被后续盘库覆盖/合并。
+    确需同步改库存行批号时传 sync_stock=true。
+    """
+    r = db.query(Receiving).get(receiving_id)
+    if not r:
+        raise HTTPException(404, "收货记录未找到")
+    old = _norm_batch(body.old_batch_no)
+    new = _norm_batch(body.new_batch_no)
+    if not new:
+        raise HTTPException(400, "新批号不能为空")
+    hit = [it for it in r.items
+           if it.item_id == body.item_id and _norm_batch(it.batch_no) == old]
+    if not hit:
+        raise HTTPException(404, f"未找到 item_id={body.item_id} 且批号为「{old or '(空)'}」的细项")
+    for it in hit:
+        it.batch_no = new
+        if body.new_expiry_date:
+            it.expiry_date = body.new_expiry_date
+    stock_updated = 0
+    if body.sync_stock:
+        for s in db.query(ReagentStock).filter(
+            ReagentStock.item_id == body.item_id,
+            ReagentStock.batch_no == old,
+        ).all():
+            s.batch_no = new
+            if body.new_expiry_date:
+                s.expiry_date = body.new_expiry_date
+            stock_updated += 1
+    db.commit()
+    return {"ok": True, "receipt_no": r.receipt_no, "updated_lines": len(hit),
+            "from": old or "(空)", "to": new, "stock_rows_updated": stock_updated}
+
+
 @router.get("/receivings/{receiving_id}/duplicates", response_model=dict)
 def check_receiving_duplicates(
     receiving_id: int, db: Session = Depends(get_db), _=Depends(get_current_user),
