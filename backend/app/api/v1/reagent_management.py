@@ -233,6 +233,102 @@ def list_stock(
 # 3. 盘库
 # =============================================================================
 
+@router.post("/stock/_normalize", response_model=dict)
+def normalize_stock(
+    dry_run: bool = Query(True, description="true=只返回将要做的变更，不落库"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+):
+    """整理 reagent_stock 历史脏数据（重复行 / 空批号行）。
+
+    1) 同一 (试剂, 批号) 存在多行 → 合并为 1 行，数量取最大值。
+       成因：盘库单里同一支试剂跨分组被重复提交，多行值相同，属重复而非累加。
+    2) 空批号行 → 回填该试剂默认批号/效期后并入对应批号行（数量相加）；
+       若该试剂确无任何批号来源，则保留 1 行空批号。
+
+    默认 dry_run=true，只出报告不改数据。
+    """
+    batch_map = _default_batch_map(db)
+    rows = db.query(ReagentStock).order_by(ReagentStock.id).all()
+
+    groups: dict = defaultdict(list)
+    for r in rows:
+        groups[(r.item_id, _norm_batch(r.batch_no))].append(r)
+
+    # 第一步：同 (item, batch) 合并，数量取 max，保留 id 最大的行
+    resolved: dict = {}
+    plan = []
+    for key, rs in groups.items():
+        if len(rs) > 1:
+            keep = max(rs, key=lambda x: (x.quantity, x.id))
+            qty = max(int(r.quantity or 0) for r in rs)
+            drop = [r for r in rs if r is not keep]
+            resolved[key] = [qty, keep, []]
+            resolved[key][2] = drop
+            plan.append({
+                "action": "dedupe",
+                "item_id": key[0], "batch_no": key[1],
+                "rows": len(rs), "keep_id": keep.id, "quantity": qty,
+                "drop_ids": [r.id for r in drop],
+            })
+        else:
+            resolved[key] = [int(rs[0].quantity or 0), rs[0], []]
+
+    # 第二步：空批号行 → 回填默认批号后并入
+    item_names = {}
+    for iid in {k[0] for k in list(resolved.keys()) if k[1] == ""}:
+        ri = db.query(ReagentItem).get(iid)
+        item_names[iid] = ri.name if ri else f"(id={iid})"
+    for key in [k for k in list(resolved.keys()) if k[1] == ""]:
+        iid = key[0]
+        qty, keep, _drop = resolved[key]
+        d_b, d_e = batch_map.get(iid, ("", None))
+        if not d_b:
+            continue
+        target = (iid, d_b)
+        if target in resolved:
+            tq, tkeep, tdrop = resolved[target]
+            resolved[target][0] = tq + qty
+            resolved[target][2] = tdrop + [keep]
+            plan.append({
+                "action": "merge_empty_batch",
+                "item_id": iid, "item_name": item_names.get(iid, ""),
+                "from": "(空批号)", "to": d_b,
+                "add": qty, "result": tq + qty, "keep_id": tkeep.id,
+                "drop_ids": [keep.id],
+            })
+        else:
+            keep.batch_no = d_b
+            if d_e:
+                keep.expiry_date = d_e
+            resolved[target] = [qty, keep, []]
+            del resolved[key]
+            plan.append({
+                "action": "fill_batch_no",
+                "item_id": iid, "item_name": item_names.get(iid, ""),
+                "from": "(空批号)", "to": d_b,
+                "quantity": qty, "keep_id": keep.id, "drop_ids": [],
+            })
+            continue
+        del resolved[key]
+
+    changes = [p for p in plan]
+    if dry_run:
+        return {"dry_run": True, "changes": changes, "count": len(changes),
+                "rows_before": len(rows), "rows_after": len(resolved)}
+
+    applied = 0
+    for _key, (qty, keep, drop) in resolved.items():
+        keep.quantity = qty
+        for r in drop:
+            db.delete(r)
+            applied += 1
+    db.commit()
+    return {"dry_run": False, "changes": changes, "count": len(changes),
+            "rows_before": len(rows), "rows_after": len(resolved),
+            "deleted_rows": applied}
+
+
 @router.get("/inventory-checks", response_model=dict)
 def list_inventory_checks(
     library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
@@ -275,8 +371,53 @@ def delete_inventory_check(
     return {"ok": True}
 
 
+def _norm_batch(v) -> str:
+    """批号归一化：None/空白 → 空串。"""
+    return str(v if v is not None else "").strip()
+
+
+def _default_batch_map(db: Session) -> dict:
+    """构建 item_id → (batch_no, expiry_date) 的**默认批号/效期**映射。
+
+    背景：批号/效期只在「到货接收」环节录入，盘库现场一般不填。
+    若盘库不带批号写入库存，就会与到货产生的带批号行并存，
+    导致实时库存里同一试剂出现「两个批号」。
+
+    取值优先级：
+    1) reagent_stock 中该试剂「有批号」且数量最大的那一批（并列取最近更新的）
+    2) 最近一次「已确认」到货接收细项的批号/效期
+    3) 都没有 → ("", None)
+    """
+    result: dict = {}
+    rows = (
+        db.query(ReagentStock)
+        .filter(ReagentStock.batch_no.isnot(None), ReagentStock.batch_no != "")
+        .order_by(ReagentStock.item_id, ReagentStock.quantity.desc(),
+                  ReagentStock.last_updated.desc())
+        .all()
+    )
+    for r in rows:
+        result.setdefault(r.item_id, (r.batch_no or "", r.expiry_date))
+    try:
+        recv = (
+            db.query(ReceivingItem, Receiving)
+            .join(Receiving, Receiving.id == ReceivingItem.receiving_id)
+            .filter(Receiving.is_confirmed == True,  # noqa: E712
+                    ReceivingItem.batch_no.isnot(None), ReceivingItem.batch_no != "")
+            .order_by(Receiving.receipt_date.desc(), Receiving.id.desc())
+            .all()
+        )
+    except Exception:
+        recv = []
+    for ri, _rv in recv:
+        result.setdefault(ri.item_id, (ri.batch_no or "", ri.expiry_date))
+    return result
+
+
 def _item_dto(ri: ReagentItem, stock_map: dict,
-               project_name: str = "", project_aliases: str = "") -> dict:
+              project_name: str = "", project_aliases: str = "",
+              batch_map: dict | None = None) -> dict:
+    d_b, d_e = (batch_map or {}).get(ri.id, ("", None))
     return {
         "item_id": ri.id, "name": ri.name, "spec": ri.spec, "type": ri.type,
         "unit": ri.unit, "material_code": ri.material_code or "",
@@ -286,6 +427,9 @@ def _item_dto(ri: ReagentItem, stock_map: dict,
         "annual_usage": int(ri.annual_usage or 0),
         "project_name": project_name,
         "project_aliases": project_aliases,
+        # 默认批号/效期（盘库录入自动带出，现场一般不填）
+        "default_batch_no": d_b or "",
+        "default_expiry_date": d_e.isoformat() if d_e else "",
     }
 
 
@@ -325,6 +469,8 @@ def build_reagent_template(db: Session, library: str) -> dict:
         ReagentStock.item_id, func.coalesce(func.sum(ReagentStock.quantity), 0)
     ).group_by(ReagentStock.item_id).all():
         stock_map[iid] = qty
+    # 默认批号/效期（盘库录入自动带出，避免盘库产生空批号行）
+    batch_map = _default_batch_map(db)
 
     # ── 按项目（仅在用试剂）──
     tir_rows = (
@@ -347,7 +493,7 @@ def build_reagent_template(db: Session, library: str) -> dict:
         if key not in proj_map:
             proj_map[key] = {"test_item_id": ti.id, "test_item_name": ti.name,
                              "test_item_aliases": ti.aliases or "", "items": []}
-        proj_map[key]["items"].append(_item_dto(ri, stock_map, ti.name, ti.aliases or ""))
+        proj_map[key]["items"].append(_item_dto(ri, stock_map, ti.name, ti.aliases or "", batch_map))
     # 未关联项目的试剂/校准品（仅在用）
     orphans = (
         db.query(ReagentItem)
@@ -360,7 +506,7 @@ def build_reagent_template(db: Session, library: str) -> dict:
     if orphan_items:
         proj_map["__orphan__"] = {
             "test_item_id": None, "test_item_name": "未关联项目的试剂 / 校准品",
-            "test_item_aliases": "", "items": [_item_dto(r, stock_map) for r in orphan_items],
+            "test_item_aliases": "", "items": [_item_dto(r, stock_map, batch_map=batch_map) for r in orphan_items],
         }
     by_project = list(proj_map.values())
     for g in by_project:
@@ -407,7 +553,7 @@ def build_reagent_template(db: Session, library: str) -> dict:
         if ins_label and ins_label not in fam_map[gkey_s]["instruments"]:
             fam_map[gkey_s]["instruments"].append(ins_label)
         if not any(it["item_id"] == ri.id for it in fam_map[gkey_s]["items"]):
-            fam_map[gkey_s]["items"].append(_item_dto(ri, stock_map))
+            fam_map[gkey_s]["items"].append(_item_dto(ri, stock_map, batch_map=batch_map))
     # 未关联仪器的耗材（仅在用）
     cons_orphans = (
         db.query(ReagentItem)
@@ -419,7 +565,7 @@ def build_reagent_template(db: Session, library: str) -> dict:
     if cons_orphan_items:
         fam_map["__cons_orphan__"] = {
             "group": "未关联仪器的耗材", "instruments": [],
-            "items": [_item_dto(r, stock_map) for r in cons_orphan_items],
+            "items": [_item_dto(r, stock_map, batch_map=batch_map) for r in cons_orphan_items],
         }
     by_instrument = list(fam_map.values())
     for g in by_instrument:
@@ -428,7 +574,7 @@ def build_reagent_template(db: Session, library: str) -> dict:
 
     # ── 质控品（单独，仅在用）──
     controls = [
-        _item_dto(r, stock_map) for r in
+        _item_dto(r, stock_map, batch_map=batch_map) for r in
         db.query(ReagentItem).filter(
             ReagentItem.type == "质控品", ReagentItem.library == library,
             ReagentItem.is_active == True,
@@ -467,34 +613,72 @@ def create_inventory_check(
     )
     db.add(check)
     db.flush()  # 获取 id
+    # ── 细项去重 ──────────────────────────────────────────────────────
+    # 同一支试剂在模板里可能跨多个分组出现（多个检验项目共用、既挂项目又挂仪器），
+    # 前端会把每个分组的量都提交上来。这里按 (item_id, 批号) 归并，
+    # 后出现的覆盖先出现的（保留最后一次录入的余量），避免实时库存出现重复行。
+    # 若同一试剂同时存在「空批号」与「指定批号」细项，以空批号为准（视为全量盘点）。
+    merged: dict = {}
+    order: list = []
     for it in data.items:
-        item = InventoryCheckItem(
-            check_id=check.id, item_id=it.item_id, batch_no=it.batch_no,
-            expiry_date=it.expiry_date, recorded_quantity=it.recorded_quantity,
-        )
-        db.add(item)
+        b = _norm_batch(it.batch_no)
+        key = (it.item_id, b)
+        if key not in order:
+            order.append(key)
+        merged[key] = it  # 后写覆盖
+
+    no_batch_ids = {iid for (iid, b) in order if b == ""}
+    keys = [k for k in order if k[1] == "" or k[0] not in no_batch_ids]
+
+    # 默认批号/效期：盘库现场一般不填批号，这里自动带出，避免产生「空批号」库存行
+    batch_map = _default_batch_map(db)
+
+    for key in keys:
+        it = merged[key]
+        iid = it.item_id
+        b = _norm_batch(it.batch_no)
+        exp = it.expiry_date
+        if not b:
+            d_b, d_e = batch_map.get(iid, ("", None))
+            b = d_b or ""
+            if not exp:
+                exp = d_e
+        db.add(InventoryCheckItem(
+            check_id=check.id, item_id=iid, batch_no=b,
+            expiry_date=exp, recorded_quantity=it.recorded_quantity,
+        ))
         # 同步更新 reagent_stock
-        # 盘库按「总余量」录入：若未指定批号，视为对该物品做全量盘点，
-        # 先清空该物品全部批次库存，再写入一条总余量，保证实时库存与盘库数一致。
-        if it.batch_no and it.batch_no.strip():
+        if b:
+            # 清掉该试剂历史遗留的空批号行（以往盘库未填批号造成的脏数据）
+            db.query(ReagentStock).filter(
+                ReagentStock.item_id == iid,
+                or_(ReagentStock.batch_no == "", ReagentStock.batch_no.is_(None)),
+            ).delete(synchronize_session=False)
+            db.flush()
             stock = db.query(ReagentStock).filter(
-                ReagentStock.item_id == it.item_id,
-                ReagentStock.batch_no == it.batch_no,
+                ReagentStock.item_id == iid,
+                ReagentStock.batch_no == b,
             ).first()
             if stock:
                 stock.quantity = it.recorded_quantity
+                if exp:
+                    stock.expiry_date = exp
                 stock.last_updated = datetime.utcnow()
             else:
                 db.add(ReagentStock(
-                    item_id=it.item_id, batch_no=it.batch_no,
-                    expiry_date=it.expiry_date, quantity=it.recorded_quantity,
+                    item_id=iid, batch_no=b,
+                    expiry_date=exp, quantity=it.recorded_quantity,
                 ))
         else:
-            for s in db.query(ReagentStock).filter(ReagentStock.item_id == it.item_id).all():
-                db.delete(s)
+            # 该试剂确实没有任何批号来源 → 全量盘点：
+            # 先清空该物品全部批次库存，再写入一条总余量，保证实时库存与盘库数一致
+            db.query(ReagentStock).filter(
+                ReagentStock.item_id == iid
+            ).delete(synchronize_session=False)
+            db.flush()  # 强制 DELETE 先落库，避免与后续 INSERT 交错
             db.add(ReagentStock(
-                item_id=it.item_id, batch_no="",
-                expiry_date=it.expiry_date, quantity=it.recorded_quantity,
+                item_id=iid, batch_no="",
+                expiry_date=exp, quantity=it.recorded_quantity,
             ))
     db.commit()
     db.refresh(check)

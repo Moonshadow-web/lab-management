@@ -38,7 +38,7 @@
       @current-change="refresh" @size-change="page=1; refresh()" />
 
     <!-- 新建盘库弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="`新建盘库（${reagentStore.library}）`" width="min(960px, 96vw)" top="3vh">
+    <el-dialog v-model="dialogVisible" :title="`新建盘库（${reagentStore.library}）`" width="min(1180px, 98vw)" top="3vh">
       <el-form :model="checkForm" label-width="80px" size="small">
         <el-row :gutter="12">
           <el-col :span="8"><el-form-item label="日期"><el-date-picker v-model="checkForm.check_date" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
@@ -63,6 +63,7 @@
         <el-input v-model="dialogSearch" placeholder="模糊检索试剂/规格/编码/品牌/项目名(含英文别名如ALT)..." clearable style="width:340px" />
         <el-button @click="onPrintBlank" :icon="Printer" size="small">打印空白录入页</el-button>
         <span class="muted" style="font-size:12px">共 {{ totalEntries }} 项</span>
+        <span class="muted" style="font-size:12px">批号/效期已自动带出该试剂当前库存批次，可手工改</span>
       </div>
 
       <div class="entry-scroll">
@@ -72,6 +73,17 @@
           <el-table :data="grp.items" border size="small">
             <el-table-column label="试剂 / 校准品" min-width="190">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
+            </el-table-column>
+            <el-table-column label="批号" width="170">
+              <template #default="{ row }">
+                <el-input v-model="batchInputs[row.item_id]" size="small" placeholder="默认批号" />
+              </template>
+            </el-table-column>
+            <el-table-column label="效期" width="165">
+              <template #default="{ row }">
+                <el-date-picker v-model="expiryInputs[row.item_id]" type="date" value-format="YYYY-MM-DD"
+                  size="small" style="width:145px" placeholder="默认效期" />
+              </template>
             </el-table-column>
             <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
@@ -87,6 +99,17 @@
             <el-table-column label="耗材" min-width="190">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
             </el-table-column>
+            <el-table-column label="批号" width="170">
+              <template #default="{ row }">
+                <el-input v-model="batchInputs[row.item_id]" size="small" placeholder="默认批号" />
+              </template>
+            </el-table-column>
+            <el-table-column label="效期" width="165">
+              <template #default="{ row }">
+                <el-date-picker v-model="expiryInputs[row.item_id]" type="date" value-format="YYYY-MM-DD"
+                  size="small" style="width:145px" placeholder="默认效期" />
+              </template>
+            </el-table-column>
             <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
                 <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:110px" controls-position="right" />
@@ -100,6 +123,17 @@
           <el-table :data="filteredControls" border size="small">
             <el-table-column label="质控品" min-width="190">
               <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
+            </el-table-column>
+            <el-table-column label="批号" width="170">
+              <template #default="{ row }">
+                <el-input v-model="batchInputs[row.item_id]" size="small" placeholder="默认批号" />
+              </template>
+            </el-table-column>
+            <el-table-column label="效期" width="165">
+              <template #default="{ row }">
+                <el-date-picker v-model="expiryInputs[row.item_id]" type="date" value-format="YYYY-MM-DD"
+                  size="small" style="width:145px" placeholder="默认效期" />
+              </template>
             </el-table-column>
             <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
@@ -115,6 +149,17 @@
             <el-table :data="grp.items" border size="small">
               <el-table-column label="名称 / 规格 / 品牌" min-width="200">
                 <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
+              </el-table-column>
+              <el-table-column label="批号" width="170">
+                <template #default="{ row }">
+                  <el-input v-model="batchInputs[row.item_id]" size="small" placeholder="默认批号" />
+                </template>
+              </el-table-column>
+              <el-table-column label="效期" width="165">
+                <template #default="{ row }">
+                  <el-date-picker v-model="expiryInputs[row.item_id]" type="date" value-format="YYYY-MM-DD"
+                    size="small" style="width:145px" placeholder="默认效期" />
+                </template>
               </el-table-column>
               <el-table-column label="盘点余量" width="120" fixed="right">
                 <template #default="{ row }">
@@ -140,8 +185,20 @@
         <el-table-column label="试剂/耗材" min-width="220">
           <template #default="{ row }">{{ row._name || `(id=${row.item_id})`}} <span class="muted">{{ row._spec }}</span></template>
         </el-table-column>
-        <el-table-column label="批号" width="120"><template #default="{ row }">{{ row.batch_no || '-' }}</template></el-table-column>
-        <el-table-column label="效期" width="110"><template #default="{ row }">{{ row.expiry_date || '-' }}</template></el-table-column>
+        <el-table-column label="批号" width="150">
+          <template #default="{ row }">
+            <span v-if="row.batch_no">{{ row.batch_no }}</span>
+            <span v-else-if="row._def_batch" class="muted">{{ row._def_batch }}（默认）</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="效期" width="140">
+          <template #default="{ row }">
+            <span v-if="row.expiry_date">{{ row.expiry_date }}</span>
+            <span v-else-if="row._def_exp" class="muted">{{ row._def_exp }}（默认）</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="余量" width="80" align="center"><template #default="{ row }">{{ row.recorded_quantity }}</template></el-table-column>
       </el-table>
       <template #footer>
@@ -177,6 +234,9 @@ watch(categoryFilter, (v) => { if (v !== 'brand') brandTypeFilter.value = '' })
 const checkForm = ref({ check_date: '', check_type: '月末盘库', remark: '' })
 const tpl = ref(null)
 const quantities = reactive({})
+// 批号 / 效期：盘库现场一般不填，这里默认带出该试剂当前库存的批号与效期
+const batchInputs = reactive({})
+const expiryInputs = reactive({})
 const nameMap = ref({})
 
 const viewVisible = ref(false), viewItems = ref([]), viewLibrary = ref('')
@@ -303,7 +363,12 @@ async function onNewCheck() {
   try {
     const r = await getReagentTemplate({ library: reagentStore.library })
     tpl.value = r[reagentStore.library] || { by_project: [], by_instrument: [], controls: [] }
-    for (const it of allItems()) quantities[it.item_id] = it.current_stock
+    for (const it of allItems()) {
+      quantities[it.item_id] = it.current_stock
+      // 默认批号/效期（后端按「库存数量最大的批次 → 最近一次确认收货」推导）
+      if (batchInputs[it.item_id] === undefined) batchInputs[it.item_id] = it.default_batch_no || ''
+      if (expiryInputs[it.item_id] === undefined) expiryInputs[it.item_id] = it.default_expiry_date || ''
+    }
   } catch (e) {
     ElMessage.error('加载模板失败：' + errText(e))
   } finally { submitting.value = false }
@@ -315,6 +380,8 @@ function buildSections(useRecorded) {
     secs.push({ heading: '项目：' + g.test_item_name, items: g.items.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
       brand: it.brand,
+      batch: batchInputs[it.item_id] || '',
+      expiry: expiryInputs[it.item_id] || '',
       current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
@@ -324,6 +391,8 @@ function buildSections(useRecorded) {
     secs.push({ heading: '仪器：' + g.group + extra, items: g.items.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
       brand: it.brand,
+      batch: batchInputs[it.item_id] || '',
+      expiry: expiryInputs[it.item_id] || '',
       current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
@@ -332,6 +401,8 @@ function buildSections(useRecorded) {
     secs.push({ heading: '质控品（单独）', items: tpl.value.controls.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
       brand: it.brand,
+      batch: batchInputs[it.item_id] || '',
+      expiry: expiryInputs[it.item_id] || '',
       current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
@@ -343,9 +414,9 @@ function sectionHtml(secs) {
   let h = ''
   for (const s of secs) {
     h += `<h3>${s.heading}</h3>`
-    h += '<table><thead><tr><th>名称</th><th>规格</th><th>品牌</th><th>材料编码</th><th>单位</th><th class="num">当前库存</th><th class="num">盘点余量</th></tr></thead><tbody>'
+    h += '<table><thead><tr><th>名称</th><th>规格</th><th>品牌</th><th>批号</th><th>效期</th><th>单位</th><th class="num">当前库存</th><th class="num">盘点余量</th></tr></thead><tbody>'
     for (const it of s.items) {
-      h += `<tr><td>${it.name || ''}</td><td>${it.spec || ''}</td><td>${it.brand || ''}</td><td>${it.material_code || ''}</td><td>${it.unit || ''}</td><td class="num">${it.current}</td><td class="num">${it.qty}</td></tr>`
+      h += `<tr><td>${it.name || ''}</td><td>${it.spec || ''}</td><td>${it.brand || ''}</td><td>${it.batch || ''}</td><td>${it.expiry || ''}</td><td>${it.unit || ''}</td><td class="num">${it.current}</td><td class="num">${it.qty}</td></tr>`
     }
     h += '</tbody></table>'
   }
@@ -363,10 +434,20 @@ async function onSubmit() {
   if (!checkForm.value.check_date) { ElMessage.warning('请选择盘库日期'); return }
   submitting.value = true
   try {
-    const items = allItems().map(it => ({
-      item_id: it.item_id, batch_no: '', expiry_date: null,
-      recorded_quantity: Number(quantities[it.item_id] || 0),
-    }))
+    // 同一支试剂可能在多个分组里出现（多个项目共用 / 既挂项目又挂仪器），
+    // 这里按 item_id 去重，只提交一条，避免实时库存产生重复行。
+    const seen = new Set()
+    const items = []
+    for (const it of allItems()) {
+      if (seen.has(it.item_id)) continue
+      seen.add(it.item_id)
+      items.push({
+        item_id: it.item_id,
+        batch_no: batchInputs[it.item_id] || '',
+        expiry_date: expiryInputs[it.item_id] || null,
+        recorded_quantity: Number(quantities[it.item_id] || 0),
+      })
+    }
     await createInventoryCheck({ library: reagentStore.library, ...checkForm.value, items })
     ElMessage.success('盘库成功，实时库存已更新')
     dialogVisible.value = false; refresh()
@@ -381,6 +462,19 @@ async function onView(row) {
       const all = await listAllReagentItems()
       for (const it of all) nameMap.value[it.id] = it
     }
+    // 默认批号/效期：盘库细项未填批号时，回显该试剂当前库存的默认批号/效期
+    if (!tpl.value) {
+      try {
+        const r = await getReagentTemplate({ library: row.library || reagentStore.library })
+        tpl.value = r[row.library || reagentStore.library] || null
+      } catch (_) { /* 模板加载失败不影响详情展示 */ }
+    }
+    const defMap = {}
+    if (tpl.value) {
+      for (const g of tpl.value.by_project || []) for (const it of g.items || []) defMap[it.item_id] = it
+      for (const g of tpl.value.by_instrument || []) for (const it of g.items || []) defMap[it.item_id] = it
+      for (const it of tpl.value.controls || []) defMap[it.item_id] = it
+    }
     // 只展示实际盘点过且有余量的条目；数量为 0 / 空 视为“未盘”，详情与打印均不显示
     viewItems.value = (r.items || [])
       .filter(i => (i.recorded_quantity ?? 0) > 0)
@@ -388,6 +482,8 @@ async function onView(row) {
         ...i,
         _name: nameMap.value[i.item_id]?.name || '',
         _spec: nameMap.value[i.item_id]?.spec || '',
+        _def_batch: defMap[i.item_id]?.default_batch_no || '',
+        _def_exp: defMap[i.item_id]?.default_expiry_date || '',
       }))
     viewLibrary.value = row.library || reagentStore.library
     viewVisible.value = true
@@ -398,7 +494,9 @@ function onPrintView() {
   let h = '<table><thead><tr><th>名称</th><th>规格</th><th>批号</th><th>效期</th><th class="num">余量</th></tr></thead><tbody>'
   for (const it of viewItems.value) {
     const qty = (it.recorded_quantity === null || it.recorded_quantity === undefined) ? '-' : it.recorded_quantity
-    h += `<tr><td>${it._name || it.item_id}</td><td>${it._spec || ''}</td><td>${it.batch_no || ''}</td><td>${it.expiry_date || ''}</td><td class="num">${qty}</td></tr>`
+    const bn = it.batch_no || it._def_batch || ''
+    const ex = it.expiry_date || it._def_exp || ''
+    h += `<tr><td>${it._name || it.item_id}</td><td>${it._spec || ''}</td><td>${bn}</td><td>${ex}</td><td class="num">${qty}</td></tr>`
   }
   h += '</tbody></table>'
   printHtml(`盘库表（${viewLibrary.value}）`,

@@ -3,6 +3,17 @@
     <div class="page-header">
       <h2 class="title">实时库存</h2>
       <p class="sub">当前库存余额（按试剂+批号+效期明细），低于预警值的标红提醒。</p>
+      <el-alert type="info" :closable="false" show-icon style="margin-top:8px">
+        <template #title>
+          <span style="font-size:12px;font-weight:600">数量是怎么来的</span>
+        </template>
+        <div style="font-size:12px;line-height:1.9">
+          <div>① <b>到货接收确认</b>：该批号库存 <b>+= 到货数量</b>（累加，不会自动扣减）。</div>
+          <div>② <b>盘库</b>：该批号库存 <b>= 盘库录入的余量</b>（覆盖，不是累加）。</div>
+          <div>③ <b>批号/效期</b>只在「到货接收」录入；盘库时系统自动带出该试剂当前库存批次，可手工改。</div>
+          <div>④ 月消耗 = 上月结余 + 本月入库 − 本次盘库结余。</div>
+        </div>
+      </el-alert>
     </div>
     <LibraryTabs @change="refresh" />
     <div class="toolbar">
