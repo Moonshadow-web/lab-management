@@ -19,6 +19,7 @@ from ...models.instrument import Instrument
 from ...models.user import User
 from ...services.attachment_compress import optimize_image_bytes
 from ...core.cos_storage import cos_storage
+from ...core.http_utils import content_disposition
 from ...schemas.comparison import (
     ComparisonGroupCreate, ComparisonGroupUpdate, ComparisonPlanCreate,
     ComparisonPlanUpdate, ComparisonPlanRead, ComparisonResultsPayload,
@@ -667,7 +668,7 @@ def get_attachment(aid: int, inline: bool = True, token: str = "", db: Session =
             disp = "inline" if inline else "attachment"
             return Response(
                 content, media_type=media,
-                headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'},
+                headers={"Content-Disposition": content_disposition(disp, a.original_name)},
             )
 
     # 回退：MySQL BLOB
@@ -683,7 +684,7 @@ def get_attachment(aid: int, inline: bool = True, token: str = "", db: Session =
     disp = "inline" if inline else "attachment"
     return Response(
         a.data, media_type=media,
-        headers={"Content-Disposition": f'{disp}; filename="{a.original_name}"'},
+        headers={"Content-Disposition": content_disposition(disp, a.original_name)},
     )
 
 

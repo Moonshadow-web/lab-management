@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from ...core.crud_base import paginate
 from ...core.database import get_db
+from ...core.http_utils import content_disposition
 from ...core.security import get_current_user, require_roles, user_roles_list
 from ...models.reagent_management import (
     ReagentItem, ReagentStock, InventoryCheck, InventoryCheckItem,
@@ -894,10 +895,11 @@ def export_order_form(
     wb.save(buf)
     buf.seek(0)
     filename = f"设备科订购表_{order.order_no}.xlsx"
+    # 中文文件名必须用 RFC 5987 传递，直接写 filename="..." 会因 latin-1 编码报 500
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition("attachment", filename)},
     )
 
 

@@ -266,7 +266,14 @@ async function onConfirm(row) {
 }
 
 function onExport(row) {
-  exportOrderForm(row.id).then((blob) => {
+  exportOrderForm(row.id).then(async (blob) => {
+    // responseType=blob 时，后端报错也会以 blob 形式返回，需解析出真实原因
+    if (blob && blob.type && String(blob.type).includes('json')) {
+      const text = await blob.text()
+      let detail = text
+      try { detail = JSON.parse(text)?.detail || text } catch (_) { /* 非 JSON 原文 */ }
+      throw new Error(detail)
+    }
     const url = window.URL.createObjectURL(new Blob([blob]))
     const a = document.createElement('a')
     a.href = url
@@ -276,7 +283,13 @@ function onExport(row) {
     document.body.removeChild(a)
     window.URL.revokeObjectURL(url)
     ElMessage.success('已导出订购表')
-  }).catch(() => ElMessage.error('导出失败'))
+  }).catch(async (e) => {
+    let msg = errText(e)
+    if (e?.response?.data instanceof Blob) {
+      try { msg = JSON.parse(await e.response.data.text())?.detail || msg } catch (_) { /* 保持原 msg */ }
+    }
+    ElMessage.error('导出失败：' + msg)
+  })
 }
 
 async function onPrint(row) {
