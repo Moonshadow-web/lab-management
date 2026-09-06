@@ -90,7 +90,7 @@
         </el-tabs>
 
         <el-divider content-position="left">签到表（BG-SM-PX-006）</el-divider>
-        <SignInSheet :owner-id="sessionForm.id" :header="sessionHeader" :can-write="canWrite" :saved-names="(sessionForm.sign_in_header && sessionForm.sign_in_header.names) || null" @save-header="onSaveHeader" />
+        <SignInSheet :key="sessionForm.id" :owner-id="sessionForm.id" :header="sessionHeader" :can-write="canWrite" :saved-names="(sessionForm.sign_in_header && sessionForm.sign_in_header.names) || null" @save-header="onSaveHeader" />
       </template>
 
       <template #footer>

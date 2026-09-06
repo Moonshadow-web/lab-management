@@ -166,7 +166,8 @@ async function doPrint() {
 
 const emit = defineEmits(['save-header'])
 function emitSaveHeader() {
-  emit('save-header', { names: rows.value.map((r) => ({ name: r.name, title: r.title })) })
+  // 持久化前再次去重，确保存库名单不含重复姓名
+  emit('save-header', { names: dedupeNames(rows.value.map((r) => ({ name: r.name, title: r.title }))) })
 }
 
 // 排除“培训老师”本人，并去重（避免编辑记录里出现两个金子铮）
