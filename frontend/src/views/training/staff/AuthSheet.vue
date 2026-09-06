@@ -39,17 +39,7 @@
                          :label="`${i.name}（${i.model || '—'}）`" :value="i.name" />
             </el-select>
           </el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="项目/方法（按仪器过滤）">
-            <el-select v-model="form.project" filterable allow-create default-first-option clearable
-                       placeholder="先选仪器，可下拉或自填" style="width:100%" no-data-text="先选仪器或自行输入">
-              <el-option v-for="t in itemOptions" :key="t.id"
-                         :label="`${t.code || ''} ${t.name || ''}`.trim()"
-                         :value="`${t.code || ''} ${t.name || ''}`.trim()" />
-            </el-select>
-          </el-form-item></el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="权限等级">
               <el-select v-model="form.auth_scope" style="width:100%">
                 <el-option label="操作（基础执行）" value="操作" />
@@ -58,8 +48,30 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8"><el-form-item label="授权生效"><el-input v-model="form.valid_from" placeholder="如 2026-01-15" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="授权到期（≤1年）"><el-input v-model="form.valid_until" placeholder="如 2027-01-14" /></el-form-item></el-col>
+        </el-row>
+
+        <el-form-item label="项目/方法（自动全选）">
+          <div class="proj-box">
+            <div v-if="!itemOptions.length" class="proj-empty">
+              {{ form.instrument ? '该仪器暂未关联项目（请先在「项目与仪器关联」维护）' : '选择仪器后，自动带出该仪器的全部项目（默认全选、只读）' }}
+            </div>
+            <template v-else>
+              <div class="proj-head">
+                该仪器共 <b>{{ itemOptions.length }}</b> 个项目，已全部授权
+                <span class="proj-tip">（自动全选，不予修改；要去掉项目请改选仪器）</span>
+              </div>
+              <div class="proj-tags">
+                <el-tag v-for="t in itemOptions" :key="t.id" size="small" type="info" effect="plain">
+                  {{ projLabel(t) }}
+                </el-tag>
+              </div>
+            </template>
+          </div>
+        </el-form-item>
+
+        <el-row :gutter="12">
+          <el-col :span="12"><el-form-item label="授权生效"><el-input v-model="form.valid_from" placeholder="如 2026-01-15" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="授权到期（≤1年）"><el-input v-model="form.valid_until" placeholder="如 2027-01-14" /></el-form-item></el-col>
         </el-row>
 
         <el-divider content-position="left">监督期（CNAS "有条件授权"）</el-divider>
@@ -193,21 +205,39 @@ function onNameChange(name) {
   form.value.person_id = p ? p.id : null
 }
 
-// 仪器变化：清空项目，按仪器加载项目列表
+// 项目展示名："编码 名称"
+function projLabel(t) {
+  return `${t.code || ''} ${t.name || ''}`.trim()
+}
+
+// 仪器变化：清空项目，按仪器加载全部项目并自动全选（只读，不可手工改）
 async function onInstrumentChange(name) {
   form.value.project = ''
   itemOptions.value = []
   if (!name) return
   const inst = instrumentOptions.value.find((x) => x.name === name)
   if (!inst) return
-  try { itemOptions.value = await getInstrumentTestItems(inst.id) } catch (e) { itemOptions.value = [] }
+  try {
+    const items = await getInstrumentTestItems(inst.id)
+    itemOptions.value = items || []
+    // 自动全选：把全部项目名以顿号连接写入 project（供列表/打印/检索使用）
+    form.value.project = itemOptions.value.map(projLabel).join('、')
+  } catch (e) { itemOptions.value = [] }
 }
 
 const columns = [
   { prop: 'name', label: '姓名', width: 90 },
   { prop: 'department', label: '部门', width: 110 },
   { prop: 'post', label: '岗位', width: 110, showOverflowTooltip: true },
-  { prop: 'project', label: '项目/方法', width: 160, showOverflowTooltip: true },
+  {
+    prop: 'project', label: '项目/方法', width: 130, tooltip: false,
+    formatter: (r) => {
+      const s = String(r.project || '').trim()
+      if (!s) return '<span style="color:#c0c4cc">—</span>'
+      const n = s.split('、').filter(Boolean).length
+      return `<span title="${s.replace(/"/g, '&quot;')}">共 ${n} 项（全选）</span>`
+    },
+  },
   { prop: 'instrument', label: '仪器', width: 110, showOverflowTooltip: true },
   { prop: 'auth_scope', label: '权限', width: 80, align: 'center' },
   { prop: 'status', label: '状态', width: 100, align: 'center' },
@@ -245,12 +275,12 @@ function blank() {
     remark: '',
   }
 }
-function openForm(row) {
+async function openForm(row) {
   form.value = row ? { ...row } : blank()
   postList.value = splitPost(form.value.post)
   itemOptions.value = []
-  // 编辑时若已有仪器，按仪器回填项目
-  if (form.value.instrument) onInstrumentChange(form.value.instrument)
+  // 编辑时若已有仪器，按仪器回填全部项目（自动全选）
+  if (form.value.instrument) await onInstrumentChange(form.value.instrument)
   visible.value = true
 }
 async function save() {
@@ -271,3 +301,32 @@ async function openDetail(row) { current.value = await getAuthSheet(row.id); det
 
 function fetch(params) { return listAuthSheet(params) }
 </script>
+
+<style scoped>
+.proj-box {
+  width: 100%;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background: #fafafa;
+  padding: 8px 10px;
+}
+.proj-empty {
+  color: #909399;
+  font-size: 12px;
+  line-height: 24px;
+}
+.proj-head {
+  font-size: 12px;
+  color: #303133;
+  margin-bottom: 6px;
+}
+.proj-head b { color: #409eff; }
+.proj-tip { color: #909399; margin-left: 6px; }
+.proj-tags {
+  max-height: 132px;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+</style>

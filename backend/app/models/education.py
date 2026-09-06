@@ -212,7 +212,9 @@ class AuthSheet(Base):
     post: Mapped[str] = mapped_column(String(100), default="")  # 岗位
 
     # ===== 5 要素 =====
-    project: Mapped[str] = mapped_column(String(200), default="")  # 项目·方法（如"肝功能/ALT"）
+    # 项目/方法：选仪器后自动带出该仪器的全部项目（全选、只读，不可手工改），
+    # 存为顿号分隔的项目名串（一台仪器可达 60+ 项，故用 Text 而非 String(200)）
+    project: Mapped[str] = mapped_column(Text, default="")
     instrument: Mapped[str] = mapped_column(String(200), default="")  # 仪器（如"罗氏 c701"）
     auth_scope: Mapped[str] = mapped_column(String(20), default="操作", index=True)
     # 权限等级：操作（基础执行） / 复核（结果审核） / 签发（最终报告）

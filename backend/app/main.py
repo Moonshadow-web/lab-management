@@ -298,6 +298,26 @@ def _ensure_missing_columns():
         except Exception as e:  # noqa: BLE001
             logger.warning("修正 personnel_edu_exp.train_date 失败(忽略): %s", e)
 
+    # 2026-09-01 修正：授权表 auth_sheets.project 原为 VARCHAR(200)。
+    # 改为「选仪器后自动带出该仪器全部项目（全选只读）」后，一台仪器可达 60+ 项目，
+    # 顿号拼接后远超 200 字符 → 写入报 "Data too long"。扩为 TEXT。幂等（已是 TEXT 则跳过）。
+    if engine.dialect.name == "mysql":
+        try:
+            with engine.connect() as c:
+                row = c.exec_driver_sql(
+                    "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='auth_sheets' "
+                    "AND COLUMN_NAME='project'"
+                ).fetchone()
+            if row is not None and str(row[0]).lower() != "text":
+                with engine.begin() as conn:
+                    conn.exec_driver_sql(
+                        "ALTER TABLE auth_sheets MODIFY project TEXT"
+                    )
+                logger.info("修正 auth_sheets.project 为 TEXT")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("修正 auth_sheets.project 为 TEXT 失败(忽略): %s", e)
+
     # 2026-07-27 到货接收改版：新增 is_confirmed/created_by/confirmed_at/confirmed_by 四列。
     # 旧记录(改版前创建)在创建时已直接写入实时库存，应视为「已确认」，避免确认时重复加库存。
     # 本回填幂等：is_confirmed 一旦非 NULL 即不再变化。仅 MySQL 执行（SQLite 本地开发库无此表结构差异问题）。
