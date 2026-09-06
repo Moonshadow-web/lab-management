@@ -344,7 +344,11 @@ class TrainingSession(Base):
     train_time: Mapped[str] = mapped_column(String(50), default="")  # 时间
     location: Mapped[str] = mapped_column(String(200), default="")  # 地点
     content: Mapped[str] = mapped_column(Text, default="")  # 培训内容
-    effect_eval: Mapped[str] = mapped_column(Text, default="")  # 培训效果及评价
+    effect_eval: Mapped[str] = mapped_column(Text, default="")  # 培训效果及评价（兼容保留，前端已改为附件）
+    # 附件自动解析元数据：上传考题 docx/pdf 后从文本解析
+    exam_person_count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)  # 考核人数
+    exam_pass_rate: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)  # 合格率(%)
+    eval_satisfy_rate: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)  # 满意率(%)
     tag: Mapped[str] = mapped_column(String(50), default="组内培训")  # 组内培训 / 艾梅乙 / 其它
     sign_in_attachment_id: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)  # 签到表扫描件附件 id
     sign_in_header: Mapped[str] = mapped_column(Text, default="{}")  # 打印空白签到表表头 {name,teacher,time,location}

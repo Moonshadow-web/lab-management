@@ -407,6 +407,10 @@ class TrainingSessionBase(BaseModel):
     location: str = ""
     content: str = ""
     effect_eval: str = ""
+    # 附件自动解析元数据
+    exam_person_count: int | None = None
+    exam_pass_rate: float | None = None
+    eval_satisfy_rate: float | None = None
     tag: str = "组内培训"
     sign_in_attachment_id: int | None = None
     sign_in_header: dict = {}

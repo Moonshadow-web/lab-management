@@ -62,16 +62,18 @@
           <el-col :span="8"><el-form-item label="地点"><el-input v-model="sessionForm.location" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="培训内容"><el-input v-model="sessionForm.content" type="textarea" :rows="3" /></el-form-item>
-        <el-form-item label="培训效果及评价"><el-input v-model="sessionForm.effect_eval" type="textarea" :rows="3" /></el-form-item>
       </el-form>
 
       <el-alert v-if="!sessionForm.id" type="warning" :closable="false" title="请先保存培训记录，再使用签到表与上传附件" style="margin-bottom:12px" />
 
       <template v-if="sessionForm.id">
-        <el-divider content-position="left">签到表（BG-KS-PX-805）</el-divider>
+        <el-divider content-position="left">签到表（BG-SM-PX-006）</el-divider>
         <SignInSheet :owner-id="sessionForm.id" :header="sessionHeader" :can-write="canWrite" :saved-names="(sessionForm.sign_in_header && sessionForm.sign_in_header.names) || null" @save-header="onSaveHeader" />
 
         <el-divider content-position="left">课件 / 通知 / 考题 / 效果评价 存档</el-divider>
+        <el-alert v-if="sessionStats.title" type="info" :closable="false" class="stats-strip">
+          考题自动解析：考核人数 <b>{{ sessionStats.exam_person_count }}</b> 人　合格率 <b>{{ sessionStats.exam_pass_rate }}</b>%　|　效果评价满意率 <b>{{ sessionStats.eval_satisfy_rate }}</b>%
+        </el-alert>
         <el-tabs v-model="attTab">
           <el-tab-pane label="课件(PPT)" name="courseware">
             <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="courseware" label="课件" accept=".ppt,.pptx,.pdf" :can-write="canWrite" />
@@ -80,10 +82,10 @@
             <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="notice" label="通知" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" :can-write="canWrite" />
           </el-tab-pane>
           <el-tab-pane label="培训考题" name="exam">
-            <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="exam" label="考题" accept=".doc,.docx,.pdf" :can-write="canWrite" />
+            <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="exam" label="考题" accept=".doc,.docx,.pdf" :can-write="canWrite" @uploaded="refreshSessionMeta" />
           </el-tab-pane>
           <el-tab-pane label="效果评价" name="effect_eval">
-            <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="effect_eval" label="效果评价" accept=".doc,.docx,.pdf" :can-write="canWrite" />
+            <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="effect_eval" label="效果评价" accept=".doc,.docx,.pdf" :can-write="canWrite" @uploaded="refreshSessionMeta" />
           </el-tab-pane>
         </el-tabs>
       </template>
@@ -105,7 +107,7 @@ import SignInSheet from '../SignInSheet.vue'
 import EducationAttachmentList from '../EducationAttachmentList.vue'
 import {
   listTrainingPlan, createTrainingPlan, updateTrainingPlan, deleteTrainingPlan,
-  listTrainingSession, createTrainingSession, updateTrainingSession, deleteTrainingSession,
+  listTrainingSession, getTrainingSession, createTrainingSession, updateTrainingSession, deleteTrainingSession,
 } from '../../../api/education'
 import { useAuthStore } from '../../../store/auth'
 
@@ -128,7 +130,10 @@ const sessionColumns = [
   { prop: 'teacher', label: '培训老师', width: 110 },
   { prop: 'train_time', label: '时间', width: 140 },
   { prop: 'location', label: '地点', width: 140 },
-  { prop: 'tag', label: '类别', width: 100 },
+  { prop: 'tag', label: '类别', width: 90 },
+  { prop: 'exam_person_count', label: '考核人数', width: 90, formatter: (r) => r.exam_person_count ?? '—' },
+  { prop: 'exam_pass_rate', label: '合格率', width: 90, formatter: (r) => r.exam_pass_rate != null ? r.exam_pass_rate + '%' : '—' },
+  { prop: 'eval_satisfy_rate', label: '满意率', width: 90, formatter: (r) => r.eval_satisfy_rate != null ? r.eval_satisfy_rate + '%' : '—' },
 ]
 
 // 计划
@@ -159,6 +164,19 @@ const sessionHeader = computed(() => ({
   name: sessionForm.value.name, teacher: sessionForm.value.teacher,
   train_time: sessionForm.value.train_time, location: sessionForm.value.location, target: sessionForm.value.target,
 }))
+const sessionStats = computed(() => ({
+  title: !!(sessionForm.value.exam_person_count || sessionForm.value.exam_pass_rate || sessionForm.value.eval_satisfy_rate),
+  exam_person_count: sessionForm.value.exam_person_count ?? '—',
+  exam_pass_rate: sessionForm.value.exam_pass_rate ?? '—',
+  eval_satisfy_rate: sessionForm.value.eval_satisfy_rate ?? '—',
+}))
+async function refreshSessionMeta() {
+  if (!sessionForm.value.id) return
+  try {
+    const res = await getTrainingSession(sessionForm.value.id)
+    sessionForm.value = { ...sessionForm.value, ...res }
+  } catch (e) {}
+}
 async function onSaveHeader({ names }) {
   // 仅本地使用（名单已体现在打印表）；如需持久化可存 sign_in_header
   sessionForm.value.sign_in_header = { ...sessionForm.value.sign_in_header, names }
@@ -182,4 +200,6 @@ function fetchSession(params) { return listTrainingSession(params) }
 
 <style scoped>
 .plan-toolbar { margin-bottom: 8px; }
+.stats-strip { margin-bottom: 10px; }
+.stats-strip :deep(.el-alert__title) { line-height: 1.6; }
 </style>

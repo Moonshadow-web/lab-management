@@ -2,7 +2,7 @@
   <div class="sign-in-sheet">
     <div class="no-print toolbar">
       <el-alert type="info" :closable="false" title="打印空白签到表 → 现场签名 → 扫描后在此上传留存">
-        打印后手工签名，再将扫描件上传到下方"签到扫描件"，即完成 BG-KS-PX-805 签到表归档。
+        打印后手工签名，再将扫描件上传到下方"签到扫描件"，即完成 BG-SM-PX-006 签到表归档。
       </el-alert>
       <div class="sheet-actions">
         <el-button type="primary" :icon="Printer" @click="doPrint">打印空白签到表</el-button>
@@ -11,9 +11,24 @@
       </div>
     </div>
 
+    <!-- 签到扫描件（签名后上传）——置于签到表上方 -->
+    <div class="no-print">
+      <el-divider content-position="left">签到扫描件（签名后上传）</el-divider>
+      <EducationAttachmentList
+        owner-type="training_session"
+        :owner-id="ownerId"
+        kind="sign_in"
+        label="签到扫描件"
+        accept=".pdf,.jpg,.jpeg,.png"
+        hint="上传打印并签名后的扫描件/照片"
+        :can-write="canWrite"
+        ref="attRef"
+      />
+    </div>
+
     <!-- 屏显预览（打印时隐藏） -->
     <div class="sheet preview no-print" v-if="rows.length">
-      <h2 class="sheet-title">检验科签到表</h2>
+      <h2 class="sheet-title">生化免疫组培训签到表</h2>
       <table class="sheet-head">
         <tr>
           <td class="lbl">培训名称</td>
@@ -57,7 +72,7 @@
     <!-- 打印专用：Teleport 到 body，仅打印时显示，规避 el-dialog fixed 浮层打印空白 -->
     <Teleport to="body">
       <div class="print-root sheet" v-if="rows.length">
-        <h2 class="sheet-title">检验科签到表</h2>
+        <h2 class="sheet-title">生化免疫组培训签到表</h2>
         <table class="sheet-head">
           <tr>
             <td class="lbl">培训名称</td>
@@ -96,6 +111,7 @@
             </tr>
           </tbody>
         </table>
+        <div class="sheet-foot">表格编号：BG-SM-PX-006　　检验科生化免疫组　　生效日期：2026.9.1</div>
       </div>
     </Teleport>
 
@@ -118,18 +134,6 @@
           </template>
         </el-table-column>
       </el-table>
-
-      <el-divider content-position="left">签到扫描件（签名后上传）</el-divider>
-      <EducationAttachmentList
-        owner-type="training_session"
-        :owner-id="ownerId"
-        kind="sign_in"
-        label="签到扫描件"
-        accept=".pdf,.jpg,.jpeg,.png"
-        hint="上传打印并签名后的扫描件/照片"
-        :can-write="canWrite"
-        ref="attRef"
-      />
     </div>
   </div>
 </template>
@@ -182,26 +186,42 @@ function emitSaveHeader() {
   emit('save-header', { names: rows.value.map((r) => ({ name: r.name, title: r.title })) })
 }
 
-// 排除“培训老师”本人，避免编辑记录里出现两个金子铮（老师既作培训人又出现在签到名单）
+// 排除“培训老师”本人，并去重（避免编辑记录里出现两个金子铮）
 function excludeTeacher(list) {
   const t = (props.header && props.header.teacher) || ''
-  if (!t) return list
-  return list.filter((p) => p.name !== t)
+  const seen = new Set()
+  return (list || []).filter((p) => {
+    const n = (p.name || '').trim()
+    if (t && n === t) return false
+    if (!n || seen.has(n)) return false
+    seen.add(n)
+    return true
+  })
 }
 
 onMounted(async () => {
   if (props.savedNames && props.savedNames.length) {
-    rows.value = props.savedNames.map((n) => ({ name: n.name || '', title: n.title || '' }))
+    rows.value = dedupeNames(props.savedNames.map((n) => ({ name: n.name || '', title: n.title || '' })))
   } else {
-    // 预填生免室人员名单
+    // 预填生免室人员名单（去重 + 排除培训老师）
     try {
       const res = await listPersonnel({ page: 1, page_size: 200 })
       const people = (res.items || []).map((p) => ({ name: p.name, title: p.title }))
-      if (people.length) rows.value = excludeTeacher(people)
+      rows.value = excludeTeacher(people)
     } catch (e) {}
   }
   if (!rows.value.length) addRow()
 })
+
+function dedupeNames(list) {
+  const seen = new Set()
+  return (list || []).filter((r) => {
+    const n = (r.name || '').trim()
+    if (!n || seen.has(n)) return false
+    seen.add(n)
+    return true
+  })
+}
 </script>
 
 <style scoped>
@@ -216,6 +236,7 @@ onMounted(async () => {
 .sign-grid th, .sign-grid td { border: 1px solid #333; padding: 8px 10px; font-size: 14px; text-align: center; height: 34px; }
 .sign-grid th { background: #f5f5f5; }
 .sign-cell { height: 34px; }
+.sheet-foot { text-align: center; font-size: 12px; color: #333; margin-top: 14px; letter-spacing: 1px; }
 
 /* 打印专用副本：屏显隐藏，仅打印时通过 Teleport 到 body 显示 */
 .print-root { display: none; }

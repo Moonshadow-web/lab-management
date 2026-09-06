@@ -240,6 +240,7 @@ async def upload_attachments(
     db: Session = Depends(get_db), user: User = Depends(WRITE),
 ):
     out = []
+    parsed_meta = {"exam_person_count": None, "exam_pass_rate": None, "eval_satisfy_rate": None}
     for f in files:
         if not f or not f.filename:
             continue
@@ -263,6 +264,22 @@ async def upload_attachments(
         )
         db.add(a)
         out.append(a)
+        # 考题 / 效果评价：从上传文档文本自动解析人数/合格率/满意率
+        if owner_type == "training_session" and kind in ("exam", "effect_eval"):
+            try:
+                text = _extract_doc_text(content, ext)
+                if kind == "exam":
+                    cnt, rate = _parse_exam(text)
+                    if cnt is not None:
+                        parsed_meta["exam_person_count"] = cnt
+                    if rate is not None:
+                        parsed_meta["exam_pass_rate"] = rate
+                elif kind == "effect_eval":
+                    rate = _parse_satisfy(text)
+                    if rate is not None:
+                        parsed_meta["eval_satisfy_rate"] = rate
+            except Exception:
+                pass
     try:
         db.commit()
     except Exception as e:  # noqa: BLE001
@@ -271,9 +288,93 @@ async def upload_attachments(
         if "max_allowed_packet" in msg or "packet bigger" in msg:
             raise HTTPException(413, "文件过大：超过数据库单包大小限制(max_allowed_packet)。请压缩后再上传。")
         raise
+    # 回写培训记录解析元数据
+    if owner_type == "training_session" and any(v is not None for v in parsed_meta.values()):
+        try:
+            sess = db.get(TrainingSession, owner_id)
+            if sess:
+                for k, v in parsed_meta.items():
+                    if v is not None:
+                        setattr(sess, k, v)
+                db.commit()
+        except Exception:
+            db.rollback()
     for a in out:
         db.refresh(a)
     return {"items": [_ser_attachment(a) for a in out], "total": len(out)}
+
+
+def _extract_doc_text(content: bytes, ext: str) -> str:
+    """从 docx/pdf 中提取纯文本，用于考题/效果评价自动解析。无第三方依赖时降级。"""
+    ext = (ext or "").lstrip(".").lower()
+    # docx = zip 的 xml
+    if ext in ("docx", "dotx"):
+        try:
+            import zipfile
+            import io
+            import re
+            z = zipfile.ZipFile(io.BytesIO(content))
+            xml = z.read("word/document.xml").decode("utf-8", errors="ignore")
+            xml = re.sub(r"</w:p>", "\n", xml)
+            xml = re.sub(r"<[^>]+>", "", xml)
+            return xml
+        except Exception:
+            return ""
+    # pdf：仅当项目装有 PyMuPDF 时可用
+    if ext == "pdf":
+        try:
+            import fitz  # PyMuPDF
+            doc = fitz.open(stream=content, filetype="pdf")
+            return "\n".join(page.get_text() for page in doc)
+        except Exception:
+            return ""
+    return ""
+
+
+def _num(s: str) -> float | None:
+    s = (s or "").replace("%", "").strip()
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+
+_CN_DIGITS = "零一二三四五六七八九十百"
+def _parse_exam(text: str):
+    """从考题文档文本解析 (考核人数, 合格率%)。示例：应考 17 人，合格 17 人，合格率 100%。"""
+    if not text:
+        return None, None
+    import re
+    cnt = None
+    for pat in (r"实考[^\d]{0,6}(\d+)\s*人", r"应考[^\d]{0,6}(\d+)\s*人"):
+        m = re.search(pat, text)
+        if m:
+            cnt = int(m.group(1))
+            break
+    if cnt is None:
+        m = re.search(r"合格率\s*([\d.]+)\s*%", text)
+        if m:
+            rate = _num(m.group(1))
+            return None, rate
+    rate = None
+    m = re.search(r"合格率\s*([\d.]+)\s*%", text)
+    if m:
+        rate = _num(m.group(1))
+    return cnt, rate
+
+
+def _parse_satisfy(text: str) -> float | None:
+    """从效果评价文档文本解析满意率(%)。示例：「满意」17 人（占 100%）。"""
+    if not text:
+        return None
+    import re
+    m = re.search(r"满意[^0-9占]{0,12}(\d+)\s*人[^0-9占]{0,6}占\s*([\d.]+)\s*%", text)
+    if m:
+        return _num(m.group(2))
+    m = re.search(r"满意度\s*([\d.]+)\s*%", text)
+    if m:
+        return _num(m.group(1))
+    return None
 
 
 

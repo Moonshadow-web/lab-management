@@ -27,6 +27,13 @@
         </template>
       </el-table-column>
     </el-table>
+    <AttachmentPreview
+      :visible="previewVisible"
+      :file="previewFile"
+      :get-url="(id, inline) => eduAttachmentUrl(id, inline)"
+      @update:visible="(v) => (previewVisible = v)"
+      @download="download"
+    />
   </div>
 </template>
 
@@ -35,6 +42,7 @@ import { ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
 import { listEduAttachments, uploadEduAttachments, eduAttachmentUrl, deleteEduAttachment } from '../../api/education'
+import AttachmentPreview from '../../components/AttachmentPreview.vue'
 
 const props = defineProps({
   ownerType: { type: String, required: true },
@@ -48,6 +56,9 @@ const props = defineProps({
 
 const items = ref([])
 const loading = ref(false)
+const previewVisible = ref(false)
+const previewFile = ref(null)
+const emit = defineEmits(['uploaded'])
 
 async function refresh() {
   if (!props.ownerId) { items.value = []; return }
@@ -65,12 +76,13 @@ async function onUpload(opt) {
     await uploadEduAttachments(props.ownerType, props.ownerId, props.kind, [opt.file])
     ElMessage.success('上传成功')
     refresh()
+    emit('uploaded')
   } catch (e) {
     ElMessage.error('上传失败：' + (e.response?.data?.detail || e.message))
   }
 }
 
-function preview(row) { window.open(eduAttachmentUrl(row.id, true), '_blank') }
+function preview(row) { previewFile.value = row; previewVisible.value = true }
 function download(row) { window.open(eduAttachmentUrl(row.id, false), '_blank') }
 async function remove(row) {
   try {
