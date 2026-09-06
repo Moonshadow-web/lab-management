@@ -20,7 +20,7 @@ G. 授权表（人员能力评估的输出：人/项目·方法/仪器/权限等
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text,
+    Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
