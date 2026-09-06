@@ -3,6 +3,7 @@
     <div class="no-print toolbar">
       <el-alert type="info" :closable="false" title="打印空白签到表 → 现场签名 → 扫描后上传到「签到扫描件」页签留存">
         打印后手工签名，再将扫描件上传到上方"课件 / 通知 / 考题 / 效果评价 / 签到 存档"的「签到扫描件」页签，即完成 BG-SM-PX-006 签到表归档。
+        <div class="fe-ver">页面版本：FE {{ feChunk || '…' }} · BE {{ beMark || '…' }}（若与最新不符请强刷 Ctrl+F5）</div>
       </el-alert>
       <div class="sheet-actions">
         <el-button type="primary" :icon="Printer" @click="doPrint">打印空白签到表</el-button>
@@ -137,6 +138,23 @@ const props = defineProps({
 })
 
 const rows = ref([])
+const feChunk = ref('')
+const beMark = ref('')
+
+// 显示浏览器实际执行的前端 chunk 与后端构建标记，便于确认是否为新版本
+async function loadVersionTag() {
+  try {
+    const s = [...document.querySelectorAll('script[src]')].map((x) => x.src || '').find((x) => x.includes('StaffEducation'))
+    feChunk.value = s ? s.split('/').pop().replace('.js', '') : '(未知)'
+  } catch (e) { feChunk.value = '(未知)' }
+  try {
+    const base = (document.baseURI || location.origin).replace(/\/[^/]*$/, '')
+    const res = await fetch(base + '/api/v1/_diag/build')
+    const j = await res.json()
+    beMark.value = j.build || ''
+  } catch (e) { beMark.value = '(未知)' }
+}
+loadVersionTag()
 
 // 渲染层强制去重：无论内存 rows 来源如何（预填/手动/历史残留），屏显与打印均不出现同名重复行
 const uniqueRows = computed(() => {
@@ -222,6 +240,7 @@ function dedupeNames(list) {
 <style scoped>
 .sign-in-sheet { padding: 8px 0; }
 .toolbar { margin-bottom: 12px; }
+.fe-ver { margin-top: 6px; font-size: 12px; color: #999; }
 .sheet-actions { margin-top: 12px; display: flex; gap: 8px; }
 .sheet-title { text-align: center; font-size: 22px; letter-spacing: 4px; margin: 8px 0 16px; }
 .sheet-head { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
