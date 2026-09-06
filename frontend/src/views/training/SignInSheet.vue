@@ -1,29 +1,14 @@
 <template>
   <div class="sign-in-sheet">
     <div class="no-print toolbar">
-      <el-alert type="info" :closable="false" title="打印空白签到表 → 现场签名 → 扫描后在此上传留存">
-        打印后手工签名，再将扫描件上传到下方"签到扫描件"，即完成 BG-SM-PX-006 签到表归档。
+      <el-alert type="info" :closable="false" title="打印空白签到表 → 现场签名 → 扫描后上传到「签到扫描件」页签留存">
+        打印后手工签名，再将扫描件上传到上方"课件 / 通知 / 考题 / 效果评价 / 签到 存档"的「签到扫描件」页签，即完成 BG-SM-PX-006 签到表归档。
       </el-alert>
       <div class="sheet-actions">
         <el-button type="primary" :icon="Printer" @click="doPrint">打印空白签到表</el-button>
         <el-button :icon="Plus" @click="addRow">加一行</el-button>
         <el-button :icon="Delete" @click="clearRows" v-if="rows.length">清空</el-button>
       </div>
-    </div>
-
-    <!-- 签到扫描件（签名后上传）——置于签到表上方 -->
-    <div class="no-print">
-      <el-divider content-position="left">签到扫描件（签名后上传）</el-divider>
-      <EducationAttachmentList
-        owner-type="training_session"
-        :owner-id="ownerId"
-        kind="sign_in"
-        label="签到扫描件"
-        accept=".pdf,.jpg,.jpeg,.png"
-        hint="上传打印并签名后的扫描件/照片"
-        :can-write="canWrite"
-        ref="attRef"
-      />
     </div>
 
     <!-- 屏显预览（打印时隐藏） -->
@@ -141,7 +126,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { Printer, Plus, Delete } from '@element-plus/icons-vue'
-import EducationAttachmentList from './EducationAttachmentList.vue'
 import { listPersonnel } from '../../api/education'
 
 const props = defineProps({
@@ -152,7 +136,6 @@ const props = defineProps({
   savedNames: { type: Array, default: null },
 })
 
-const attRef = ref(null)
 const rows = ref([])
 
 const pairedRows = computed(() => {

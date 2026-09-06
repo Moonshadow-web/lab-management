@@ -67,7 +67,7 @@
       <el-alert v-if="!sessionForm.id" type="warning" :closable="false" title="请先保存培训记录，再使用签到表与上传附件" style="margin-bottom:12px" />
 
       <template v-if="sessionForm.id">
-        <el-divider content-position="left">课件 / 通知 / 考题 / 效果评价 存档</el-divider>
+        <el-divider content-position="left">课件 / 通知 / 考题 / 效果评价 / 签到 存档</el-divider>
         <el-alert v-if="sessionStats.title" type="info" :closable="false" class="stats-strip">
           考题自动解析：考核人数 <b>{{ sessionStats.exam_person_count }}</b> 人　合格率 <b>{{ sessionStats.exam_pass_rate }}</b>%　|　效果评价满意率 <b>{{ sessionStats.eval_satisfy_rate }}</b>%
         </el-alert>
@@ -83,6 +83,9 @@
           </el-tab-pane>
           <el-tab-pane label="效果评价" name="effect_eval">
             <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="effect_eval" label="效果评价" accept=".doc,.docx,.pdf" :can-write="canWrite" @uploaded="refreshSessionMeta" />
+          </el-tab-pane>
+          <el-tab-pane label="签到扫描件" name="sign_in">
+            <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="sign_in" label="签到扫描件" accept=".pdf,.jpg,.jpeg,.png" hint="上传打印并签名后的扫描件/照片" :can-write="canWrite" />
           </el-tab-pane>
         </el-tabs>
 
