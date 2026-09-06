@@ -102,7 +102,7 @@
 
     <div class="no-print">
       <el-divider content-position="left">编辑签到名单（打印前可调）</el-divider>
-      <el-table :data="rows" border size="small">
+      <el-table :data="uniqueRows" border size="small">
         <el-table-column label="姓名" width="160">
           <template #default="{ row, $index }">
             <el-input v-model="row.name" placeholder="姓名" @input="persistHeader()" />
@@ -138,12 +138,23 @@ const props = defineProps({
 
 const rows = ref([])
 
+// 渲染层强制去重：无论内存 rows 来源如何（预填/手动/历史残留），屏显与打印均不出现同名重复行
+const uniqueRows = computed(() => {
+  const seen = new Set()
+  return rows.value.filter((r) => {
+    const n = (r.name || '').trim()
+    if (!n || seen.has(n)) return false
+    seen.add(n)
+    return true
+  })
+})
+
 const pairedRows = computed(() => {
   const out = []
-  for (let i = 0; i < rows.value.length; i += 2) {
-    out.push({ left: rows.value[i], right: rows.value[i + 1] })
+  for (let i = 0; i < uniqueRows.value.length; i += 2) {
+    out.push({ left: uniqueRows.value[i], right: uniqueRows.value[i + 1] })
   }
-  if (rows.value.length % 2 === 1) out.push({ left: rows.value[rows.value.length - 1], right: null })
+  if (uniqueRows.value.length % 2 === 1) out.push({ left: uniqueRows.value[uniqueRows.value.length - 1], right: null })
   // 保证至少 30 行（与原表行数相当）
   while (out.length < 30) out.push({ left: null, right: null })
   return out
@@ -167,7 +178,7 @@ async function doPrint() {
 const emit = defineEmits(['save-header'])
 function emitSaveHeader() {
   // 持久化前再次去重，确保存库名单不含重复姓名
-  emit('save-header', { names: dedupeNames(rows.value.map((r) => ({ name: r.name, title: r.title }))) })
+  emit('save-header', { names: dedupeNames(uniqueRows.value.map((r) => ({ name: r.name, title: r.title }))) })
 }
 
 // 排除“培训老师”本人，并去重（避免编辑记录里出现两个金子铮）
