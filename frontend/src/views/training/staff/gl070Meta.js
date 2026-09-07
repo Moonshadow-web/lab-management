@@ -1,10 +1,12 @@
-// BG-KS-GL-070 仪器使用授权书 · 岗位→仪器 映射（岗前培训考核及授权表 P2 级联数据源）
-// 编号基准：以系统仪器库 dept_no 为准（2026-09-08 用户裁定）：
+// BG-KS-GL-070 仪器使用授权书 · 岗位→仪器/管理者/使用者 映射（岗前培训考核及授权表 P2/P3 数据源）
+// 数据基准：系统文件管理最新生效版（documents id=496，2026-08-13 更新，已剔除离职人员）
+// 用户裁定（2026-09-08）：
 //   1) 安图A6200 → SM-2010（GL-070 原写 SM-1024，库中已停用，作废）
 //   2) DXI800 编号以库为准：1=SM-2004、2=SM-2005、3=SM-2006、4=SM-2007（GL-070 原写 3=SM-2005，作废）
 export const GL070_POSITIONS = [
   {
     name: '生化流水线岗',
+    users: ['杨静', '金子铮', '王春馨', '姚建民', '秦满红', '郑飞', '吕文娟', '夏立娇', '秦东芳', '赵海元', '朱春阳', '孔亚龙', '张婵媛', '赵瑞', '王淑华'],
     instruments: [
       { name: '贝克曼生化流水线', code: 'MHZYY-JYK-SM-2001', manager: '朱春阳' },
       { name: '贝克曼AU5821A', code: 'MHZYY-JYK-SM-2002', manager: '朱春阳' },
@@ -17,6 +19,7 @@ export const GL070_POSITIONS = [
   },
   {
     name: '急诊岗',
+    users: ['杨静', '金子铮', '王春馨', '姚建民', '秦满红', '郑飞', '吕文娟', '夏立娇', '秦东芳', '赵海元', '朱春阳', '孔亚龙', '张婵媛', '赵瑞', '王淑华'],
     instruments: [
       { name: '贝克曼AU5800急', code: 'MHZYY-JYK-SM-1005', manager: '张婵媛' },
       { name: '贝克曼DXI800急', code: 'MHZYY-JYK-SM-2008', manager: '赵瑞' },
@@ -28,10 +31,12 @@ export const GL070_POSITIONS = [
   },
   {
     name: '病房体检岗',
+    users: ['杨静', '金子铮', '王春馨', '姚建民', '秦满红', '郑飞', '吕文娟', '夏立娇', '秦东芳', '赵海元', '朱春阳', '孔亚龙', '张婵媛', '赵瑞', '王淑华'],
     instruments: [{ name: '日立HT7600', code: 'MHZYY-JYK-SM-1013', manager: '吕文娟' }],
   },
   {
     name: '糖化电泳岗',
+    users: ['杨静', '金子铮', '郑飞', '吕文娟', '夏立娇', '秦东芳', '赵瑞', '王淑华'],
     instruments: [
       { name: '东曹HLC-723G8', code: 'MHZYY-JYK-SM-1021', manager: '姚建民' },
       { name: 'Sebia Capillarys 3 OCTA', code: 'MHZYY-JYK-SM-1026', manager: '杨静' },
@@ -40,6 +45,7 @@ export const GL070_POSITIONS = [
   },
   {
     name: '凝血流水线岗',
+    users: ['杨静', '孔亚龙', '夏立娇', '郑飞', '吕文娟'],
     instruments: [
       { name: '沃芬HemoCELL', code: 'MHZYY-JYK-SM-1009', manager: '孔亚龙' },
       { name: '沃芬TOP700A', code: 'MHZYY-JYK-SM-1010', manager: '孔亚龙' },
@@ -49,6 +55,7 @@ export const GL070_POSITIONS = [
   },
   {
     name: '免疫岗',
+    users: ['杨静', '金子铮', '王春馨', '姚建民', '秦满红', '郑飞', '吕文娟', '夏立娇', '秦东芳', '赵海元', '朱春阳', '孔亚龙', '张婵媛', '王淑华', '赵瑞'],
     instruments: [
       { name: '罗氏Cobas e601', code: 'MHZYY-JYK-SM-1016', manager: '赵海元' },
       { name: '罗氏Cobas e601A', code: 'MHZYY-JYK-SM-1017', manager: '赵海元' },
@@ -59,10 +66,12 @@ export const GL070_POSITIONS = [
   },
   {
     name: '质谱岗',
+    users: ['赵瑞', '秦东芳', '夏立娇'],
     instruments: [{ name: '超高效液相色谱串联质谱系统', code: 'MHZYY-JYK-SM-1032', manager: '赵瑞' }],
   },
   {
     name: '生免一体机岗',
+    users: ['杨静', '金子铮', '王春馨', '姚建民', '秦满红', '郑飞', '吕文娟', '夏立娇', '秦东芳', '赵海元', '朱春阳', '孔亚龙', '张婵媛', '赵瑞', '王淑华'],
     instruments: [{ name: '迈瑞生免一体机', code: 'MHZYY-JYK-SM-2011', manager: '金子铮' }],
   },
 ]
