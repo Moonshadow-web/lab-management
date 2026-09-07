@@ -19,6 +19,7 @@ from ...models.education import (
     TrainingPlan, TrainingSession,
     InternshipMentor, InternshipScore,
     AuthSheet,
+    PreJobAuth,
     EducationAttachment,
 )
 from ...models.user import User
@@ -41,6 +42,7 @@ from ...schemas.education import (
     InternshipMentorCreate, InternshipMentorUpdate, InternshipMentorRead,
     InternshipScoreCreate, InternshipScoreUpdate, InternshipScoreRead,
     AuthSheetCreate, AuthSheetUpdate, AuthSheetRead,
+    PreJobAuthCreate, PreJobAuthUpdate, PreJobAuthRead,
     EducationAttachmentRead,
 )
 
@@ -146,6 +148,14 @@ score_router = make_router(
     prefix="/internship-scores", write_roles=("admin", "training_manager"),
     json_fields=["subjects_json"],
 )
+# H. 岗前培训考核及授权表
+prejob_router = make_router(
+    PreJobAuth, PreJobAuthRead, PreJobAuthCreate, PreJobAuthUpdate,
+    search_fields=["name"], filter_fields=["conclusion", "status"],
+    order_by=[PreJobAuth.id.desc()],
+    prefix="/pre-job-auths", write_roles=("admin", "training_manager"),
+    json_fields=["positions_json", "instruments_json", "permissions_json", "items_json"],
+)
 
 router.include_router(personnel_router)
 router.include_router(edu_router)
@@ -162,6 +172,7 @@ router.include_router(plan_router)
 router.include_router(session_router)
 router.include_router(mentor_router)
 router.include_router(score_router)
+router.include_router(prejob_router)
 
 
 # =========================================================================

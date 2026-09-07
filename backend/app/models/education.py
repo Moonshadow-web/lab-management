@@ -424,3 +424,32 @@ class EducationAttachment(Base):
     size_bytes: Mapped[int] = mapped_column(Integer, default=0)
     uploaded_by: Mapped[str] = mapped_column(String(100), default="")
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# =========================================================================
+# H. 岗前培训考核及授权表（盛京版式；岗位/仪器/权限多选，GL-070 级联）
+# =========================================================================
+class PreJobAuth(Base):
+    """岗前培训考核及授权表。岗位多选 → 仪器多选（GL-070 映射级联）→ 逐项去仪器/项目考核。"""
+
+    __tablename__ = "pre_job_auth"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), index=True, default="")  # 申请人
+    apply_date: Mapped[str] = mapped_column(String(20), default="")  # 申请日期
+    positions_json: Mapped[str] = mapped_column(Text, default="[]")  # 考核岗位（多选）
+    instruments_json: Mapped[str] = mapped_column(Text, default="[]")  # 考核仪器（多选 [{name,code,position}]）
+    permissions_json: Mapped[str] = mapped_column(Text, default="[]")  # 授权岗位/权限（多选）
+    items_json: Mapped[str] = mapped_column(Text, default="[]")  # 逐项去仪器/项目 [{instrument, code, items, result}]
+    theory_eval: Mapped[str] = mapped_column(Text, default="")  # 理论考核
+    operation_eval: Mapped[str] = mapped_column(Text, default="")  # 操作考核
+    group_leader_opinion: Mapped[str] = mapped_column(Text, default="")  # 组长意见
+    director_opinion: Mapped[str] = mapped_column(Text, default="")  # 主任意见
+    conclusion: Mapped[str] = mapped_column(String(20), default="待审核")  # 通过/不通过/待审核
+    auth_date: Mapped[str] = mapped_column(String(20), default="")  # 授权日期
+    batch_id: Mapped[str] = mapped_column(String(50), default="")  # 批量生成授权分组（P3）
+    status: Mapped[str] = mapped_column(String(20), default="进行中")
+    remark: Mapped[str] = mapped_column(String(500), default="")
+    created_by: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -93,3 +93,10 @@ export function eduAttachmentUrl(id, inline = true) {
 export function deleteEduAttachment(id) {
   return request.delete(`/api/v1/education-attachments/file/${id}`)
 }
+
+// H. 岗前培训考核及授权表
+export function listPreJobAuth(params) { return request.get(`${P}/pre-job-auths`, { params }) }
+export function getPreJobAuth(id) { return request.get(`${P}/pre-job-auths/${id}`) }
+export function createPreJobAuth(data) { return request.post(`${P}/pre-job-auths`, data) }
+export function updatePreJobAuth(id, data) { return request.put(`${P}/pre-job-auths/${id}`, data) }
+export function deletePreJobAuth(id) { return request.delete(`${P}/pre-job-auths/${id}`) }

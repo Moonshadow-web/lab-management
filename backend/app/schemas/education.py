@@ -5,6 +5,7 @@
 - Read 额外含 id 与时间戳。
 - JSON 列在 API 层用 list[dict] / dict 表达，落库时由 API 序列化为 Text。
 """
+import json
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -582,5 +583,51 @@ class AuthSheetRead(AuthSheetBase):
     id: int
     status_changed_at: datetime | None = None
     created_by: str = ""
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class PreJobAuthBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    name: str = ""
+    apply_date: str = ""
+    positions_json: list = []
+    instruments_json: list = []
+    permissions_json: list = []
+    items_json: list = []
+    theory_eval: str = ""
+    operation_eval: str = ""
+    group_leader_opinion: str = ""
+    director_opinion: str = ""
+    conclusion: str = "待审核"
+    auth_date: str = ""
+    batch_id: str = ""
+    status: str = "进行中"
+    remark: str = ""
+
+    @field_validator("positions_json", "instruments_json", "permissions_json", "items_json", mode="before")
+    @classmethod
+    def _json_list(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            try:
+                return json.loads(v)
+            except Exception:
+                return []
+        return v or []
+
+
+class PreJobAuthCreate(PreJobAuthBase):
+    pass
+
+
+class PreJobAuthUpdate(PreJobAuthBase):
+    pass
+
+
+class PreJobAuthRead(PreJobAuthBase):
+    id: int
     created_at: datetime | None = None
     updated_at: datetime | None = None
