@@ -169,10 +169,10 @@ const uniqueRows = computed(() => {
 
 const pairedRows = computed(() => {
   const out = []
+  // 两两配对：奇数长度时循环本身已把最后一人放到 left（right=null），切勿再重复 push
   for (let i = 0; i < uniqueRows.value.length; i += 2) {
-    out.push({ left: uniqueRows.value[i], right: uniqueRows.value[i + 1] })
+    out.push({ left: uniqueRows.value[i], right: uniqueRows.value[i + 1] || null })
   }
-  if (uniqueRows.value.length % 2 === 1) out.push({ left: uniqueRows.value[uniqueRows.value.length - 1], right: null })
   // 保证至少 30 行（与原表行数相当）
   while (out.length < 30) out.push({ left: null, right: null })
   return out
