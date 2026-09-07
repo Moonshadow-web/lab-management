@@ -97,7 +97,7 @@
             </tr>
           </tbody>
         </table>
-        <div class="sheet-foot">表格编号：BG-SM-PX-006　　检验科生化免疫组　　生效日期：2026.9.1</div>
+        <div class="print-foot">表格编号：BG-SM-PX-006　　检验科生化免疫组　　生效日期：2026.9.1</div>
       </div>
     </Teleport>
 
@@ -252,7 +252,8 @@ function dedupeNames(list) {
 .sign-grid th, .sign-grid td { border: 1px solid #333; padding: 8px 10px; font-size: 14px; text-align: center; height: 34px; }
 .sign-grid th { background: #f5f5f5; }
 .sign-cell { height: 34px; }
-.sheet-foot { text-align: center; font-size: 12px; color: #333; margin-top: 14px; letter-spacing: 1px; }
+/* 打印页脚：fixed 使其在每一页底部重复出现 */
+.print-foot { display: none; }
 
 /* 打印专用副本：屏显隐藏，仅打印时通过 Teleport 到 body 显示 */
 .print-root { display: none; }
@@ -267,6 +268,18 @@ function dedupeNames(list) {
     position: static !important;
     width: 100% !important;
     visibility: visible !important;
+    padding-bottom: 14mm; /* 给每页固定页脚留出空间，避免表格压住编号行 */
+  }
+  .print-foot {
+    display: block !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 12px;
+    color: #333;
+    letter-spacing: 1px;
   }
 }
 </style>
