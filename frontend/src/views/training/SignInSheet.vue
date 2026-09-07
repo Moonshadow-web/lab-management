@@ -157,11 +157,13 @@ async function loadVersionTag() {
 loadVersionTag()
 
 // 渲染层强制去重：无论内存 rows 来源如何（预填/手动/历史残留），屏显与打印均不出现同名重复行
+// 注意：空名单行必须保留——否则「加一行」新增的空行会被过滤掉，表现为点了没反应
 const uniqueRows = computed(() => {
   const seen = new Set()
   return rows.value.filter((r) => {
     const n = (r.name || '').trim()
-    if (!n || seen.has(n)) return false
+    if (!n) return true
+    if (seen.has(n)) return false
     seen.add(n)
     return true
   })
