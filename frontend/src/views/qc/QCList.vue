@@ -1013,11 +1013,14 @@ function disposeChart() {
   }
 }
 
-// 模板 ref 位于 el-tab-pane 的 v-for 内，Vue 会把它绑定成数组（即使只渲染一个元素）。
-// 直接把数组传给 echarts.init 会抛 TypeError，导致质控图静默不渲染。
+// el-tab-pane 用了 v-for，pane 内的 template v-if 会在每个 pane 实例中求值，
+// 因此 chart-box 会渲染多份（每个 tab 一份），但只有当前激活 pane 的那份可见，
+// 其余均为 display:none（尺寸 0）。ref 也因此被 Vue 绑定成数组。
+// 必须取"可见"的那份传给 echarts.init，否则图表画在隐藏 div 上 → 页面上永远空白。
 function getChartEl() {
   const r = chartRef.value
-  return Array.isArray(r) ? r[0] : r
+  const list = Array.isArray(r) ? r : [r]
+  return list.find((el) => el && el.offsetParent !== null) || null
 }
 
 async function loadChartData() {
