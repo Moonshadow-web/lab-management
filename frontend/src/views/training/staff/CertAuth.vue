@@ -7,6 +7,7 @@
       @add="openForm()" @edit="openForm" @delete="onDelete" ref="tableRef"
     >
       <template #row-extra="{ row }">
+        <el-button link type="primary" @click="printPx001(row)">打印审核表</el-button>
         <el-button link type="primary" @click="openDetail(row)">详情/附件</el-button>
       </template>
     </CrudTable>
@@ -61,6 +62,7 @@ import { ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../../components/CrudTable.vue'
 import EducationAttachmentList from '../EducationAttachmentList.vue'
+import { printHtml } from '../../../utils/printHtml'
 import { listCertAuth, createCertAuth, updateCertAuth, deleteCertAuth, getCertAuth } from '../../../api/education'
 import { useAuthStore } from '../../../store/auth'
 
@@ -94,4 +96,47 @@ const current = ref(null)
 async function openDetail(row) { current.value = await getCertAuth(row.id); detailVisible.value = true }
 
 function fetch(params) { return listCertAuth(params) }
+
+// ===== P1：PX-001 原表版式打印（BG-SM-PX-001 生化免疫组独立上岗资格认证审核表） =====
+function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') }
+function printPx001(row) {
+  const html = `
+  <h2 style="text-align:center;font-size:20px;letter-spacing:3px;margin:0 0 14px;">生化免疫组独立上岗资格认证审核表</h2>
+  <table style="border:1.5px solid #333;font-size:13px;">
+    <tr>
+      <td class="lbl" style="width:90px;text-align:center;background:#f7f7f7;">申请人</td>
+      <td style="width:200px;text-align:center;height:30px;">${esc(row.applicant)}</td>
+      <td class="lbl" style="width:90px;text-align:center;background:#f7f7f7;">申请日期</td>
+      <td style="text-align:center;">${esc(row.apply_date)}</td>
+    </tr>
+    <tr>
+      <td class="lbl" style="text-align:center;background:#f7f7f7;">申请内容</td>
+      <td colspan="3" style="height:86px;vertical-align:top;padding:8px 10px;">${esc(row.apply_content) || '描述独立上岗工作内容'}</td>
+    </tr>
+    <tr>
+      <td class="lbl" style="text-align:center;background:#f7f7f7;">考核内容</td>
+      <td colspan="3" style="height:120px;vertical-align:top;padding:8px 10px;">
+        <b>理论考核</b>（答案见附件）<br>${esc(row.theory_eval)}<br>
+        <b>操作考核</b><br>${esc(row.operation_eval)}<br>
+        <span style="font-size:12px;color:#444;">附：考核内容应涵盖独立上岗工作内容全部；生免独立值班，则应包括血库和微生物考核部分</span>
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl" style="text-align:center;background:#f7f7f7;">考核专业组<br>组长意见</td>
+      <td colspan="3" style="height:130px;vertical-align:top;padding:8px 10px;">
+        ${esc(row.group_leader_opinion)}<br><br>
+        <span style="font-size:12px;color:#444;">附：简述理论和操作考核情况及成绩，判断是否可独立上岗。若是生免独立值班，则应包括血库和微生物组长意见。</span>
+        <div style="margin-top:18px;text-align:right;">组长签字：　　　　　　日期：　　　　</div>
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl" style="text-align:center;background:#f7f7f7;">主任意见</td>
+      <td colspan="3" style="height:110px;vertical-align:top;padding:8px 10px;">
+        ${esc(row.director_opinion)}
+        <div style="margin-top:24px;text-align:right;">科主任签字：　　　　　　日期：　　　　</div>
+      </td>
+    </tr>
+  </table>`
+  printHtml('BG-SM-PX-001 独立上岗资格认证审核表', html)
+}
 </script>
