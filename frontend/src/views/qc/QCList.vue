@@ -1008,6 +1008,13 @@ function disposeChart() {
   }
 }
 
+// 模板 ref 位于 el-tab-pane 的 v-for 内，Vue 会把它绑定成数组（即使只渲染一个元素）。
+// 直接把数组传给 echarts.init 会抛 TypeError，导致质控图静默不渲染。
+function getChartEl() {
+  const r = chartRef.value
+  return Array.isArray(r) ? r[0] : r
+}
+
 async function loadChartData() {
   if (!chartProject.value) return
   const { year, month } = parseChartMonth()
@@ -1026,7 +1033,12 @@ async function loadChartData() {
 
 function renderChart(rows) {
   disposeChart()
-  if (!chartRef.value || !rows.length) return
+  const box = getChartEl()
+  if (!box) return
+  if (!rows.length) {
+    ElMessage.warning('该项目在当前月份没有每日质控数据，无法绘制质控图')
+    return
+  }
 
   // 按水平分组并生成 series（只绘制当前选中的水平）
   const byLevel = {}
@@ -1268,11 +1280,19 @@ function renderChart(rows) {
     })
   }
   // 动态按需加载 echarts（仅 LJ 质控图用到），避免首屏加载大体积依赖
-  import('echarts').then((echarts) => {
-    if (!chartRef.value) return
-    chartInstance = echarts.init(chartRef.value)
-    chartInstance.setOption(option)
-  })
+  import('echarts')
+    .then((mod) => {
+      // 兼容 CJS interop：echarts 可能挂在 default 上
+      const ec = mod && (mod.default || mod)
+      const box = getChartEl()
+      if (!box || typeof ec.init !== 'function') return
+      chartInstance = ec.init(box)
+      chartInstance.setOption(option)
+    })
+    .catch((e) => {
+      // 必须有 catch：否则 echarts 加载/初始化失败会被 Promise 静默吞掉，表现为"点了没反应"
+      ElMessage.error('质控图渲染失败：' + (e?.message || e))
+    })
 }
 
 onUnmounted(() => {
