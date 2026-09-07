@@ -789,6 +789,7 @@ const chartSelectedLevels = ref([])   // 多选：当前项目下要显示的水
 const chartLoading = ref(false)
 const chartData = ref([])
 let chartInstance = null
+let chartResizeObserver = null
 
 // 按权限收口可见页签：technical_support 仅见其被授权的页签
 const visibleTabs = computed(() => {
@@ -1002,6 +1003,10 @@ function onChartInstrumentChange() {
 }
 
 function disposeChart() {
+  if (chartResizeObserver) {
+    chartResizeObserver.disconnect()
+    chartResizeObserver = null
+  }
   if (chartInstance) {
     chartInstance.dispose()
     chartInstance = null
@@ -1288,6 +1293,14 @@ function renderChart(rows) {
       if (!box || typeof ec.init !== 'function') return
       chartInstance = ec.init(box)
       chartInstance.setOption(option)
+      // flex/tab 布局可能晚于 init 完成，此时容器宽度为 0、canvas 退化成 100px 窄条；
+      // 用 ResizeObserver 在容器拿到真实尺寸后自动 resize，并兜底一帧后强制 resize
+      if (chartResizeObserver) chartResizeObserver.disconnect()
+      chartResizeObserver = new ResizeObserver(() => {
+        if (chartInstance) chartInstance.resize()
+      })
+      chartResizeObserver.observe(box)
+      requestAnimationFrame(() => { if (chartInstance) chartInstance.resize() })
     })
     .catch((e) => {
       // 必须有 catch：否则 echarts 加载/初始化失败会被 Promise 静默吞掉，表现为"点了没反应"
