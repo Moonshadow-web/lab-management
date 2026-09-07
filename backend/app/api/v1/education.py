@@ -157,6 +157,57 @@ prejob_router = make_router(
     json_fields=["positions_json", "instruments_json", "permissions_json", "items_json"],
 )
 
+
+@prejob_router.post("/{pid}/generate-auths")
+def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    """P3：结论=通过 时，按考核仪器逐台自动生成授权记录（AuthSheet，监督期「有条件」状态）。"""
+    p = db.get(PreJobAuth, pid)
+    if not p:
+        raise HTTPException(404, "记录不存在")
+    if p.conclusion != "通过":
+        raise HTTPException(400, "结论须为「通过」才能生成授权")
+    if p.batch_id:
+        raise HTTPException(400, f"已生成过授权（批次 {p.batch_id}），请到「授权表」查看")
+
+    def _as_list(v):
+        if isinstance(v, list):
+            return v
+        try:
+            return json.loads(v or "[]")
+        except Exception:
+            return []
+
+    positions = _as_list(p.positions_json)
+    instruments = _as_list(p.instruments_json)
+    items = _as_list(p.items_json)
+    item_map = {i.get("code"): (i.get("items") or "") for i in items}
+    person = db.query(PersonnelMaster).filter_by(name=p.name).first()
+    today = datetime.now().strftime("%Y-%m-%d")
+    created = 0
+    for inst in instruments:
+        code = inst.get("code", "")
+        db.add(AuthSheet(
+            person_id=person.id if person else None,
+            name=p.name,
+            post="、".join(positions),
+            instrument=f"{inst.get('name', '')}（{code.replace('MHZYY-JYK-', '')}）",
+            project=item_map.get(code, ""),
+            auth_scope="操作",
+            status="有条件",
+            status_reason="岗前培训考核通过，监督期内",
+            source_assessment_id=p.id,
+            source_assessment_text=f"岗前培训授权-单{p.id}",
+            auth_date=p.auth_date or today,
+            valid_from=p.auth_date or today,
+            has_assessment_pass=True,
+            remark=f"岗前培训考核及授权表 id={p.id} 自动生成",
+            created_by=user.username,
+        ))
+        created += 1
+    p.batch_id = f"PJ{p.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    db.commit()
+    return {"ok": True, "created": created, "batch_id": p.batch_id}
+
 router.include_router(personnel_router)
 router.include_router(edu_router)
 router.include_router(work_router)

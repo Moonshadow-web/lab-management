@@ -7,6 +7,8 @@
       @add="openForm()" @edit="openForm" @delete="onDelete" ref="tableRef"
     >
       <template #row-extra="{ row }">
+        <el-button v-if="row.conclusion === '通过' && !row.batch_id" link type="warning" @click="genAuths(row)">生成授权</el-button>
+        <el-button v-if="row.batch_id" link type="success" @click="viewAuths(row)">查看授权</el-button>
         <el-button link type="primary" @click="printForm(row)">打印</el-button>
       </template>
     </CrudTable>
@@ -67,6 +69,18 @@
         <el-button type="primary" @click="save">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="authsVisible" :title="'自动生成的授权 · ' + (authRow ? authRow.name : '')" width="760px">
+      <el-table :data="authsList" border size="small" v-loading="authsLoading">
+        <el-table-column prop="instrument" label="仪器" min-width="180" />
+        <el-table-column prop="post" label="岗位" min-width="140" />
+        <el-table-column prop="auth_scope" label="权限" width="70" />
+        <el-table-column prop="status" label="状态" width="80" />
+        <el-table-column prop="valid_from" label="生效" width="100" />
+        <el-table-column prop="project" label="考核项目" min-width="160" show-overflow-tooltip />
+      </el-table>
+      <div style="color:#999;font-size:12px;margin-top:8px;">可在「授权表」页签中管理（状态机：有条件→有效/暂停/撤销）</div>
+    </el-dialog>
   </div>
 </template>
 
@@ -76,7 +90,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../../components/CrudTable.vue'
 import { printHtml } from '../../../utils/printHtml'
 import { GL070_POSITIONS } from './gl070Meta'
-import { listPreJobAuth, createPreJobAuth, updatePreJobAuth, deletePreJobAuth } from '../../../api/education'
+import { listPreJobAuth, createPreJobAuth, updatePreJobAuth, deletePreJobAuth, generatePreJobAuths, listAuthSheet } from '../../../api/education'
 import { useAuthStore } from '../../../store/auth'
 
 const META = GL070_POSITIONS
@@ -158,6 +172,33 @@ async function onDelete(row) {
   try { await ElMessageBox.confirm('确认删除？', '提示', { type: 'warning' }); await deletePreJobAuth(row.id); ElMessage.success('已删除'); tableRef.value?.refresh() } catch (e) {}
 }
 function fetch(params) { return listPreJobAuth(params) }
+
+// ===== P3：同意上岗 → 自动生成授权（batch_id 分组） =====
+async function genAuths(row) {
+  const n = (row.instruments_json || []).length
+  try {
+    await ElMessageBox.confirm(
+      `将为 ${row.name} 按考核通过的 ${n} 台仪器逐台生成授权记录（初始状态「有条件」= 监督期内），可在「授权表」页签管理。确认生成？`,
+      '生成授权确认', { type: 'warning', confirmButtonText: '生成' }
+    )
+  } catch (e) { return }
+  try {
+    const res = await generatePreJobAuths(row.id)
+    ElMessage.success(`已生成 ${res.created} 条授权，批次 ${res.batch_id}`)
+    tableRef.value?.refresh()
+  } catch (e) { ElMessage.error('生成失败：' + (e.response?.data?.detail || e.message)) }
+}
+const authsVisible = ref(false)
+const authsLoading = ref(false)
+const authsList = ref([])
+const authRow = ref(null)
+async function viewAuths(row) {
+  authRow.value = row; authsVisible.value = true; authsLoading.value = true
+  try {
+    const res = await listAuthSheet({ q: `岗前培训授权-单${row.id}`, page_size: 100 })
+    authsList.value = (res.items || []).filter((a) => a.source_assessment_id === row.id)
+  } finally { authsLoading.value = false }
+}
 
 // 盛京版式打印
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') }
