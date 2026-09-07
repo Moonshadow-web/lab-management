@@ -260,7 +260,9 @@ function dedupeNames(list) {
 
 @media print {
   .no-print { display: none !important; }
-  @page { size: A4; margin: 16mm; }
+  /* 底边距 26mm：内容区止于此线之上，编号页脚 fixed 在该线处，永不与表格重叠；
+     浏览器自带的 网址/页码 在更下方的页边距里 */
+  @page { size: A4; margin: 14mm 12mm 26mm 12mm; }
   /* print-root 已 Teleport 到 body，直接隐藏其它 body 子元素，避免 el-dialog fixed 浮层打印空白 */
   body > *:not(.print-root) { display: none !important; }
   .print-root {
@@ -268,7 +270,6 @@ function dedupeNames(list) {
     position: static !important;
     width: 100% !important;
     visibility: visible !important;
-    padding-bottom: 14mm; /* 给每页固定页脚留出空间，避免表格压住编号行 */
   }
   .print-foot {
     display: block !important;
