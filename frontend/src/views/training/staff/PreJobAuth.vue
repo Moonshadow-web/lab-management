@@ -52,9 +52,12 @@
 
         <el-divider content-position="left">按岗位考核（方式与题库自动带出，可填写）</el-divider>
         <el-button size="small" @click="autoJudge()" type="warning" style="margin-bottom:8px;">按考核结果自动判定结论</el-button>
-        <el-collapse v-model="openPosts">
-          <el-collapse-item v-for="pc in examAreas" :key="pc.post" :name="pc.post">
-            <template #title><b>{{ pc.post }}</b>　<el-tag size="small" type="info">{{ pc.methods.join(' / ') }}</el-tag>　<el-tag size="small" :type="pc.pass ? 'success' : 'warning'">{{ pc.pass ? '合格' : '未达合格线' }}</el-tag></template>
+        <div v-for="pc in examAreas" :key="pc.post" style="border:1px solid #e4e7ed;border-radius:6px;padding:10px 12px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <b style="font-size:15px;">{{ pc.post }}</b>
+            <el-tag size="small" type="info">{{ pc.methods.join(' / ') }}</el-tag>
+            <el-tag size="small" :type="pc.pass ? 'success' : 'warning'">{{ pc.pass ? '合格' : '未达合格线' }}</el-tag>
+          </div>
             <template v-if="pc.methods.includes('口头问答')">
               <div style="font-weight:600;margin:4px 0;">口头问答（逐题记录要点）</div>
               <div v-for="(qa, qi) in pc.bank.qa_json || []" :key="'q' + qi" style="margin-bottom:6px;">
@@ -93,8 +96,7 @@
               </div>
               <div>理论得分：<b>{{ theoryScore(pc) }}</b> / {{ theoryFull(pc) }}　合格线 {{ Math.ceil(theoryFull(pc) * 0.6) }}</div>
             </template>
-          </el-collapse-item>
-        </el-collapse>
+        </div>
 
         <el-form-item label="理论考核" style="margin-top:12px"><el-input v-model="form.theory_eval" type="textarea" :rows="2" /></el-form-item>
         <el-form-item label="操作考核"><el-input v-model="form.operation_eval" type="textarea" :rows="2" /></el-form-item>
@@ -156,7 +158,7 @@ const positions = ref([])
 const instrumentCodes = ref([])
 const permissions = ref([])
 const banks = ref({})
-const openPosts = ref([])
+
 const examData = ref({})
 const form = ref(blank())
 function blank() {
@@ -180,7 +182,7 @@ watch(positions, () => {
   instrumentCodes.value = instrumentOptions.value.map((i) => i.code)
   const missing = positions.value.filter((p) => !examData.value[p])
   missing.forEach((p) => { examData.value[p] = { qaNotes: {}, practicalScores: {}, theoryAnswers: {} } })
-  openPosts.value = positions.value
+
 })
 
 const instrumentOptions = computed(() => {
