@@ -246,6 +246,8 @@ const examAreas = computed(() => positions.value.map((post) => {
 function practicalScore(pc) {
   return (pc.bank.practical_json || []).reduce((s, p, i) => s + (Number((examData.value[pc.post] || {}).practicalScores?.[i]) || 0), 0)
 }
+// 注意：pc.theoryFull 是数值属性，模板/判分里用函数取值（曾误写 theoryFull(pc) 导致渲染崩溃、弹窗空白）
+function theoryFull(pc) { return pc.theoryFull || 0 }
 function theoryScore(pc) {
   let s = 0
   const d = examData.value[pc.post] || {}
