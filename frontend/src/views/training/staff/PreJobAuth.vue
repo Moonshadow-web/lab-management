@@ -160,6 +160,8 @@ const permissions = ref([])
 const banks = ref({})
 
 const examData = ref({})
+// 预初始化全部岗位的填写区——避免选岗位瞬间模板读取 undefined 导致弹窗空白
+META.forEach((p) => { examData.value[p.name] = { qaNotes: {}, practicalScores: {}, theoryAnswers: {} } })
 const form = ref(blank())
 function blank() {
   return {
@@ -183,7 +185,7 @@ watch(positions, () => {
   const missing = positions.value.filter((p) => !examData.value[p])
   missing.forEach((p) => { examData.value[p] = { qaNotes: {}, practicalScores: {}, theoryAnswers: {} } })
 
-})
+}, { flush: 'sync' })
 
 const instrumentOptions = computed(() => {
   const sel = positions.value
