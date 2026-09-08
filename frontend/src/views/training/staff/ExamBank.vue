@@ -141,9 +141,10 @@ function openForm(row) {
     qaList.value = JSON.parse(JSON.stringify(row.qa_json || []))
     practicalList.value = JSON.parse(JSON.stringify(row.practical_json || []))
     const t = row.theory_json || {}
+    const toArr = (a) => (Array.isArray(a) ? a : String(a || '').split(''))
     theoryList.value = {
       single: JSON.parse(JSON.stringify(t.single || [])),
-      multi: JSON.parse(JSON.stringify(t.multi || [])),
+      multi: (t.multi || []).map((x) => ({ ...x, answer: toArr(x.answer) })),
       judge: JSON.parse(JSON.stringify(t.judge || [])),
     }
   } else {
@@ -156,12 +157,17 @@ function openForm(row) {
 }
 async function save() {
   if (!form.value.post) { ElMessage.error('请选择岗位'); return }
+  const toStr = (a) => (Array.isArray(a) ? a.join('') : String(a || ''))
   const payload = {
     post: form.value.post,
     methods_json: methods.value,
     qa_json: qaList.value.filter((x) => x.q),
     practical_json: practicalList.value.filter((x) => x.point),
-    theory_json: theoryList.value,
+    theory_json: {
+      single: theoryList.value.single,
+      multi: theoryList.value.multi.map((x) => ({ ...x, answer: toStr(x.answer) })),
+      judge: theoryList.value.judge,
+    },
     remark: form.value.remark,
   }
   try {
