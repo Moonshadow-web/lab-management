@@ -19,7 +19,7 @@ from ...models.education import (
     TrainingPlan, TrainingSession,
     InternshipMentor, InternshipScore,
     AuthSheet,
-    PreJobAuth, ExamBank,
+    PreJobAuth, ExamBank, PostInstrumentMap,
     EducationAttachment,
 )
 from ...models.user import User
@@ -44,6 +44,7 @@ from ...schemas.education import (
     AuthSheetCreate, AuthSheetUpdate, AuthSheetRead,
     PreJobAuthCreate, PreJobAuthUpdate, PreJobAuthRead,
     ExamBankCreate, ExamBankUpdate, ExamBankRead,
+    PostInstrumentMapCreate, PostInstrumentMapUpdate, PostInstrumentMapRead,
     EducationAttachmentRead,
 )
 
@@ -469,3 +470,13 @@ def _media_for(a: EducationAttachment) -> str:
     if a.file_type == "pdf":
         return "application/pdf"
     return "application/octet-stream"
+
+# J. 岗位↔仪器 匹配（可视化维护）
+postmap_router = make_router(
+    PostInstrumentMap, PostInstrumentMapRead, PostInstrumentMapCreate, PostInstrumentMapUpdate,
+    search_fields=["post", "instrument_name", "instrument_code"], filter_fields=["post"],
+    order_by=[PostInstrumentMap.post, PostInstrumentMap.sort_no],
+    prefix="/post-instrument-maps", write_roles=("admin", "training_manager"),
+    json_fields=["methods_json"],
+)
+router.include_router(postmap_router)

@@ -685,3 +685,37 @@ class ExamBankUpdate(ExamBankBase):
 class ExamBankRead(ExamBankBase):
     id: int
     updated_at: datetime | None = None
+
+
+class PostInstrumentMapBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    post: str = ""
+    instrument_name: str = ""
+    instrument_code: str = ""
+    manager: str = ""
+    methods_json: list = []
+    sort_no: int = 0
+    remark: str = ""
+
+    @field_validator("methods_json", mode="before")
+    @classmethod
+    def _pm_list(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v or "[]")
+            except Exception:
+                return []
+        return v or []
+
+
+class PostInstrumentMapCreate(PostInstrumentMapBase):
+    pass
+
+
+class PostInstrumentMapUpdate(PostInstrumentMapBase):
+    pass
+
+
+class PostInstrumentMapRead(PostInstrumentMapBase):
+    id: int
+    updated_at: datetime | None = None

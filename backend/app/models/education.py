@@ -473,3 +473,23 @@ class ExamBank(Base):
     remark: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# =========================================================================
+# J. 岗位↔仪器 匹配（可视化维护；原硬编码于前端 gl070Meta.js）
+# =========================================================================
+class PostInstrumentMap(Base):
+    """岗位与关键仪器的对应关系（BG-KS-GL-070 仪器使用授权书的维护数据）。"""
+
+    __tablename__ = "post_instrument_map"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    post: Mapped[str] = mapped_column(String(50), index=True, default="")  # 岗位
+    instrument_name: Mapped[str] = mapped_column(String(100), default="")  # 仪器名称
+    instrument_code: Mapped[str] = mapped_column(String(50), index=True, default="")  # 仪器编号 dept_no
+    manager: Mapped[str] = mapped_column(String(50), default="")  # 仪器管理者
+    methods_json: Mapped[str] = mapped_column(Text, default="[]")  # 该岗位考核方式（1-2 种，冗余便于列表）
+    sort_no: Mapped[int] = mapped_column(Integer, default=0)
+    remark: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
