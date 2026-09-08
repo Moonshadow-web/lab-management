@@ -94,3 +94,9 @@ export function getQCProjectDaily(year, month, instrumentId, testItem) {
 export function getQCInstruments() {
   return request.get('/api/v1/qc-summaries/instruments')
 }
+// 清空某仪器某年月的已上传质控数据（月结行 + 每日测值）；文字小结保留
+export function clearQCMonth(instrumentId, year, month) {
+  return request.post('/api/v1/qc-summaries/clear-month', null, {
+    params: { instrument_id: instrumentId, year, month },
+  })
+}

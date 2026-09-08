@@ -647,6 +647,72 @@ def upload_qc_summary(
     }
 
 
+@router.post("/clear-month", dependencies=[Depends(require_roles("admin", "qc_manager"))])
+def clear_month_data(
+    instrument_id: int,
+    year: int,
+    month: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """清空某台仪器某年月的「已上传」质控数据。
+
+    删除范围：qc_monthly_summaries（月结行）+ 其下 qc_daily_values（每日测值）。
+    保留：qc_monthly_reports（文字小结）—— 可能含人工编辑内容，避免误删。
+
+    instrument_id / year / month 以 query 参数传入。
+    """
+    if not instrument_id or not year or not month:
+        raise HTTPException(status_code=400, detail="instrument_id / year / month 均为必填")
+
+    summaries = (
+        db.query(QCMonthlySummary)
+        .filter_by(year=year, month=month, instrument_id=instrument_id)
+        .all()
+    )
+    if not summaries:
+        return {
+            "ok": True,
+            "deleted_summaries": 0,
+            "deleted_daily": 0,
+            "message": "该仪器本月没有已上传数据，无需清空",
+        }
+
+    sids = [s.id for s in summaries]
+    inst_name = summaries[0].instrument or ""
+    # 先删子表（每日测值），再删主表，避免残留孤儿明细
+    deleted_daily = (
+        db.query(QCDailyValue)
+        .filter(QCDailyValue.summary_id.in_(sids))
+        .delete(synchronize_session=False)
+    )
+    deleted_summaries = (
+        db.query(QCMonthlySummary)
+        .filter(QCMonthlySummary.id.in_(sids))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+
+    write_audit(db, user, "delete", "qc_monthly_summaries", 0, {
+        "action": "clear_month",
+        "instrument_id": instrument_id,
+        "instrument": inst_name,
+        "year": year,
+        "month": month,
+        "deleted_summaries": deleted_summaries,
+        "deleted_daily": deleted_daily,
+    })
+
+    return {
+        "ok": True,
+        "deleted_summaries": deleted_summaries,
+        "deleted_daily": deleted_daily,
+        "instrument": inst_name,
+        "year": year,
+        "month": month,
+    }
+
+
 @router.post("/_backfill_goals", dependencies=[Depends(require_roles("admin", "qc_manager"))])
 def backfill_quality_goals(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """回填已存月结行的质量目标（按水平重算，纠正历史值）。

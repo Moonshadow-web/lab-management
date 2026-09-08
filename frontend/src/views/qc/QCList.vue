@@ -37,6 +37,14 @@
             @click="loadSummary"
           >统计</el-button>
           <el-button v-if="auth.canWrite('qc')" type="primary" :loading="uploading" @click="triggerCsv">上传该仪器 LIS 数据(CSV/XLSX)</el-button>
+          <el-button
+            v-if="auth.canWrite('qc')"
+            type="danger"
+            plain
+            :disabled="!monthValue || !uploadInstrumentId"
+            :loading="clearing"
+            @click="clearMonth"
+          >清空本月数据</el-button>
           <input ref="csvInput" type="file" accept=".csv,.xlsx,.xls" hidden @change="onCsvChange" />
           <div v-if="uploading" class="upload-progress">
             <el-progress
@@ -763,6 +771,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listQCSummaries, uploadQCSummary, getQCDaily, updateQCSummary, deleteQCSummary,
   getQCReport, upsertQCReport, regenerateQCReport, exportQCReportDocx, getQCProjectDaily,
+  clearQCMonth,
 } from '../../api/qc'
 import { getQCInstruments } from '../../api/qc'
 import {
@@ -839,6 +848,7 @@ const uploadInstrumentId = ref(null)   // 月结筛选 + 上传 时选定的受�
 const uploading = ref(false)            // LIS 上传进行中（控制进度条显隐 + 按钮 loading）
 const uploadPercent = ref(0)            // 上传百分比 0-100（file 字节上传进度）
 const uploadStage = ref('uploading')    // 'uploading' | 'parsing'(字节传完，等服务端解析)
+const clearing = ref(false)             // 清空本月数据 进行中
 const csvInput = ref(null)
 const reportMap = reactive({})         // blockKey -> 文字报告对象
 
@@ -1346,6 +1356,48 @@ async function loadSummary() {
     }
   } finally {
     loadingSummary.value = false
+  }
+}
+
+// 清空该仪器本月的已上传质控数据（月结行 + 每日测值）；文字小结保留
+async function clearMonth() {
+  const { year, month } = parseMonth()
+  if (!year || !month || !uploadInstrumentId.value) {
+    ElMessage.warning('请先选择「年月」与「质控仪器」')
+    return
+  }
+  const inst = instrumentList.value.find((i) => i.id === uploadInstrumentId.value)
+  const instName = inst ? instLabel(inst) : `ID ${uploadInstrumentId.value}`
+  const loaded = summaryRows.value.length
+  try {
+    await ElMessageBox.confirm(
+      `将删除「${instName}」${year} 年 ${month} 月的全部已上传质控数据（月结记录及其每日测值）${
+        loaded ? `，当前已加载 ${loaded} 条` : ''
+      }。\n\n此操作不可恢复；文字小结会保留。确定继续吗？`,
+      '清空本月已上传数据',
+      { type: 'warning', confirmButtonText: '确定清空', cancelButtonText: '取消', dangerouslyUseHTMLString: false },
+    )
+  } catch {
+    return // 用户取消
+  }
+  clearing.value = true
+  try {
+    const res = await clearQCMonth(uploadInstrumentId.value, year, month)
+    const s = res?.deleted_summaries ?? 0
+    const d = res?.deleted_daily ?? 0
+    if (!s && !d) {
+      ElMessage.info(res?.message || '该仪器本月没有已上传数据')
+    } else {
+      ElMessage.success(`已清空：月结 ${s} 条、每日测值 ${d} 条`)
+    }
+    // 清空本地视图，避免残留已删除行（reportMap 是 reactive，逐键删除而非重新赋值）
+    summaryRows.value = []
+    Object.keys(reportMap).forEach((k) => delete reportMap[k])
+    await loadSummary()
+  } catch (e) {
+    ElMessage.error('清空失败：' + (e.response?.data?.detail || e.message || e))
+  } finally {
+    clearing.value = false
   }
 }
 
