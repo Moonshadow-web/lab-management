@@ -51,7 +51,11 @@
           </div>
 
           <template v-if="pc.methods.includes('口头问答')">
-            <div style="font-weight:600;margin:4px 0;">口头问答（参考题库提问）</div>
+            <div style="font-weight:600;margin:4px 0;">口头问答（题库问题，考官据此提问）</div>
+            <div v-for="(qa, qi) in pc.bank.qa_json || []" :key="'q' + qi" style="margin-bottom:6px;">
+              <div style="font-size:13px;">{{ qi + 1 }}. {{ qa.q }}</div>
+              <div style="font-size:12px;color:#888;">参考答案：{{ qa.a }}</div>
+            </div>
             <el-form-item label="考核结果" label-width="90px">
               <el-select v-model="examData[pc.post].qaResult" style="width:160px;"><el-option label="合格" value="合格" /><el-option label="不合格" value="不合格" /></el-select>
             </el-form-item>
