@@ -237,6 +237,10 @@
                 <el-input-number v-model="form.ucal" :min="0" :controls="false" :precision="2" :step="0.1" style="width:180px" />
                 <span style="margin-left:8px;color:#909399;font-size:12px">多个校准品时，保守选择相对标准不确定度最大的</span>
               </el-form-item>
+              <div class="ucal-tip">
+                ⚠️ 此处填<b>标准不确定度 u（k=1）</b>。厂家证书给的是扩展不确定度 U 时（如「U=2%，k=2」），
+                请先除以包含因子 k 再填（2% ÷ 2 = <b>1.0</b>）；系统会在最后统一乘 k=2 得到 U。
+              </div>
               <el-form-item label="来源">
                 <el-radio-group v-model="form.ucal_source">
                   <el-radio value="厂家">厂家提供</el-radio>
@@ -869,6 +873,11 @@ onMounted(loadProjects)
 .uncert-header span { font-size: 13px; color: #909399; }
 .data-block { background: #f7fafc; border-radius: 10px; padding: 14px; margin-bottom: 14px; border: 1px solid #e4e7ed; }
 .data-block-title { font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 10px; }
+.ucal-tip {
+  margin: 2px 0 10px; padding: 8px 10px; font-size: 12px; line-height: 1.7;
+  color: #8a6d3b; background: #fdf6ec; border: 1px solid #f5dab1;
+  border-radius: 6px;
+}
 .mode-tip { font-size: 12px; color: #606266; background: #fffbe6; border-left: 3px solid #d6b800; padding: 6px 10px; margin-top: 8px; border-radius: 4px; }
 .level-tag { color: #fff; font-weight: 600; padding: 4px 12px; border-radius: 6px; display: inline-block; margin-bottom: 8px; }
 .formula { background: #fafbfc; border: 1px solid #e4e7ed; border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #303133; margin-top: 10px; }

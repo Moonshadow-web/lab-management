@@ -181,6 +181,28 @@ export function buildSummaryReport(list) {
 </body></html>`
 }
 
+export function buildAllReports(list) {
+  // 把多条「完整评定报告」拼成一个连续 HTML，每条另起一页（A4），
+  // 便于一次性打印/另存为单个 PDF 归档。
+  const parts = (list || []).map((p) => {
+    const html = p.mode === 'multi' ? buildMultiReport(p) : buildSingleReport(p)
+    const m = /<body>([\s\S]*?)<\/body>/.exec(html)
+    return m ? m[1] : ''
+  }).filter(Boolean)
+
+  const body = parts
+    .map((b, i) => (i === 0 ? b : `<div style="page-break-before:always"></div>${b}`))
+    .join('\n')
+
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>测量不确定度评定报告汇编</title><style>${reportStyle()}</style></head><body>
+<h1>民航总医院检验科生化免疫组</h1>
+<h1>测量不确定度评定报告汇编</h1>
+<p>共 ${parts.length} 份报告 | 编制日期：${todayStr()}</p>
+<div style="page-break-before:always"></div>
+${body}
+</body></html>`
+}
+
 export function downloadHtml(html, name) {
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)

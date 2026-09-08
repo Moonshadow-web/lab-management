@@ -24,6 +24,7 @@
           />
           <el-button :disabled="!filtered.length" @click="previewSummary">📑 预览汇总表</el-button>
           <el-button type="primary" :disabled="!filtered.length" @click="downloadSummary">⬇️ 下载汇总表 PDF</el-button>
+          <el-button type="success" :disabled="!filtered.length" @click="downloadAllReports">📚 全部报告合并 PDF</el-button>
         </div>
       </div>
     </el-card>
@@ -92,6 +93,7 @@ import {
   buildSingleReport,
   buildMultiReport,
   buildSummaryReport,
+  buildAllReports,
   printOrSavePdf,
   downloadHtml,
 } from '../../utils/uncertaintyReport'
@@ -166,6 +168,17 @@ function downloadOne(p) {
 
 function downloadSummary() {
   printOrSavePdf(buildSummaryReport(filtered.value), `测量不确定度评定汇总表_${todayStr()}`)
+}
+
+// 把当前列表（未搜索时即全部）的每份完整评定报告按顺序拼成一个 PDF
+function downloadAllReports() {
+  const list = filtered.value
+  if (!list.length) {
+    ElMessage.warning('没有可导出的报告')
+    return
+  }
+  ElMessage.info(`正在生成 ${list.length} 份报告的合并 PDF，请在弹窗中选择「另存为 PDF」或打印`)
+  printOrSavePdf(buildAllReports(list), `测量不确定度评定报告汇编_${list.length}份_${todayStr()}`)
 }
 
 function downloadCurrentHtml() {
