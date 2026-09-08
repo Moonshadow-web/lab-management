@@ -172,8 +172,8 @@ def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = 
     p = db.get(PreJobAuth, pid)
     if not p:
         raise HTTPException(404, "记录不存在")
-    if p.conclusion != "通过":
-        raise HTTPException(400, "结论须为「通过」才能生成授权")
+    if p.conclusion not in ("通过", "同意上岗"):
+        raise HTTPException(400, "考核意见须为「同意上岗」才能生成授权")
     if p.batch_id:
         raise HTTPException(400, f"已生成过授权（批次 {p.batch_id}），请到「授权表」查看")
 
