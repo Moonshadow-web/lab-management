@@ -595,6 +595,7 @@ class PreJobAuthBase(BaseModel):
     instruments_json: list = []
     permissions_json: list = []
     items_json: list = []
+    exam_json: dict = {}
     theory_eval: str = ""
     operation_eval: str = ""
     group_leader_opinion: str = ""
@@ -618,6 +619,16 @@ class PreJobAuthBase(BaseModel):
                 return []
         return v or []
 
+    @field_validator("exam_json", mode="before")
+    @classmethod
+    def _exam_dict(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v or "{}")
+            except Exception:
+                return {}
+        return v or {}
+
 
 class PreJobAuthCreate(PreJobAuthBase):
     pass
@@ -630,4 +641,47 @@ class PreJobAuthUpdate(PreJobAuthBase):
 class PreJobAuthRead(PreJobAuthBase):
     id: int
     created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ExamBankBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    post: str = ""
+    methods_json: list = []
+    qa_json: list = []
+    practical_json: list = []
+    theory_json: dict = {}
+    remark: str = ""
+
+    @field_validator("methods_json", "qa_json", "practical_json", mode="before")
+    @classmethod
+    def _eb_list(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v or "[]")
+            except Exception:
+                return []
+        return v or []
+
+    @field_validator("theory_json", mode="before")
+    @classmethod
+    def _eb_dict(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v or "{}")
+            except Exception:
+                return {}
+        return v or {}
+
+
+class ExamBankCreate(ExamBankBase):
+    pass
+
+
+class ExamBankUpdate(ExamBankBase):
+    pass
+
+
+class ExamBankRead(ExamBankBase):
+    id: int
     updated_at: datetime | None = None

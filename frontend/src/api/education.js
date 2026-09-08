@@ -101,3 +101,4 @@ export function createPreJobAuth(data) { return request.post(`${P}/pre-job-auths
 export function updatePreJobAuth(id, data) { return request.put(`${P}/pre-job-auths/${id}`, data) }
 export function deletePreJobAuth(id) { return request.delete(`${P}/pre-job-auths/${id}`) }
 export function generatePreJobAuths(id) { return request.post(`${P}/pre-job-auths/${id}/generate-auths`) }
+export function listExamBank(params) { return request.get(`${P}/exam-banks`, { params }) }

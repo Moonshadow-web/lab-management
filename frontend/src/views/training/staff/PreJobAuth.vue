@@ -20,18 +20,18 @@
           <el-col :span="12"><el-form-item label="申请日期"><el-input v-model="form.apply_date" placeholder="如 2026-09-08" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="考核岗位（多选）">
-          <el-select v-model="positions" multiple style="width:100%" placeholder="按 GL-070 选择岗位">
+          <el-select v-model="positions" multiple style="width:100%" placeholder="按 GL-070 选择岗位，仪器自动带出">
             <el-option v-for="p in META" :key="p.name" :label="p.name" :value="p.name" />
           </el-select>
         </el-form-item>
-        <el-form-item label="考核仪器（多选）">
-          <el-select v-model="instrumentCodes" multiple style="width:100%" placeholder="随岗位级联，可多选">
+        <el-form-item label="考核仪器（自动带出，可调整）">
+          <el-select v-model="instrumentCodes" multiple style="width:100%">
             <el-option v-for="i in instrumentOptions" :key="i.code" :label="i.name + '（' + i.code.replace('MHZYY-JYK-', '') + '）'" :value="i.code" />
           </el-select>
         </el-form-item>
         <el-form-item label="授权权限（多选）">
-          <el-select v-model="permissions" multiple style="width:100%" placeholder="授权上岗的岗位，可多选">
-            <el-option v-for="p in META" :key="p.name" :label="p.name" :value="p.name" />
+          <el-select v-model="permissions" multiple style="width:100%" placeholder="操作 / 复核 / 报告">
+            <el-option v-for="s in AUTH_SCOPES" :key="s" :label="s" :value="s" />
           </el-select>
         </el-form-item>
 
@@ -49,6 +49,52 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <el-divider content-position="left">按岗位考核（方式与题库自动带出，可填写）</el-divider>
+        <el-button size="small" @click="autoJudge()" type="warning" style="margin-bottom:8px;">按考核结果自动判定结论</el-button>
+        <el-collapse v-model="openPosts">
+          <el-collapse-item v-for="pc in examAreas" :key="pc.post" :name="pc.post">
+            <template #title><b>{{ pc.post }}</b>　<el-tag size="small" type="info">{{ pc.methods.join(' / ') }}</el-tag>　<el-tag size="small" :type="pc.pass ? 'success' : 'warning'">{{ pc.pass ? '合格' : '未达合格线' }}</el-tag></template>
+            <template v-if="pc.methods.includes('口头问答')">
+              <div style="font-weight:600;margin:4px 0;">口头问答（逐题记录要点）</div>
+              <div v-for="(qa, qi) in pc.bank.qa_json || []" :key="'q' + qi" style="margin-bottom:6px;">
+                <div>{{ qi + 1 }}. {{ qa.q }}</div>
+                <el-input v-model="examData[pc.post].qaNotes[qi]" size="small" type="textarea" :rows="1" placeholder="作答要点/评价（参考答案见题库）" />
+              </div>
+            </template>
+            <template v-if="pc.methods.includes('实操考核')">
+              <div style="font-weight:600;margin:4px 0;">实操考核（要点打分，满分 {{ pc.practicalTotal }}）</div>
+              <div v-for="(pt, pi) in pc.bank.practical_json || []" :key="'p' + pi" style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <span style="flex:1;">{{ pi + 1 }}. {{ pt.point }}</span>
+                <span style="color:#888;">满分 {{ pt.score }}</span>
+                <el-input-number v-model="examData[pc.post].practicalScores[pi]" size="small" :min="0" :max="pt.score" style="width:110px;" />
+              </div>
+              <div>实操得分：<b>{{ practicalScore(pc) }}</b> / {{ pc.practicalTotal }}　合格线 {{ Math.ceil(pc.practicalTotal * 0.8) }}</div>
+            </template>
+            <template v-if="pc.methods.includes('理论考核')">
+              <div style="font-weight:600;margin:4px 0;">理论考核（单选/多选/判断各5题，自动判分）</div>
+              <div v-for="(t, ti) in (pc.bank.theory_json && pc.bank.theory_json.single) || []" :key="'s' + ti" style="margin-bottom:4px;">
+                <div>单选 {{ ti + 1 }}. {{ t.q }}</div>
+                <el-radio-group v-model="examData[pc.post].theoryAnswers['s' + ti]" size="small">
+                  <el-radio v-for="o in t.options" :key="o" :value="o.slice(0, 1)">{{ o }}</el-radio>
+                </el-radio-group>
+              </div>
+              <div v-for="(t, ti) in (pc.bank.theory_json && pc.bank.theory_json.multi) || []" :key="'m' + ti" style="margin-bottom:4px;">
+                <div>多选 {{ ti + 1 }}. {{ t.q }}</div>
+                <el-checkbox-group v-model="examData[pc.post].theoryAnswers['m' + ti]">
+                  <el-checkbox v-for="o in t.options" :key="o" :value="o.slice(0, 1)">{{ o }}</el-checkbox>
+                </el-checkbox-group>
+              </div>
+              <div v-for="(t, ti) in (pc.bank.theory_json && pc.bank.theory_json.judge) || []" :key="'j' + ti" style="margin-bottom:4px;">
+                <div>判断 {{ ti + 1 }}. {{ t.q }}</div>
+                <el-radio-group v-model="examData[pc.post].theoryAnswers['j' + ti]" size="small">
+                  <el-radio value="对">对</el-radio><el-radio value="错">错</el-radio>
+                </el-radio-group>
+              </div>
+              <div>理论得分：<b>{{ theoryScore(pc) }}</b> / {{ theoryFull(pc) }}　合格线 {{ Math.ceil(theoryFull(pc) * 0.6) }}</div>
+            </template>
+          </el-collapse-item>
+        </el-collapse>
 
         <el-form-item label="理论考核" style="margin-top:12px"><el-input v-model="form.theory_eval" type="textarea" :rows="2" /></el-form-item>
         <el-form-item label="操作考核"><el-input v-model="form.operation_eval" type="textarea" :rows="2" /></el-form-item>
@@ -89,11 +135,10 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../../components/CrudTable.vue'
 import { printHtml } from '../../../utils/printHtml'
-import { GL070_POSITIONS } from './gl070Meta'
-import { listPreJobAuth, createPreJobAuth, updatePreJobAuth, deletePreJobAuth, generatePreJobAuths, listAuthSheet } from '../../../api/education'
+import { GL070_POSITIONS as META, AUTH_SCOPES } from './gl070Meta'
+import { listPreJobAuth, createPreJobAuth, updatePreJobAuth, deletePreJobAuth, generatePreJobAuths, listAuthSheet, listExamBank } from '../../../api/education'
 import { useAuthStore } from '../../../store/auth'
 
-const META = GL070_POSITIONS
 const auth = useAuthStore()
 const canWrite = ref(auth.canWrite('training'))
 const tableRef = ref(null)
@@ -110,13 +155,33 @@ const visible = ref(false)
 const positions = ref([])
 const instrumentCodes = ref([])
 const permissions = ref([])
+const banks = ref({})
+const openPosts = ref([])
+const examData = ref({})
 const form = ref(blank())
 function blank() {
   return {
-    id: null, name: '', apply_date: '', positions_json: [], instruments_json: [], permissions_json: [], items_json: [],
+    id: null, name: '', apply_date: '', positions_json: [], instruments_json: [], permissions_json: [], items_json: [], exam_json: {},
     theory_eval: '', operation_eval: '', group_leader_opinion: '', director_opinion: '', conclusion: '待审核', auth_date: '', status: '进行中', remark: '',
   }
 }
+
+// 题库（按岗位）
+async function loadBanks() {
+  try {
+    const res = await listExamBank({ page_size: 50 })
+    banks.value = Object.fromEntries((res.items || []).map((b) => [b.post, b]))
+  } catch (e) { banks.value = {} }
+}
+loadBanks()
+
+// 选岗位 → 仪器自动全部带出；并初始化该岗位的考核填写区
+watch(positions, () => {
+  instrumentCodes.value = instrumentOptions.value.map((i) => i.code)
+  const missing = positions.value.filter((p) => !examData.value[p])
+  missing.forEach((p) => { examData.value[p] = { qaNotes: {}, practicalScores: {}, theoryAnswers: {} } })
+  openPosts.value = positions.value
+})
 
 const instrumentOptions = computed(() => {
   const sel = positions.value
@@ -129,11 +194,7 @@ const instrumentOptions = computed(() => {
   return out
 })
 
-// 岗位变化 → 清掉不在候选内的仪器，并同步逐项考核行
-watch(positions, () => {
-  const codes = new Set(instrumentOptions.value.map((i) => i.code))
-  instrumentCodes.value = instrumentCodes.value.filter((c) => codes.has(c))
-})
+// 仪器变化 → 同步逐项考核行
 watch(instrumentCodes, () => {
   const map = new Map(GL070_META_ALL.value.map((i) => [i.code, i]))
   form.value.items_json = instrumentCodes.value.map((c) => {
@@ -144,19 +205,60 @@ watch(instrumentCodes, () => {
 })
 const GL070_META_ALL = computed(() => META.flatMap((p) => p.instruments.map((i) => ({ ...i, position: p.name }))))
 
+// ===== 按岗位考核区：方式/题库自动带出，作答打分自动汇总 =====
+const examAreas = computed(() => positions.value.map((post) => {
+  const bank = banks.value[post] || { post, methods_json: ['实操考核'], qa_json: [], practical_json: [], theory_json: {} }
+  const methods = bank.methods_json && bank.methods_json.length ? bank.methods_json : ['实操考核']
+  const practicalTotal = (bank.practical_json || []).reduce((s, p) => s + (p.score || 0), 0)
+  const theoryFull = ((bank.theory_json && (bank.theory_json.single || []).length) || 0) * 2
+    + ((bank.theory_json && (bank.theory_json.multi || []).length) || 0) * 4
+    + ((bank.theory_json && (bank.theory_json.judge || []).length) || 0) * 2
+  return { post, bank, methods, practicalTotal, theoryFull }
+}))
+function practicalScore(pc) {
+  const got = (pc.bank.practical_json || []).reduce((s, p, i) => s + (Number((examData.value[pc.post] || {}).practicalScores?.[i]) || 0), 0)
+  return got
+}
+function theoryScore(pc) {
+  let s = 0
+  const d = examData.value[pc.post] || {}
+  const T = pc.bank.theory_json || {}
+  ;(T.single || []).forEach((t, i) => { if (d.theoryAnswers?.['s' + i] === t.answer.slice(0, 1)) s += 2 })
+  ;(T.multi || []).forEach((t, i) => {
+    const got = (d.theoryAnswers?.['m' + i] || []).slice().sort().join('')
+    if (got && got === t.answer.split('').sort().join('')) s += 4
+  })
+  ;(T.judge || []).forEach((t, i) => { if (d.theoryAnswers?.['j' + i] === t.answer) s += 2 })
+  return s
+}
+function postPass(pc) {
+  if (pc.methods.includes('实操考核') && practicalScore(pc) < Math.ceil(pc.practicalTotal * 0.8)) return false
+  if (pc.methods.includes('理论考核') && theoryScore(pc) < Math.ceil(theoryFull(pc) * 0.6)) return false
+  return true
+}
+function autoJudge() {
+  const allPass = examAreas.value.every(postPass)
+  form.value.conclusion = allPass ? '通过' : '不通过'
+  form.value.exam_json = JSON.parse(JSON.stringify(examData.value))
+  ElMessage.success(allPass ? '全部岗位考核合格 → 结论「通过」，可点「生成授权」' : '存在未达合格线岗位 → 结论「不通过」')
+}
+
 function openForm(row) {
   if (row) {
     form.value = { ...blank(), ...row }
     positions.value = [...(row.positions_json || [])]
     instrumentCodes.value = (row.instruments_json || []).map((i) => i.code)
     permissions.value = [...(row.permissions_json || [])]
+    examData.value = JSON.parse(JSON.stringify(row.exam_json || {}))
+    positions.value.forEach((p) => { if (!examData.value[p]) examData.value[p] = { qaNotes: {}, practicalScores: {}, theoryAnswers: {} } })
   } else {
-    form.value = blank(); positions.value = []; instrumentCodes.value = []; permissions.value = []
+    form.value = blank(); positions.value = []; instrumentCodes.value = []; permissions.value = []; examData.value = {}
   }
   visible.value = true
 }
 async function save() {
   try {
+    form.value.exam_json = JSON.parse(JSON.stringify(examData.value))
     const payload = {
       ...form.value,
       positions_json: positions.value,

@@ -448,8 +448,28 @@ class PreJobAuth(Base):
     conclusion: Mapped[str] = mapped_column(String(20), default="待审核")  # 通过/不通过/待审核
     auth_date: Mapped[str] = mapped_column(String(20), default="")  # 授权日期
     batch_id: Mapped[str] = mapped_column(String(50), default="")  # 批量生成授权分组（P3）
+    exam_json: Mapped[str] = mapped_column(Text, default="{}")  # 考核记录快照（按岗位×方式的作答/打分）
     status: Mapped[str] = mapped_column(String(20), default="进行中")
     remark: Mapped[str] = mapped_column(String(500), default="")
     created_by: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# =========================================================================
+# I. 岗位考核题库（口头问答 Q&A / 实操要点打分 / 理论题）——岗前培训考核及授权表的数据源
+# =========================================================================
+class ExamBank(Base):
+    """按岗位维护的考核方式与题库。methods_json 1-2 种；qa/practical/theory 为题库内容。"""
+
+    __tablename__ = "exam_banks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    post: Mapped[str] = mapped_column(String(50), unique=True, index=True, default="")  # 岗位
+    methods_json: Mapped[str] = mapped_column(Text, default="[]")  # 考核方式 1-2 种
+    qa_json: Mapped[str] = mapped_column(Text, default="[]")  # 口头问答 [{q, a}]
+    practical_json: Mapped[str] = mapped_column(Text, default="[]")  # 实操 [{point, score}]
+    theory_json: Mapped[str] = mapped_column(Text, default="{}")  # 理论 {single:[],multi:[],judge:[]}
+    remark: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

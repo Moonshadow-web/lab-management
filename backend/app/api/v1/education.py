@@ -19,7 +19,7 @@ from ...models.education import (
     TrainingPlan, TrainingSession,
     InternshipMentor, InternshipScore,
     AuthSheet,
-    PreJobAuth,
+    PreJobAuth, ExamBank,
     EducationAttachment,
 )
 from ...models.user import User
@@ -43,6 +43,7 @@ from ...schemas.education import (
     InternshipScoreCreate, InternshipScoreUpdate, InternshipScoreRead,
     AuthSheetCreate, AuthSheetUpdate, AuthSheetRead,
     PreJobAuthCreate, PreJobAuthUpdate, PreJobAuthRead,
+    ExamBankCreate, ExamBankUpdate, ExamBankRead,
     EducationAttachmentRead,
 )
 
@@ -154,7 +155,14 @@ prejob_router = make_router(
     search_fields=["name"], filter_fields=["conclusion", "status"],
     order_by=[PreJobAuth.id.desc()],
     prefix="/pre-job-auths", write_roles=("admin", "training_manager"),
-    json_fields=["positions_json", "instruments_json", "permissions_json", "items_json"],
+    json_fields=["positions_json", "instruments_json", "permissions_json", "items_json", "exam_json"],
+)
+# I. 岗位考核题库
+exambank_router = make_router(
+    ExamBank, ExamBankRead, ExamBankCreate, ExamBankUpdate,
+    search_fields=["post"], order_by=[ExamBank.id.asc()],
+    prefix="/exam-banks", write_roles=("admin", "training_manager"),
+    json_fields=["methods_json", "qa_json", "practical_json", "theory_json"],
 )
 
 
@@ -179,6 +187,7 @@ def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = 
 
     positions = _as_list(p.positions_json)
     instruments = _as_list(p.instruments_json)
+    scopes = [s for s in _as_list(p.permissions_json) if s in ("操作", "复核", "报告")] or ["操作"]
     items = _as_list(p.items_json)
     item_map = {i.get("code"): (i.get("items") or "") for i in items}
     person = db.query(PersonnelMaster).filter_by(name=p.name).first()
@@ -186,24 +195,25 @@ def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = 
     created = 0
     for inst in instruments:
         code = inst.get("code", "")
-        db.add(AuthSheet(
-            person_id=person.id if person else None,
-            name=p.name,
-            post="、".join(positions),
-            instrument=f"{inst.get('name', '')}（{code.replace('MHZYY-JYK-', '')}）",
-            project=item_map.get(code, ""),
-            auth_scope="操作",
-            status="有条件",
-            status_reason="岗前培训考核通过，监督期内",
-            source_assessment_id=p.id,
-            source_assessment_text=f"岗前培训授权-单{p.id}",
-            auth_date=p.auth_date or today,
-            valid_from=p.auth_date or today,
-            has_assessment_pass=True,
-            remark=f"岗前培训考核及授权表 id={p.id} 自动生成",
-            created_by=user.username,
-        ))
-        created += 1
+        for scope in scopes:
+            db.add(AuthSheet(
+                person_id=person.id if person else None,
+                name=p.name,
+                post="、".join(positions),
+                instrument=f"{inst.get('name', '')}（{code.replace('MHZYY-JYK-', '')}）",
+                project=item_map.get(code, ""),
+                auth_scope=scope,
+                status="有条件",
+                status_reason="岗前培训考核通过，监督期内",
+                source_assessment_id=p.id,
+                source_assessment_text=f"岗前培训授权-单{p.id}",
+                auth_date=p.auth_date or today,
+                valid_from=p.auth_date or today,
+                has_assessment_pass=True,
+                remark=f"岗前培训考核及授权表 id={p.id} 自动生成",
+                created_by=user.username,
+            ))
+            created += 1
     p.batch_id = f"PJ{p.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     db.commit()
     return {"ok": True, "created": created, "batch_id": p.batch_id}
@@ -224,6 +234,7 @@ router.include_router(session_router)
 router.include_router(mentor_router)
 router.include_router(score_router)
 router.include_router(prejob_router)
+router.include_router(exambank_router)
 
 
 # =========================================================================
