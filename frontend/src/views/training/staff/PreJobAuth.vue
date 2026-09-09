@@ -175,7 +175,7 @@ const permissions = ref([])
 const banks = ref({})
 const examData = ref({})
 // 预初始化全部岗位的填写区——避免选岗位瞬间模板读取 undefined 导致弹窗空白
-META.forEach((p) => { examData.value[p.name] = { qaNotes: {}, practicalScores: {}, theoryAnswers: {}, qaResult: '合格', mastery: '基本了解', trainTime: '', trainPerson: '', trainContent: '岗位职责、项目SOP、仪器SOP' } })
+META.forEach((p) => { ensureExam(p.name) })
 const form = ref(blank())
 function blank() {
   return {
@@ -199,6 +199,21 @@ const POSITIONS = computed(() => {
   })
   return [...map.values()]
 })
+
+// 确保某岗位的考核填写区存在并补默认值（老记录快照缺键时自动补）
+function ensureExam(post) {
+  if (!examData.value[post]) examData.value[post] = {}
+  const d = examData.value[post]
+  d.qaNotes = d.qaNotes || {}
+  d.practicalScores = d.practicalScores || {}
+  d.theoryAnswers = d.theoryAnswers || {}
+  if (d.qaResult === undefined) d.qaResult = '合格'
+  if (d.mastery === undefined) d.mastery = '基本了解'
+  if (d.trainTime === undefined) d.trainTime = ''
+  if (d.trainPerson === undefined) d.trainPerson = ''
+  if (!d.trainContent) d.trainContent = '岗位职责、项目SOP、仪器SOP'
+  return d
+}
 
 async function loadBanks() {
   try {
@@ -231,7 +246,7 @@ const instrumentOptions = computed(() => {
 // 选岗位 → 仪器自动全部带出（同步执行，消除渲染窗口期）
 watch(positions, () => {
   instrumentCodes.value = instrumentOptions.value.map((i) => i.code)
-  positions.value.forEach((p) => { if (!examData.value[p]) examData.value[p] = { qaNotes: {}, practicalScores: {}, theoryAnswers: {}, qaResult: '合格', mastery: '基本了解', trainTime: '', trainPerson: '', trainContent: '岗位职责、项目SOP、仪器SOP' } })
+positions.value.forEach((p) => { ensureExam(p) })
 }, { flush: 'sync' })
 
 const GL070_META_ALL = computed(() => POSITIONS.value.flatMap((p) => p.instruments.map((i) => ({ ...i, position: p.name }))))
@@ -315,7 +330,7 @@ function openForm(row) {
     instrumentCodes.value = (row.instruments_json || []).map((i) => i.code)
     permissions.value = [...(row.permissions_json || [])]
     examData.value = JSON.parse(JSON.stringify(row.exam_json || {}))
-    positions.value.forEach((p) => { if (!examData.value[p]) examData.value[p] = { qaNotes: {}, practicalScores: {}, theoryAnswers: {}, qaResult: '合格', mastery: '基本了解', trainTime: '', trainPerson: '', trainContent: '岗位职责、项目SOP、仪器SOP' } })
+positions.value.forEach((p) => { ensureExam(p) })
   } else {
     form.value = blank(); positions.value = []; instrumentCodes.value = []; permissions.value = []
     examData.value = JSON.parse(JSON.stringify(examData.value))
