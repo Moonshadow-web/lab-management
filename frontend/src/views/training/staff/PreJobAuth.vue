@@ -9,6 +9,7 @@
       <template #row-extra="{ row }">
         <el-button v-if="row.conclusion === '同意上岗' && !row.batch_id" link type="warning" @click="genAuths(row)">生成授权</el-button>
         <el-button v-if="row.batch_id" link type="success" @click="viewAuths(row)">查看授权</el-button>
+        <el-button link type="primary" @click="showQr(row)">扫码答题</el-button>
         <el-button link type="primary" @click="printForm(row)">打印</el-button>
       </template>
     </CrudTable>
@@ -121,6 +122,15 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="qrVisible" title="理论考核 · 扫码答题" width="380px" align-center>
+      <div style="text-align:center;">
+        <div style="color:#666;font-size:12px;margin-bottom:8px;">手机扫码后在浏览器作答，提交后自动判分并回写成绩</div>
+        <img v-if="qrUrl" :src="qrUrl" style="width:220px;height:220px;" />
+        <div style="margin-top:8px;font-size:12px;color:#888;word-break:break-all;">{{ examLink }}</div>
+        <el-button size="small" style="margin-top:8px;" @click="copyLink">复制链接</el-button>
+      </div>
+    </el-dialog>
+
     <el-dialog v-model="authsVisible" :title="'自动生成的授权 · ' + (authRow ? authRow.name : '')" width="760px">
       <el-table :data="authsList" border size="small" v-loading="authsLoading">
         <el-table-column prop="instrument" label="仪器" min-width="180" />
@@ -140,6 +150,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../../components/CrudTable.vue'
 import { printHtml } from '../../../utils/printHtml'
+import QRCode from 'qrcode'
 import { GL070_POSITIONS as META, AUTH_SCOPES } from './gl070Meta'
 import { listPreJobAuth, createPreJobAuth, updatePreJobAuth, deletePreJobAuth, generatePreJobAuths, listAuthSheet, listExamBank, listPostInstrumentMap } from '../../../api/education'
 import { listInstruments, getInstrumentTestItems } from '../../../api/instruments'
@@ -356,6 +367,19 @@ async function viewAuths(row) {
     const res = await listAuthSheet({ q: `岗前培训授权-单${row.id}`, page_size: 100 })
     authsList.value = (res.items || []).filter((a) => a.source_assessment_id === row.id)
   } finally { authsLoading.value = false }
+}
+
+// ===== 扫码答题 =====
+const qrVisible = ref(false)
+const qrUrl = ref('')
+const examLink = ref('')
+async function showQr(row) {
+  examLink.value = window.location.origin + '/exam/' + row.id
+  try { qrUrl.value = await QRCode.toDataURL(examLink.value, { width: 440 }) } catch (e) { qrUrl.value = '' }
+  qrVisible.value = true
+}
+function copyLink() {
+  try { navigator.clipboard.writeText(examLink.value); ElMessage.success('链接已复制') } catch (e) { ElMessage.info(examLink.value) }
 }
 
 // 盛京版式打印
