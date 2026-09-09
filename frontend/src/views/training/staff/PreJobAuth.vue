@@ -424,7 +424,8 @@ async function printForm(row) {
     ;((bank.theory_json || {}).single || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;">${i + 1}. ${esc(t.q)}<br>${t.options.map((o) => esc(o)).join('　　')}<br>答：＿＿＿＿＿</div>`))
     ;((bank.theory_json || {}).multi || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;">${i + 1}. ${esc(t.q)}<br>${t.options.map((o) => esc(o)).join('　　')}<br>答：＿＿＿＿＿</div>`))
     ;((bank.theory_json || {}).judge || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;">${i + 1}. ${esc(t.q)}　答：＿＿＿</div>`))
-    return { post, bank, instRows, d, qaQ, prRows, th }
+    const methods = bank.methods_json && bank.methods_json.length ? bank.methods_json : ['实操考核']
+    return { post, bank, methods, instRows, d, qaQ, prRows, th }
   })
 
   const main = perPost.map((pp) => `
