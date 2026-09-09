@@ -29,6 +29,7 @@ const routes = [
       { path: 'instrument-families', name: 'instrument-families', component: () => import('../views/instruments/InstrumentFamilyManage.vue'), meta: { title: '仪器关联', moduleKey: 'instrument-families' } },
       { path: 'qc', name: 'qc', component: () => import('../views/qc/QCList.vue'), meta: { title: '质控管理', moduleKeys: ['qc-monthly', 'eqa', 'comparison', 'interlab', 'qc-target'] } },
       { path: 'eqa-associations', name: 'eqa-associations', component: () => import('../views/eqa/EqaAssociationManage.vue'), meta: { title: '项目库与质评关联', moduleKey: 'instrument-families' } },
+      { path: 'post-instrument-map', name: 'post-instrument-map', component: () => import('../views/training/PostInstrumentMap.vue'), meta: { title: '岗位仪器匹配', moduleKey: 'instrument-families' } },
       { path: 'quality-requirements', name: 'quality-requirements', component: () => import('../views/quality/QualityRequirementList.vue'), meta: { title: '项目质量要求', moduleKey: 'quality-requirements' } },
       { path: 'reagent/items', name: 'reagent-items', component: () => import('../views/reagent/ReagentItems.vue'), meta: { title: '试剂目录', moduleKey: 'reagents' } },
       { path: 'reagent/stock', name: 'reagent-stock', component: () => import('../views/reagent/ReagentStock.vue'), meta: { title: '实时库存', moduleKey: 'reagents' } },

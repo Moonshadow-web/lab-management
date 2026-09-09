@@ -105,3 +105,7 @@ export function listExamBank(params) { return request.get(`${P}/exam-banks`, { p
 export function createExamBank(data) { return request.post(`${P}/exam-banks`, data) }
 export function updateExamBank(id, data) { return request.put(`${P}/exam-banks/${id}`, data) }
 export function deleteExamBank(id) { return request.delete(`${P}/exam-banks/${id}`) }
+export function listPostInstrumentMap(params) { return request.get(`${P}/post-instrument-maps`, { params }) }
+export function createPostInstrumentMap(data) { return request.post(`${P}/post-instrument-maps`, data) }
+export function updatePostInstrumentMap(id, data) { return request.put(`${P}/post-instrument-maps/${id}`, data) }
+export function deletePostInstrumentMap(id) { return request.delete(`${P}/post-instrument-maps/${id}`) }

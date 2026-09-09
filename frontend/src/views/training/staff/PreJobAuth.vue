@@ -21,7 +21,7 @@
         </el-row>
         <el-form-item label="考核岗位（多选）">
           <el-select v-model="positions" multiple style="width:100%" placeholder="按 GL-070 选择岗位，仪器自动带出">
-            <el-option v-for="p in META" :key="p.name" :label="p.name" :value="p.name" />
+            <el-option v-for="p in POSITIONS" :key="p.name" :label="p.name" :value="p.name" />
           </el-select>
         </el-form-item>
         <el-form-item label="考核仪器（自动带出，可调整）">
@@ -141,7 +141,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../../components/CrudTable.vue'
 import { printHtml } from '../../../utils/printHtml'
 import { GL070_POSITIONS as META, AUTH_SCOPES } from './gl070Meta'
-import { listPreJobAuth, createPreJobAuth, updatePreJobAuth, deletePreJobAuth, generatePreJobAuths, listAuthSheet, listExamBank } from '../../../api/education'
+import { listPreJobAuth, createPreJobAuth, updatePreJobAuth, deletePreJobAuth, generatePreJobAuths, listAuthSheet, listExamBank, listPostInstrumentMap } from '../../../api/education'
 import { listInstruments, getInstrumentTestItems } from '../../../api/instruments'
 import { useAuthStore } from '../../../store/auth'
 
@@ -173,6 +173,22 @@ function blank() {
   }
 }
 
+// 岗位↔仪器 匹配（可视化维护；接口为空时回退到内置 gl070Meta）
+const postMap = ref([])
+async function loadPostMap() {
+  try { const r = await listPostInstrumentMap({ page: 1, page_size: 300 }); postMap.value = (r.items || []) } catch (e) { postMap.value = [] }
+}
+loadPostMap()
+const POSITIONS = computed(() => {
+  if (!postMap.value.length) return META
+  const map = new Map()
+  postMap.value.forEach((x) => {
+    if (!map.has(x.post)) map.set(x.post, { name: x.post, methods: x.methods_json || [], users: [], instruments: [] })
+    map.get(x.post).instruments.push({ name: x.instrument_name, code: x.instrument_code, manager: x.manager })
+  })
+  return [...map.values()]
+})
+
 async function loadBanks() {
   try {
     const res = await listExamBank({ page_size: 50 })
@@ -192,7 +208,7 @@ onMounted(async () => {
 
 const instrumentOptions = computed(() => {
   const sel = positions.value
-  const pool = (sel && sel.length ? META.filter((p) => sel.includes(p.name)) : META)
+  const pool = (sel && sel.length ? POSITIONS.value.filter((p) => sel.includes(p.name)) : POSITIONS.value)
   const out = []
   const seen = new Set()
   pool.forEach((p) => p.instruments.forEach((i) => {
@@ -207,7 +223,7 @@ watch(positions, () => {
   positions.value.forEach((p) => { if (!examData.value[p]) examData.value[p] = { qaNotes: {}, practicalScores: {}, theoryAnswers: {}, qaResult: '合格', mastery: '基本了解', trainTime: '', trainPerson: '', trainContent: '岗位职责、项目SOP、仪器SOP' } })
 }, { flush: 'sync' })
 
-const GL070_META_ALL = computed(() => META.flatMap((p) => p.instruments.map((i) => ({ ...i, position: p.name }))))
+const GL070_META_ALL = computed(() => POSITIONS.value.flatMap((p) => p.instruments.map((i) => ({ ...i, position: p.name }))))
 
 // 仪器变化 → 同步逐项行
 watch(instrumentCodes, () => {
