@@ -1,124 +1,88 @@
 <template>
   <div class="auth-sheet">
-    <CrudTable
-      :columns="columns" :fetch="fetch"
-      search-placeholder="搜索姓名/项目/仪器/授权人"
-      :can-write="canWrite"
-      @add="openForm()" @edit="openForm" @delete="onDelete" ref="tableRef"
-    >
-      <template #row-extra="{ row }">
-        <el-button link type="primary" @click="openDetail(row)">详情/附件</el-button>
-      </template>
-    </CrudTable>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div>
+        <h2 class="title" style="margin:0;">授权表</h2>
+        <span style="color:#666;font-size:12px;">一人一条：岗位、仪器、权限均为多选；项目由关联库自动带出</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <el-input v-model="kw" size="small" placeholder="搜索姓名/仪器" style="width:180px;" clearable />
+        <el-button type="primary" size="small" :disabled="!canWrite" @click="openForm()">新增授权</el-button>
+      </div>
+    </div>
 
-    <el-dialog v-model="visible" :title="form.id ? '编辑授权记录' : '新增授权记录'" width="860px" top="2vh">
-      <el-form :model="form" label-width="120px">
-        <el-divider content-position="left">基本信息</el-divider>
-        <el-row :gutter="12">
-          <el-col :span="8"><el-form-item label="姓名">
-            <el-select v-model="form.name" filterable allow-create default-first-option clearable
-                       placeholder="可下拉选择或自填" style="width:100%" @change="onNameChange">
-              <el-option v-for="p in people" :key="p.id" :label="p.name" :value="p.name" />
-            </el-select>
-          </el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="所在部门"><el-input v-model="form.department" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="岗位（可多选）">
-            <el-select v-model="postList" multiple collapse-tags collapse-tags-tooltip :max-collapse-tags="2"
-                       placeholder="可多选" style="width:100%">
-              <el-option v-for="p in postOptions" :key="p" :label="p" :value="p" />
-            </el-select>
-          </el-form-item></el-col>
-        </el-row>
+    <el-table :data="filtered" border size="small" v-loading="loading">
+      <el-table-column prop="name" label="姓名" width="100" />
+      <el-table-column prop="department" label="部门" width="110" />
+      <el-table-column label="授权岗位" min-width="160">
+        <template #default="{ row }">{{ postsOf(row).join('、') }}</template>
+      </el-table-column>
+      <el-table-column label="授权仪器" min-width="200">
+        <template #default="{ row }">{{ instNames(row).join('、') || row.instrument }}</template>
+      </el-table-column>
+      <el-table-column label="权限" width="120">
+        <template #default="{ row }">{{ scopesOf(row).join('、') || row.auth_scope }}</template>
+      </el-table-column>
+      <el-table-column prop="status" label="状态" width="80" />
+      <el-table-column prop="valid_until" label="有效期至" width="110" />
+      <el-table-column prop="authorizer" label="授权人" width="90" />
+      <el-table-column label="操作" width="180">
+        <template #default="{ row }">
+          <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+          <el-button link type="primary" :disabled="!canWrite" @click="openForm(row)">编辑</el-button>
+          <el-button link type="primary" @click="printRow(row)">打印</el-button>
+          <el-button link type="danger" :disabled="!canWrite" @click="onDelete(row)">删除</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
 
-        <el-divider content-position="left">授权五要素</el-divider>
+    <el-dialog v-model="visible" :title="form.id ? '编辑授权 · ' + form.name : '新增授权'" width="820px" top="3vh">
+      <el-form :model="form" label-width="110px">
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="仪器">
-            <el-select v-model="form.instrument" filterable clearable
-                       placeholder="从仪器库选择（含型号）" style="width:100%" @change="onInstrumentChange">
-              <el-option v-for="i in instrumentOptions" :key="i.id"
-                         :label="`${i.name}（${i.model || '—'}）`" :value="i.name" />
-            </el-select>
-          </el-form-item></el-col>
-          <el-col :span="12">
-            <el-form-item label="权限等级">
-              <el-select v-model="form.auth_scope" style="width:100%">
-                <el-option label="操作（基础执行）" value="操作" />
-                <el-option label="复核（结果审核）" value="复核" />
-                <el-option label="签发（最终报告）" value="签发" />
+          <el-col :span="8">
+            <el-form-item label="姓名">
+              <el-select v-model="form.name" filterable allow-create default-first-option @change="onNameChange" style="width:100%">
+                <el-option v-for="p in people" :key="p.id" :label="p.name" :value="p.name" />
               </el-select>
             </el-form-item>
           </el-col>
+          <el-col :span="8"><el-form-item label="部门"><el-input v-model="form.department" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="状态">
+            <el-select v-model="form.status" style="width:100%"><el-option v-for="s in STATUS" :key="s" :label="s" :value="s" /></el-select>
+          </el-form-item></el-col>
         </el-row>
 
-        <el-form-item label="项目/方法（自动全选）">
-          <div class="proj-box">
-            <div v-if="!itemOptions.length" class="proj-empty">
-              {{ form.instrument ? '该仪器暂未关联项目（请先在「项目与仪器关联」维护）' : '选择仪器后，自动带出该仪器的全部项目（默认全选、只读）' }}
-            </div>
-            <template v-else>
-              <div class="proj-head">
-                该仪器共 <b>{{ itemOptions.length }}</b> 个项目，已全部授权
-                <span class="proj-tip">（自动全选，不予修改；要去掉项目请改选仪器）</span>
-              </div>
-              <div class="proj-tags">
-                <el-tag v-for="t in itemOptions" :key="t.id" size="small" type="info" effect="plain">
-                  {{ projLabel(t) }}
-                </el-tag>
-              </div>
-            </template>
+        <el-form-item label="授权岗位（多选）">
+          <el-select v-model="posts" multiple style="width:100%" @change="onPostChange">
+            <el-option v-for="p in postNames" :key="p" :label="p" :value="p" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="授权仪器（多选）">
+          <el-select v-model="instCodes" multiple style="width:100%">
+            <el-option v-for="i in instOptions" :key="i.code" :label="i.name + '（' + i.code.replace('MHZYY-JYK-', '') + '）'" :value="i.code" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="授权权限（多选）">
+          <el-select v-model="scopes" multiple style="width:100%">
+            <el-option v-for="s in SCOPES" :key="s" :label="s" :value="s" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="项目/方法（自动全带出）">
+          <div style="max-height:110px;overflow:auto;border:1px solid #eee;border-radius:4px;padding:6px;font-size:12px;color:#444;">
+            {{ projText || '（选择仪器后自动列出全部关联项目）' }}
           </div>
         </el-form-item>
 
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="授权生效"><el-input v-model="form.valid_from" placeholder="如 2026-01-15" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="授权到期（≤1年）"><el-input v-model="form.valid_until" placeholder="如 2027-01-14" /></el-form-item></el-col>
-        </el-row>
-
-        <el-divider content-position="left">监督期（CNAS "有条件授权"）</el-divider>
-        <el-row :gutter="12">
-          <el-col :span="8"><el-form-item label="监督期起"><el-input v-model="form.supervised_from" placeholder="可选" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="监督期止"><el-input v-model="form.supervised_until" placeholder="可选" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="监督人"><el-input v-model="form.supervisor" placeholder="如 资深员工姓名" /></el-form-item></el-col>
-        </el-row>
-
-        <el-divider content-position="left">状态机 + 关联评估</el-divider>
-        <el-row :gutter="12">
-          <el-col :span="8">
-            <el-form-item label="状态">
-              <el-select v-model="form.status" style="width:100%">
-                <el-option label="有效" value="有效" />
-                <el-option label="有条件（监督期内）" value="有条件" />
-                <el-option label="暂停（PT/请假等）" value="暂停" />
-                <el-option label="撤销（连续不通过/违规）" value="撤销" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="16"><el-form-item label="状态变更原因"><el-input v-model="form.status_reason" placeholder="如 2026-Q2 PT-EQA 钾不合格，暂停 3 个月" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="授权人"><el-input v-model="form.authorizer" /></el-form-item></el-col>
+          <el-col :span="10"><el-form-item label="授权人资质"><el-input v-model="form.authorizer_qualification" /></el-form-item></el-col>
+          <el-col :span="6"><el-form-item label="授权日期"><el-input v-model="form.auth_date" placeholder="2026-09-10" @change="calcValid" /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="8">
-            <el-form-item label="关联评估单ID">
-              <el-input v-model.number="form.source_assessment_id" type="number" placeholder="如 6" clearable />
-            </el-form-item>
-          </el-col>
-          <el-col :span="16"><el-form-item label="评估摘要（冗余展示）"><el-input v-model="form.source_assessment_text" placeholder="如 2026 年度能力评估-张三-95分" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="有效期起"><el-input v-model="form.valid_from" @change="calcValid" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="有效期至"><el-input v-model="form.valid_until" /></el-form-item></el-col>
         </el-row>
-
-        <el-divider content-position="left">授权人（CNAS 要求：中级及以上 + 本领域 ≥3 年）</el-divider>
-        <el-row :gutter="12">
-          <el-col :span="8"><el-form-item label="授权签字人"><el-input v-model="form.authorizer" /></el-form-item></el-col>
-          <el-col :span="10"><el-form-item label="授权人资质"><el-input v-model="form.authorizer_qualification" placeholder="如 副主任技师 / 本领域 12 年" /></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="授权日期"><el-input v-model="form.auth_date" placeholder="如 2026-01-15" /></el-form-item></el-col>
-        </el-row>
-
-        <el-divider content-position="left">授权前置条件（CNAS 6.2）</el-divider>
-        <el-row :gutter="24">
-          <el-col :span="8"><el-checkbox v-model="form.has_qualification">资质合规</el-checkbox></el-col>
-          <el-col :span="8"><el-checkbox v-model="form.has_assessment_pass">培训与评估合格</el-checkbox></el-col>
-          <el-col :span="8"><el-checkbox v-model="form.has_supervised_period">监督期表现</el-checkbox></el-col>
-        </el-row>
-
-        <el-form-item label="备注" style="margin-top:8px"><el-input v-model="form.remark" type="textarea" :rows="2" /></el-form-item>
+        <el-form-item label="备注"><el-input v-model="form.remark" /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
@@ -126,207 +90,197 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailVisible" :title="(current?.name || '授权详情') + ' · 授权记录'" width="760px">
+    <el-dialog v-model="detailVisible" :title="'授权详情 · ' + (current ? current.name : '')" width="760px">
       <el-descriptions :column="2" border v-if="current">
-        <el-descriptions-item label="姓名">{{ current.name }}</el-descriptions-item>
         <el-descriptions-item label="部门">{{ current.department }}</el-descriptions-item>
-        <el-descriptions-item label="岗位" :span="2">{{ current.post }}</el-descriptions-item>
-        <el-descriptions-item label="项目/方法" :span="2">{{ current.project }}</el-descriptions-item>
-        <el-descriptions-item label="仪器" :span="2">{{ current.instrument }}</el-descriptions-item>
-        <el-descriptions-item label="权限等级"><el-tag :type="scopeTag(current.auth_scope)" effect="light">{{ current.auth_scope }}</el-tag></el-descriptions-item>
-        <el-descriptions-item label="有效期">{{ current.valid_from }} ~ {{ current.valid_until }}</el-descriptions-item>
-        <el-descriptions-item label="监督期" :span="2">{{ current.supervised_from || '—' }} ~ {{ current.supervised_until || '—' }}　监督人：{{ current.supervisor || '—' }}</el-descriptions-item>
-        <el-descriptions-item label="状态"><el-tag :type="statusTag(current.status)" effect="dark">{{ current.status }}</el-tag></el-descriptions-item>
-        <el-descriptions-item label="状态变更原因">{{ current.status_reason || '—' }}</el-descriptions-item>
-        <el-descriptions-item label="关联评估单" :span="2">
-          {{ current.source_assessment_text || '—' }}
-          <span v-if="current.source_assessment_id" style="color:#909399">（评估单 #{{ current.source_assessment_id }}）</span>
+        <el-descriptions-item label="状态">{{ current.status }}</el-descriptions-item>
+        <el-descriptions-item label="授权岗位" :span="2">{{ postsOf(current).join('、') }}</el-descriptions-item>
+        <el-descriptions-item label="授权仪器" :span="2">{{ instNames(current).join('、') || current.instrument }}</el-descriptions-item>
+        <el-descriptions-item label="权限" :span="2">{{ scopesOf(current).join('、') || current.auth_scope }}</el-descriptions-item>
+        <el-descriptions-item label="项目/方法（全部关联项目）" :span="2">
+          <div style="max-height:180px;overflow:auto;">{{ detailProj || '加载中…' }}</div>
         </el-descriptions-item>
-        <el-descriptions-item label="授权签字人">{{ current.authorizer }}</el-descriptions-item>
+        <el-descriptions-item label="授权人">{{ current.authorizer }}</el-descriptions-item>
         <el-descriptions-item label="授权人资质">{{ current.authorizer_qualification }}</el-descriptions-item>
-        <el-descriptions-item label="授权日期" :span="2">{{ current.auth_date }}</el-descriptions-item>
-        <el-descriptions-item label="前置条件" :span="2">
-          <el-tag v-if="current.has_qualification" type="success" size="small" effect="plain" style="margin-right:6px">资质合规</el-tag>
-          <el-tag v-if="current.has_assessment_pass" type="success" size="small" effect="plain" style="margin-right:6px">评估合格</el-tag>
-          <el-tag v-if="current.has_supervised_period" type="success" size="small" effect="plain" style="margin-right:6px">监督期</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="备注" :span="2">{{ current.remark || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="授权日期">{{ current.auth_date }}</el-descriptions-item>
+        <el-descriptions-item label="有效期">{{ current.valid_from }} ~ {{ current.valid_until }}</el-descriptions-item>
       </el-descriptions>
-      <el-divider content-position="left">授权扫描件/附件</el-divider>
-      <EducationAttachmentList
-        owner-type="auth_sheet" :owner-id="current?.id" kind="auth_doc"
-        label="授权附件" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-        :can-write="canWrite"
-      />
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import CrudTable from '../../../components/CrudTable.vue'
-import EducationAttachmentList from '../EducationAttachmentList.vue'
-import { listAuthSheet, createAuthSheet, updateAuthSheet, deleteAuthSheet, getAuthSheet, listPersonnel } from '../../../api/education'
+import { printHtml } from '../../../utils/printHtml'
+import { GL070_POSITIONS } from './gl070Meta'
+import { listAuthSheet, getAuthSheet, createAuthSheet, updateAuthSheet, deleteAuthSheet, listPersonnel, listPostInstrumentMap } from '../../../api/education'
 import { listInstruments, getInstrumentTestItems } from '../../../api/instruments'
 import { useAuthStore } from '../../../store/auth'
-import { postOptions, splitPost, joinPost } from './competencyMeta'
 
 const auth = useAuthStore()
 const canWrite = ref(auth.canWrite('training'))
-const tableRef = ref(null)
+const SCOPES = ['操作', '复核', '报告']
+const STATUS = ['有效', '有条件', '暂停', '撤销']
 
-// 人员档案（下拉选项）
+const list = ref([])
+const loading = ref(false)
+const kw = ref('')
 const people = ref([])
-// 仪器库（下拉选项）
-const instrumentOptions = ref([])
-// 当前仪器对应的项目列表
-const itemOptions = ref([])
-// 岗位多选（编辑时回显用）
-const postList = ref([])
+const instByCode = ref({})
+const postMap = ref([])
+const visible = ref(false)
+const detailVisible = ref(false)
+const current = ref(null)
+const posts = ref([])
+const instCodes = ref([])
+const scopes = ref([])
+const projText = ref('')
+const detailProj = ref('')
+const form = ref(blank())
 
-onMounted(async () => {
-  // 人员档案一次拉够（按 name 排序）
-  try {
-    const p = await listPersonnel({ page: 1, page_size: 500 })
-    people.value = (p.items || []).map((x) => ({ id: x.id, name: x.name }))
-  } catch (e) {}
-  // 仪器库（含型号）
-  try {
-    const r = await listInstruments({ page: 1, page_size: 1000 })
-    instrumentOptions.value = (r.items || []).filter((x) => x.status !== '停用')
-  } catch (e) {}
+function blank() {
+  return {
+    id: null, name: '', person_id: null, department: '生化免疫组', post: '', instrument: '', auth_scope: '',
+    project: '', status: '有效', valid_from: '', valid_until: '', auth_date: '',
+    authorizer: '金子铮', authorizer_qualification: '免疫组组长/主治医师/本领域6年',
+    posts_json: [], instruments_json: [], scopes_json: [], remark: '',
+  }
+}
+
+const postNames = computed(() => (postMap.value.length ? [...new Set(postMap.value.map((x) => x.post))] : GL070_POSITIONS.map((p) => p.name)))
+const instOptions = computed(() => {
+  if (postMap.value.length) {
+    const sel = posts.value
+    const rows = sel && sel.length ? postMap.value.filter((x) => sel.includes(x.post)) : postMap.value
+    const seen = new Set()
+    return rows.filter((x) => (seen.has(x.instrument_code) ? false : seen.add(x.instrument_code)))
+      .map((x) => ({ name: x.instrument_name, code: x.instrument_code }))
+  }
+  const pool = posts.value && posts.value.length ? GL070_POSITIONS.filter((p) => posts.value.includes(p.name)) : GL070_POSITIONS
+  const out = []
+  const seen = new Set()
+  pool.forEach((p) => p.instruments.forEach((i) => { if (!seen.has(i.code)) { seen.add(i.code); out.push({ name: i.name, code: i.code }) } }))
+  return out
 })
 
-// 姓名变化：从下拉选出的回填 person_id，自填则清空
+const filtered = computed(() => {
+  const k = kw.value.trim()
+  if (!k) return list.value
+  return list.value.filter((r) => (r.name || '').includes(k) || (r.instrument || '').includes(k))
+})
+function postsOf(r) { return r.posts_json && r.posts_json.length ? r.posts_json : String(r.post || '').split('、').filter(Boolean) }
+function instNames(r) { return (r.instruments_json || []).map((i) => i.name || i).filter(Boolean) }
+function scopesOf(r) { return r.scopes_json && r.scopes_json.length ? r.scopes_json : String(r.auth_scope || '').split('、').filter(Boolean) }
+
+onMounted(async () => {
+  await refresh()
+  try { const p = await listPersonnel({ page: 1, page_size: 500 }); people.value = (p.items || []).map((x) => ({ id: x.id, name: x.name })) } catch (e) {}
+  try { const r = await listInstruments({ page: 1, page_size: 1000 }); instByCode.value = Object.fromEntries((r.items || []).map((x) => [x.dept_no, x])) } catch (e) {}
+  try { const m = await listPostInstrumentMap({ page: 1, page_size: 300 }); postMap.value = m.items || [] } catch (e) {}
+})
+async function refresh() {
+  loading.value = true
+  try { const r = await listAuthSheet({ page: 1, page_size: 500 }); list.value = r.items || [] } finally { loading.value = false }
+}
+
 function onNameChange(name) {
-  if (!name) { form.value.person_id = null; return }
   const p = people.value.find((x) => x.name === name)
   form.value.person_id = p ? p.id : null
 }
-
-// 项目展示名："编码 名称"
-function projLabel(t) {
-  return `${t.code || ''} ${t.name || ''}`.trim()
+function onPostChange() {
+  const codes = new Set(instOptions.value.map((i) => i.code))
+  instCodes.value = instCodes.value.filter((c) => codes.has(c))
 }
+watch(instCodes, async () => {
+  const names = []
+  for (const c of instCodes.value) {
+    const db = instByCode.value[c]
+    if (db) {
+      try {
+        const items = await getInstrumentTestItems(db.id)
+        names.push(...(items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim()))
+      } catch (e) {}
+    }
+  }
+  projText.value = [...new Set(names)].join('、')
+  form.value.project = projText.value
+})
 
-// 仪器变化：清空项目，按仪器加载全部项目并自动全选（只读，不可手工改）
-async function onInstrumentChange(name) {
-  form.value.project = ''
-  itemOptions.value = []
-  if (!name) return
-  const inst = instrumentOptions.value.find((x) => x.name === name)
-  if (!inst) return
-  try {
-    const items = await getInstrumentTestItems(inst.id)
-    itemOptions.value = items || []
-    // 自动全选：把全部项目名以顿号连接写入 project（供列表/打印/检索使用）
-    form.value.project = itemOptions.value.map(projLabel).join('、')
-  } catch (e) { itemOptions.value = [] }
-}
-
-const columns = [
-  { prop: 'name', label: '姓名', width: 90 },
-  { prop: 'department', label: '部门', width: 110 },
-  { prop: 'post', label: '岗位', width: 110, showOverflowTooltip: true },
-  {
-    prop: 'project', label: '项目/方法', width: 130, tooltip: false,
-    formatter: (r) => {
-      const s = String(r.project || '').trim()
-      if (!s) return '<span style="color:#c0c4cc">—</span>'
-      const n = s.split('、').filter(Boolean).length
-      return `<span title="${s.replace(/"/g, '&quot;')}">共 ${n} 项（全选）</span>`
-    },
-  },
-  { prop: 'instrument', label: '仪器', width: 110, showOverflowTooltip: true },
-  { prop: 'auth_scope', label: '权限', width: 80, align: 'center' },
-  { prop: 'status', label: '状态', width: 100, align: 'center' },
-  { prop: 'valid_until', label: '到期', width: 110, align: 'center' },
-  { prop: 'authorizer', label: '授权人', width: 90 },
-  { prop: 'auth_date', label: '授权日期', width: 110 },
-]
-
-function scopeTag(scope) {
-  if (scope === '签发') return 'danger'
-  if (scope === '复核') return 'warning'
-  return 'info'
-}
-function statusTag(status) {
-  if (status === '有效') return 'success'
-  if (status === '有条件') return 'warning'
-  if (status === '暂停') return 'info'
-  if (status === '撤销') return 'danger'
-  return 'info'
-}
-
-const visible = ref(false)
-const form = ref(blank())
-function blank() {
-  return {
-    id: null,
-    name: '', department: '生化免疫组', post: '',
-    project: '', instrument: '', auth_scope: '操作',
-    valid_from: '', valid_until: '',
-    supervised_from: '', supervised_until: '', supervisor: '',
-    status: '有条件', status_reason: '',
-    source_assessment_id: null, source_assessment_text: '',
-    authorizer: '', authorizer_qualification: '', auth_date: '',
-    has_qualification: false, has_assessment_pass: false, has_supervised_period: false,
-    remark: '',
+function calcValid() {
+  const d = (form.value.auth_date || '').trim()
+  form.value.valid_from = form.value.valid_from || d
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const dt = new Date(d)
+    form.value.valid_until = `${dt.getFullYear() + 1}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
   }
 }
-async function openForm(row) {
-  form.value = row ? { ...row } : blank()
-  postList.value = splitPost(form.value.post)
-  itemOptions.value = []
-  // 编辑时若已有仪器，按仪器回填全部项目（自动全选）
-  if (form.value.instrument) await onInstrumentChange(form.value.instrument)
+
+function openForm(row) {
+  if (row) {
+    form.value = { ...blank(), ...row }
+    posts.value = [...postsOf(row)]
+    instCodes.value = (row.instruments_json || []).map((i) => i.code || i)
+    scopes.value = [...scopesOf(row)]
+    projText.value = row.project || ''
+  } else {
+    form.value = blank(); posts.value = []; instCodes.value = []; scopes.value = []; projText.value = ''
+  }
   visible.value = true
 }
 async function save() {
   try {
-    form.value.post = joinPost(postList.value)
-    if (form.value.id) await updateAuthSheet(form.value.id, form.value)
-    else await createAuthSheet(form.value)
-    ElMessage.success('已保存'); visible.value = false; tableRef.value?.refresh()
+    const picked = instOptions.value.filter((i) => instCodes.value.includes(i.code))
+    const payload = {
+      ...form.value,
+      posts_json: posts.value,
+      instruments_json: picked,
+      scopes_json: scopes.value,
+      post: posts.value.join('、'),
+      instrument: picked.map((i) => i.name).join('、'),
+      auth_scope: scopes.value.join('、'),
+      project: projText.value,
+    }
+    if (payload.id) await updateAuthSheet(payload.id, payload)
+    else await createAuthSheet(payload)
+    ElMessage.success('已保存'); visible.value = false; refresh()
   } catch (e) { ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message)) }
 }
 async function onDelete(row) {
-  try { await ElMessageBox.confirm('确认删除？', '提示', { type: 'warning' }); await deleteAuthSheet(row.id); ElMessage.success('已删除'); tableRef.value?.refresh() } catch (e) {}
+  try { await ElMessageBox.confirm(`删除「${row.name}」的授权记录？`, '提示', { type: 'warning' }); await deleteAuthSheet(row.id); ElMessage.success('已删除'); refresh() } catch (e) {}
 }
 
-const detailVisible = ref(false)
-const current = ref(null)
-async function openDetail(row) { current.value = await getAuthSheet(row.id); detailVisible.value = true }
+async function openDetail(row) {
+  current.value = await getAuthSheet(row.id)
+  detailVisible.value = true
+  detailProj.value = ''
+  const names = []
+  for (const i of current.value.instruments_json || []) {
+    const db = instByCode.value[i.code]
+    if (db) {
+      try {
+        const items = await getInstrumentTestItems(db.id)
+        names.push(...(items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim()))
+      } catch (e) {}
+    }
+  }
+  detailProj.value = [...new Set(names)].join('、') || current.value.project || '（无关联项目）'
+}
 
-function fetch(params) { return listAuthSheet(params) }
+function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
+function printRow(row) {
+  const html = `
+  <h2 style="text-align:center;letter-spacing:3px;">检验科生化免疫组 人员授权书</h2>
+  <table style="border:1.5px solid #333;font-size:13px;">
+    <tr><td style="width:90px;text-align:center;background:#f7f7f7;">姓名</td><td style="width:150px;">${esc(row.name)}</td><td style="width:90px;text-align:center;background:#f7f7f7;">部门</td><td>${esc(row.department)}</td></tr>
+    <tr><td style="text-align:center;background:#f7f7f7;">授权岗位</td><td colspan="3">${esc(postsOf(row).join('、'))}</td></tr>
+    <tr><td style="text-align:center;background:#f7f7f7;">授权仪器</td><td colspan="3">${esc(instNames(row).join('、') || row.instrument)}</td></tr>
+    <tr><td style="text-align:center;background:#f7f7f7;">授权权限</td><td colspan="3">${esc(scopesOf(row).join('、') || row.auth_scope)}</td></tr>
+    <tr><td style="text-align:center;background:#f7f7f7;">项目/方法</td><td colspan="3" style="font-size:11px;">${esc(row.project)}</td></tr>
+    <tr><td style="text-align:center;background:#f7f7f7;">有效期</td><td colspan="3">${esc(row.valid_from)} ~ ${esc(row.valid_until)}</td></tr>
+    <tr><td style="text-align:center;background:#f7f7f7;">授权人</td><td>${esc(row.authorizer)}</td><td style="text-align:center;background:#f7f7f7;">资质</td><td>${esc(row.authorizer_qualification)}</td></tr>
+  </table>
+  <div style="margin-top:24px;text-align:right;">授权人签字：　　　　　　日期：　　　　</div>`
+  printHtml('人员授权书', html)
+}
 </script>
-
-<style scoped>
-.proj-box {
-  width: 100%;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  background: #fafafa;
-  padding: 8px 10px;
-}
-.proj-empty {
-  color: #909399;
-  font-size: 12px;
-  line-height: 24px;
-}
-.proj-head {
-  font-size: 12px;
-  color: #303133;
-  margin-bottom: 6px;
-}
-.proj-head b { color: #409eff; }
-.proj-tip { color: #909399; margin-left: 6px; }
-.proj-tags {
-  max-height: 132px;
-  overflow-y: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-</style>

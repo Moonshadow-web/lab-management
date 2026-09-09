@@ -546,6 +546,9 @@ class AuthSheetBase(BaseModel):
     post: str = ""
     # 5 要素
     project: str = ""
+    posts_json: list = []
+    instruments_json: list = []
+    scopes_json: list = []
     instrument: str = ""
     auth_scope: str = "操作"
     valid_from: str = ""
@@ -569,6 +572,17 @@ class AuthSheetBase(BaseModel):
     has_assessment_pass: bool = False
     has_supervised_period: bool = False
     remark: str = ""
+
+
+    @field_validator("posts_json", "instruments_json", "scopes_json", mode="before")
+    @classmethod
+    def _as_json_list(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v or "[]")
+            except Exception:
+                return []
+        return v or []
 
 
 class AuthSheetCreate(AuthSheetBase):
