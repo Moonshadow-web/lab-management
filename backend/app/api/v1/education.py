@@ -332,4 +332,30 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True, "score": total, "full": full, "detail": detail}
 
+# J. 岗位↔仪器 匹配（可视化维护）
+postmap_router = make_router(
+    PostInstrumentMap, PostInstrumentMapRead, PostInstrumentMapCreate, PostInstrumentMapUpdate,
+    search_fields=["post", "instrument_name", "instrument_code"], filter_fields=["post"],
+    order_by=[PostInstrumentMap.post, PostInstrumentMap.sort_no],
+    prefix="/post-instrument-maps", write_roles=("admin", "training_manager"),
+    json_fields=["methods_json"],
+)
+
+router.include_router(personnel_router)
+router.include_router(edu_router)
+router.include_router(work_router)
+router.include_router(cert_router)
+router.include_router(reward_router)
+router.include_router(edu_exp_router)
+router.include_router(new_emp_router)
+router.include_router(cert_auth_router)
+router.include_router(auth_sheet_router)
+router.include_router(competency_router)
+router.include_router(comparison_router)
+router.include_router(plan_router)
+router.include_router(session_router)
+router.include_router(mentor_router)
+router.include_router(score_router)
+router.include_router(prejob_router)
+router.include_router(exambank_router)
 router.include_router(postmap_router)
