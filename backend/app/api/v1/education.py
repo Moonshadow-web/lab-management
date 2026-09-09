@@ -479,4 +479,110 @@ postmap_router = make_router(
     prefix="/post-instrument-maps", write_roles=("admin", "training_manager"),
     json_fields=["methods_json"],
 )
+
+# =========================================================================
+# K. 免登录公开答题（扫码即答：填姓名 → 找到自己的岗前考核单 → 提交自动判分回写）
+# =========================================================================
+@router.get("/public/pre-job-auths")
+def public_prejob_by_name(name: str = "", db: Session = Depends(get_db)):
+    """按姓名查找待考的岗前培训考核单（免登录）。"""
+    q = (name or "").strip()
+    if not q:
+        return {"items": []}
+    rows = (
+        db.query(PreJobAuth)
+        .filter(PreJobAuth.name == q)
+        .order_by(PreJobAuth.id.desc())
+        .limit(20)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "apply_date": r.apply_date,
+                "positions_json": json.loads(r.positions_json or "[]"),
+                "conclusion": r.conclusion,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/public/exam-paper/{pid}")
+def public_exam_paper(pid: int, db: Session = Depends(get_db)):
+    """取理论试卷（不含答案，免登录）。"""
+    p = db.get(PreJobAuth, pid)
+    if not p:
+        raise HTTPException(404, "考核单不存在")
+    positions = json.loads(p.positions_json or "[]")
+
+    def strip(lst):
+        return [{"q": t.get("q", ""), "options": t.get("options", [])} for t in (lst or [])]
+
+    papers = []
+    for post in positions:
+        b = db.query(ExamBank).filter(ExamBank.post == post).first()
+        T = json.loads((b.theory_json if b else None) or "{}")
+        papers.append({
+            "post": post,
+            "single": strip(T.get("single")),
+            "multi": strip(T.get("multi")),
+            "judge": strip(T.get("judge")),
+        })
+    return {"id": p.id, "name": p.name, "positions": positions, "papers": papers}
+
+
+@router.post("/public/exam-submit/{pid}")
+def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
+    """提交理论答卷：校验姓名 → 服务端判分 → 回写 exam_json（免登录）。"""
+    p = db.get(PreJobAuth, pid)
+    if not p:
+        raise HTTPException(404, "考核单不存在")
+    name = (payload.get("name") or "").strip()
+    if not name or name != (p.name or "").strip():
+        raise HTTPException(400, "姓名与考核单不一致，请确认")
+    positions = json.loads(p.positions_json or "[]")
+    answers = payload.get("answers") or {}
+    try:
+        exam = json.loads(p.exam_json or "{}") if isinstance(p.exam_json, str) else (p.exam_json or {})
+    except Exception:
+        exam = {}
+
+    total = 0
+    full = 0
+    detail = {}
+    for post in positions:
+        b = db.query(ExamBank).filter(ExamBank.post == post).first()
+        T = json.loads((b.theory_json if b else None) or "{}")
+        a = answers.get(post) or {}
+        s = 0
+        for i, t in enumerate(T.get("single") or []):
+            if a.get("s%d" % i) == str(t.get("answer", "")).strip()[:1]:
+                s += 2
+        for i, t in enumerate(T.get("multi") or []):
+            got = "".join(sorted(a.get("m%d" % i) or []))
+            if got and got == "".join(sorted(str(t.get("answer", "")))):
+                s += 4
+        for i, t in enumerate(T.get("judge") or []):
+            if a.get("j%d" % i) == str(t.get("answer", "")):
+                s += 2
+        f = len(T.get("single") or []) * 2 + len(T.get("multi") or []) * 4 + len(T.get("judge") or []) * 2
+        detail[post] = {"score": s, "full": f}
+        total += s
+        full += f
+        d = exam.get(post) or {}
+        if not d.get("trainContent"):
+            d["trainContent"] = "岗位职责、项目SOP、仪器SOP"
+        if not d.get("mastery"):
+            d["mastery"] = "基本了解"
+        if not d.get("qaResult"):
+            d["qaResult"] = "合格"
+        d["theoryAnswers"] = a
+        exam[post] = d
+    p.exam_json = json.dumps(exam, ensure_ascii=False)
+    db.commit()
+    return {"ok": True, "score": total, "full": full, "detail": detail}
+
 router.include_router(postmap_router)

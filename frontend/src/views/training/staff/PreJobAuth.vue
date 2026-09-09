@@ -1,5 +1,8 @@
 <template>
   <div class="pre-job-auth">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+      <el-button size="small" type="primary" plain @click="showQrPublic">理论答题二维码（通用·免登录）</el-button>
+    </div>
     <CrudTable
       :columns="columns" :fetch="fetch"
       search-placeholder="搜索申请人"
@@ -122,7 +125,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="qrVisible" title="理论考核 · 扫码答题" width="380px" align-center>
+    <el-dialog v-model="qrVisible" title="理论考核 · 扫码答题（扫码后填姓名）" width="380px" align-center>
       <div style="text-align:center;">
         <div style="color:#666;font-size:12px;margin-bottom:8px;">手机扫码后在浏览器作答，提交后自动判分并回写成绩</div>
         <img v-if="qrUrl" :src="qrUrl" style="width:220px;height:220px;" />
@@ -388,6 +391,12 @@ async function viewAuths(row) {
 const qrVisible = ref(false)
 const qrUrl = ref('')
 const examLink = ref('')
+// 通用二维码：任何人扫 → 填姓名 → 找到自己的考核单 → 作答
+async function showQrPublic() {
+  examLink.value = window.location.origin + '/exam'
+  try { qrUrl.value = await QRCode.toDataURL(examLink.value, { width: 440 }) } catch (e) { qrUrl.value = '' }
+  qrVisible.value = true
+}
 async function showQr(row) {
   examLink.value = window.location.origin + '/exam/' + row.id
   try { qrUrl.value = await QRCode.toDataURL(examLink.value, { width: 440 }) } catch (e) { qrUrl.value = '' }
