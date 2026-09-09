@@ -11,6 +11,12 @@ const routes = [
     meta: { public: true },
   },
   {
+    path: '/exam/:id',
+    name: 'exam-answer',
+    component: () => import('../views/training/ExamAnswer.vue'),
+    meta: { title: '理论考核答题' },
+  },
+  {
     // 工程师扫码免登录填写维修记录（需带 token 参数）
     path: '/repair-fill',
     name: 'repair-fill',
