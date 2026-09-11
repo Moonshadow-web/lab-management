@@ -411,9 +411,10 @@ function copyLink() {
 
 // 盛京版式打印
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') }
-async function printForm(row) {
-  let bankMap = {}
-  try { const res = await listExamBank({ page_size: 50 }); bankMap = Object.fromEntries((res.items || []).map((b) => [b.post, b])) } catch (e) {}
+// 同步打印：必须用已缓存的题库（若在 await 之后再 window.open，浏览器会当弹窗拦截 → 表现为"点打印无反应"）
+function printForm(row) {
+  const bankMap = banks.value || {}
+  if (!Object.keys(bankMap).length) loadBanks()
   const posts = row.positions_json || []
   const projOf = (code) => { const r = (row.items_json || []).find((x) => x.code === code); return r ? (r.items || '') : '' }
   const perPost = posts.map((post) => {
