@@ -102,7 +102,6 @@ auth_sheet_router = make_router(
     AuthSheet, AuthSheetRead, AuthSheetCreate, AuthSheetUpdate,
     search_fields=["name", "project", "instrument", "authorizer", "source_assessment_text"],
     filter_fields=["status", "auth_scope", "department", "person_id", "authorizer"],
-    json_fields=["posts_json", "instruments_json", "scopes_json"],
     order_by=[AuthSheet.id.desc()],
     prefix="/auth-sheets", write_roles=("admin", "training_manager"),
 )
@@ -170,7 +169,7 @@ exambank_router = make_router(
 
 @prejob_router.post("/{pid}/generate-auths")
 def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
-    """P3：考核意见=同意上岗 时，为该人员生成「一人一条」的授权记录。"""
+    """P3：结论=通过 时，按考核仪器逐台自动生成授权记录（AuthSheet，监督期「有条件」状态）。"""
     p = db.get(PreJobAuth, pid)
     if not p:
         raise HTTPException(404, "记录不存在")
@@ -189,43 +188,297 @@ def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = 
 
     positions = _as_list(p.positions_json)
     instruments = _as_list(p.instruments_json)
-    scopes = [x for x in _as_list(p.permissions_json) if x in ("操作", "复核", "报告")] or ["操作"]
+    scopes = [s for s in _as_list(p.permissions_json) if s in ("操作", "复核", "报告")] or ["操作"]
+    items = _as_list(p.items_json)
+    item_map = {i.get("code"): (i.get("items") or "") for i in items}
     person = db.query(PersonnelMaster).filter_by(name=p.name).first()
-
-    # 有效期：授权日期起 1 年
-    auth_date = p.auth_date or datetime.now().strftime("%Y-%m-%d")
-    valid_until = ""
-    try:
-        d = datetime.strptime(auth_date, "%Y-%m-%d")
-        valid_until = "%04d-%02d-%02d" % (d.year + 1, d.month, d.day)
-    except Exception:
-        valid_until = ""
-
-    db.add(AuthSheet(
-        person_id=person.id if person else None,
-        name=p.name,
-        department="生化免疫组",
-        post="、".join(positions),
-        instrument="、".join([i.get("name", "") for i in instruments]),
-        auth_scope="、".join(scopes),
-        posts_json=json.dumps(positions, ensure_ascii=False),
-        instruments_json=json.dumps(instruments, ensure_ascii=False),
-        scopes_json=json.dumps(scopes, ensure_ascii=False),
-        status="有效",
-        valid_from=auth_date,
-        valid_until=valid_until,
-        auth_date=auth_date,
-        authorizer="金子铮",
-        authorizer_qualification="免疫组组长/主治医师/本领域6年",
-        source_assessment_id=p.id,
-        source_assessment_text=f"岗前培训授权-单{p.id}",
-        has_assessment_pass=True,
-        remark=f"岗前培训考核及授权表 id={p.id} 自动生成（一人一条）",
-        created_by=user.username,
-    ))
+    today = datetime.now().strftime("%Y-%m-%d")
+    created = 0
+    for inst in instruments:
+        code = inst.get("code", "")
+        for scope in scopes:
+            db.add(AuthSheet(
+                person_id=person.id if person else None,
+                name=p.name,
+                post="、".join(positions),
+                instrument=f"{inst.get('name', '')}（{code.replace('MHZYY-JYK-', '')}）",
+                project=item_map.get(code, ""),
+                auth_scope=scope,
+                status="有条件",
+                status_reason="岗前培训考核通过，监督期内",
+                source_assessment_id=p.id,
+                source_assessment_text=f"岗前培训授权-单{p.id}",
+                auth_date=p.auth_date or today,
+                valid_from=p.auth_date or today,
+                has_assessment_pass=True,
+                remark=f"岗前培训考核及授权表 id={p.id} 自动生成",
+                created_by=user.username,
+            ))
+            created += 1
     p.batch_id = f"PJ{p.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     db.commit()
-    return {"ok": True, "created": 1, "batch_id": p.batch_id}
+    return {"ok": True, "created": created, "batch_id": p.batch_id}
+
+router.include_router(personnel_router)
+router.include_router(edu_router)
+router.include_router(work_router)
+router.include_router(cert_router)
+router.include_router(reward_router)
+router.include_router(edu_exp_router)
+router.include_router(new_emp_router)
+router.include_router(cert_auth_router)
+router.include_router(auth_sheet_router)
+router.include_router(competency_router)
+router.include_router(comparison_router)
+router.include_router(plan_router)
+router.include_router(session_router)
+router.include_router(mentor_router)
+router.include_router(score_router)
+router.include_router(prejob_router)
+router.include_router(exambank_router)
+
+
+# =========================================================================
+# 附件：照片 / 签到扫描件 / 课件 / 通知 / 考题 / 效果评价 等
+# （独立挂载到顶层 api_router，避免被 /education 前缀二次包裹）
+# =========================================================================
+attach_router = APIRouter(prefix="/education-attachments", tags=["education-attachments"])
+
+_IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp", "bmp"}
+_PDF_EXTS = {"pdf"}
+_DOC_EXTS = {"doc", "docx", "xls", "xlsx", "csv", "ppt", "pptx"}
+
+
+def _classify_ext(ext: str) -> str:
+    e = (ext or "").lstrip(".").lower()
+    if e in _IMAGE_EXTS:
+        return "image"
+    if e in _PDF_EXTS:
+        return "pdf"
+    if e in _DOC_EXTS:
+        return "doc"
+    return "other"
+
+
+def _ser_attachment(a: EducationAttachment) -> dict:
+    return {
+        "id": a.id, "owner_type": a.owner_type, "owner_id": a.owner_id, "kind": a.kind,
+        "file_type": a.file_type, "original_name": a.original_name, "size_bytes": a.size_bytes,
+        "uploaded_by": a.uploaded_by,
+        "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
+    }
+
+
+@attach_router.get("/file/{aid}")
+def get_attachment(aid: int, inline: bool = True, db: Session = Depends(get_db),
+                   user: User = Depends(get_current_user)):
+    from urllib.parse import quote
+    a = db.get(EducationAttachment, aid)
+    if not a:
+        raise HTTPException(404, "附件不存在")
+
+    def _cd():
+        # RFC 5987 编码中文文件名，避免响应头含非 ASCII 字符导致 500
+        disp = "inline" if inline else "attachment"
+        return f"{disp}; filename*=UTF-8''{quote(a.original_name)}"
+
+    if a.cloud_key and cos_storage.ready:
+        if not inline:
+            cos_url = cos_storage.url(a.cloud_key, a.original_name)
+            if cos_url:
+                return RedirectResponse(url=cos_url, status_code=302)
+        content = cos_storage.get_bytes(a.cloud_key)
+        if content:
+            return Response(content, media_type=_media_for(a), headers={"Content-Disposition": _cd()})
+    if not a.data:
+        raise HTTPException(404, "文件已丢失")
+    return Response(a.data, media_type=_media_for(a), headers={"Content-Disposition": _cd()})
+
+
+@attach_router.get("/{owner_type}/{owner_id}")
+def list_attachments(
+    owner_type: str, owner_id: int, kind: str | None = None,
+    db: Session = Depends(get_db), user: User = Depends(get_current_user),
+):
+    q = db.query(EducationAttachment).filter_by(owner_type=owner_type, owner_id=owner_id)
+    if kind:
+        q = q.filter_by(kind=kind)
+    items = q.order_by(EducationAttachment.id.desc()).all()
+    return {"items": [_ser_attachment(a) for a in items], "total": len(items)}
+
+
+@attach_router.post("/{owner_type}/{owner_id}", status_code=201)
+async def upload_attachments(
+    owner_type: str, owner_id: int, kind: str = "other",
+    files: list[UploadFile] = File(...),
+    db: Session = Depends(get_db), user: User = Depends(WRITE),
+):
+    out = []
+    parsed_meta = {"exam_person_count": None, "exam_pass_rate": None, "eval_satisfy_rate": None}
+    for f in files:
+        if not f or not f.filename:
+            continue
+        ext = os.path.splitext(f.filename)[1] or ""
+        safe = f"{owner_type}_{owner_id}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{len(out)}{ext}"
+        content = await f.read()
+        ft = _classify_ext(ext)
+        if ft == "image":
+            content = optimize_image_bytes(content, ext)
+        cloud_key = None
+        if cos_storage.ready:
+            try:
+                cloud_key = cos_storage.save("education_attachments", f.filename or safe, content)
+            except Exception:
+                pass
+        a = EducationAttachment(
+            owner_type=owner_type, owner_id=owner_id, kind=kind,
+            file_type=ft, original_name=f.filename, stored_name=safe, rel_path="",
+            cloud_key=cloud_key, data=content if not cloud_key else None,
+            size_bytes=len(content), uploaded_by=user.username,
+        )
+        db.add(a)
+        out.append(a)
+        # 考题 / 效果评价：从上传文档文本自动解析人数/合格率/满意率
+        if owner_type == "training_session" and kind in ("exam", "effect_eval"):
+            try:
+                text = _extract_doc_text(content, ext)
+                if kind == "exam":
+                    cnt, rate = _parse_exam(text)
+                    if cnt is not None:
+                        parsed_meta["exam_person_count"] = cnt
+                    if rate is not None:
+                        parsed_meta["exam_pass_rate"] = rate
+                elif kind == "effect_eval":
+                    rate = _parse_satisfy(text)
+                    if rate is not None:
+                        parsed_meta["eval_satisfy_rate"] = rate
+            except Exception:
+                pass
+    try:
+        db.commit()
+    except Exception as e:  # noqa: BLE001
+        db.rollback()
+        msg = str(e)
+        if "max_allowed_packet" in msg or "packet bigger" in msg:
+            raise HTTPException(413, "文件过大：超过数据库单包大小限制(max_allowed_packet)。请压缩后再上传。")
+        raise
+    # 回写培训记录解析元数据
+    if owner_type == "training_session" and any(v is not None for v in parsed_meta.values()):
+        try:
+            sess = db.get(TrainingSession, owner_id)
+            if sess:
+                for k, v in parsed_meta.items():
+                    if v is not None:
+                        setattr(sess, k, v)
+                db.commit()
+        except Exception:
+            db.rollback()
+    for a in out:
+        db.refresh(a)
+    return {"items": [_ser_attachment(a) for a in out], "total": len(out)}
+
+
+def _extract_doc_text(content: bytes, ext: str) -> str:
+    """从 docx/pdf 中提取纯文本，用于考题/效果评价自动解析。无第三方依赖时降级。"""
+    ext = (ext or "").lstrip(".").lower()
+    # docx = zip 的 xml
+    if ext in ("docx", "dotx"):
+        try:
+            import zipfile
+            import io
+            import re
+            z = zipfile.ZipFile(io.BytesIO(content))
+            xml = z.read("word/document.xml").decode("utf-8", errors="ignore")
+            xml = re.sub(r"</w:p>", "\n", xml)
+            xml = re.sub(r"<[^>]+>", "", xml)
+            return xml
+        except Exception:
+            return ""
+    # pdf：仅当项目装有 PyMuPDF 时可用
+    if ext == "pdf":
+        try:
+            import fitz  # PyMuPDF
+            doc = fitz.open(stream=content, filetype="pdf")
+            return "\n".join(page.get_text() for page in doc)
+        except Exception:
+            return ""
+    return ""
+
+
+def _num(s: str) -> float | None:
+    s = (s or "").replace("%", "").strip()
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+
+_CN_DIGITS = "零一二三四五六七八九十百"
+def _parse_exam(text: str):
+    """从考题文档文本解析 (考核人数, 合格率%)。示例：应考 17 人，合格 17 人，合格率 100%。"""
+    if not text:
+        return None, None
+    import re
+    cnt = None
+    for pat in (r"实考[^\d]{0,6}(\d+)\s*人", r"应考[^\d]{0,6}(\d+)\s*人"):
+        m = re.search(pat, text)
+        if m:
+            cnt = int(m.group(1))
+            break
+    if cnt is None:
+        m = re.search(r"合格率\s*([\d.]+)\s*%", text)
+        if m:
+            rate = _num(m.group(1))
+            return None, rate
+    rate = None
+    m = re.search(r"合格率\s*([\d.]+)\s*%", text)
+    if m:
+        rate = _num(m.group(1))
+    return cnt, rate
+
+
+def _parse_satisfy(text: str) -> float | None:
+    """从效果评价文档文本解析满意率(%)。示例：「满意」17 人（占 100%）。"""
+    if not text:
+        return None
+    import re
+    m = re.search(r"满意[^0-9占]{0,12}(\d+)\s*人[^0-9占]{0,6}占\s*([\d.]+)\s*%", text)
+    if m:
+        return _num(m.group(2))
+    m = re.search(r"满意度\s*([\d.]+)\s*%", text)
+    if m:
+        return _num(m.group(1))
+    return None
+
+
+
+
+@attach_router.delete("/file/{aid}")
+def delete_attachment(aid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    a = db.get(EducationAttachment, aid)
+    if not a:
+        raise HTTPException(404, "附件不存在")
+    db.delete(a)
+    db.commit()
+    return {"ok": True}
+
+
+def _media_for(a: EducationAttachment) -> str:
+    if a.file_type == "image":
+        ext = os.path.splitext(a.stored_name)[1].lstrip(".").lower() or "jpeg"
+        return f"image/{ext}" if ext != "jpg" else "image/jpeg"
+    if a.file_type == "pdf":
+        return "application/pdf"
+    return "application/octet-stream"
+
+# J. 岗位↔仪器 匹配（可视化维护）
+postmap_router = make_router(
+    PostInstrumentMap, PostInstrumentMapRead, PostInstrumentMapCreate, PostInstrumentMapUpdate,
+    search_fields=["post", "instrument_name", "instrument_code"], filter_fields=["post"],
+    order_by=[PostInstrumentMap.post, PostInstrumentMap.sort_no],
+    prefix="/post-instrument-maps", write_roles=("admin", "training_manager"),
+    json_fields=["methods_json"],
+)
 
 # =========================================================================
 # K. 免登录公开答题（扫码即答：填姓名 → 找到自己的岗前考核单 → 提交自动判分回写）
@@ -332,30 +585,4 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True, "score": total, "full": full, "detail": detail}
 
-# J. 岗位↔仪器 匹配（可视化维护）
-postmap_router = make_router(
-    PostInstrumentMap, PostInstrumentMapRead, PostInstrumentMapCreate, PostInstrumentMapUpdate,
-    search_fields=["post", "instrument_name", "instrument_code"], filter_fields=["post"],
-    order_by=[PostInstrumentMap.post, PostInstrumentMap.sort_no],
-    prefix="/post-instrument-maps", write_roles=("admin", "training_manager"),
-    json_fields=["methods_json"],
-)
-
-router.include_router(personnel_router)
-router.include_router(edu_router)
-router.include_router(work_router)
-router.include_router(cert_router)
-router.include_router(reward_router)
-router.include_router(edu_exp_router)
-router.include_router(new_emp_router)
-router.include_router(cert_auth_router)
-router.include_router(auth_sheet_router)
-router.include_router(competency_router)
-router.include_router(comparison_router)
-router.include_router(plan_router)
-router.include_router(session_router)
-router.include_router(mentor_router)
-router.include_router(score_router)
-router.include_router(prejob_router)
-router.include_router(exambank_router)
 router.include_router(postmap_router)
