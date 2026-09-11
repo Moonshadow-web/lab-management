@@ -252,6 +252,12 @@ watch(positions, () => {
 positions.value.forEach((p) => { ensureExam(p) })
 }, { flush: 'sync' })
 
+// 编号 → 岗位（打印时用；老记录 instruments_json 可能没存 position）
+const codeToPost = computed(() => {
+  const m = {}
+  POSITIONS.value.forEach((pp) => (pp.instruments || []).forEach((i) => { if (i.code) m[i.code] = pp.name }))
+  return m
+})
 const GL070_META_ALL = computed(() => POSITIONS.value.flatMap((p) => p.instruments.map((i) => ({ ...i, position: p.name }))))
 
 // 仪器变化 → 同步逐项行
@@ -373,7 +379,28 @@ async function save() {
 async function onDelete(row) {
   try { await ElMessageBox.confirm('确认删除？', '提示', { type: 'warning' }); await deletePreJobAuth(row.id); ElMessage.success('已删除'); tableRef.value?.refresh() } catch (e) {}
 }
-function fetch(params) { return listPreJobAuth(params) }
+// 列表加载后，后台预热各行仪器的关联项目（打印是同步的，必须提前缓存）
+async function warmProjects(rows) {
+  const codes = []
+  ;(rows || []).forEach((r) => (r.instruments_json || []).forEach((i) => { if (i.code) codes.push(i.code) }))
+  const todo = [...new Set(codes)].filter((c) => !projCache.has(c))
+  for (const c of todo) {
+    const db = instByCode.value[c]
+    let pj = ''
+    if (db) {
+      try {
+        const items = await getInstrumentTestItems(db.id)
+        pj = (items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim()).join('、')
+      } catch (e) { pj = '' }
+    }
+    projCache.set(c, pj)
+  }
+}
+async function fetch(params) {
+  const res = await listPreJobAuth(params)
+  warmProjects(res.items || [])
+  return res
+}
 
 // ===== P3：同意上岗 → 自动生成授权 =====
 async function genAuths(row) {
@@ -431,10 +458,11 @@ function printForm(row) {
 
   const posts = row.positions_json || []
   const allInsts = row.instruments_json || []
-  const instsOfPost = (post) => allInsts.filter((i) => (i.position || '') === post)
+  const instsOfPost = (post) => allInsts.filter((i) => (i.position || codeToPost.value[i.code] || '') === post)
   const projOf = (code) => {
     const r = (row.items_json || []).find((x) => x.code === code)
-    return r ? (r.items || '') : ''
+    const fromRow = r ? (r.items || '') : ''
+    return fromRow || projCache.get(code) || ''
   }
   const instTable = (list) => `<table style="border-collapse:collapse;width:100%;font-size:12px;">
       <tr><th style="border:1px solid #333;background:#f1f5f9;padding:4px;">仪器</th><th style="border:1px solid #333;background:#f1f5f9;padding:4px;">编号</th><th style="border:1px solid #333;background:#f1f5f9;padding:4px;">关联项目</th></tr>
