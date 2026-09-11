@@ -526,14 +526,14 @@ async function printForm(row) {
     const tPct = tFull ? Math.round(theoryScoreOf2(row, post, bank) * 100 / tFull) : 0
 
     // 口头问答：问题清单
-    const qaList = (bank.qa_json || []).map((q, i) => `<div>${i + 1}. ${esc(q.q)}</div>`).join('')
+    const qaList = `<div style="font-size:10px;line-height:1.35;">${(bank.qa_json || []).map((q, i) => `<div>${i + 1}. ${esc(q.q)}</div>`).join('')}</div>`
     // 实操：要点 + 分值 + 得分
-    const prRows = (bank.practical_json || []).map((x, i) => `<tr><td style="border:1px solid #333;padding:4px;">${i + 1}. ${esc(x.point)}</td><td style="border:1px solid #333;padding:4px;width:60px;text-align:center;">${x.score}</td><td style="border:1px solid #333;padding:4px;width:60px;text-align:center;">${(d.practicalScores || {})[i] || ''}</td></tr>`).join('')
+    const prRows = (bank.practical_json || []).map((x, i) => `<tr><td style="border:1px solid #333;padding:3px 4px;font-size:10px;line-height:1.3;">${i + 1}. ${esc(x.point)}</td><td style="border:1px solid #333;padding:4px;width:60px;text-align:center;">${x.score}</td><td style="border:1px solid #333;padding:4px;width:60px;text-align:center;">${(d.practicalScores || {})[i] || ''}</td></tr>`).join('')
     // 理论：题目 + 选项（不含答案）
     const th = []
-    ;((bank.theory_json || {}).single || []).forEach((t, i) => th.push(`<div style="margin-bottom:3px;">${i + 1}. ${esc(t.q)}<br>${(t.options || []).map((o) => esc(o)).join('　　')}</div>`))
-    ;((bank.theory_json || {}).multi || []).forEach((t, i) => th.push(`<div style="margin-bottom:3px;">${i + 1}. ${esc(t.q)}<br>${(t.options || []).map((o) => esc(o)).join('　　')}</div>`))
-    ;((bank.theory_json || {}).judge || []).forEach((t, i) => th.push(`<div style="margin-bottom:3px;">${i + 1}. ${esc(t.q)}　（对 / 错）</div>`))
+    ;((bank.theory_json || {}).single || []).forEach((t, i) => th.push(`<div style="margin-bottom:3px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}<br>${(t.options || []).map((o) => esc(o)).join('　　')}</div>`))
+    ;((bank.theory_json || {}).multi || []).forEach((t, i) => th.push(`<div style="margin-bottom:3px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}<br>${(t.options || []).map((o) => esc(o)).join('　　')}</div>`))
+    ;((bank.theory_json || {}).judge || []).forEach((t, i) => th.push(`<div style="margin-bottom:3px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}　（对 / 错）</div>`))
 
     return `
     <h3 style="margin:0 0 6px;">岗位：${esc(post)}</h3>
@@ -545,12 +545,12 @@ async function printForm(row) {
       ${boxRow('仪器', esc(instsOfPost(post).map((i) => i.name).join('、')))}
       ${boxRow('项目', esc(projOfPost(post)), 9)}
     </table>
-    ${methods.includes('口头问答') ? `<h4 style="margin:10px 0 4px;">一、口头问答（考核结果：${esc(d.qaResult || '')}）</h4>${qaList}` : ''}
-    ${prRows ? `<h4 style="margin:10px 0 4px;">二、实操考核（${pPct} / 100 分，合格线 80）</h4>
+    ${methods.includes('口头问答') ? `<h4 style="margin:8px 0 3px;font-size:12px;">一、口头问答（考核结果：${esc(d.qaResult || '')}）</h4>${qaList}` : ''}
+    ${prRows ? `<h4 style="margin:8px 0 3px;font-size:12px;">二、实操考核（${pPct} / 100 分，合格线 80）</h4>
       <table style="border-collapse:collapse;width:100%;font-size:12px;">
-        <tr><th style="border:1px solid #333;background:#f1f5f9;padding:4px;">考核要点</th><th style="border:1px solid #333;background:#f1f5f9;padding:4px;width:60px;">分值</th><th style="border:1px solid #333;background:#f1f5f9;padding:4px;width:60px;">得分</th></tr>
+        <tr><th style="border:1px solid #333;background:#f1f5f9;padding:3px 4px;font-size:10px;">考核要点</th><th style="border:1px solid #333;background:#f1f5f9;padding:3px 4px;font-size:10px;width:50px;">分值</th><th style="border:1px solid #333;background:#f1f5f9;padding:3px 4px;font-size:10px;width:50px;">得分</th></tr>
         ${prRows}</table>` : ''}
-    ${th.length ? `<h4 style="margin:10px 0 4px;">三、理论考核（${tPct} / 100 分，合格线 60）</h4>${th.join('')}` : ''}
+    ${th.length ? `<h4 style="margin:8px 0 3px;font-size:12px;">三、理论考核（${tPct} / 100 分，合格线 60）</h4>${th.join('')}` : ''}
     <table style="border-collapse:collapse;width:100%;font-size:12px;margin-top:8px;">
       ${boxRow('考核方式', esc(methods.join('、')))}
       ${boxRow('掌握程度', esc(d.mastery || ''))}
