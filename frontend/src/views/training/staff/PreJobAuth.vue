@@ -538,7 +538,7 @@ async function printForm(row) {
       let ok = false
       if (pStr) ok = multi ? (pStr.split('').sort().join('') === rStr.split('').sort().join('')) : (pStr === rStr)
       const mark = pStr ? (ok ? '<b>✓ 正确</b>' : `<b>✗ 错误</b>（正确答案：${esc(rStr)}）`) : '（未作答）'
-      return `<div style="font-size:10px;color:#333;">我的选择：<b>${esc(pStr || '—')}</b>　${mark}</div>`
+      return `<div style="font-size:10px;color:#333;">被考核人选择：<b>${esc(pStr || '—')}</b>　${mark}</div>`
     }
     ;((bank.theory_json || {}).single || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}<br>${(t.options || []).map((o) => esc(o)).join('　　')}<br>${answerLine(ansMap['s' + i], t.answer, false)}</div>`))
     ;((bank.theory_json || {}).multi || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}<br>${(t.options || []).map((o) => esc(o)).join('　　')}<br>${answerLine(ansMap['m' + i], t.answer, true)}</div>`))
