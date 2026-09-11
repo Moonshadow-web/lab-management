@@ -540,6 +540,13 @@ def public_exam_paper(pid: int, db: Session = Depends(get_db)):
     return {"id": p.id, "name": p.name, "positions": positions, "papers": papers}
 
 
+def _ans_str(a) -> str:
+    """答案容错：题库中答案可能存为数组。"""
+    if isinstance(a, (list, tuple)):
+        return "".join(str(x) for x in a)
+    return str(a if a is not None else "").strip()
+
+
 @router.post("/public/exam-submit/{pid}")
 def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
     """提交理论答卷：校验姓名 → 服务端判分 → 回写 exam_json（免登录）。"""
