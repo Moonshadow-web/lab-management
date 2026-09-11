@@ -361,6 +361,14 @@ positions.value.forEach((p) => { ensureExam(p) })
     examData.value = JSON.parse(JSON.stringify(examData.value))
   }
   visible.value = true
+  // 打开即预热该记录的关联项目，并写入 items_json（保存后固化，打印不再依赖缓存）
+  warmProjects([form.value]).then(() => {
+    ;(form.value.instruments_json || []).forEach((i) => {
+      const it = (form.value.items_json || []).find((x) => x.code === i.code)
+      const pj = projCache.get(i.code)
+      if (it && pj && !it.items) it.items = pj
+    })
+  })
 }
 async function save() {
   try {
