@@ -498,8 +498,8 @@ async function printForm(row) {
     <table style="border:1.5px solid #333;font-size:13px;">
       <tr><td style="width:90px;text-align:center;background:#f7f7f7;">申请人</td><td style="width:180px;text-align:center;">${esc(row.name)}</td><td style="width:90px;text-align:center;background:#f7f7f7;">申请日期</td><td style="text-align:center;">${esc(row.apply_date)}</td></tr>
       <tr><td style="text-align:center;background:#f7f7f7;">考核岗位</td><td colspan="3" style="padding:4px 8px;">${esc(posts.join('、'))}</td></tr>
-      <tr><td style="text-align:center;background:#f7f7f7;">仪器</td><td colspan="3" style="padding:4px 8px;">${esc(instNamesAll)}</td></tr>
-      <tr><td style="text-align:center;background:#f7f7f7;">项目</td><td colspan="3" style="padding:4px 8px;font-size:12px;">${esc(allProjText)}</td></tr>
+      <tr><td style="text-align:center;background:#f7f7f7;">仪器</td><td colspan="3" style="padding:4px 8px;font-size:11px;line-height:1.3;">${esc(instNamesAll)}</td></tr>
+      <tr><td style="text-align:center;background:#f7f7f7;">项目</td><td colspan="3" style="padding:4px 8px;font-size:9px;line-height:1.25;">${esc(allProjText)}</td></tr>
       <tr><td style="text-align:center;background:#f7f7f7;">授权权限</td><td colspan="3" style="padding:4px 8px;">${esc((row.permissions_json || []).join('、'))}</td></tr>
     </table>
     <h3>考核意见</h3>
@@ -543,7 +543,7 @@ async function printForm(row) {
     </table>
     <table style="border-collapse:collapse;width:100%;font-size:12px;">
       ${boxRow('仪器', esc(instsOfPost(post).map((i) => i.name).join('、')))}
-      ${boxRow('项目', esc(projOfPost(post)), 11)}
+      ${boxRow('项目', esc(projOfPost(post)), 9)}
     </table>
     ${methods.includes('口头问答') ? `<h4 style="margin:10px 0 4px;">一、口头问答（考核结果：${esc(d.qaResult || '')}）</h4>${qaList}` : ''}
     ${prRows ? `<h4 style="margin:10px 0 4px;">二、实操考核（${pPct} / 100 分，合格线 80）</h4>
