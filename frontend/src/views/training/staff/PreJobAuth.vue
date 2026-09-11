@@ -384,7 +384,7 @@ async function warmProjects(rows) {
   const codes = []
   ;(rows || []).forEach((r) => (r.instruments_json || []).forEach((i) => { if (i.code) codes.push(i.code) }))
   const todo = [...new Set(codes)].filter((c) => !projCache.has(c))
-  for (const c of todo) {
+  const one = async (c) => {
     const db = instByCode.value[c]
     let pj = ''
     if (db) {
@@ -394,6 +394,10 @@ async function warmProjects(rows) {
       } catch (e) { pj = '' }
     }
     projCache.set(c, pj)
+  }
+  // 并发分批（每批 6 个）加速预热
+  for (let i = 0; i < todo.length; i += 6) {
+    await Promise.all(todo.slice(i, i + 6).map(one))
   }
 }
 async function fetch(params) {
@@ -452,9 +456,12 @@ function copyLink() {
 // 盛京版式打印
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') }
 // 同步打印：必须用已缓存的题库（await 之后再 window.open 会被浏览器当弹窗拦截）
-function printForm(row) {
+async function printForm(row) {
   const bankMap = banks.value || {}
   if (!Object.keys(bankMap).length) loadBanks()
+  // 冷缓存：先补齐该记录所有仪器的关联项目（打印需同步取值）
+  const missing = (row.instruments_json || []).some((i) => i.code && !projCache.has(i.code))
+  if (missing) await warmProjects([row])
 
   const posts = row.positions_json || []
   const allInsts = row.instruments_json || []
