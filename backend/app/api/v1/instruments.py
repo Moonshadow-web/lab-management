@@ -465,6 +465,37 @@ def repair_invite_submit(token: str, item: InstrumentRepairCreate, db: Session =
     return {"ok": True, "id": rec.id, "instrument_id": iid}
 
 
+@public_router.get("/public/repairs/by-code/{code}")
+def repair_by_code_info(code: str, db: Session = Depends(get_db)):
+    """稳定链接（按仪器编号）：长期有效、免登录读取仪器信息。"""
+    inst = db.query(Instrument).filter(Instrument.dept_no == code).first()
+    if not inst:
+        raise HTTPException(status_code=404, detail="未找到该编号的仪器，请确认二维码是否正确")
+    return {
+        "instrument_id": inst.id,
+        "name": inst.name,
+        "dept_no": inst.dept_no,
+        "model": inst.model,
+        "location": inst.location,
+        "owner": inst.owner,
+    }
+
+
+@public_router.post("/public/repairs/by-code/{code}", status_code=201)
+def repair_by_code_submit(code: str, item: InstrumentRepairCreate, db: Session = Depends(get_db)):
+    """稳定链接：工程师免登录提交维修记录（仪器由编号确定，不允许前端指定）。"""
+    inst = db.query(Instrument).filter(Instrument.dept_no == code).first()
+    if not inst:
+        raise HTTPException(status_code=404, detail="未找到该编号的仪器")
+    data = item.model_dump(exclude={"instrument_id", "signer_id", "created_by_id"})
+    data["qc_detail"] = _qc_detail_dumps(data.get("qc_detail"))
+    rec = InstrumentRepair(instrument_id=inst.id, **data)
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    return {"ok": True, "id": rec.id, "instrument_id": inst.id}
+
+
 def _get_calibration(db: Session, instrument_id: int, rec_id: int):
     rec = db.get(CalibrationRecord, rec_id)
     if not rec or rec.instrument_id != instrument_id:

@@ -53,6 +53,10 @@ import RepairRecordForm from './RepairRecordForm.vue'
 import { buildQcSummary } from '../../utils/repairQc'
 
 const token = new URLSearchParams(window.location.search).get('token') || ''
+// 稳定链接：?code=<仪器编号>（长期有效、免登录）；旧链接 ?token=... 仍兼容
+const code = new URLSearchParams(window.location.search).get('code') || ''
+const linkKind = code ? 'by-code' : 'invite'
+const linkKey = code || token
 const loading = ref(true)
 const error = ref('')
 const info = ref({})
@@ -74,7 +78,7 @@ async function loadInfo() {
   loading.value = true
   error.value = ''
   try {
-    const res = await request.get(`/api/v1/public/repairs/invite/${token}`)
+    const res = await request.get(`/api/v1/public/repairs/${linkKind}/${linkKey}`)
     info.value = res || {}
   } catch (e) {
     error.value = e?.response?.data?.detail || '链接无效或已过期'
@@ -91,7 +95,7 @@ async function submit() {
   submitting.value = true
   try {
     const payload = { ...form, qc_verification: buildQcSummary(form.qc_detail) }
-    await request.post(`/api/v1/public/repairs/invite/${token}`, payload)
+    await request.post(`/api/v1/public/repairs/${linkKind}/${linkKey}`, payload)
     submitted.value = true
   } catch (e) {
     ElMessage.error(e?.response?.data?.detail || '提交失败，请重试')
@@ -111,7 +115,7 @@ function resetAll() {
 }
 
 onMounted(() => {
-  if (!token) {
+  if (!token && !code) {
     error.value = '缺少链接参数，请重新扫码'
     loading.value = false
     return

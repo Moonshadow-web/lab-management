@@ -717,8 +717,8 @@ async function openRepairQR() {
   qrImg.value = ''
   qrUrl.value = ''
   try {
-    const res = await createRepairInvite(repairInstrument.value.id)
-    const url = `${window.location.origin}/repair-fill?token=${res.token}`
+    // 稳定链接：按仪器编号，长期有效、免登录（不再使用 30 天有效期的 token）
+    const url = `${window.location.origin}/repair-fill?code=${encodeURIComponent(repairInstrument.value.dept_no || '')}`
     qrUrl.value = url
     qrImg.value = await QRCode.toDataURL(url, { width: 240, margin: 1 })
   } catch (e) {
