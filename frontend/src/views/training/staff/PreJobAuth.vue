@@ -304,11 +304,13 @@ function theoryFull(pc) { return pc.theoryFull || 0 }
 // 百分制（每岗位满分 100）
 function theoryPct(pc) { const t = theoryFull(pc); return t ? Math.round(theoryScore(pc) * 100 / t) : 0 }
 function practicalPct(pc) { const t = pc.practicalTotal || 0; return t ? Math.round(practicalScore(pc) * 100 / t) : 0 }
+// 答案容错：题库里多选答案可能存成数组（历史数据），统一转字符串比较
+function ansStr(a) { return Array.isArray(a) ? a.join('') : String(a == null ? '' : a) }
 function theoryScore(pc) {
   let s = 0
   const d = examData.value[pc.post] || {}
   const T = pc.bank.theory_json || {}
-  ;(T.single || []).forEach((t, i) => { if (d.theoryAnswers?.['s' + i] === t.answer.slice(0, 1)) s += 2 })
+  ;(T.single || []).forEach((t, i) => { if (ansStr(d.theoryAnswers?.['s' + i]) === ansStr(t.answer).slice(0, 1)) s += 2 })
   ;(T.multi || []).forEach((t, i) => {
     const got = (d.theoryAnswers?.['m' + i] || []).slice().sort().join('')
     if (got && got === t.answer.split('').sort().join('')) s += 4
@@ -487,9 +489,9 @@ function theoryScoreOf(row, pp) {
   let s = 0
   const d = (row.exam_json || {})[pp.post] || {}
   const T = pp.bank.theory_json || {}
-  ;(T.single || []).forEach((t, i) => { if (d.theoryAnswers?.['s' + i] === t.answer.slice(0, 1)) s += 2 })
-  ;(T.multi || []).forEach((t, i) => { const g = (d.theoryAnswers?.['m' + i] || []).slice().sort().join(''); if (g && g === t.answer.split('').sort().join('')) s += 4 })
-  ;(T.judge || []).forEach((t, i) => { if (d.theoryAnswers?.['j' + i] === t.answer) s += 2 })
+  ;(T.single || []).forEach((t, i) => { if (ansStr(d.theoryAnswers?.['s' + i]) === ansStr(t.answer).slice(0, 1)) s += 2 })
+  ;(T.multi || []).forEach((t, i) => { const g = (d.theoryAnswers?.['m' + i] || []).slice().sort().join(''); if (g && g === ansStr(t.answer).split('').sort().join('')) s += 4 })
+  ;(T.judge || []).forEach((t, i) => { if (d.theoryAnswers?.['j' + i] === ansStr(t.answer)) s += 2 })
   return s
 }
 </script>

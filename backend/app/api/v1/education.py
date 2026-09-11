@@ -565,14 +565,14 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
         a = answers.get(post) or {}
         s = 0
         for i, t in enumerate(T.get("single") or []):
-            if a.get("s%d" % i) == str(t.get("answer", "")).strip()[:1]:
+            if a.get("s%d" % i) == _ans_str(t.get("answer"))[:1]:
                 s += 2
         for i, t in enumerate(T.get("multi") or []):
             got = "".join(sorted(a.get("m%d" % i) or []))
-            if got and got == "".join(sorted(str(t.get("answer", "")))):
+            if got and got == "".join(sorted(_ans_str(t.get("answer")))):
                 s += 4
         for i, t in enumerate(T.get("judge") or []):
-            if a.get("j%d" % i) == str(t.get("answer", "")):
+            if a.get("j%d" % i) == _ans_str(t.get("answer")):
                 s += 2
         f = len(T.get("single") or []) * 2 + len(T.get("multi") or []) * 4 + len(T.get("judge") or []) * 2
         pct = int(round(s * 100.0 / f)) if f else 0
