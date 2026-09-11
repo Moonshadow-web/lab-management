@@ -67,7 +67,7 @@
             <el-option v-for="s in SCOPES" :key="s" :label="s" :value="s" />
           </el-select>
         </el-form-item>
-        <el-form-item label="项目/方法（自动全带出）">
+        <el-form-item label="项目（自动全带出）">
           <div style="max-height:110px;overflow:auto;border:1px solid #eee;border-radius:4px;padding:6px;font-size:12px;color:#444;">
             {{ projText || '（选择仪器后自动列出全部关联项目）' }}
           </div>
@@ -97,7 +97,7 @@
         <el-descriptions-item label="授权岗位" :span="2">{{ postsOf(current).join('、') }}</el-descriptions-item>
         <el-descriptions-item label="授权仪器" :span="2">{{ instNames(current).join('、') || current.instrument }}</el-descriptions-item>
         <el-descriptions-item label="权限" :span="2">{{ scopesOf(current).join('、') || current.auth_scope }}</el-descriptions-item>
-        <el-descriptions-item label="项目/方法（全部关联项目）" :span="2">
+        <el-descriptions-item label="项目（全部关联项目）" :span="2">
           <div style="max-height:180px;overflow:auto;">{{ detailProj || '加载中…' }}</div>
         </el-descriptions-item>
         <el-descriptions-item label="授权人">{{ current.authorizer }}</el-descriptions-item>
@@ -289,11 +289,14 @@ function printRow(row) {
     <tr><td style="text-align:center;background:#f7f7f7;">授权岗位</td><td colspan="3">${esc(postsOf(row).join('、'))}</td></tr>
     <tr><td style="text-align:center;background:#f7f7f7;">授权仪器</td><td colspan="3">${esc(instNames(row).join('、') || row.instrument)}</td></tr>
     <tr><td style="text-align:center;background:#f7f7f7;">授权权限</td><td colspan="3">${esc(scopesOf(row).join('、') || row.auth_scope)}</td></tr>
-    <tr><td style="text-align:center;background:#f7f7f7;">项目/方法</td><td colspan="3" style="font-size:11px;">${esc(row.project)}</td></tr>
+    <tr><td style="text-align:center;background:#f7f7f7;">项目</td><td colspan="3" style="font-size:11px;">${esc(row.project)}</td></tr>
     <tr><td style="text-align:center;background:#f7f7f7;">有效期</td><td colspan="3">${esc(row.valid_from)} ~ ${esc(row.valid_until)}</td></tr>
     <tr><td style="text-align:center;background:#f7f7f7;">授权人</td><td>${esc(row.authorizer)}</td><td style="text-align:center;background:#f7f7f7;">资质</td><td>${esc(row.authorizer_qualification)}</td></tr>
   </table>
-  <div style="margin-top:24px;text-align:right;">授权人签字：　　　　　　日期：　　　　</div>`
+  <div style="margin-top:26px;text-align:left;font-size:13px;">授权人签字：　　　　　　日期：</div>
+  <div style="margin-top:34px;padding-top:6px;border-top:1px solid #999;font-size:11px;color:#333;text-align:center;">
+    表格编号：BG-SM-GL-023　　　　民航总医院检验科生化免疫组　　　　生效日期：2026.9.15
+  </div>`
   printHtml('人员授权书', html)
 }
 </script>
