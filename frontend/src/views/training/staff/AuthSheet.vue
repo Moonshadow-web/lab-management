@@ -135,6 +135,7 @@ const current = ref(null)
 const posts = ref([])
 const instCodes = ref([])
 const scopes = ref([])
+const projCache = new Map()
 const projText = ref('')
 const detailProj = ref('')
 const form = ref(blank())
@@ -195,13 +196,19 @@ function onPostChange() {
 watch(instCodes, async () => {
   const names = []
   for (const c of instCodes.value) {
-    const db = instByCode.value[c]
-    if (db) {
-      try {
-        const items = await getInstrumentTestItems(db.id)
-        names.push(...(items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim()))
-      } catch (e) {}
+    let pj = projCache.get(c)
+    if (pj === undefined) {
+      pj = []
+      const db = instByCode.value[c]
+      if (db) {
+        try {
+          const items = await getInstrumentTestItems(db.id)
+          pj = (items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim())
+        } catch (e) { pj = [] }
+      }
+      projCache.set(c, pj)
     }
+    names.push(...pj)
   }
   projText.value = [...new Set(names)].join('、')
   form.value.project = projText.value
@@ -256,13 +263,19 @@ async function openDetail(row) {
   detailProj.value = ''
   const names = []
   for (const i of current.value.instruments_json || []) {
-    const db = instByCode.value[i.code]
-    if (db) {
-      try {
-        const items = await getInstrumentTestItems(db.id)
-        names.push(...(items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim()))
-      } catch (e) {}
+    let pj = projCache.get(i.code)
+    if (pj === undefined) {
+      pj = []
+      const db = instByCode.value[i.code]
+      if (db) {
+        try {
+          const items = await getInstrumentTestItems(db.id)
+          pj = (items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim())
+        } catch (e) { pj = [] }
+      }
+      projCache.set(i.code, pj)
     }
+    names.push(...pj)
   }
   detailProj.value = [...new Set(names)].join('、') || current.value.project || '（无关联项目）'
 }

@@ -76,7 +76,7 @@
               <span style="color:#888;">满分 {{ pt.score }}</span>
               <el-input-number v-model="examData[pc.post].practicalScores[pi]" size="small" :min="0" :max="pt.score" style="width:110px;" />
             </div>
-            <div>实操得分：<b>{{ practicalPct(pc) }}</b> / 100 分（原始 {{ practicalScore(pc) }}/{{ pc.practicalTotal }}，合格线 80）</div>
+            <div>实操得分：<b>{{ practicalPct(pc) }}</b> / 100 分（合格线 80）</div>
           </template>
 
           <template v-if="pc.methods.includes('理论考核')">
@@ -99,7 +99,7 @@
                 <el-radio value="对">对</el-radio><el-radio value="错">错</el-radio>
               </el-radio-group>
             </div>
-            <div>理论得分：<b>{{ theoryPct(pc) }}</b> / 100 分（原始 {{ theoryScore(pc) }}/{{ theoryFull(pc) }}，合格线 60）</div>
+            <div>理论得分：<b>{{ theoryPct(pc) }}</b> / 100 分（合格线 60）</div>
           </template>
 
           <el-form-item label="掌握程度" label-width="90px" style="margin-top:8px;">
@@ -265,6 +265,8 @@ watch(instrumentCodes, () => {
 }, { flush: 'sync' })
 
 // 仪器关联项目（自动从关联库带出，只读展示）
+// 关联项目缓存：同一台仪器只请求一次（避免每点一次就刷一次）
+const projCache = new Map()
 const projLoading = ref(false)
 const instrumentProjects = ref([])
 watch(instrumentCodes, async () => {
@@ -272,17 +274,26 @@ watch(instrumentCodes, async () => {
   const rows = []
   for (const c of instrumentCodes.value) {
     const inst = GL070_META_ALL.value.find((i) => i.code === c) || {}
-    let projects = ''
-    const dbInst = instByCode.value[c]
-    if (dbInst) {
-      try {
-        const items = await getInstrumentTestItems(dbInst.id)
-        projects = (items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim()).join('、')
-      } catch (e) { projects = '' }
+    let projects = projCache.get(c)
+    if (projects === undefined) {
+      projects = ''
+      const dbInst = instByCode.value[c]
+      if (dbInst) {
+        try {
+          const items = await getInstrumentTestItems(dbInst.id)
+          projects = (items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim()).join('、')
+        } catch (e) { projects = '' }
+      }
+      projCache.set(c, projects)
     }
     rows.push({ code: c, name: inst.name || '', projects })
   }
   instrumentProjects.value = rows
+  // 把自动带出的项目写入记录（保存后打印才有项目）
+  rows.forEach((r) => {
+    const it = (form.value.items_json || []).find((x) => x.code === r.code)
+    if (it && r.projects) it.items = r.projects
+  })
   projLoading.value = false
 })
 
@@ -413,75 +424,87 @@ function copyLink() {
 
 // 盛京版式打印
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') }
-// 同步打印：必须用已缓存的题库（若在 await 之后再 window.open，浏览器会当弹窗拦截 → 表现为"点打印无反应"）
+// 同步打印：必须用已缓存的题库（await 之后再 window.open 会被浏览器当弹窗拦截）
 function printForm(row) {
   const bankMap = banks.value || {}
   if (!Object.keys(bankMap).length) loadBanks()
+
   const posts = row.positions_json || []
-  const projOf = (code) => { const r = (row.items_json || []).find((x) => x.code === code); return r ? (r.items || '') : '' }
-  const perPost = posts.map((post) => {
-    const bank = bankMap[post] || {}
-    const insts = (row.instruments_json || []).filter((i) => i.position === post)
-    const instRows = insts.map((i) => `<tr><td>${esc(i.name)}</td><td style="text-align:center;">${esc(i.code.replace('MHZYY-JYK-', ''))}</td><td>${esc(projOf(i.code))}</td></tr>`).join('')
-    const d = (row.exam_json || {})[post] || {}
-    const qaQ = (bank.qa_json || []).map((x, i) => `<div style="margin-bottom:4px;">${i + 1}. ${esc(x.q)}</div>`).join('')
-    const prRows = (bank.practical_json || []).map((x, i) => `<tr><td>${i + 1}. ${esc(x.point)}</td><td style="width:70px;text-align:center;">${x.score}</td><td style="width:70px;"></td></tr>`).join('')
-    const th = []
-    ;((bank.theory_json || {}).single || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;">${i + 1}. ${esc(t.q)}<br>${t.options.map((o) => esc(o)).join('　　')}<br>答：＿＿＿＿＿</div>`))
-    ;((bank.theory_json || {}).multi || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;">${i + 1}. ${esc(t.q)}<br>${t.options.map((o) => esc(o)).join('　　')}<br>答：＿＿＿＿＿</div>`))
-    ;((bank.theory_json || {}).judge || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;">${i + 1}. ${esc(t.q)}　答：＿＿＿</div>`))
-    const methods = bank.methods_json && bank.methods_json.length ? bank.methods_json : ['实操考核']
-    return { post, bank, methods, instRows, d, qaQ, prRows, th }
-  })
-
-  const main = perPost.map((pp) => `
-    <h3 style="margin:12px 0 4px;">岗位：${esc(pp.post)}</h3>
-    <table style="border:1.5px solid #333;font-size:12px;">
-      <tr><td style="width:80px;text-align:center;background:#f7f7f7;">培训时间</td><td style="text-align:center;">${esc(pp.d.trainTime || '')}</td><td style="width:70px;text-align:center;background:#f7f7f7;">培训人</td><td style="text-align:center;">${esc(pp.d.trainPerson || '')}</td></tr>
-      <tr><td style="text-align:center;background:#f7f7f7;">培训内容</td><td colspan="3" style="padding:4px 8px;">${esc(pp.d.trainContent || '')}</td></tr>
-    </table>
-    <table style="border-collapse:collapse;width:100%;font-size:12px;margin-top:4px;">
+  const allInsts = row.instruments_json || []
+  const instsOfPost = (post) => allInsts.filter((i) => (i.position || '') === post)
+  const projOf = (code) => {
+    const r = (row.items_json || []).find((x) => x.code === code)
+    return r ? (r.items || '') : ''
+  }
+  const instTable = (list) => `<table style="border-collapse:collapse;width:100%;font-size:12px;">
       <tr><th style="border:1px solid #333;background:#f1f5f9;padding:4px;">仪器</th><th style="border:1px solid #333;background:#f1f5f9;padding:4px;">编号</th><th style="border:1px solid #333;background:#f1f5f9;padding:4px;">关联项目</th></tr>
-      ${pp.instRows}
+      ${list.map((i) => `<tr><td>${esc(i.name)}</td><td style="text-align:center;">${esc(String(i.code || '').replace('MHZYY-JYK-', ''))}</td><td style="font-size:11px;">${esc(projOf(i.code))}</td></tr>`).join('')}
+    </table>`
+  const allProjText = [...new Set(allInsts.map((i) => projOf(i.code)).filter(Boolean))].join('；')
+  const instNamesAll = [...new Set(allInsts.map((i) => i.name).filter(Boolean))].join('、')
+
+  // ===== 第一页：基本信息（含仪器、项目）+ 考核意见 + 签字（居中）=====
+  const page1 = `
+    <h2 style="text-align:center;letter-spacing:3px;margin:0 0 4px;">岗前培训考核及授权表</h2>
+    <div class="meta" style="text-align:center;">表格编号：BG-SM-PX-002　　检验科生化免疫组</div>
+    <table style="border:1.5px solid #333;font-size:13px;">
+      <tr><td style="width:90px;text-align:center;background:#f7f7f7;">申请人</td><td style="width:180px;text-align:center;">${esc(row.name)}</td><td style="width:90px;text-align:center;background:#f7f7f7;">申请日期</td><td style="text-align:center;">${esc(row.apply_date)}</td></tr>
+      <tr><td style="text-align:center;background:#f7f7f7;">考核岗位</td><td colspan="3" style="padding:4px 8px;">${esc(posts.join('、'))}</td></tr>
+      <tr><td style="text-align:center;background:#f7f7f7;height:40px;">仪器</td><td colspan="3" style="padding:4px 8px;">${esc(instNamesAll)}</td></tr>
+      <tr><td style="text-align:center;background:#f7f7f7;">项目</td><td colspan="3" style="padding:4px 8px;font-size:12px;">${esc(allProjText)}</td></tr>
+      <tr><td style="text-align:center;background:#f7f7f7;">授权权限</td><td colspan="3" style="padding:4px 8px;">${esc((row.permissions_json || []).join('、'))}</td></tr>
     </table>
-    <table style="border-collapse:collapse;width:100%;font-size:12px;margin-top:4px;">
-      <tr><td style="width:80px;text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">考核方式</td><td style="border:1px solid #333;padding:4px;">${esc(pp.methods.join('、'))}</td></tr>
-      <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">口头问答</td><td style="border:1px solid #333;padding:4px;">${esc(pp.d.qaResult || '')}</td></tr>
-      <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">实操得分</td><td style="border:1px solid #333;padding:4px;">${pp.bank.practical_json && pp.bank.practical_json.length ? practicalPctOf(row, pp) + ' 分（原始 ' + practicalScoreOf(row, pp) + '/' + pp.practicalTotal + '）' : ''}</td></tr>
-      <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">理论得分</td><td style="border:1px solid #333;padding:4px;">${pp.bank.theory_json ? theoryPctOf(row, pp) + ' 分（原始 ' + theoryScoreOf(row, pp) + '/' + pp.theoryFull + '）' : ''}</td></tr>
-      <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">掌握程度</td><td style="border:1px solid #333;padding:4px;">${esc(pp.d.mastery || '')}</td></tr>
-    </table>`).join('')
+    <h3>考核意见</h3>
+    <table style="border:1.5px solid #333;font-size:13px;">
+      <tr><td style="width:130px;text-align:center;background:#f7f7f7;">考核意见（授权）</td><td style="padding:6px 10px;">${esc(row.conclusion)}${row.auth_date ? '　授权日期：' + esc(row.auth_date) : ''}</td></tr>
+      <tr><td style="text-align:center;background:#f7f7f7;">备注</td><td style="padding:6px 10px;min-height:36px;">${esc(row.remark)}</td></tr>
+    </table>
+    <div style="margin-top:34px;text-align:center;font-size:14px;letter-spacing:1px;">
+      员工签字：　　　　　　　　组长签字：　　　　　　　　日期：
+    </div>
+    <div style="page-break-after: always;"></div>`
 
-  const appendix = perPost.map((pp) => `
-    <h3 style="margin:14px 0 4px;">附：${esc(pp.post)} 考核题</h3>
-    ${pp.qaQ ? '<h4>一、口头问答</h4>' + pp.qaQ : ''}
-    ${pp.prRows ? '<h4>二、实操要点与打分（满分 ' + pp.practicalTotal + '）</h4><table style="border-collapse:collapse;width:100%;font-size:12px;"><tr><th style="border:1px solid #333;padding:4px;">要点</th><th style="border:1px solid #333;padding:4px;width:70px;">分值</th><th style="border:1px solid #333;padding:4px;width:70px;">得分</th></tr>' + pp.prRows + '</table>' : ''}
-    ${pp.th.length ? '<h4>三、理论考核</h4>' + pp.th.join('') : ''}
-  `).join('')
+  // ===== 之后：每个岗位一页 =====
+  const pages = posts.map((post) => {
+    const bank = bankMap[post] || {}
+    const methods = bank.methods_json && bank.methods_json.length ? bank.methods_json : ['实操考核']
+    const d = (row.exam_json || {})[post] || {}
+    const list = instsOfPost(post)
+    const pTotal = (bank.practical_json || []).reduce((x, y) => x + (y.score || 0), 0)
+    const tFull = ((bank.theory_json && (bank.theory_json.single || []).length) || 0) * 2
+      + ((bank.theory_json && (bank.theory_json.multi || []).length) || 0) * 4
+      + ((bank.theory_json && (bank.theory_json.judge || []).length) || 0) * 2
+    const pGot = (bank.practical_json || []).reduce((x, y, i) => x + (Number((d.practicalScores || {})[i]) || 0), 0)
+    const pPct = pTotal ? Math.round(pGot * 100 / pTotal) : 0
+    const tPct = tFull ? Math.round(theoryScoreOf2(row, post, bank) * 100 / tFull) : 0
+    return `
+    <h3 style="margin:0 0 6px;">岗位：${esc(post)}</h3>
+    <table style="border:1.5px solid #333;font-size:12px;">
+      <tr><td style="width:80px;text-align:center;background:#f7f7f7;">培训时间</td><td style="text-align:center;">${esc(d.trainTime || '')}</td><td style="width:70px;text-align:center;background:#f7f7f7;">培训人</td><td style="text-align:center;">${esc(d.trainPerson || '')}</td></tr>
+      <tr><td style="text-align:center;background:#f7f7f7;">培训内容</td><td colspan="3" style="padding:4px 8px;">${esc(d.trainContent || '')}</td></tr>
+    </table>
+    ${instTable(list)}
+    <table style="border-collapse:collapse;width:100%;font-size:12px;">
+      <tr><td style="width:80px;text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">考核方式</td><td style="border:1px solid #333;padding:4px;">${esc(methods.join('、'))}</td></tr>
+      ${methods.includes('口头问答') ? `<tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">口头问答</td><td style="border:1px solid #333;padding:4px;">${esc(d.qaResult || '')}</td></tr>` : ''}
+      ${(bank.practical_json || []).length ? `<tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">实操得分</td><td style="border:1px solid #333;padding:4px;">${pPct} / 100 分（合格线 80）</td></tr>` : ''}
+      ${tFull ? `<tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">理论得分</td><td style="border:1px solid #333;padding:4px;">${tPct} / 100 分（合格线 60）</td></tr>` : ''}
+      <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">掌握程度</td><td style="border:1px solid #333;padding:4px;">${esc(d.mastery || '')}</td></tr>
+    </table>
+    <div style="page-break-after: always;"></div>`
+  }).join('')
 
-  const html = `
-  <h2 style="text-align:center;font-size:20px;letter-spacing:3px;margin:0 0 6px;">岗前培训考核及授权表</h2>
-  <div style="text-align:center;color:#555;font-size:12px;margin-bottom:10px;">表格编号：BG-SM-PX-002　　检验科生化免疫组</div>
-  <table style="border:1.5px solid #333;font-size:13px;">
-    <tr><td style="width:90px;text-align:center;background:#f7f7f7;">申请人</td><td style="width:180px;text-align:center;height:30px;">${esc(row.name)}</td><td style="width:90px;text-align:center;background:#f7f7f7;">申请日期</td><td style="text-align:center;">${esc(row.apply_date)}</td></tr>
-    <tr><td style="text-align:center;background:#f7f7f7;">考核岗位</td><td colspan="3" style="padding:6px 10px;">${esc(posts.join('、'))}</td></tr>
-    <tr><td style="text-align:center;background:#f7f7f7;">授权权限</td><td colspan="3" style="padding:6px 10px;">${esc((row.permissions_json || []).join('、'))}</td></tr>
-  </table>
-  ${main}
-  <h3>四、考核意见</h3>
-  <table style="border:1.5px solid #333;font-size:13px;">
-    <tr><td style="width:120px;text-align:center;background:#f7f7f7;">考核意见（授权）</td><td style="padding:6px 10px;">${esc(row.conclusion)}${row.auth_date ? '　授权日期：' + esc(row.auth_date) : ''}</td></tr>
-    <tr><td style="text-align:center;background:#f7f7f7;">备注</td><td style="padding:6px 10px;min-height:36px;">${esc(row.remark)}</td></tr>
-  </table>
-  <div style="margin-top:26px;font-size:13px;text-align:right;">
-    员工签字：　　　　　　组长签字：　　　　　　日期：　　　　
-  </div>
-  ${appendix}`
-  printHtml('岗前培训考核及授权表', html)
+  printHtml('岗前培训考核及授权表', page1 + pages)
 }
-function practicalScoreOf(row, pp) {
-  const d = (row.exam_json || {})[pp.post] || {}
-  return (pp.bank.practical_json || []).reduce((s, p, i) => s + (Number(d.practicalScores?.[i]) || 0), 0)
+// 某岗位理论得分（按 job 快照判分）
+function theoryScoreOf2(row, post, bank) {
+  let s = 0
+  const d = (row.exam_json || {})[post] || {}
+  const T = bank.theory_json || {}
+  ;(T.single || []).forEach((t, i) => { if (ansStr(d.theoryAnswers?.['s' + i]) === ansStr(t.answer).slice(0, 1)) s += 2 })
+  ;(T.multi || []).forEach((t, i) => { const g = (d.theoryAnswers?.['m' + i] || []).slice().sort().join(''); if (g && g === ansStr(t.answer).split('').sort().join('')) s += 4 })
+  ;(T.judge || []).forEach((t, i) => { if (d.theoryAnswers?.['j' + i] === ansStr(t.answer)) s += 2 })
+  return s
 }
 function practicalPctOf(row, pp) { const t = pp.practicalTotal || 0; return t ? Math.round(practicalScoreOf(row, pp) * 100 / t) : 0 }
 function theoryPctOf(row, pp) { const t = pp.theoryFull || 0; return t ? Math.round(theoryScoreOf(row, pp) * 100 / t) : 0 }
