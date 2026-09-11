@@ -189,7 +189,7 @@ def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = 
 
     positions = _as_list(p.positions_json)
     instruments = _as_list(p.instruments_json)
-    scopes = [x for x in _as_list(p.permissions_json) if x in ("操作", "复核", "报告")] or ["操作"]
+    scopes = [x for x in _as_list(p.permissions_json) if x in ("操作", "复核", "报告", "LIS使用", "LIS管理")] or ["操作"]
     person = db.query(PersonnelMaster).filter_by(name=p.name).first()
     auth_date = p.auth_date or datetime.now().strftime("%Y-%m-%d")
     valid_until = ""

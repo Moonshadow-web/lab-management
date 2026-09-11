@@ -120,7 +120,7 @@ import { useAuthStore } from '../../../store/auth'
 
 const auth = useAuthStore()
 const canWrite = ref(auth.canWrite('training'))
-const SCOPES = ['操作', '复核', '报告']
+const SCOPES = ['操作', '复核', '报告', 'LIS使用', 'LIS管理']
 const STATUS = ['有效', '有条件', '暂停', '撤销']
 
 const list = ref([])
@@ -243,9 +243,9 @@ async function save() {
       posts_json: posts.value,
       instruments_json: picked,
       scopes_json: scopes.value,
-      post: posts.value.join('、'),
-      instrument: picked.map((i) => i.name).join('、'),
-      auth_scope: scopes.value.join('、'),
+      post: posts.value.join('、').slice(0, 190),
+      instrument: picked.map((i) => i.name).join('、').slice(0, 190),
+      auth_scope: scopes.value.join('、').slice(0, 60),
       project: projText.value,
     }
     if (payload.id) await updateAuthSheet(payload.id, payload)

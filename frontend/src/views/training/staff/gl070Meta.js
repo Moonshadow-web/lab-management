@@ -81,7 +81,7 @@ export const GL070_POSITIONS = [
 ]
 
 // 授权权限三级（= 授权表权限等级 auth_scope）
-export const AUTH_SCOPES = ['操作', '复核', '报告']
+export const AUTH_SCOPES = ['操作', '复核', '报告', 'LIS使用', 'LIS管理']
 export const GL070_ALL_INSTRUMENTS = GL070_POSITIONS.flatMap((p) =>
   p.instruments.map((i) => ({ ...i, position: p.name }))
 )
