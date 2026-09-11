@@ -571,6 +571,21 @@ class AuthSheetBase(BaseModel):
     remark: str = ""
 
 
+    posts_json: list = []
+    instruments_json: list = []
+    scopes_json: list = []
+
+    @field_validator("posts_json", "instruments_json", "scopes_json", mode="before")
+    @classmethod
+    def _as_json_list(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v or "[]")
+            except Exception:
+                return []
+        return v or []
+
+
 class AuthSheetCreate(AuthSheetBase):
     pass
 

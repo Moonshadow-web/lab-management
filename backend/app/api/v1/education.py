@@ -104,6 +104,7 @@ auth_sheet_router = make_router(
     filter_fields=["status", "auth_scope", "department", "person_id", "authorizer"],
     order_by=[AuthSheet.id.desc()],
     prefix="/auth-sheets", write_roles=("admin", "training_manager"),
+    json_fields=["posts_json", "instruments_json", "scopes_json"],
 )
 
 # C. 能力评估 + 人员比对
