@@ -529,11 +529,20 @@ async function printForm(row) {
     const qaList = `<div style="font-size:10px;line-height:1.35;">${(bank.qa_json || []).map((q, i) => `<div>${i + 1}. ${esc(q.q)}</div>`).join('')}</div>`
     // 实操：要点 + 分值 + 得分
     const prRows = (bank.practical_json || []).map((x, i) => `<tr><td style="border:1px solid #333;padding:3px 4px;font-size:10px;line-height:1.3;">${i + 1}. ${esc(x.point)}</td><td style="border:1px solid #333;padding:4px;width:60px;text-align:center;">${x.score}</td><td style="border:1px solid #333;padding:4px;width:60px;text-align:center;">${(d.practicalScores || {})[i] || ''}</td></tr>`).join('')
-    // 理论：题目 + 选项（不含答案）
+    // 理论：题目 + 选项 + 本人作答 + 对错判定
+    const ansMap = d.theoryAnswers || {}
     const th = []
-    ;((bank.theory_json || {}).single || []).forEach((t, i) => th.push(`<div style="margin-bottom:3px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}<br>${(t.options || []).map((o) => esc(o)).join('　　')}</div>`))
-    ;((bank.theory_json || {}).multi || []).forEach((t, i) => th.push(`<div style="margin-bottom:3px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}<br>${(t.options || []).map((o) => esc(o)).join('　　')}</div>`))
-    ;((bank.theory_json || {}).judge || []).forEach((t, i) => th.push(`<div style="margin-bottom:3px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}　（对 / 错）</div>`))
+    const answerLine = (picked, right, multi) => {
+      const pStr = Array.isArray(picked) ? picked.join('') : String(picked == null ? '' : picked)
+      const rStr = ansStr(right)
+      let ok = false
+      if (pStr) ok = multi ? (pStr.split('').sort().join('') === rStr.split('').sort().join('')) : (pStr === rStr)
+      const mark = pStr ? (ok ? '<b>✓ 正确</b>' : `<b>✗ 错误</b>（正确答案：${esc(rStr)}）`) : '（未作答）'
+      return `<div style="font-size:10px;color:#333;">我的选择：<b>${esc(pStr || '—')}</b>　${mark}</div>`
+    }
+    ;((bank.theory_json || {}).single || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}<br>${(t.options || []).map((o) => esc(o)).join('　　')}<br>${answerLine(ansMap['s' + i], t.answer, false)}</div>`))
+    ;((bank.theory_json || {}).multi || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}<br>${(t.options || []).map((o) => esc(o)).join('　　')}<br>${answerLine(ansMap['m' + i], t.answer, true)}</div>`))
+    ;((bank.theory_json || {}).judge || []).forEach((t, i) => th.push(`<div style="margin-bottom:4px;font-size:10px;line-height:1.35;">${i + 1}. ${esc(t.q)}　（对 / 错）<br>${answerLine(ansMap['j' + i], t.answer, false)}</div>`))
 
     return `
     <h3 style="margin:0 0 6px;">岗位：${esc(post)}</h3>
