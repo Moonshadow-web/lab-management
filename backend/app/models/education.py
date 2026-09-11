@@ -232,6 +232,11 @@ class AuthSheet(Base):
     status_reason: Mapped[str] = mapped_column(String(500), default="")  # 状态变更原因（如 "PT-EQA 钾不合格"）
     status_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)  # 状态变更时间
 
+    # ===== 多选（一人一条：岗位 / 仪器 / 权限 均多选） =====
+    posts_json: Mapped[str] = mapped_column(Text, default="[]")
+    instruments_json: Mapped[str] = mapped_column(Text, default="[]")
+    scopes_json: Mapped[str] = mapped_column(Text, default="[]")
+
     # ===== 关联评估（评估合格的产出） =====
     source_assessment_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True, default=None)
     # 关联的能力评估单 id（competency_assessment.id）
