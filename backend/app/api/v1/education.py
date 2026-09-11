@@ -170,7 +170,7 @@ exambank_router = make_router(
 
 @prejob_router.post("/{pid}/generate-auths")
 def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
-    """P3：结论=通过 时，按考核仪器逐台自动生成授权记录（AuthSheet，监督期「有条件」状态）。"""
+    """P3：考核意见=同意上岗 时，为该人员生成「一人一条」的授权记录。"""
     p = db.get(PreJobAuth, pid)
     if not p:
         raise HTTPException(404, "记录不存在")
@@ -189,36 +189,41 @@ def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = 
 
     positions = _as_list(p.positions_json)
     instruments = _as_list(p.instruments_json)
-    scopes = [s for s in _as_list(p.permissions_json) if s in ("操作", "复核", "报告")] or ["操作"]
-    items = _as_list(p.items_json)
-    item_map = {i.get("code"): (i.get("items") or "") for i in items}
+    scopes = [x for x in _as_list(p.permissions_json) if x in ("操作", "复核", "报告")] or ["操作"]
     person = db.query(PersonnelMaster).filter_by(name=p.name).first()
-    today = datetime.now().strftime("%Y-%m-%d")
-    created = 0
-    for inst in instruments:
-        code = inst.get("code", "")
-        for scope in scopes:
-            db.add(AuthSheet(
-                person_id=person.id if person else None,
-                name=p.name,
-                post="、".join(positions),
-                instrument=f"{inst.get('name', '')}（{code.replace('MHZYY-JYK-', '')}）",
-                project=item_map.get(code, ""),
-                auth_scope=scope,
-                status="有条件",
-                status_reason="岗前培训考核通过，监督期内",
-                source_assessment_id=p.id,
-                source_assessment_text=f"岗前培训授权-单{p.id}",
-                auth_date=p.auth_date or today,
-                valid_from=p.auth_date or today,
-                has_assessment_pass=True,
-                remark=f"岗前培训考核及授权表 id={p.id} 自动生成",
-                created_by=user.username,
-            ))
-            created += 1
+    auth_date = p.auth_date or datetime.now().strftime("%Y-%m-%d")
+    valid_until = ""
+    try:
+        dd = datetime.strptime(auth_date, "%Y-%m-%d")
+        valid_until = "%04d-%02d-%02d" % (dd.year + 1, dd.month, dd.day)
+    except Exception:
+        valid_until = ""
+    inst_names = [i.get("name", "") for i in instruments]
+    db.add(AuthSheet(
+        person_id=person.id if person else None,
+        name=p.name,
+        department="生化免疫组",
+        post="、".join(positions)[:95],
+        instrument="、".join(inst_names)[:190],
+        auth_scope="、".join(scopes)[:18],
+        posts_json=json.dumps(positions, ensure_ascii=False),
+        instruments_json=json.dumps(instruments, ensure_ascii=False),
+        scopes_json=json.dumps(scopes, ensure_ascii=False),
+        status="有效",
+        valid_from=auth_date,
+        valid_until=valid_until,
+        auth_date=auth_date,
+        authorizer="金子铮",
+        authorizer_qualification="免疫组组长/主治医师/本领域6年",
+        source_assessment_id=p.id,
+        source_assessment_text=f"岗前培训授权-单{p.id}",
+        has_assessment_pass=True,
+        remark=f"岗前培训考核及授权表 id={p.id} 自动生成（一人一条）",
+        created_by=user.username,
+    ))
     p.batch_id = f"PJ{p.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     db.commit()
-    return {"ok": True, "created": created, "batch_id": p.batch_id}
+    return {"ok": True, "created": 1, "batch_id": p.batch_id}
 
 router.include_router(personnel_router)
 router.include_router(edu_router)
