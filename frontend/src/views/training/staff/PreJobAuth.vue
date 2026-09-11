@@ -76,7 +76,7 @@
               <span style="color:#888;">满分 {{ pt.score }}</span>
               <el-input-number v-model="examData[pc.post].practicalScores[pi]" size="small" :min="0" :max="pt.score" style="width:110px;" />
             </div>
-            <div>实操得分：<b>{{ practicalScore(pc) }}</b> / {{ pc.practicalTotal }}</div>
+            <div>实操得分：<b>{{ practicalPct(pc) }}</b> / 100 分（原始 {{ practicalScore(pc) }}/{{ pc.practicalTotal }}，合格线 80）</div>
           </template>
 
           <template v-if="pc.methods.includes('理论考核')">
@@ -99,7 +99,7 @@
                 <el-radio value="对">对</el-radio><el-radio value="错">错</el-radio>
               </el-radio-group>
             </div>
-            <div>理论得分：<b>{{ theoryScore(pc) }}</b> / {{ theoryFull(pc) }}</div>
+            <div>理论得分：<b>{{ theoryPct(pc) }}</b> / 100 分（原始 {{ theoryScore(pc) }}/{{ theoryFull(pc) }}，合格线 60）</div>
           </template>
 
           <el-form-item label="掌握程度" label-width="90px" style="margin-top:8px;">
@@ -301,6 +301,9 @@ function practicalScore(pc) {
 }
 // 注意：pc.theoryFull 是数值属性，模板/判分里用函数取值（曾误写 theoryFull(pc) 导致渲染崩溃、弹窗空白）
 function theoryFull(pc) { return pc.theoryFull || 0 }
+// 百分制（每岗位满分 100）
+function theoryPct(pc) { const t = theoryFull(pc); return t ? Math.round(theoryScore(pc) * 100 / t) : 0 }
+function practicalPct(pc) { const t = pc.practicalTotal || 0; return t ? Math.round(practicalScore(pc) * 100 / t) : 0 }
 function theoryScore(pc) {
   let s = 0
   const d = examData.value[pc.post] || {}
@@ -314,8 +317,8 @@ function theoryScore(pc) {
   return s
 }
 function postPass(pc) {
-  if (pc.methods.includes('实操考核') && practicalScore(pc) < Math.ceil(pc.practicalTotal * 0.8)) return false
-  if (pc.methods.includes('理论考核') && theoryScore(pc) < Math.ceil(theoryFull(pc) * 0.6)) return false
+  if (pc.methods.includes('实操考核') && (pc.practicalTotal || 0) > 0 && practicalPct(pc) < 80) return false
+  if (pc.methods.includes('理论考核') && theoryFull(pc) > 0 && theoryPct(pc) < 60) return false
   if (pc.methods.includes('口头问答') && (examData.value[pc.post] || {}).qaResult === '不合格') return false
   return true
 }
@@ -441,8 +444,8 @@ async function printForm(row) {
     <table style="border-collapse:collapse;width:100%;font-size:12px;margin-top:4px;">
       <tr><td style="width:80px;text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">考核方式</td><td style="border:1px solid #333;padding:4px;">${esc(pp.methods.join('、'))}</td></tr>
       <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">口头问答</td><td style="border:1px solid #333;padding:4px;">${esc(pp.d.qaResult || '')}</td></tr>
-      <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">实操得分</td><td style="border:1px solid #333;padding:4px;">${pp.bank.practical_json && pp.bank.practical_json.length ? practicalScoreOf(row, pp) + ' / ' + pp.practicalTotal : ''}</td></tr>
-      <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">理论得分</td><td style="border:1px solid #333;padding:4px;">${pp.bank.theory_json ? theoryScoreOf(row, pp) + ' / ' + pp.theoryFull : ''}</td></tr>
+      <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">实操得分</td><td style="border:1px solid #333;padding:4px;">${pp.bank.practical_json && pp.bank.practical_json.length ? practicalPctOf(row, pp) + ' 分（原始 ' + practicalScoreOf(row, pp) + '/' + pp.practicalTotal + '）' : ''}</td></tr>
+      <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">理论得分</td><td style="border:1px solid #333;padding:4px;">${pp.bank.theory_json ? theoryPctOf(row, pp) + ' 分（原始 ' + theoryScoreOf(row, pp) + '/' + pp.theoryFull + '）' : ''}</td></tr>
       <tr><td style="text-align:center;background:#f7f7f7;border:1px solid #333;padding:4px;">掌握程度</td><td style="border:1px solid #333;padding:4px;">${esc(pp.d.mastery || '')}</td></tr>
     </table>`).join('')
 
@@ -477,6 +480,8 @@ function practicalScoreOf(row, pp) {
   const d = (row.exam_json || {})[pp.post] || {}
   return (pp.bank.practical_json || []).reduce((s, p, i) => s + (Number(d.practicalScores?.[i]) || 0), 0)
 }
+function practicalPctOf(row, pp) { const t = pp.practicalTotal || 0; return t ? Math.round(practicalScoreOf(row, pp) * 100 / t) : 0 }
+function theoryPctOf(row, pp) { const t = pp.theoryFull || 0; return t ? Math.round(theoryScoreOf(row, pp) * 100 / t) : 0 }
 function theoryScoreOf(row, pp) {
   let s = 0
   const d = (row.exam_json || {})[pp.post] || {}

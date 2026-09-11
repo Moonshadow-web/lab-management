@@ -64,8 +64,11 @@
     <!-- 完成 -->
     <div v-else style="text-align:center;padding:24px 0;">
       <h3 style="color:#16a34a;">提交成功</h3>
-      <p style="font-size:18px;">理论得分：<b>{{ result.score }}</b> / {{ result.full }}</p>
-      <p style="color:#888;">成绩已回写到您的岗前培训考核记录</p>
+      <p style="font-size:18px;">理论得分（总分）：<b>{{ result.pct }}</b> / 100 分</p>
+      <div v-for="(v, k) in result.detail || {}" :key="k" style="font-size:14px;color:#444;">
+        {{ k }}：<b>{{ v.pct }}</b> / 100 分（原始 {{ v.score }}/{{ v.full }}）　合格线 60
+      </div>
+      <p style="color:#888;margin-top:8px;">成绩已回写到您的岗前培训考核记录</p>
     </div>
   </div>
 </template>

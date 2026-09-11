@@ -575,7 +575,8 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
             if a.get("j%d" % i) == str(t.get("answer", "")):
                 s += 2
         f = len(T.get("single") or []) * 2 + len(T.get("multi") or []) * 4 + len(T.get("judge") or []) * 2
-        detail[post] = {"score": s, "full": f}
+        pct = int(round(s * 100.0 / f)) if f else 0
+        detail[post] = {"score": s, "full": f, "pct": pct}
         total += s
         full += f
         d = exam.get(post) or {}
@@ -589,6 +590,8 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
         exam[post] = d
     p.exam_json = json.dumps(exam, ensure_ascii=False)
     db.commit()
-    return {"ok": True, "score": total, "full": full, "detail": detail}
+    pcts = [v["pct"] for v in detail.values()]
+    avg_pct = int(round(sum(pcts) / len(pcts))) if pcts else 0
+    return {"ok": True, "score": total, "full": full, "pct": avg_pct, "detail": detail}
 
 router.include_router(postmap_router)
