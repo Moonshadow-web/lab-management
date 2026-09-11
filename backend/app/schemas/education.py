@@ -555,7 +555,7 @@ class AuthSheetBase(BaseModel):
     supervised_until: str = ""
     supervisor: str = ""
     # 状态机
-    status: str = "有条件"
+    status: str = "有效"
     status_reason: str = ""
     # 关联评估
     source_assessment_id: int | None = None
