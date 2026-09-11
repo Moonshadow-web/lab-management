@@ -494,7 +494,6 @@ async function printForm(row) {
   // ===== 第一页 =====
   const page1 = `
     <h2 style="text-align:center;letter-spacing:3px;margin:0 0 4px;">岗前培训考核及授权表</h2>
-    <div class="meta" style="text-align:center;">表格编号：BG-SM-PX-002　　检验科生化免疫组</div>
     <table style="border:1.5px solid #333;font-size:13px;">
       <tr><td style="width:90px;text-align:center;background:#f7f7f7;">申请人</td><td style="width:180px;text-align:center;">${esc(row.name)}</td><td style="width:90px;text-align:center;background:#f7f7f7;">申请日期</td><td style="text-align:center;">${esc(row.apply_date)}</td></tr>
       <tr><td style="text-align:center;background:#f7f7f7;">考核岗位</td><td colspan="3" style="padding:4px 8px;">${esc(posts.join('、'))}</td></tr>
@@ -509,6 +508,9 @@ async function printForm(row) {
     </table>
     <div style="margin-top:34px;text-align:center;font-size:14px;letter-spacing:1px;">
       员工签字：　　　　　　　　组长签字：　　　　　　　　日期：
+    </div>
+    <div style="margin-top:30px;padding-top:6px;border-top:1px solid #999;font-size:11px;color:#333;text-align:center;">
+      表格编号：BG-SM-PX-002　　　　民航总医院检验科生化免疫组　　　　失效日期：2026.9.15
     </div>
     ${pageBreak}`
 

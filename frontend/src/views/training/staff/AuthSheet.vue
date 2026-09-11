@@ -283,7 +283,8 @@ async function openDetail(row) {
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 function printRow(row) {
   const html = `
-  <h2 style="text-align:center;letter-spacing:3px;">检验科生化免疫组 人员授权书</h2>
+  <h2 style="text-align:center;letter-spacing:3px;margin:0 0 2px;">检验科生化免疫组</h2>
+  <h2 style="text-align:center;letter-spacing:3px;margin:0 0 10px;">人员授权书</h2>
   <table style="border:1.5px solid #333;font-size:13px;">
     <tr><td style="width:90px;text-align:center;background:#f7f7f7;">姓名</td><td style="width:150px;">${esc(row.name)}</td><td style="width:90px;text-align:center;background:#f7f7f7;">部门</td><td>${esc(row.department)}</td></tr>
     <tr><td style="text-align:center;background:#f7f7f7;">授权岗位</td><td colspan="3">${esc(postsOf(row).join('、'))}</td></tr>
