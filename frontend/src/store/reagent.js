@@ -24,6 +24,15 @@ export const useReagentStore = defineStore('reagent', {
     libs: defaultsOf(groupCode()),
   }),
   actions: {
+    // 进入页面时按"当前登录组"重置（store 可能在登录前就已初始化，会带入生免组默认值）
+    syncGroup() {
+      const g = groupCode()
+      if (this.group === g && this.libs.length) return
+      this.group = g
+      this.libs = defaultsOf(g)
+      const saved = localStorage.getItem(storageKey()) || ''
+      this.library = saved || defaultsOf(g)[0] || ''
+    },
     // 由页面按本组数据回填可选责任库（生免组至少保留默认两类）
     setLibraries(list) {
       const g = groupCode()
