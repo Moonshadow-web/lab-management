@@ -61,6 +61,7 @@ def list_audit_logs(
             "record_id": i.record_id,
             "detail": i.detail,
             "ip": i.ip,
+            "group_code": getattr(i, "group_code", "") or "",
             "created_at": i.created_at.strftime("%Y-%m-%d %H:%M:%S") if i.created_at else "",
         })
     return {"items": result, "total": total, "page": page, "pages": pages, "page_size": page_size}
