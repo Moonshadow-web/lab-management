@@ -265,6 +265,73 @@ def list_stock(
 # 3. 盘库
 # =============================================================================
 
+@router.post("/stock/_merge_batches", response_model=dict)
+def merge_stock_batches(
+    dry_run: bool = Query(True, description="true=只返回将要做的变更，不落库"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+    group: str = Depends(get_current_group),
+):
+    """同一试剂存在多个批号行时，合并到**效期最近**的那一批（数量相加）。
+
+    规则：
+    - 保留行：效期最早（最近效期）的非空效期行；若都无空效期，则保留数量最大（并列取 id 最大）
+    - 其余行数量累加到保留行后删除；批号与效期以保留行为准
+    - 仅处理当前专业组的库存；返回 dry_run 报告（含被删行的批号/效期/数量，便于追溯）
+    """
+    _g = (group or "sm").strip().lower()
+    q = db.query(ReagentStock)
+    conds = [ReagentStock.group_code == _g]
+    if _g == "sm":
+        conds += [ReagentStock.group_code.is_(None), ReagentStock.group_code == ""]
+    rows = q.filter(or_(*conds)).order_by(ReagentStock.id).all()
+    item_names = {i.id: i.name for i in db.query(ReagentItem.id, ReagentItem.name).all()}
+
+    groups: dict = defaultdict(list)
+    for r in rows:
+        groups[r.item_id].append(r)
+
+    changes = []
+    for item_id, rs in groups.items():
+        if len(rs) < 2:
+            continue
+        # 效期最近优先：非空效期升序 → 再按数量/id 降序
+        def sort_key(x):
+            e = getattr(x, "expiry_date", None)
+            return (0 if e else 1, e or date.max, -int(x.quantity or 0), -x.id)
+        keep = sorted(rs, key=sort_key)[0]
+        drops = [r for r in rs if r.id != keep.id]
+        add = sum(int(r.quantity or 0) for r in drops)
+        changes.append({
+            "action": "merge_batches_to_near_expiry",
+            "item_id": item_id,
+            "item_name": item_names.get(item_id, ""),
+            "keep_id": keep.id,
+            "keep_batch": keep.batch_no or "(空)",
+            "keep_expiry": str(keep.expiry_date) if keep.expiry_date else "",
+            "keep_qty_before": int(keep.quantity or 0),
+            "add": add,
+            "result": int(keep.quantity or 0) + add,
+            "drop": [
+                {"id": r.id, "batch": r.batch_no or "(空)", "expiry": str(r.expiry_date) if r.expiry_date else "", "qty": int(r.quantity or 0)}
+                for r in drops
+            ],
+        })
+
+    if not dry_run:
+        for c in changes:
+            keep = db.get(ReagentStock, c["keep_id"])
+            if not keep:
+                continue
+            keep.quantity = c["result"]
+            for d in c["drop"]:
+                obj = db.get(ReagentStock, d["id"])
+                if obj:
+                    db.delete(obj)
+        db.commit()
+
+    return {"dry_run": dry_run, "changes": changes, "count": len(changes)}
+
 @router.post("/stock/_normalize", response_model=dict)
 def normalize_stock(
     dry_run: bool = Query(True, description="true=只返回将要做的变更，不落库"),
