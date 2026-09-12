@@ -63,6 +63,14 @@ const routes = [
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 
+// 非生免组允许访问的路径（与侧边菜单白名单一致）；其余一律回工作台
+const OTHER_GROUP_ALLOWED = new Set([
+  '/dashboard', '/test-items', '/documents', '/instruments',
+  '/reagent', '/reagent/items', '/reagent/stock', '/reagent/inventory',
+  '/reagent/orders', '/reagent/consumption', '/reagent/associations',
+  '/reagent/receivings',
+])
+
 const router = createRouter({
   history: createWebHistory(),
   routes,
@@ -75,6 +83,9 @@ router.beforeEach((to, from, next) => {
   } else if (to.path === '/login' && auth.isLoggedIn) {
     // 已登录却访问 /login：带 redirect 则回跳原页面，否则进工作台
     next(to.query.redirect || '/dashboard')
+  } else if ((auth.groupCode || 'sm') !== 'sm' && !OTHER_GROUP_ALLOWED.has(to.path)) {
+    // 专业组隔离：非生免组不可直达白名单之外的页面
+    next('/dashboard')
   } else if (to.meta.adminOnly) {
     // adminOnly 路由仅管理员可访问
     const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')

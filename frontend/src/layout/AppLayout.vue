@@ -86,6 +86,14 @@ const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
+// 非生免组可见路径白名单（其余菜单不显示，路由层也会拦截直达）
+const OTHER_GROUP_PATHS = new Set([
+  '/dashboard', '/test-items', '/documents', '/instruments',
+  '/reagent', '/reagent/items', '/reagent/stock', '/reagent/inventory',
+  '/reagent/orders', '/reagent/consumption', '/reagent/associations',
+  '/reagent/receivings',
+])
+
 const menus = computed(() => {
   const all = [
     { path: '/dashboard', title: '工作台', icon: 'Odometer' },
@@ -121,6 +129,10 @@ const menus = computed(() => {
     if (m.moduleKeys) return auth.canAccessAnyMenu(m.moduleKeys)
     return auth.canAccessMenu(m.moduleKey)
   })
+  // 专业组裁剪：非生免组只保留白名单菜单
+  if ((auth.groupCode || 'sm') !== 'sm') {
+    return visible.filter((m) => OTHER_GROUP_PATHS.has(m.path))
+  }
   // 管理员额外可见系统管理类
   const isAdmin = auth.user?.role === 'admin' || (auth.user?.roles || '').includes('admin')
   if (isAdmin) {
