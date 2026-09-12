@@ -49,6 +49,7 @@ def make_router(
     write_roles: tuple[str, ...] | None = None,
     delete_roles: tuple[str, ...] | None = None,
     json_fields: list[str] | None = None,
+    group_scoped: bool = False,
 ):
     """通用 CRUD 路由工厂：分页/搜索、get、create、update、delete，并统一写审计日志。
 
@@ -63,6 +64,37 @@ def make_router(
     自动 json.dumps 序列化（ensure_ascii=False），读回时由 schema 反序列化。
     """
     _json_fields = set(json_fields or [])
+    # 专业组数据隔离：group_scoped=True 时才生效；当前组为生免组(sm)/空 → 不过滤（保持原行为）
+    if group_scoped:
+        from ._auth_helpers import get_current_group as _get_group
+
+        def _group_param(group: str = Depends(_get_group)) -> str:
+            return (group or "sm").strip().lower()
+    else:
+        def _group_param() -> str | None:
+            return None
+
+    def _need_filter(group: str | None) -> bool:
+        return bool(group_scoped) and bool(group) and group not in ("sm",)
+
+    def _shared_conds(Model_):
+        """科室共享数据：编号含 KS 段（如 BG-KS-… / MHZYY-JYK-KS-…）。"""
+        out = []
+        for f in ("code", "dept_no", "doc_number"):
+            col = getattr(Model_, f, None)
+            if col is not None:
+                out.append(col.ilike("%KS%"))
+        return out
+
+    def _visible(obj, group: str) -> bool:
+        """非生免组可见：本组数据 或 KS 共享数据。"""
+        if getattr(obj, "group_code", None) == group:
+            return True
+        for f in ("code", "dept_no", "doc_number"):
+            v = getattr(obj, f, None)
+            if isinstance(v, str) and "KS" in v:
+                return True
+        return False
     # 写权限依赖：有 write_roles 则校验角色，否则仅要求登录
     WriteDep = require_roles(*write_roles) if write_roles else get_current_user
     # 删除权限：独立配置；未设则沿用 write_roles
@@ -78,9 +110,14 @@ def make_router(
         q: str | None = None,
         db: Session = Depends(get_db),
         user: User = Depends(get_current_user),
+        group: str | None = Depends(_group_param),
     ):
         params = dict(request.query_params)
         query = db.query(Model)
+        if _need_filter(group):
+            col = getattr(Model, "group_code", None)
+            if col is not None:
+                query = query.filter(or_(col == group, *_shared_conds(Model)))
         if q and search_fields:
             conds = [getattr(Model, f).ilike(f"%{q}%") for f in search_fields if hasattr(Model, f)]
             if conds:
@@ -168,9 +205,16 @@ def make_router(
         return ReadSchema.model_validate(_serialize(obj))
 
     @router.get("/{item_id}", response_model=ReadSchema)
-    def get_item(item_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    def get_item(
+        item_id: int,
+        db: Session = Depends(get_db),
+        user: User = Depends(get_current_user),
+        group: str | None = Depends(_group_param),
+    ):
         obj = db.get(Model, item_id)
         if not obj:
+            raise HTTPException(status_code=404, detail="未找到记录")
+        if _need_filter(group) and not _visible(obj, group):
             raise HTTPException(status_code=404, detail="未找到记录")
         return _to_read(obj)
 
@@ -180,8 +224,11 @@ def make_router(
         request: Request,
         db: Session = Depends(get_db),
         user: User = Depends(WriteDep),
+        group: str | None = Depends(_group_param),
     ):
         data = item.model_dump()
+        if _need_filter(group) and hasattr(Model, "group_code"):
+            data["group_code"] = group
         for f in _json_fields:
             if f in data and data[f] is not None and not isinstance(data[f], str):
                 data[f] = json.dumps(data[f], ensure_ascii=False)
@@ -201,8 +248,11 @@ def make_router(
         request: Request,
         db: Session = Depends(get_db),
         user: User = Depends(WriteDep),
+        group: str | None = Depends(_group_param),
     ):
         obj = db.get(Model, item_id)
+        if _need_filter(group) and obj is not None and not _visible(obj, group):
+            raise HTTPException(status_code=403, detail="无权修改其他专业组的数据")
         if not obj:
             raise HTTPException(status_code=404, detail="未找到记录")
         changes = item.model_dump(exclude_unset=True)
@@ -225,10 +275,13 @@ def make_router(
         request: Request,
         db: Session = Depends(get_db),
         user: User = Depends(DeleteDep),
+        group: str | None = Depends(_group_param),
     ):
         obj = db.get(Model, item_id)
         if not obj:
             raise HTTPException(status_code=404, detail="未找到记录")
+        if _need_filter(group) and not _visible(obj, group):
+            raise HTTPException(status_code=403, detail="无权删除其他专业组的数据")
         db.delete(obj)
         db.commit()
         write_audit(db, user, "delete", Model.__tablename__, item_id, "", _ip(request))

@@ -73,6 +73,7 @@ router = make_router(
     filter_fields=["category", "brand", "specimen", "method", "instrument"],
     prefix="/test-items",
     write_roles=("admin",),
+    group_scoped=True,  # S3：按专业组隔离（生免组不受影响；其他组只看本组 + KS 共享）
     order_by=[_CATEGORY_RANK, _COMMON_CASE, TestItem.name],
 )
 
