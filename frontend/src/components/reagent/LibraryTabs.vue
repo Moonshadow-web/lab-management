@@ -13,7 +13,8 @@ import { ref, watch, onMounted } from 'vue'
 import { useReagentStore, LIBRARIES } from '../../store/reagent'
 
 const reagentStore = useReagentStore()
-const libs = LIBRARIES
+reagentStore.syncGroup()
+const libs = computed(() => reagentStore.libs)
 const selected = ref(reagentStore.library)
 
 // 外部切换（如其他页面修改了 store）时同步回来
