@@ -62,11 +62,11 @@ const error = ref('')
 const info = ref({})
 const submitted = ref(false)
 const submitting = ref(false)
-// 日期默认当日 00:00:00，时间由用户再填
+// 日期默认当天，精度到分钟（不显示秒）
 function todayDefault() {
   const d = new Date()
   const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} 00:00:00`
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 const form = reactive({
   fault_desc: '', affected_items: '', finder: '', found_at: todayDefault(),

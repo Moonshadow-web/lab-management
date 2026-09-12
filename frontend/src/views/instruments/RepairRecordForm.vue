@@ -8,7 +8,7 @@
       </el-col>
       <el-col :span="12" :xs="24">
         <el-form-item label="发现时间">
-          <el-date-picker v-model="form.found_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="选择日期+时间" style="width:100%" />
+          <el-date-picker v-model="form.found_at" type="datetime" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DD HH:mm" placeholder="选择日期+时间" style="width:100%" />
         </el-form-item>
       </el-col>
       <el-col :span="24">
@@ -23,12 +23,12 @@
       </el-col>
       <el-col :span="12" :xs="24">
         <el-form-item label="通知维修时间">
-          <el-date-picker v-model="form.notify_repair_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
+          <el-date-picker v-model="form.notify_repair_at" type="datetime" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DD HH:mm" style="width:100%" />
         </el-form-item>
       </el-col>
       <el-col :span="12" :xs="24">
         <el-form-item label="处理时间">
-          <el-date-picker v-model="form.handled_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
+          <el-date-picker v-model="form.handled_at" type="datetime" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DD HH:mm" style="width:100%" />
         </el-form-item>
       </el-col>
       <el-col :span="24">
@@ -43,7 +43,7 @@
       </el-col>
       <el-col :span="12" :xs="24">
         <el-form-item label="恢复使用时间">
-          <el-date-picker v-model="form.restored_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
+          <el-date-picker v-model="form.restored_at" type="datetime" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DD HH:mm" style="width:100%" />
         </el-form-item>
       </el-col>
     </el-row>
