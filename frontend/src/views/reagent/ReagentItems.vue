@@ -181,7 +181,7 @@ async function refresh() {
     if (showInactive.value) params.show_inactive = true
     const r = await listReagentItems(params)
     items.value = r.items; total.value = r.total
-    reagentStore.setLibraries([...new Set(((rows.value || []).map((r) => r.library)).filter(Boolean))])
+    reagentStore.setLibraries([...new Set(((items.value || []).map((x) => x.library)).filter(Boolean))])
     await loadStats()
   } catch (e) {
     ElMessage.error('加载失败：' + errText(e))
