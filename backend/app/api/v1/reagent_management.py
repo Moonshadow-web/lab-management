@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from ...core.crud_base import paginate
 from ...core.database import get_db
 from ...core.http_utils import content_disposition
+from ...core._auth_helpers import get_current_group
 from ...core.security import get_current_user, require_roles, user_roles_list
 from ...models.reagent_management import (
     ReagentItem, ReagentStock, InventoryCheck, InventoryCheckItem,
@@ -44,6 +45,21 @@ router = APIRouter(prefix="/reagent", tags=["reagent-management"])
 # 1. 试剂目录 CRUD
 # =============================================================================
 
+def _rg_scope(query, Model, group: str):
+    """按专业组过滤试剂相关列表：本组 或 材料编码含 KS（科室共享）；生免组兼容历史空值。"""
+    col = getattr(Model, "group_code", None)
+    if col is None:
+        return query
+    conds = [col == group]
+    if group == "sm":
+        conds.append(col.is_(None))
+        conds.append(col == "")
+    code_col = getattr(Model, "material_code", None)
+    if code_col is not None:
+        conds.append(code_col.ilike("%KS%"))
+    return query.filter(or_(*conds))
+
+
 @router.get("/items", response_model=dict)
 def list_reagent_items(
     q: str = Query("", description="搜索（名称/品牌/材料编码/项目名/项目别名）"),
@@ -55,8 +71,11 @@ def list_reagent_items(
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
+    group: str = Depends(get_current_group),
 ):
     base = db.query(ReagentItem)
+    if group:
+        base = _rg_scope(base, ReagentItem, (group or "sm").strip().lower())
     if q.strip():
         kw = f"%{q.strip()}%"
         # 通过关联表匹配项目名/项目别名（如 alt → 丙氨酸氨基转移酶）
@@ -128,9 +147,13 @@ def get_reagent_item(item_id: int, db: Session = Depends(get_db), _=Depends(get_
 @router.post("/items", response_model=ReagentItemRead)
 def create_reagent_item(
     data: ReagentItemCreate, db: Session = Depends(get_db),
+    group: str = Depends(get_current_group),
     user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
 ):
-    item = ReagentItem(**data.model_dump())
+    _d = data.model_dump()
+    if group:
+        _d["group_code"] = (group or "sm").strip().lower()
+    item = ReagentItem(**_d)
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -204,8 +227,13 @@ def list_stock(
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
+    group: str = Depends(get_current_group),
 ):
     base = db.query(ReagentStock)
+    if group:
+        _g = (group or "sm").strip().lower()
+        _ids = [r[0] for r in _rg_scope(db.query(ReagentItem.id), ReagentItem, _g).all()]
+        base = base.filter(ReagentStock.item_id.in_(_ids or [-1]))
     if q.strip():
         kw = f"%{q.strip()}%"
         item_ids = [r[0] for r in db.query(ReagentItem.id).filter(
