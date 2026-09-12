@@ -4,17 +4,18 @@
     <el-radio-group v-model="selected" size="small" @change="onRadioChange">
       <el-radio-button v-for="lib in libs" :key="lib" :value="lib">{{ lib }}</el-radio-button>
     </el-radio-group>
-    <span class="hint">（生化凝血 / 免疫 分开管理，两人各管一类）</span>
+    <span v-if="isSmGroup" class="hint">（生化凝血 / 免疫 分开管理，两人各管一类）</span>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useReagentStore, LIBRARIES } from '../../store/reagent'
 
 const reagentStore = useReagentStore()
 reagentStore.syncGroup()
 const libs = computed(() => reagentStore.libs)
+const isSmGroup = computed(() => (localStorage.getItem('group_code') || 'sm') === 'sm')
 const selected = ref(reagentStore.library)
 
 // 外部切换（如其他页面修改了 store）时同步回来
