@@ -265,6 +265,42 @@ def list_stock(
 # 3. 盘库
 # =============================================================================
 
+@router.post("/stock/_restore_merge", response_model=dict)
+def restore_merged_batches(
+    payload: dict,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+    group: str = Depends(get_current_group),
+):
+    """撤销「跨批号合并」：把保留行数量还原，并重建被删除的批号行。
+
+    payload: {"changes":[{"keep_id":int,"keep_qty_before":int,
+                          "drop":[{"item_id":int,"batch_no":str,"expiry_date":"YYYY-MM-DD","quantity":int}]}]}
+    """
+    _g = (group or "sm").strip().lower()
+    done = []
+    for c in (payload or {}).get("changes", []):
+        keep = db.get(ReagentStock, int(c.get("keep_id") or 0))
+        if keep:
+            keep.quantity = int(c.get("keep_qty_before") or 0)
+        for d in c.get("drop", []):
+            exp = d.get("expiry_date") or None
+            if isinstance(exp, str) and exp:
+                try:
+                    exp = date.fromisoformat(exp)
+                except ValueError:
+                    exp = None
+            db.add(ReagentStock(
+                item_id=int(d.get("item_id") or 0),
+                batch_no=d.get("batch_no") or "",
+                expiry_date=exp,
+                quantity=int(d.get("quantity") or 0),
+                group_code=_g,
+            ))
+        done.append(c.get("keep_id"))
+    db.commit()
+    return {"ok": True, "restored": done}
+
 @router.post("/stock/_merge_batches", response_model=dict)
 def merge_stock_batches(
     dry_run: bool = Query(True, description="true=只返回将要做的变更，不落库"),
@@ -521,8 +557,7 @@ def _default_batch_map(db: Session) -> dict:
     rows = (
         db.query(ReagentStock)
         .filter(ReagentStock.batch_no.isnot(None), ReagentStock.batch_no != "")
-        .order_by(ReagentStock.item_id, ReagentStock.quantity.desc(),
-                  ReagentStock.last_updated.desc())
+        .order_by(ReagentStock.item_id, ReagentStock.id.asc())  # 空批号并入「旧批号」= 最早创建的那批
         .all()
     )
     for r in rows:
