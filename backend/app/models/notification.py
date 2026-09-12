@@ -14,6 +14,7 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm")  # 所属专业组（默认生免组）
     module: Mapped[str] = mapped_column(String(50), default="")  # 所属模块
     ref_type: Mapped[str] = mapped_column(String(50), default="")  # 关联类型（如 instrument）
     ref_id: Mapped[int] = mapped_column(default=0)  # 关联记录 id

@@ -79,13 +79,17 @@ async def dashboard_stats(
         .where(NotificationRead.user_id == user.id)
         .subquery()
     )
+    _nconds = [(Notification.recipient_user_id == user.id)]  # 私密消息本人可见
+    if _g == "sm":
+        _nconds += [Notification.group_code == "sm", Notification.group_code.is_(None), Notification.group_code == ""]
+    else:
+        _nconds.append(Notification.group_code == _g)
     unread_stmt = (
         select(func.count())
         .select_from(Notification)
         .outerjoin(read_subq, Notification.id == read_subq.c.notification_id)
         .where(
-            (Notification.recipient_user_id.is_(None))
-            | (Notification.recipient_user_id == user.id),
+            or_(*_nconds),
             read_subq.c.notification_id.is_(None),
         )
     )

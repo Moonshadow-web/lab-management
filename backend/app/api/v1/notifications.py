@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from ...core.config import SYSTEM_NAME
 from ...core.database import get_db
+from ...core._auth_helpers import get_current_group
 from ...core.security import get_current_user, require_roles
 from ...models.notification import Notification, NotificationRead
 from ...models.user import User
@@ -19,6 +20,7 @@ def list_notifications(
     unread_only: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    group: str = Depends(get_current_group),
 ):
     # 当前用户已读通知 id 子查询（按用户维度，互不影响）
     read_subq = db.query(NotificationRead.notification_id).filter(
@@ -29,10 +31,20 @@ def list_notifications(
         read_subq, Notification.id == read_subq.c.notification_id
     )
     # 私密消息仅本人可见；广播(NULL)对所有人可见（换班等私密提醒不会泄露给无关人）
-    query = query.filter(
-        (Notification.recipient_user_id.is_(None))
-        | (Notification.recipient_user_id == user.id)
-    )
+    from sqlalchemy import or_
+    _g = (group or "sm").strip().lower()
+    _conds = [(Notification.recipient_user_id == user.id)]  # 私密消息始终本人可见
+    if _g == "sm":
+        _conds += [
+            Notification.group_code == "sm",
+            Notification.group_code.is_(None),
+            Notification.group_code == "",
+        ]
+    else:
+        _conds.append(Notification.group_code == _g)
+    if unread_only:
+        pass
+    query = query.filter(or_(*_conds))
     if unread_only:
         # 未读 = 该用户在 notification_reads 中无对应记录
         query = query.filter(read_subq.c.notification_id.is_(None))
