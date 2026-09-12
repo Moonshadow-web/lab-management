@@ -49,7 +49,7 @@
       <div class="stat-sub" style="margin-top:8px">全部责任库 · 仅启用</div>
     </AppCard>
 
-    <AppCard title="今日我的岗位" class="mt">
+    <AppCard v-if="isSmGroup" title="今日我的岗位" class="mt">
       <template #header-extra>
         <el-radio-group v-model="rangeMode" size="small" @change="onRangeChange">
           <el-radio-button label="week">本周</el-radio-button>
@@ -161,6 +161,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import AppCard from '../components/AppCard.vue'
+import { useAuthStore } from '../store/auth'
 import { getDashboardStats } from '../api/dashboard'
 import { listTestItems } from '../api/testItems'
 import { listInstruments } from '../api/instruments'
@@ -174,6 +175,10 @@ import { listNC } from '../api/nonconformity'
 import { getMyToday, getMySchedule, getRestRoster } from '../api/scheduling'
 
 const router = useRouter()
+const auth = useAuthStore()
+// 专业组隔离：非生免组不显示排班相关卡片（排班模块未对其开放）
+const isSmGroup = computed(() => (auth.groupCode || 'sm') === 'sm')
+
 const stats = ref({
   testItems: '-', instruments: '-', documents: '-', notifications: '-',
   qc: '-', reagents: '-', reagentCounts: {}, training: '-', verification: '-', nc: '-',
@@ -254,6 +259,7 @@ async function loadNotices() {
 
 async function loadMyShifts() {
   try {
+    if (!isSmGroup.value) { myShifts.value = []; return }
     myShifts.value = await getMyToday()
   } catch (e) {
     myShifts.value = []
@@ -262,6 +268,7 @@ async function loadMyShifts() {
 
 async function loadMySchedule() {
   try {
+    if (!isSmGroup.value) { mySchedule.value = []; return }
     mySchedule.value = await getMySchedule({ range: rangeMode.value })
   } catch (e) {
     mySchedule.value = []
@@ -270,6 +277,7 @@ async function loadMySchedule() {
 
 async function loadRestRoster() {
   try {
+    if (!isSmGroup.value) { restRoster.value = []; return }
     restRoster.value = await getRestRoster({ range: rangeMode.value })
   } catch (e) {
     restRoster.value = []
