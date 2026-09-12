@@ -7,7 +7,7 @@
       :class="{ 'aside-mobile': isMobile, 'aside-open': isMobile && drawerVisible }"
     >
       <div class="logo">
-        生免组管理系统
+        民航总医院检验科<br />实验室管理系统
         <el-icon class="close-btn" @click="drawerVisible = false" v-if="isMobile"><Close /></el-icon>
       </div>
       <el-menu
@@ -45,7 +45,10 @@
       <el-header class="header">
         <el-icon class="hamburger" @click="drawerVisible = true" v-if="isMobile"><Menu /></el-icon>
         <span class="title">{{ currentTitle }}</span>
-        <el-tag size="small" type="info" style="margin-left:8px;">{{ auth.groupName }}</el-tag>
+        <el-tag
+          effect="dark"
+          style="margin-left:10px;font-size:14px;font-weight:600;letter-spacing:1px;padding:0 12px;height:28px;line-height:28px;border-radius:6px;"
+        >{{ auth.groupName }}</el-tag>
         <el-select
           v-if="auth.canSwitchGroup"
           v-model="switchTarget"

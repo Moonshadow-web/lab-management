@@ -1,8 +1,9 @@
 <template>
   <div class="login-wrap">
     <el-card class="login-card">
-      <div class="login-title">生免组实验室管理系统</div>
-      <div class="login-sub">民航总医院检验科 · 生化免疫专业组</div>
+      <div class="login-title">民航总医院检验科</div>
+      <div class="login-title2">实验室管理系统</div>
+      <div class="login-sub">请选择专业组后登录</div>
       <el-form :model="form" @submit.prevent="onSubmit">
         <el-form-item>
           <el-select v-model="form.groupCode" size="large" style="width:100%" placeholder="选择专业组">
@@ -165,6 +166,14 @@ async function onChangePwd() {
   font-weight: 700;
   text-align: center;
   color: #1a365d;
+}
+.login-title2 {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  color: #1a365d;
+  letter-spacing: 2px;
+  margin-top: 2px;
 }
 .login-sub {
   text-align: center;
