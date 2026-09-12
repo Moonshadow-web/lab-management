@@ -33,22 +33,39 @@ _STATS_MODELS = [
 async def dashboard_stats(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
+    group: str = Depends(get_current_group),
 ):
-    """返回工作台各模块的记录总数 + 未读提醒数。"""
+    """返回工作台各模块记录总数（**按当前专业组过滤**）+ 未读提醒数。"""
+    from sqlalchemy import or_
+    _g = (group or "sm").strip().lower()
     result = {}
+
+    def _scope(stmt, model):
+        """按专业组过滤：本组 + 编号含 KS（共享）；生免组兼容历史空值。"""
+        col = model.__table__.columns.get("group_code")
+        if col is None:
+            # 未纳入组隔离的表（质控/培训/验证/不符合项等）：非生免组不可见 → 计 0
+            return None if _g != "sm" else stmt
+        conds = [col == _g]
+        if _g == "sm":
+            conds.append(col.is_(None))
+            conds.append(col == "")
+        for f in ("code", "dept_no", "doc_number", "material_code"):
+            c2 = model.__table__.columns.get(f)
+            if c2 is not None:
+                conds.append(c2.ilike("%KS%"))
+        return stmt.where(or_(*conds))
 
     for key, model in _STATS_MODELS:
         stmt = select(func.count()).select_from(model)
-        count = db.execute(stmt).scalar() or 0
-        result[key] = count
+        stmt = _scope(stmt, model)
+        result[key] = 0 if stmt is None else (db.execute(stmt).scalar() or 0)
 
-    # 试剂目录：按类型统计（仅启用），用于工作台试剂统计卡片
+    # 试剂目录：按类型统计（仅启用，按组过滤）
     reagent_counts = {"试剂": 0, "校准品": 0, "耗材": 0, "质控品": 0}
-    rows = db.execute(
-        select(ReagentItem.type, func.count())
-        .where(ReagentItem.is_active == True)
-        .group_by(ReagentItem.type)
-    ).all()
+    _rq = select(ReagentItem.type, func.count()).where(ReagentItem.is_active == True)
+    _rq = _scope(_rq, ReagentItem)
+    rows = [] if _rq is None else db.execute(_rq.group_by(ReagentItem.type)).all()
     for t, n in rows:
         if t in reagent_counts:
             reagent_counts[t] = n
