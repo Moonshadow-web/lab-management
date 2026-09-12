@@ -498,3 +498,27 @@ class PostInstrumentMap(Base):
     remark: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# =========================================================================
+# 岗前理论考核答题记录（扫码/在线答题的独立归档，每次提交一条，不覆盖）
+# =========================================================================
+class PreJobTheoryRecord(Base):
+    """一次理论答题的归档记录（可作为理论考核归档留存）。"""
+
+    __tablename__ = "prejob_theory_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pre_job_auth_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True, default=None)  # 关联岗前考核单
+    name: Mapped[str] = mapped_column(String(50), index=True, default="")  # 被考核人
+    posts_json: Mapped[str] = mapped_column(Text, default="[]")  # 考核岗位（多选）
+    papers_json: Mapped[str] = mapped_column(Text, default="{}")  # 试卷快照（题目与标准答案，防题库改版无法复核）
+    answers_json: Mapped[str] = mapped_column(Text, default="{}")  # 作答明细 {岗位:{s0:..,m0:[],j0:..}}
+    detail_json: Mapped[str] = mapped_column(Text, default="{}")  # 各岗位得分 {岗位:{score,full,pct}}
+    score_raw: Mapped[int] = mapped_column(Integer, default=0)  # 原始分合计
+    score_full: Mapped[int] = mapped_column(Integer, default=0)  # 原始满分合计
+    score_pct: Mapped[int] = mapped_column(Integer, default=0)  # 百分制（各岗位平均）
+    attempt_no: Mapped[int] = mapped_column(Integer, default=1)  # 第几次作答
+    source: Mapped[str] = mapped_column(String(20), default="qr")  # qr=扫码 / online=登录在线
+    submit_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

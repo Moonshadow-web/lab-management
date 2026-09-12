@@ -3,6 +3,9 @@
 权限：写（增删改）需 admin 或 training_manager；读对所有登录用户开放。模块 key 沿用 'training'。
 """
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 import os
 from datetime import datetime
 
@@ -19,7 +22,7 @@ from ...models.education import (
     TrainingPlan, TrainingSession,
     InternshipMentor, InternshipScore,
     AuthSheet,
-    PreJobAuth, ExamBank, PostInstrumentMap,
+    PreJobAuth, ExamBank, PostInstrumentMap, PreJobTheoryRecord,
     EducationAttachment,
 )
 from ...models.user import User
@@ -45,6 +48,7 @@ from ...schemas.education import (
     PreJobAuthCreate, PreJobAuthUpdate, PreJobAuthRead,
     ExamBankCreate, ExamBankUpdate, ExamBankRead,
     PostInstrumentMapCreate, PostInstrumentMapUpdate, PostInstrumentMapRead,
+    PreJobTheoryRecordCreate, PreJobTheoryRecordUpdate, PreJobTheoryRecordRead,
     EducationAttachmentRead,
 )
 
@@ -224,6 +228,15 @@ def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = 
     p.batch_id = f"PJ{p.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     db.commit()
     return {"ok": True, "created": 1, "batch_id": p.batch_id}
+
+# L. 岗前理论考核答题记录（归档）
+theoryrec_router = make_router(
+    PreJobTheoryRecord, PreJobTheoryRecordRead, PreJobTheoryRecordCreate, PreJobTheoryRecordUpdate,
+    search_fields=["name"], filter_fields=["pre_job_auth_id", "source"],
+    order_by=[PreJobTheoryRecord.submit_at.desc(), PreJobTheoryRecord.id.desc()],
+    prefix="/prejob-theory-records", write_roles=("admin", "training_manager"),
+    json_fields=["posts_json", "papers_json", "answers_json", "detail_json"],
+)
 
 router.include_router(personnel_router)
 router.include_router(edu_router)
@@ -599,6 +612,38 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
     db.commit()
     pcts = [v["pct"] for v in detail.values()]
     avg_pct = int(round(sum(pcts) / len(pcts))) if pcts else 0
+
+    # 归档：每次提交单独留存一条（失败不影响考生提交）
+    try:
+        papers = {}
+        for post in positions:
+            b = db.query(ExamBank).filter(ExamBank.post == post).first()
+            T = json.loads((b.theory_json if b else None) or "{}")
+            papers[post] = T
+        prev = db.query(PreJobTheoryRecord).filter(PreJobTheoryRecord.pre_job_auth_id == p.id).count()
+        db.add(PreJobTheoryRecord(
+            pre_job_auth_id=p.id,
+            name=p.name,
+            posts_json=json.dumps(positions, ensure_ascii=False),
+            papers_json=json.dumps(papers, ensure_ascii=False),
+            answers_json=json.dumps(answers, ensure_ascii=False),
+            detail_json=json.dumps(detail, ensure_ascii=False),
+            score_raw=total,
+            score_full=full,
+            score_pct=avg_pct,
+            attempt_no=prev + 1,
+            source=str(payload.get("source") or "qr"),
+            submit_at=datetime.now(),
+        ))
+        db.commit()
+    except Exception as e:  # noqa: BLE001
+        db.rollback()
+        try:
+            logger.warning("理论答题归档写入失败(忽略): %s", e)
+        except Exception:  # noqa: BLE001
+            pass
+
     return {"ok": True, "score": total, "full": full, "pct": avg_pct, "detail": detail}
 
 router.include_router(postmap_router)
+router.include_router(theoryrec_router)

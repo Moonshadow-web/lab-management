@@ -734,3 +734,51 @@ class PostInstrumentMapUpdate(PostInstrumentMapBase):
 class PostInstrumentMapRead(PostInstrumentMapBase):
     id: int
     updated_at: datetime | None = None
+
+
+class PreJobTheoryRecordBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    pre_job_auth_id: int | None = None
+    name: str = ""
+    posts_json: list = []
+    papers_json: dict = {}
+    answers_json: dict = {}
+    detail_json: dict = {}
+    score_raw: int = 0
+    score_full: int = 0
+    score_pct: int = 0
+    attempt_no: int = 1
+    source: str = "qr"
+    submit_at: datetime | None = None
+
+    @field_validator("posts_json", mode="before")
+    @classmethod
+    def _tr_list(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v or "[]")
+            except Exception:
+                return []
+        return v or []
+
+    @field_validator("papers_json", "answers_json", "detail_json", mode="before")
+    @classmethod
+    def _tr_dict(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v or "{}")
+            except Exception:
+                return {}
+        return v or {}
+
+
+class PreJobTheoryRecordCreate(PreJobTheoryRecordBase):
+    pass
+
+
+class PreJobTheoryRecordUpdate(PreJobTheoryRecordBase):
+    pass
+
+
+class PreJobTheoryRecordRead(PreJobTheoryRecordBase):
+    id: int

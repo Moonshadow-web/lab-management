@@ -20,6 +20,9 @@
       <el-tab-pane label="岗位考核题库" name="exam_bank">
         <ExamBank />
       </el-tab-pane>
+      <el-tab-pane label="岗前理论考核答题记录" name="prejob_theory">
+        <PreJobTheoryRecords />
+      </el-tab-pane>
       <el-tab-pane label="授权表" name="auth_sheet">
         <AuthSheet />
       </el-tab-pane>
@@ -54,6 +57,7 @@ import CertAuth from './staff/CertAuth.vue'
 import PreJobAuth from './staff/PreJobAuth.vue'
 import ExamBank from './staff/ExamBank.vue'
 import AuthSheet from './staff/AuthSheet.vue'
+import PreJobTheoryRecords from './staff/PreJobTheoryRecords.vue'
 import CompetencyAssessment from './staff/CompetencyAssessment.vue'
 import PersonnelComparison from './staff/PersonnelComparison.vue'
 import GroupTraining from './staff/GroupTraining.vue'

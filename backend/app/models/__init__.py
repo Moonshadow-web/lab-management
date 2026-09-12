@@ -36,6 +36,7 @@ from .education import (
     TrainingPlan, TrainingSession,
     InternshipMentor, InternshipScore,
     EducationAttachment,
+    PreJobTheoryRecord,
 )
 from .iso15189 import (
     ReviewCampaign, ReviewAssignment, ReviewRecord,

@@ -109,3 +109,6 @@ export function listPostInstrumentMap(params) { return request.get(`${P}/post-in
 export function createPostInstrumentMap(data) { return request.post(`${P}/post-instrument-maps`, data) }
 export function updatePostInstrumentMap(id, data) { return request.put(`${P}/post-instrument-maps/${id}`, data) }
 export function deletePostInstrumentMap(id) { return request.delete(`${P}/post-instrument-maps/${id}`) }
+export function listPreJobTheoryRecords(params) { return request.get(`${P}/prejob-theory-records`, { params }) }
+export function getPreJobTheoryRecord(id) { return request.get(`${P}/prejob-theory-records/${id}`) }
+export function deletePreJobTheoryRecord(id) { return request.delete(`${P}/prejob-theory-records/${id}`) }
