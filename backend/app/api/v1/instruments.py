@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ...core.config import ALGORITHM, SECRET_KEY
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
+from ...core._auth_helpers import get_current_group
 from ...core.security import decode_token, get_current_user
 from ...core.storage import storage, persist_save, persist_delete
 from ...core.cos_storage import cos_storage
@@ -61,6 +62,7 @@ router = make_router(
     order_by=_instrument_order,
     prefix="/instruments",
     write_roles=("admin", "specialty_leader"),
+    group_scoped=True,  # S3：按专业组隔离（生免组看本组+历史空值+KS共享；其他组看本组+KS共享）
 )
 
 
@@ -259,15 +261,23 @@ def delete_calibration(
 def list_all_repairs(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    group: str = Depends(get_current_group),
 ):
-    """汇总所有仪器的维修记录（跨仪器，供「汇总维修记录」查看），附仪器名称/型号/编号。"""
+    """汇总维修记录（按专业组过滤：本组仪器 + KS 共享仪器）。"""
+    _g = (group or "sm").strip().lower()
+    _iq = db.query(Instrument)
+    if _g == "sm":
+        _iq = _iq.filter(or_(Instrument.group_code == _g, Instrument.group_code.is_(None), Instrument.group_code == "", Instrument.dept_no.ilike("%KS%")))
+    else:
+        _iq = _iq.filter(or_(Instrument.group_code == _g, Instrument.dept_no.ilike("%KS%")))
+    inst_map = {i.id: i for i in _iq.all()}
     rows = (
         db.query(InstrumentRepair)
+        .filter(InstrumentRepair.instrument_id.in_(list(inst_map.keys()) or [-1]))
         .order_by(InstrumentRepair.id.desc())
         .limit(1000)
         .all()
     )
-    inst_map = {i.id: i for i in db.query(Instrument).all()}
     out = []
     for r in rows:
         d = _repair_to_read(r)
