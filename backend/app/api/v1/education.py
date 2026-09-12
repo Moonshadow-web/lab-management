@@ -596,7 +596,8 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
                 s += 2
         f = len(T.get("single") or []) * 2 + len(T.get("multi") or []) * 4 + len(T.get("judge") or []) * 2
         pct = int(round(s * 100.0 / f)) if f else 0
-        detail[post] = {"score": s, "full": f, "pct": pct}
+        # 该岗位若无理论考核（full=0），不计入百分制平均分
+        detail[post] = {"score": s, "full": f, "pct": pct, "no_theory": f == 0}
         total += s
         full += f
         d = exam.get(post) or {}
@@ -610,7 +611,8 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
         exam[post] = d
     p.exam_json = json.dumps(exam, ensure_ascii=False)
     db.commit()
-    pcts = [v["pct"] for v in detail.values()]
+    # 平均分只统计有理论考核的岗位（无理论考核的岗位不计入）
+    pcts = [v["pct"] for v in detail.values() if not v.get("no_theory")]
     avg_pct = int(round(sum(pcts) / len(pcts))) if pcts else 0
 
     # 归档：每次提交单独留存一条（失败不影响考生提交）

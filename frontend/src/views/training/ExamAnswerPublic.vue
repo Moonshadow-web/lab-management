@@ -66,7 +66,7 @@
       <h3 style="color:#16a34a;">提交成功</h3>
       <p style="font-size:18px;">理论得分（总分）：<b>{{ result.pct }}</b> / 100 分</p>
       <div v-for="(v, k) in result.detail || {}" :key="k" style="font-size:14px;color:#444;">
-        {{ k }}：<b>{{ v.pct }}</b> / 100 分（原始 {{ v.score }}/{{ v.full }}）　合格线 60
+        {{ k }}：<template v-if="v.full"><b>{{ v.pct }}</b> / 100 分（原始 {{ v.score }}/{{ v.full }}）　合格线 60</template><template v-else>该岗位无理论考核（不计入）</template>
       </div>
       <p style="color:#888;margin-top:8px;">成绩已回写到您的岗前培训考核记录</p>
     </div>

@@ -49,7 +49,10 @@
         <h4 style="margin:6px 0;border-left:4px solid #2563eb;padding-left:8px;">
           {{ post }}　
           <span style="color:#666;font-weight:400;font-size:12px;">
-            得分 {{ (current.detail_json || {})[post]?.pct ?? 0 }} / 100（原始 {{ (current.detail_json || {})[post]?.score ?? 0 }}/{{ (current.detail_json || {})[post]?.full ?? 0 }}）
+            <template v-if="(current.detail_json || {})[post]?.full">
+              得分 {{ (current.detail_json || {})[post]?.pct ?? 0 }} / 100（原始 {{ (current.detail_json || {})[post]?.score ?? 0 }}/{{ (current.detail_json || {})[post]?.full ?? 0 }}）
+            </template>
+            <template v-else>该岗位无理论考核（不计入百分制）</template>
           </span>
         </h4>
         <div v-for="q in questionsOf(post)" :key="q.key" style="margin-bottom:5px;font-size:12px;line-height:1.5;">
@@ -155,7 +158,9 @@ async function exportExcel() {
       { header: '岗位得分明细', key: 'detail', width: 50 },
     ]
     rows.value.forEach((r) => {
-      const detail = Object.entries(r.detail_json || {}).map(([k, v]) => `${k}: ${v.pct ?? 0}/100（${v.score ?? 0}/${v.full ?? 0}）`).join('；')
+      const detail = Object.entries(r.detail_json || {})
+        .map(([k, v]) => (v.full ? `${k}: ${v.pct ?? 0}/100（${v.score ?? 0}/${v.full ?? 0}）` : `${k}: 无理论考核(不计入)`))
+        .join('；')
       ws.addRow({
         name: r.name,
         posts: (r.posts_json || []).join('、'),
@@ -186,7 +191,8 @@ function printRow(row) {
     const d = (row.detail_json || {})[post] || {}
     const qs = questionsOf2(row, post)
     return `<h3 style="margin:10px 0 4px;">${esc(post)}　<span style="font-weight:400;font-size:12px;">
-      得分 ${d.pct ?? 0} / 100（原始 ${d.score ?? 0}/${d.full ?? 0}）</span></h3>
+      ${d.full ? '得分 ' + (d.pct ?? 0) + ' / 100（原始 ' + (d.score ?? 0) + '/' + (d.full ?? 0) + '）' : '无理论考核（不计入）'}</span></h3>
+      ${!d.full ? '<div style="font-size:12px;color:#888;">该岗位无理论考核（不计入百分制）</div>' : ''}
       ${qs.map((q) => `<div style="font-size:12px;margin-bottom:4px;">${q.seq}. ${esc(q.q)}<br/>
         <span style="color:#333;">被考核人选择：<b>${esc(q.picked || '—')}</b>　${q.picked ? (q.ok ? '✓ 正确' : '✗ 错误') : '（未作答）'}　（正确答案：${esc(q.answer)}）</span></div>`).join('')}`
   }).join('')
