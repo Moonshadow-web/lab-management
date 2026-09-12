@@ -88,6 +88,7 @@ def create_user(
         role=item.role,
         roles=item.roles or "",
         department=item.department,
+        group_code=(item.group_code or "sm"),
         is_active=item.is_active,
         must_change_password=True,
         password_hash=hash_password(item.password or "123456"),

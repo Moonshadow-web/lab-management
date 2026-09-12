@@ -1,0 +1,1 @@
+import{a as t}from"./index-DeBECfLk.js";function i(n){return t.get("/api/v1/nonconformities",{params:n})}function r(n){return t.post("/api/v1/nonconformities",n)}function a(n,e){return t.put(`/api/v1/nonconformities/${n}`,e)}function s(n){return t.delete(`/api/v1/nonconformities/${n}`)}export{r as c,s as d,i as l,a as u};

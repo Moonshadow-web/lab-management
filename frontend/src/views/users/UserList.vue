@@ -38,6 +38,9 @@
             <span v-if="!row.roles && row.role" style="color: #999; font-size: 12px">—</span>
           </template>
         </el-table-column>
+        <el-table-column label="专业组" width="110">
+          <template #default="{ row }">{{ GROUP_NAMES[row.group_code] || '生化免疫组' }}</template>
+        </el-table-column>
         <el-table-column label="权限概览" min-width="200">
           <template #default="{ row }">
             <el-tag v-if="isAdmin(row)" type="danger" size="small" effect="dark">管理员·通杀</el-tag>
@@ -187,6 +190,11 @@
             <el-option v-for="r in roleOptions" :key="r.code" :label="r.label" :value="r.code" />
           </el-select>
         </el-form-item>
+        <el-form-item label="专业组">
+          <el-select v-model="addForm.group_code" style="width: 100%">
+            <el-option v-for="g in groupOptions" :key="g.code" :label="g.name" :value="g.code" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="初始密码">
           <el-input v-model="addForm.password" placeholder="留空则默认 123456" />
           <div style="font-size: 12px; color: #999; margin-top: 4px">用户首次登录必须修改</div>
@@ -235,6 +243,11 @@
         <el-form-item label="部门">
           <el-input v-model="editForm.department" />
         </el-form-item>
+        <el-form-item label="专业组">
+          <el-select v-model="editForm.group_code" style="width: 100%">
+            <el-option v-for="g in groupOptions" :key="g.code" :label="g.name" :value="g.code" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="邮箱">
           <el-input v-model="editForm.email" placeholder="接收提醒的邮箱" />
         </el-form-item>
@@ -254,6 +267,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { listUsers, createUser, updateUser, deleteUser, resetPassword, getRoleOptions } from '../../api/users'
 import { getModulePermissionsStructure } from '../../api/modulePermissions'
 import { usePermissionStore } from '../../store/permission'
+import request from '../../utils/request'
 
 // 模块列表：启动时由 /module-permissions/structure 拉取（保留硬编码 fallback 保证首屏可用）
 const FALLBACK_MODULES = [
@@ -304,8 +318,10 @@ const ROLE_LABELS = {
   staff: '职工',
 }
 
-const addForm = ref({ username: '', full_name: '', role: 'member', roleCodes: [], password: '' })
-const editForm = ref({ role: '', roleCodes: [], full_name: '', department: '', email: '' })
+const GROUP_NAMES = { sm: '生化免疫组', lj: '临检组', wsw: '微生物组', fz: '分子组', xk: '血库' }
+const groupOptions = ref([{ code: 'sm', name: '生化免疫组' }])
+const addForm = ref({ username: '', full_name: '', role: 'member', roleCodes: [], password: '', group_code: 'sm' })
+const editForm = ref({ role: '', roleCodes: [], full_name: '', department: '', email: '', group_code: 'sm' })
 
 function roleLabel(code) {
   return ROLE_LABELS[code] || code
@@ -415,7 +431,8 @@ async function onSubmitAdd() {
       full_name: addForm.value.full_name,
       role: addForm.value.role,
       roles: addForm.value.roleCodes.join(','),
-      department: '生免组',
+      department: GROUP_NAMES[addForm.value.group_code] || '生免组',
+      group_code: addForm.value.group_code || 'sm',
       is_active: true,
       password: addForm.value.password || '',
     })
@@ -464,6 +481,7 @@ function onEditInfo(row) {
   editForm.value.full_name = row.full_name
   editForm.value.department = row.department
   editForm.value.email = row.email
+  editForm.value.group_code = row.group_code || 'sm'
   showInfo.value = true
 }
 
@@ -477,6 +495,7 @@ async function onSubmitInfo() {
       roles: editingUser.value.roles || '',
       department: editForm.value.department,
       email: editForm.value.email,
+      group_code: editForm.value.group_code || 'sm',
       notify_email: editingUser.value.notify_email ?? true,
       is_active: editingUser.value.is_active,
     })
@@ -528,6 +547,11 @@ async function onDelete(row) {
 
 onMounted(async () => {
   try { roleOptions.value = await getRoleOptions() } catch {}
+  // 专业组字典（用于新增/编辑用户时选择所属组）
+  try {
+    const g = await request.get('/api/v1/auth/lab-groups')
+    if (g?.items?.length) groupOptions.value = g.items
+  } catch (e) { /* 拉不到用默认生免组 */ }
   // 拉最新模块结构（同步到全局 store + 本地 MODULES 列表）
   try {
     const r = await getModulePermissionsStructure()

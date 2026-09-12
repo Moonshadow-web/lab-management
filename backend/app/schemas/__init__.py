@@ -16,6 +16,7 @@ class UserBase(BaseModel):
     email: str = ""
     notify_email: bool = True
     is_active: bool = True
+    group_code: str = "sm"  # 所属专业组（默认生免组）
 
     @field_validator("notify_email", mode="before")
     @classmethod
