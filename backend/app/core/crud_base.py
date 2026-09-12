@@ -75,7 +75,8 @@ def make_router(
             return None
 
     def _need_filter(group: str | None) -> bool:
-        return bool(group_scoped) and bool(group) and group not in ("sm",)
+        # 所有专业组都按组过滤（含生免组）：生免组=本组 + 历史空值 + KS 共享
+        return bool(group_scoped) and bool(group)
 
     def _shared_conds(Model_):
         """科室共享数据：编号含 KS 段（如 BG-KS-… / MHZYY-JYK-KS-…）。"""
@@ -87,8 +88,11 @@ def make_router(
         return out
 
     def _visible(obj, group: str) -> bool:
-        """非生免组可见：本组数据 或 KS 共享数据。"""
-        if getattr(obj, "group_code", None) == group:
+        """可见：本组数据 / 生免组兼容历史空值 / KS 共享数据。"""
+        gc = getattr(obj, "group_code", None)
+        if gc == group:
+            return True
+        if group == "sm" and (gc is None or gc == ""):
             return True
         for f in ("code", "dept_no", "doc_number"):
             v = getattr(obj, f, None)
@@ -117,7 +121,13 @@ def make_router(
         if _need_filter(group):
             col = getattr(Model, "group_code", None)
             if col is not None:
-                query = query.filter(or_(col == group, *_shared_conds(Model)))
+                conds = [col == group]
+                if group == "sm":
+                    # 兼容历史数据：空值视为生免组
+                    conds.append(col.is_(None))
+                    conds.append(col == "")
+                conds.extend(_shared_conds(Model))
+                query = query.filter(or_(*conds))
         if q and search_fields:
             conds = [getattr(Model, f).ilike(f"%{q}%") for f in search_fields if hasattr(Model, f)]
             if conds:
