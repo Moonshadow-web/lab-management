@@ -26,7 +26,7 @@
       </el-table-column>
       <el-table-column prop="attempt_no" label="第几次" width="80" align="center" />
       <el-table-column label="来源" width="80" align="center">
-        <template #default="{ row }">{{ row.source === 'qr' ? '扫码' : '在线' }}</template>
+        <template #default="{ row }">{{ srcLabel(row.source) }}</template>
       </el-table-column>
       <el-table-column prop="submit_at" label="提交时间" width="170">
         <template #default="{ row }">{{ fmt(row.submit_at) }}</template>
@@ -87,6 +87,7 @@ function fmt(v) {
   return String(v).replace('T', ' ').slice(0, 19)
 }
 const ansStr = (a) => (Array.isArray(a) ? a.join('') : String(a == null ? '' : a))
+const srcLabel = (s) => ({ qr: '扫码', online: '在线', import: '导入' }[s] || s || '扫码')
 
 async function refresh() {
   loading.value = true
@@ -161,7 +162,7 @@ async function exportExcel() {
         pct: r.score_pct,
         raw: `${r.score_raw}/${r.score_full}`,
         attempt: r.attempt_no,
-        source: r.source === 'qr' ? '扫码' : '在线',
+        source: srcLabel(r.source),
         time: fmt(r.submit_at),
         detail,
       })
