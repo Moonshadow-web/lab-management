@@ -15,7 +15,9 @@ from ..models.audit_log import AuditLog
 from ..models.user import User
 
 
-def write_audit(db: Session, user: User | None, action: str, table: str, record_id, detail, ip: str | None = None):
+def write_audit(db: Session, user: User | None, action: str, table: str, record_id, detail, ip: str | None = None, group: str | None = None):
+    """写审计日志（含专业组，便于按组追溯）。group 未传时取用户所属组，默认生免组。"""
+    _g = (group or getattr(user, "group_code", None) or "sm")
     db.add(
         AuditLog(
             user_id=user.id if user else 0,
@@ -24,6 +26,7 @@ def write_audit(db: Session, user: User | None, action: str, table: str, record_
             record_id=record_id or 0,
             detail=str(detail)[:2000],
             ip=ip,
+            group_code=str(_g).strip().lower() or "sm",
         )
     )
     db.commit()
@@ -246,7 +249,7 @@ def make_router(
         db.add(obj)
         db.commit()
         db.refresh(obj)
-        write_audit(db, user, "create", Model.__tablename__, obj.id, data, _ip(request))
+        write_audit(db, user, "create", Model.__tablename__, obj.id, data, _ip(request), group=group)
         if after_write:
             after_write(db, "create", obj)
         return _to_read(obj)
@@ -274,7 +277,7 @@ def make_router(
             obj.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(obj)
-        write_audit(db, user, "update", Model.__tablename__, item_id, changes, _ip(request))
+        write_audit(db, user, "update", Model.__tablename__, item_id, changes, _ip(request, group=group))
         if after_write:
             after_write(db, "update", obj)
         return _to_read(obj)
@@ -294,7 +297,7 @@ def make_router(
             raise HTTPException(status_code=403, detail="无权删除其他专业组的数据")
         db.delete(obj)
         db.commit()
-        write_audit(db, user, "delete", Model.__tablename__, item_id, "", _ip(request))
+        write_audit(db, user, "delete", Model.__tablename__, item_id, "", _ip(request), group=group)
         if after_write:
             after_write(db, "delete", obj)
         return {"ok": True}

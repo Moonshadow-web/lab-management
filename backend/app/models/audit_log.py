@@ -16,4 +16,5 @@ class AuditLog(Base):
     record_id: Mapped[int] = mapped_column(Integer, default=0)
     detail: Mapped[str] = mapped_column(Text, default="")
     ip: Mapped[str] = mapped_column(String(50), default="")
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm")  # 操作时所在专业组
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
