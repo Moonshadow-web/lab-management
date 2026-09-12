@@ -116,9 +116,12 @@ def get_reagent_item_counts(
     active_only: bool = Query(True, description="仅统计启用项"),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
+    group: str = Depends(get_current_group),
 ):
     """按类型统计试剂目录数量。用于试剂目录页/工作台展示：试剂/校准品/耗材/质控品。"""
     base = db.query(ReagentItem)
+    if group:
+        base = _rg_scope(base, ReagentItem, (group or "sm").strip().lower())
     if library:
         base = base.filter(ReagentItem.library == library)
     if active_only:
@@ -391,9 +394,12 @@ def list_inventory_checks(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    group: str = Depends(get_current_group),
     _=Depends(get_current_user),
 ):
     base = db.query(InventoryCheck)
+    if group:
+        base = _rg_scope(base, InventoryCheck, (group or "sm").strip().lower())
     if library:
         base = base.filter(InventoryCheck.library == library)
     total = base.count()
@@ -658,9 +664,12 @@ def get_reagent_template(
 @router.post("/inventory-checks", response_model=InventoryCheckRead)
 def create_inventory_check(
     data: InventoryCheckCreate, db: Session = Depends(get_db),
+    group: str = Depends(get_current_group),
     user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
 ):
     check = InventoryCheck(
+        group_code=(group or "sm").strip().lower(),
+    
         library=data.library or "",
         check_date=data.check_date,
         check_type=data.check_type,
@@ -765,9 +774,12 @@ def list_orders(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    group: str = Depends(get_current_group),
     user: User = Depends(get_current_user),
 ):
     base = db.query(ReagentOrder)
+    if group:
+        base = _rg_scope(base, ReagentOrder, (group or "sm").strip().lower())
     if library:
         base = base.filter(ReagentOrder.library == library)
     # 试剂配送：仅看自己建的
@@ -799,6 +811,7 @@ def get_order(order_id: int, db: Session = Depends(get_db), _=Depends(get_curren
 @router.post("/orders", response_model=ReagentOrderRead)
 def create_order(
     data: ReagentOrderCreate, db: Session = Depends(get_db),
+    group: str = Depends(get_current_group),
     user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     order_no = data.order_no or _gen_order_no(db)
@@ -806,6 +819,8 @@ def create_order(
     while db.query(ReagentOrder).filter(ReagentOrder.order_no == order_no).first():
         order_no = _gen_order_no(db)
     order = ReagentOrder(
+        group_code=(group or "sm").strip().lower(),
+    
         library=data.library or "", order_no=order_no, order_date=data.order_date,
         order_type=data.order_type, status="草稿",
         operator=user.full_name or user.username, remark=data.remark,
@@ -942,9 +957,12 @@ def list_receivings(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    group: str = Depends(get_current_group),
     user: User = Depends(get_current_user),
 ):
     base = db.query(Receiving)
+    if group:
+        base = _rg_scope(base, Receiving, (group or "sm").strip().lower())
     if library:
         lib_item_ids = [r[0] for r in db.query(ReagentItem.id).filter(ReagentItem.library == library).all()]
         recv_ids = [r[0] for r in db.query(ReceivingItem.receiving_id).filter(
@@ -976,9 +994,12 @@ def get_receiving(receiving_id: int, db: Session = Depends(get_db), _=Depends(ge
 @router.post("/receivings", response_model=ReceivingRead)
 def create_receiving(
     data: ReceivingCreate, db: Session = Depends(get_db),
+    group: str = Depends(get_current_group),
     user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
 ):
     rec = Receiving(
+        group_code=(group or "sm").strip().lower(),
+    
         receipt_no=data.receipt_no, receipt_date=data.receipt_date,
         order_id=data.order_id, delivery_person=data.delivery_person,
         receiver=data.receiver or "",  # 新建/编辑时保存用户实际填入值（可空，由确认时填入确认人）
@@ -1226,9 +1247,12 @@ def list_consumption(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
+    group: str = Depends(get_current_group),
     _=Depends(get_current_user),
 ):
     base = db.query(ReagentConsumption)
+    if group:
+        base = _rg_scope(base, ReagentConsumption, (group or "sm").strip().lower())
     if year_month:
         base = base.filter(ReagentConsumption.year_month == year_month)
     if library or q.strip():

@@ -12,6 +12,7 @@ from ...models.test_item import TestItem
 from ...models.user import User
 from ...schemas import TestItemCreate, TestItemRead, TestItemUpdate
 from ...core.database import get_db
+from ...core._auth_helpers import get_current_group
 from ...core.security import get_current_user
 from ...core.brand import extract_brand, resolve_brand
 
@@ -147,9 +148,14 @@ async def import_test_items(file: UploadFile = File(...), db: Session = Depends(
 async def test_items_stats(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    group: str = Depends(get_current_group),
 ):
-    """统计分类：按类别、按品牌、按仪器的计数，供前端概览展示。"""
-    rows = db.query(TestItem).all()
+    """统计分类：按类别、按品牌、按仪器的计数（按专业组过滤，口径与列表一致）。"""
+    from sqlalchemy import or_
+    _q = db.query(TestItem)
+    _g = (group or "sm").strip().lower()
+    _q = _q.filter(or_(TestItem.group_code == _g, TestItem.group_code.is_(None), TestItem.group_code == "")) if _g == "sm" else _q.filter(TestItem.group_code == _g)
+    rows = _q.all()
     cat_counter = Counter(r.category or "未分类" for r in rows)
     brand_counter = Counter(resolve_brand(r.calibrator, r.brand) or "未标识" for r in rows)
     def _norm_inst(r):
