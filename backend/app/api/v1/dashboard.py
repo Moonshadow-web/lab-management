@@ -5,6 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core._auth_helpers import get_current_group
 from app.core.security import get_current_user
 from app.models.test_item import TestItem
 from app.models.instrument import Instrument
