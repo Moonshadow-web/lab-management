@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "s1-groups-2026-09-12"
+_BUILD_MARK = "s1-reagent-2026-09-12"
 
 
 def get_build_mark() -> str:
@@ -173,7 +173,7 @@ def diag_groups():
             with SessionLocal() as db:
                 out["groups"] = [{"code": g.code, "name": g.name} for g in db.query(LabGroup).order_by(LabGroup.sort_no).all()]
         cols = {}
-        for t in ("users", "test_items", "documents", "instruments"):
+        for t in ("users", "test_items", "documents", "instruments", "reagent_items", "reagent_stock", "reagent_receivings", "reagent_orders", "reagent_inventory_checks", "reagent_consumption"):
             if insp.has_table(t):
                 cols[t] = "group_code" in {c["name"] for c in insp.get_columns(t)}
         out["group_code_columns"] = cols

@@ -59,6 +59,7 @@ class ReagentItem(Base):
 
     __tablename__ = "reagent_items"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     type: Mapped[str] = mapped_column(String(20), default="试剂", index=True)
     category: Mapped[str] = mapped_column(String(50), default="", index=True)
@@ -88,6 +89,7 @@ class ReagentStock(Base):
 
     __tablename__ = "reagent_stock"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
     batch_no: Mapped[str] = mapped_column(String(100), default="", index=True)
@@ -107,6 +109,7 @@ class InventoryCheck(Base):
 
     __tablename__ = "reagent_inventory_checks"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     library: Mapped[str] = mapped_column(String(20), default="", index=True)  # 责任库：生化凝血/免疫
     check_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
@@ -125,6 +128,7 @@ class InventoryCheckItem(Base):
 
     __tablename__ = "reagent_inventory_items"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     check_id: Mapped[int] = mapped_column(ForeignKey("reagent_inventory_checks.id"), nullable=False, index=True)
     item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
@@ -148,6 +152,7 @@ class ReagentOrder(Base):
 
     __tablename__ = "reagent_orders"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     library: Mapped[str] = mapped_column(String(20), default="", index=True)  # 责任库：生化凝血/免疫
     order_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
@@ -173,6 +178,7 @@ class ReagentOrderItem(Base):
 
     __tablename__ = "reagent_order_items"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("reagent_orders.id"), nullable=False, index=True)
     item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
@@ -192,6 +198,7 @@ class Receiving(Base):
 
     __tablename__ = "reagent_receivings"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     receipt_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     receipt_date: Mapped[date] = mapped_column(Date, nullable=False)
@@ -215,6 +222,7 @@ class ReceivingItem(Base):
 
     __tablename__ = "reagent_receiving_items"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     receiving_id: Mapped[int] = mapped_column(ForeignKey("reagent_receivings.id"), nullable=False, index=True)
     item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
@@ -234,6 +242,7 @@ class ReagentConsumption(Base):
 
     __tablename__ = "reagent_consumption"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
     year_month: Mapped[str] = mapped_column(String(7), nullable=False, index=True)  # YYYY-MM
@@ -252,6 +261,7 @@ class TestItemReagent(Base):
 
     __tablename__ = "test_item_reagents"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     test_item_id: Mapped[int] = mapped_column(ForeignKey("test_items.id"), nullable=False, index=True)
     reagent_item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
@@ -275,6 +285,7 @@ class InstrumentReagent(Base):
 
     __tablename__ = "instrument_reagents"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False, index=True)
     reagent_item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
