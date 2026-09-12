@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session
 from ...core.config import REFRESH_TOKEN_EXPIRE_DAYS
 from ...core.crud_base import write_audit
 from ...core.database import get_db
+from ...core._auth_helpers import (
+    DEFAULT_GROUP_CODE,
+    create_group_access_token,
+    is_admin,
+)
 from ...core.security import (
     create_access_token,
     create_refresh_token,
@@ -17,6 +22,7 @@ from ...core.security import (
     verify_password,
 )
 from ...models.refresh_token import RefreshToken
+from ...models.lab_group import LAB_GROUPS, LabGroup
 from ...models.user import User
 from ...schemas import ChangePassword, UserRead
 
@@ -48,6 +54,7 @@ def _lock_msg(user: User) -> str:
 @router.post("/login")
 def login(
     form: OAuth2PasswordRequestForm = Depends(),
+    group_code: str | None = Query(None, description="专业组编码（不传则按账号所属组）"),
     request: Request = None,
     db: Session = Depends(get_db),
 ):
@@ -95,7 +102,16 @@ def login(
     user.locked_until = None
     db.commit()
     write_audit(db, user, "login", "users", user.id, "login success", ip)
-    token = create_access_token(user.id)
+    # ===== 专业组校验（不传则用账号所属组；管理员可进任意组）=====
+    user_group = (getattr(user, "group_code", "") or DEFAULT_GROUP_CODE).strip().lower()
+    want = (group_code or user_group or DEFAULT_GROUP_CODE).strip().lower()
+    valid = {c for c, _n, _s in LAB_GROUPS}
+    if want not in valid:
+        raise HTTPException(status_code=400, detail="专业组参数无效")
+    if want != user_group and not is_admin(user):
+        raise HTTPException(status_code=403, detail="该账号不属于所选专业组，请联系管理员")
+
+    token = create_group_access_token(user.id, want)
     refresh, jti = create_refresh_token(user.id)
     # refresh token 落库容错：万一 refresh_tokens 表/索引损坏导致写入失败，
     # 绝不让登录整体 500（仍可凭 access token 正常使用，只是暂无自动续期）。
@@ -110,12 +126,51 @@ def login(
         db.commit()
     except Exception:  # noqa: BLE001
         db.rollback()
+    # 可切换的专业组：管理员=全部；普通用户=本组
+    if is_admin(user):
+        switchable = [c for c, _n, _s in LAB_GROUPS]
+    else:
+        switchable = [user_group]
+
     return {
         "access_token": token,
         "refresh_token": refresh,
         "token_type": "bearer",
         "must_change_password": bool(user.must_change_password),
         "roles": user.roles or "",
+        "group_code": want,
+        "can_switch_group": is_admin(user),
+        "switchable_groups": switchable,
+    }
+
+
+@router.get("/lab-groups")
+def list_lab_groups(db: Session = Depends(get_db)):
+    """专业组字典（免登录，供登录页选择）。数据库无数据时回退内置常量。"""
+    rows = db.query(LabGroup).order_by(LabGroup.sort_no).all()
+    if rows:
+        return {"items": [{"code": g.code, "name": g.name} for g in rows if g.is_active]}
+    return {"items": [{"code": c, "name": n} for c, n, _s in LAB_GROUPS]}
+
+
+@router.post("/switch-group")
+def switch_group(
+    group_code: str = Query(..., description="目标专业组编码"),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """切换当前专业组（管理员可为任意组；普通用户仅限本组），返回新的 access token。"""
+    valid = {c for c, _n, _s in LAB_GROUPS}
+    want = (group_code or "").strip().lower()
+    if want not in valid:
+        raise HTTPException(status_code=400, detail="专业组参数无效")
+    user_group = (getattr(user, "group_code", "") or DEFAULT_GROUP_CODE).strip().lower()
+    if want != user_group and not is_admin(user):
+        raise HTTPException(status_code=403, detail="无权切换到该专业组")
+    return {
+        "access_token": create_group_access_token(user.id, want),
+        "token_type": "bearer",
+        "group_code": want,
     }
 
 

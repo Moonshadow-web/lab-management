@@ -34,10 +34,17 @@ const FALLBACK_MODULE_WRITE_ROLES = {
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem('token') || '',
+    groupCode: localStorage.getItem('group_code') || 'sm',
+    canSwitchGroup: false,
+    switchableGroups: [],
     refreshToken: localStorage.getItem('refresh_token') || '',
     user: JSON.parse(localStorage.getItem('user') || 'null'),
   }),
   getters: {
+    groupName() {
+      const map = { sm: '生化免疫组', lj: '临检组', wsw: '微生物组', fz: '分子组', xk: '血库' }
+      return map[this.groupCode] || this.groupCode || '生化免疫组'
+    },
     isLoggedIn: (state) => !!state.token,
     // 用户拥有的全部角色码列表
     myRoles: (state) => {
@@ -59,13 +66,19 @@ export const useAuthStore = defineStore('auth', {
     },
   },
   actions: {
-    async login(username, password) {
+    async login(username, password, groupCode) {
       const form = new URLSearchParams()
       form.append('username', username)
       form.append('password', password)
-      const data = await request.post('/api/v1/auth/login', form, {
+      const q = groupCode ? `?group_code=${encodeURIComponent(groupCode)}` : ''
+      const data = await request.post('/api/v1/auth/login' + q, form, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
+      // 当前专业组（老后端不返回时默认生免组）
+      this.groupCode = data.group_code || 'sm'
+      localStorage.setItem('group_code', this.groupCode)
+      this.canSwitchGroup = !!data.can_switch_group
+      this.switchableGroups = data.switchable_groups || [this.groupCode]
       this.token = data.access_token
       localStorage.setItem('token', this.token)
       if (data.refresh_token) {
@@ -87,6 +100,15 @@ export const useAuthStore = defineStore('auth', {
         old_password: oldPassword,
         new_password: newPassword,
       })
+    },
+    // 切换专业组：换新令牌后强制刷新，避免残留上一组数据
+    async switchGroup(code) {
+      const data = await request.post(`/api/v1/auth/switch-group?group_code=${encodeURIComponent(code)}`)
+      this.token = data.access_token
+      localStorage.setItem('token', this.token)
+      this.groupCode = data.group_code || code
+      localStorage.setItem('group_code', this.groupCode)
+      location.reload()
     },
     logout() {
       const refreshToken = localStorage.getItem('refresh_token')

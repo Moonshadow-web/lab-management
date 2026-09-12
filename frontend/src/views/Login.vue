@@ -5,6 +5,11 @@
       <div class="login-sub">民航总医院检验科 · 生化免疫专业组</div>
       <el-form :model="form" @submit.prevent="onSubmit">
         <el-form-item>
+          <el-select v-model="form.groupCode" size="large" style="width:100%" placeholder="选择专业组">
+            <el-option v-for="g in groups" :key="g.code" :label="g.name" :value="g.code" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
           <el-input v-model="form.username" placeholder="用户名" :prefix-icon="User" size="large" />
         </el-form-item>
         <el-form-item>
@@ -61,12 +66,24 @@ import { useRouter, useRoute } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../store/auth'
+import request from '../utils/request'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
-const form = ref({ username: '', password: '' })
+const form = ref({ username: '', password: '', groupCode: localStorage.getItem('group_code') || 'sm' })
 const loading = ref(false)
+const groups = ref([{ code: 'sm', name: '生化免疫组' }])
+
+onMounted(async () => {
+  try {
+    const res = await request.get('/api/v1/auth/lab-groups')
+    if (res?.items?.length) {
+      groups.value = res.items
+      if (!groups.value.some((g) => g.code === form.value.groupCode)) form.value.groupCode = groups.value[0].code
+    }
+  } catch (e) { /* 拉不到就用默认生免组 */ }
+})
 
 // 强制改密
 const showChangePwd = ref(false)

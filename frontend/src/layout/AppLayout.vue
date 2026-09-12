@@ -45,6 +45,16 @@
       <el-header class="header">
         <el-icon class="hamburger" @click="drawerVisible = true" v-if="isMobile"><Menu /></el-icon>
         <span class="title">{{ currentTitle }}</span>
+        <el-tag size="small" type="info" style="margin-left:8px;">{{ auth.groupName }}</el-tag>
+        <el-select
+          v-if="auth.canSwitchGroup"
+          v-model="switchTarget"
+          size="small"
+          style="width:120px;margin-left:8px;"
+          @change="onSwitchGroup"
+        >
+          <el-option v-for="c in auth.switchableGroups" :key="c" :label="GROUP_NAMES[c] || c" :value="c" />
+        </el-select>
         <el-dropdown @command="onCommand">
           <span class="user-info">
             {{ auth.user?.full_name || auth.user?.username }}
@@ -69,6 +79,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import { usePermissionStore } from '../store/permission'
 import { Share, Connection, Document, Menu, Close, Grid } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import SwapNotifier from '../components/SwapNotifier.vue'
 
 const auth = useAuthStore()
@@ -123,6 +134,17 @@ const menus = computed(() => {
 
 const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
 const drawerVisible = ref(false)
+const GROUP_NAMES = { sm: '生化免疫组', lj: '临检组', wsw: '微生物组', fz: '分子组', xk: '血库' }
+const switchTarget = ref(auth.groupCode || 'sm')
+async function onSwitchGroup(code) {
+  if (!code || code === auth.groupCode) return
+  try {
+    await auth.switchGroup(code)
+  } catch (e) {
+    ElMessage.error('切换失败：' + (e?.response?.data?.detail || e.message))
+    switchTarget.value = auth.groupCode
+  }
+}
 function checkMobile() {
   isMobile.value = window.innerWidth <= 768
   if (!isMobile.value) drawerVisible.value = false
