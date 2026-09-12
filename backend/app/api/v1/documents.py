@@ -10,6 +10,7 @@ import re
 
 from ...core.crud_base import paginate, write_audit
 from ...core.database import get_db
+from ...core._auth_helpers import get_current_group
 from ...core.security import get_current_user, require_roles
 from ...core.storage import storage, persist_save, persist_delete
 from ...core.cos_storage import cos_storage
@@ -73,6 +74,27 @@ def _manual_core(title: str) -> str:
     t = re.sub(r"[—\-–\s/]+", "", t)
     t = re.sub(r"^[0-9]+", "", t)                     # 去开头序号
     return _norm(t)
+
+
+def _doc_group_filter(query, group: str):
+    """按专业组过滤文件列表/详情：本组 或 编号含 KS（科室共享）；生免组兼容历史空值。"""
+    from sqlalchemy import or_
+    conds = [Document.group_code == group]
+    if group == "sm":
+        conds.append(Document.group_code.is_(None))
+        conds.append(Document.group_code == "")
+    conds.append(Document.doc_number.ilike("%KS%"))
+    return query.filter(or_(*conds))
+
+
+def _doc_visible(doc, group: str) -> bool:
+    gc = getattr(doc, "group_code", None)
+    if gc == group:
+        return True
+    if group == "sm" and (gc is None or gc == ""):
+        return True
+    num = getattr(doc, "doc_number", "") or ""
+    return "KS" in str(num)
 
 
 @router.get("/project-manuals")
@@ -211,9 +233,12 @@ def list_documents(
     hide_invalid: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    group: str = Depends(get_current_group),
 ):
     params = dict(request.query_params)
     query = db.query(Document).options(defer(Document.data))  # 列表不加载二进制字节（JSON 序列化会 UnicodeDecodeError）
+    if group:
+        query = _doc_group_filter(query, (group or "sm").strip().lower())
     if q:
         query = query.filter(
             Document.title.ilike(f"%{q}%")
@@ -236,8 +261,15 @@ def list_documents(
 
 
 @router.get("/{doc_id}", response_model=DocumentRead)
-def get_document(doc_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def get_document(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    group: str = Depends(get_current_group),
+):
     d = db.query(Document).options(defer(Document.data)).filter(Document.id == doc_id).first()
+    if d is not None and group and not _doc_visible(d, (group or "sm").strip().lower()):
+        raise HTTPException(status_code=404, detail="未找到文档")
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
     return d
@@ -249,10 +281,13 @@ def update_document(
     payload: DocumentUpdate,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "specialty_leader")),
+    group: str = Depends(get_current_group),
 ):
     d = db.get(Document, doc_id)
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
+    if group and not _doc_visible(d, (group or "sm").strip().lower()):
+        raise HTTPException(status_code=403, detail="无权修改其他专业组的文件")
     if payload.category and payload.category not in DOC_CATEGORIES:
         raise HTTPException(status_code=400, detail="文件分类不合法")
     data = payload.model_dump(exclude_unset=True)
@@ -279,6 +314,7 @@ def upload_document(
     description: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "specialty_leader")),
+    group: str = Depends(get_current_group),
 ):
     if category not in DOC_CATEGORIES:
         raise HTTPException(status_code=400, detail="文件分类不合法")
@@ -297,6 +333,7 @@ def upload_document(
     meta = parse_doc_metadata(str(storage.get_path(rel)), title or file.filename or "", category)
     version = "1.0"
     d = Document(
+        group_code=group,
         title=title or _strip_title_prefix(file.filename or "未命名"),
         category=category,
         version=version,
@@ -657,10 +694,13 @@ def delete_document(
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "specialty_leader")),
+    group: str = Depends(get_current_group),
 ):
     d = db.get(Document, doc_id)
     if not d:
         raise HTTPException(status_code=404, detail="未找到文件")
+    if group and not _doc_visible(d, (group or "sm").strip().lower()):
+        raise HTTPException(status_code=403, detail="无权删除其他专业组的文件")
     # 记录作废日志（删除前捕获名称/编码）
     _log_change(db, d, "作废", user.full_name or user.username)
     if d.file_path:
