@@ -277,7 +277,7 @@ def make_router(
             obj.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(obj)
-        write_audit(db, user, "update", Model.__tablename__, item_id, changes, _ip(request, group=group))
+        write_audit(db, user, "update", Model.__tablename__, item_id, changes, _ip(request), group=group)
         if after_write:
             after_write(db, "update", obj)
         return _to_read(obj)
