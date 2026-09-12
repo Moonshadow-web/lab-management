@@ -23,8 +23,7 @@
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
           <el-select v-model="projLibFilter" placeholder="全部责任库" clearable style="width:140px" @change="loadProj">
-            <el-option label="生化凝血" value="生化凝血" />
-            <el-option label="免疫" value="免疫" />
+            <el-option v-for="l in libsStore.libs" :key="l" :label="l" :value="l" />
           </el-select>
           <el-select v-model="projAutoFilter" placeholder="全部来源" clearable style="width:140px" @change="loadProj">
             <el-option label="仅自动匹配" :value="true" />
@@ -99,8 +98,7 @@
       <el-tab-pane label="待关联建议" name="suggest">
         <div class="toolbar">
           <el-select v-model="sugLib" placeholder="全部责任库" clearable style="width:140px" @change="loadSuggestions">
-            <el-option label="生化凝血" value="生化凝血" />
-            <el-option label="免疫" value="免疫" />
+            <el-option v-for="l in libsStore.libs" :key="l" :label="l" :value="l" />
           </el-select>
           <el-button :icon="Refresh" @click="loadSuggestions" :loading="sugLoading">刷新建议</el-button>
           <el-button type="success" :icon="Check" :loading="adoptingAll" @click="adoptAll" v-if="canWrite">批量采纳全部建议</el-button>
@@ -254,8 +252,10 @@ import { listTestItems } from '../../api/testItems'
 import { listReagentItems } from '../../api/reagent'
 import { listInstruments } from '../../api/instruments'
 import { useAuthStore } from '../../store/auth'
+import { useReagentStore } from '../../store/reagent'
 
 const auth = useAuthStore()
+const libsStore = useReagentStore()
 const canWrite = computed(() => auth.canWrite('reagents'))
 
 const activeTab = ref('project')

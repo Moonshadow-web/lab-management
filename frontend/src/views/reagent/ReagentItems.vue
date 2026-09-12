@@ -139,7 +139,7 @@ const reagentStore = useReagentStore()
 const canWrite = computed(() => auth.canWrite('reagents'))
 const types = ['试剂', '校准品', '质控品', '耗材']
 const categories = ['生化', '免疫', '凝血', '血气', '尿液', '其他']
-const libs = LIBRARIES
+const libs = computed(() => reagentStore.libs)
 
 const items = ref([]), total = ref(0), page = ref(1), pageSize = ref(50), loading = ref(false)
 const q = ref(''), filterType = ref(''), filterLibrary = ref('')
@@ -181,6 +181,7 @@ async function refresh() {
     if (showInactive.value) params.show_inactive = true
     const r = await listReagentItems(params)
     items.value = r.items; total.value = r.total
+    reagentStore.setLibraries([...new Set(((rows.value || []).map((r) => r.library)).filter(Boolean))])
     await loadStats()
   } catch (e) {
     ElMessage.error('加载失败：' + errText(e))
