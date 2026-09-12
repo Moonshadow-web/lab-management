@@ -3,6 +3,7 @@ from .audit_log import AuditLog
 from .document import Document, DocumentVersion
 from .document_instrument import DocumentInstrument
 from .file_change_log import FileChangeLog
+from .lab_group import LAB_GROUPS, DEFAULT_GROUP_CODE, LabGroup
 from .instrument import CalibrationRecord, Instrument, InstrumentRepair
 from .instrument_archive import InstrumentArchive
 from .instrument_family import InstrumentFamily, InstrumentFamilyMember

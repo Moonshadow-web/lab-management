@@ -9,6 +9,7 @@ from ..core.database import Base
 class TestItem(Base):
     __tablename__ = "test_items"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(50), index=True, default="")
     name: Mapped[str] = mapped_column(String(200), index=True, default="")

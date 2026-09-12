@@ -118,6 +118,25 @@ def _on_connect_raise_max_allowed_packet(dbapi_conn, conn_record):
         pass
 
 
+def _seed_lab_groups():
+    """幂等种子：专业组字典（生免/临检/微生物/分子/血库）。缺失才插入，不覆盖已有。"""
+    try:
+        from .models.lab_group import LAB_GROUPS, LabGroup
+        with SessionLocal() as db:
+            existing = {row[0] for row in db.query(LabGroup.code).all()}
+            added = 0
+            for code, name, sort_no in LAB_GROUPS:
+                if code in existing:
+                    continue
+                db.add(LabGroup(code=code, name=name, sort_no=sort_no, is_active=True))
+                added += 1
+            if added:
+                db.commit()
+                logger.info("专业组字典种子：新增 %d 个组", added)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("专业组字典种子失败(忽略): %s", e)
+
+
 def _ensure_missing_columns():
     """MySQL/任意 dialect 自愈：补齐缺失表 + 缺失列（逐表/逐列容错）。
 
@@ -932,6 +951,10 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
     except Exception as e:  # noqa: BLE001
         logger.error("init error (create_all): %s", e)
+    try:
+        _seed_lab_groups()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("seed lab_groups error (non-fatal): %s", e)
     try:
         _migrate_schema()
     except Exception as e:  # noqa: BLE001

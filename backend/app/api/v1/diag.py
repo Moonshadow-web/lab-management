@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "uncert-ucal-tip-and-allreports-pdf-2026-09-09"
+_BUILD_MARK = "s1-groups-2026-09-12"
 
 
 def get_build_mark() -> str:
@@ -153,6 +153,33 @@ router = APIRouter(prefix="/_diag", tags=["diag"])
 def diag_build():
     """返回构建标记，确认当前服役容器版本（免鉴权，仅探针）。"""
     return {"build": _BUILD_MARK, "has_self_heal": True}
+
+
+@router.get("/groups")
+def diag_groups():
+    """专业组诊断：确认 lab_groups 表已建 + 字典已种子 + 各业务表已有 group_code 列。"""
+    from sqlalchemy import inspect as sa_inspect
+    from ...core.database import engine as _engine
+    from ...models.lab_group import LAB_GROUPS
+
+    out = {"expected": [c for c, _n, _s in LAB_GROUPS]}
+    try:
+        insp = sa_inspect(_engine)
+        out["table_exists"] = insp.has_table("lab_groups")
+        out["groups"] = []
+        if out["table_exists"]:
+            from ...core.database import SessionLocal
+            from ...models.lab_group import LabGroup
+            with SessionLocal() as db:
+                out["groups"] = [{"code": g.code, "name": g.name} for g in db.query(LabGroup).order_by(LabGroup.sort_no).all()]
+        cols = {}
+        for t in ("users", "test_items", "documents", "instruments"):
+            if insp.has_table(t):
+                cols[t] = "group_code" in {c["name"] for c in insp.get_columns(t)}
+        out["group_code_columns"] = cols
+    except Exception as e:  # noqa: BLE001
+        out["error"] = str(e)[:200]
+    return out
 
 
 @router.get("/_debug_manuals")

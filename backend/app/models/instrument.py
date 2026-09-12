@@ -12,6 +12,7 @@ INSTRUMENT_STATUS = ["在用", "备用", "维修", "停用"]
 class Instrument(Base):
     __tablename__ = "instruments"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组（默认生免组）
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200), index=True, default="")
     dept_no: Mapped[str] = mapped_column(String(50), default="")  # 科室编号
