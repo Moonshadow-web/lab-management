@@ -70,7 +70,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="8"><el-form-item label="考核负责人"><el-input v-model="form.exam_responsible" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="考核时间"><el-input v-model="form.exam_time" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="考核时间"><el-date-picker v-model="form.exam_time" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
           <el-col :span="12">
             <el-form-item label="状态"><el-select v-model="form.status" style="width:100%"><el-option label="进行中" value="进行中" /><el-option label="已完成" value="已完成" /></el-select></el-form-item>
           </el-col>
