@@ -76,8 +76,6 @@
             <th style="width:44px">得分</th>
             <th style="width:98px">评估方法</th>
             <th>依据描述</th>
-            <th style="width:104px">关联编号</th>
-            <th style="width:72px">日期</th>
           </tr>
         </thead>
         <tbody>
@@ -87,8 +85,6 @@
             <td>{{ score(it) }}</td>
             <td>{{ methodLabel(ev(it).method) || '—' }}</td>
             <td class="left">{{ ev(it).evidence || '—' }}</td>
-            <td>{{ ev(it).ref_id || '—' }}</td>
-            <td>{{ ev(it).date || d.assess_date || '—' }}</td>
           </tr>
         </tbody>
       </table>

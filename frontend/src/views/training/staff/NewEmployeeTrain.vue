@@ -26,7 +26,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="8"><el-form-item label="培训专业"><el-input v-model="form.train_major" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="入组时间"><el-input v-model="form.group_join_date" placeholder="如 2026-01" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="入组时间"><el-date-picker v-model="form.group_join_date" type="month" value-format="YYYY-MM" format="YYYY-MM" placeholder="YYYY-MM" style="width:100%" /></el-form-item></el-col>
           <el-col :span="16"><el-form-item label="培训时长"><el-input v-model="form.train_duration" placeholder="如 急诊3月、病房2月..." /></el-form-item></el-col>
         </el-row>
 

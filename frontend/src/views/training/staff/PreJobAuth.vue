@@ -21,7 +21,7 @@
       <el-form :model="form" label-width="130px">
         <el-row :gutter="12">
           <el-col :span="12"><el-form-item label="申请人"><el-input v-model="form.name" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="申请日期"><el-input v-model="form.apply_date" placeholder="如 2026-09-09" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="申请日期"><el-date-picker v-model="form.apply_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="考核岗位（多选）">
           <el-select v-model="positions" multiple style="width:100%" placeholder="按 GL-070 选择岗位，仪器自动带出">
@@ -115,7 +115,7 @@
               <el-select v-model="form.conclusion" style="width:100%" placeholder="请选择"><el-option label="同意上岗" value="同意上岗" /><el-option label="不同意上岗" value="不同意上岗" /></el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="7"><el-form-item label="授权日期"><el-input v-model="form.auth_date" /></el-form-item></el-col>
+          <el-col :span="7"><el-form-item label="授权日期"><el-date-picker v-model="form.auth_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
           <el-col :span="7"><el-form-item label="备注"><el-input v-model="form.remark" /></el-form-item></el-col>
         </el-row>
       </el-form>

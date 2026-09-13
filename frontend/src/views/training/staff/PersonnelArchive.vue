@@ -21,7 +21,7 @@
         <el-row :gutter="12">
           <el-col :span="12"><el-form-item label="姓名"><el-input v-model="form.name" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="性别"><el-input v-model="form.gender" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="出生年月"><el-input v-model="form.birth_date" placeholder="如 1990-01" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="出生年月"><el-date-picker v-model="form.birth_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="学历"><el-input v-model="form.education" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="职称"><el-input v-model="form.title" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="职务"><el-input v-model="form.position" /></el-form-item></el-col>

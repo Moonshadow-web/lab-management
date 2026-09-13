@@ -68,7 +68,7 @@
           <el-col :span="6"><el-form-item label="授权人"><el-input v-model="form.authorizer" /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="评估日期"><el-input v-model="form.assess_date" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="评估日期"><el-date-picker v-model="form.assess_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="备注"><el-input v-model="form.remark" placeholder="可选" /></el-form-item></el-col>
         </el-row>
       </el-form>

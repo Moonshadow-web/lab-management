@@ -16,7 +16,7 @@
       <el-form :model="form" label-width="110px">
         <el-row :gutter="12">
           <el-col :span="12"><el-form-item label="申请人"><el-input v-model="form.applicant" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="申请日期"><el-input v-model="form.apply_date" placeholder="如 2026-01-15" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="申请日期"><el-date-picker v-model="form.apply_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="申请内容"><el-input v-model="form.apply_content" type="textarea" :rows="2" placeholder="申请独立上岗的岗位/仪器" /></el-form-item>
         <el-form-item label="理论考核"><el-input v-model="form.theory_eval" type="textarea" :rows="2" /></el-form-item>

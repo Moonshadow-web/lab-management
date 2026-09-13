@@ -76,11 +76,11 @@
         <el-row :gutter="12">
           <el-col :span="8"><el-form-item label="授权人"><el-input v-model="form.authorizer" /></el-form-item></el-col>
           <el-col :span="10"><el-form-item label="授权人资质"><el-input v-model="form.authorizer_qualification" /></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="授权日期"><el-input v-model="form.auth_date" placeholder="2026-09-10" @change="calcValid" /></el-form-item></el-col>
+          <el-col :span="6"><el-form-item label="授权日期"><el-date-picker v-model="form.auth_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" @change="calcValid"/></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="8"><el-form-item label="有效期起"><el-input v-model="form.valid_from" @change="calcValid" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="有效期至"><el-input v-model="form.valid_until" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="有效期起"><el-date-picker v-model="form.valid_from" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" @change="calcValid"/></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="有效期至"><el-date-picker v-model="form.valid_until" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="备注"><el-input v-model="form.remark" /></el-form-item>
       </el-form>

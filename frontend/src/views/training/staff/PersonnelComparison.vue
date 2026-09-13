@@ -21,7 +21,7 @@
         <el-row :gutter="12">
           <el-col :span="8"><el-form-item label="试剂批号"><el-input v-model="form.reagent_batch" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="试剂有效期"><el-input v-model="form.reagent_expire" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="检测日期"><el-input v-model="form.test_date" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="检测日期"><el-date-picker v-model="form.test_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="样本编号"><el-input v-model="sampleNosText" placeholder="多个以逗号分隔" /></el-form-item>
 
