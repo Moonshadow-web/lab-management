@@ -60,13 +60,22 @@ def _report_single_html(v):
     l2_mean = float(v.get("l2_mean") or 0)
     l2_sd = float(v.get("l2_sd") or 0)
     l2_n = int(v.get("l2_n") or 0)
+    # 可选第三水平（L3）：填写了才在报告中体现
+    l3_mean = float(v.get("l3_mean") or 0)
+    l3_sd = float(v.get("l3_sd") or 0)
+    l3_n = int(v.get("l3_n") or 0)
+    has_l3 = l3_n >= 2 and l3_mean > 0
     ucal = float(v.get("ucal") or 0)
     ucal_source = v.get("ucal_source") or "厂家"
     rsd1 = l1_sd / l1_mean * 100 if l1_mean > 0 else 0
     rsd2 = l2_sd / l2_mean * 100 if l2_mean > 0 else 0
     # u_Rw 公式
+    rsd3 = l3_sd / l3_mean * 100 if has_l3 else 0
     if l1_n >= 2 and l2_n >= 2 and l1_mean > 0 and l2_mean > 0:
-        u_rw_sq = (rsd1 ** 2 * (l1_n - 1) + rsd2 ** 2 * (l2_n - 1)) / (l1_n + l2_n - 2)
+        if has_l3:
+            u_rw_sq = (rsd1 ** 2 * (l1_n - 1) + rsd2 ** 2 * (l2_n - 1) + rsd3 ** 2 * (l3_n - 1)) / (l1_n + l2_n + l3_n - 3)
+        else:
+            u_rw_sq = (rsd1 ** 2 * (l1_n - 1) + rsd2 ** 2 * (l2_n - 1)) / (l1_n + l2_n - 2)
         u_rw = math.sqrt(u_rw_sq)
     else:
         u_rw_sq = 0
@@ -81,6 +90,22 @@ def _report_single_html(v):
     pv_unit = v.get("patient_unit") or ""
     pv_ext = pv * u_ext / 100 if pv > 0 else 0
     today = datetime.now().strftime("%Y年%m月%d日")
+    # ── L3 可选水平：填了才在报告体现 ──
+    if has_l3:
+        l3_row = (f'<tr><td>质控水平 3 (L3)</td><td>{_fmt(l3_mean)} {_esc(pv_unit)}</td>'
+                  f'<td>{_fmt(l3_sd)} {_esc(pv_unit)}</td><td>{_fmt(l3_sd)} {_esc(pv_unit)}</td>'
+                  f'<td>{_fmt(rsd3)}%</td><td>{l3_n}</td></tr>')
+        l3_label = "L1、L2、L3"
+        formula_general = ("u<sub>Rw</sub> = √[(RSD<sub>L1</sub>² × (n<sub>L1</sub>-1) + RSD<sub>L2</sub>² × (n<sub>L2</sub>-1) "
+                           "+ RSD<sub>L3</sub>² × (n<sub>L3</sub>-1)) / (n<sub>L1</sub> + n<sub>L2</sub> + n<sub>L3</sub> - 3)]")
+        formula_numbers = (f"= √[({_fmt(rsd1)}² × ({l1_n}-1) + {_fmt(rsd2)}² × ({l2_n}-1) + {_fmt(rsd3)}² × ({l3_n}-1)) "
+                           f"/ ({l1_n}+{l2_n}+{l3_n}-3)]")
+    else:
+        l3_row = ""
+        l3_label = "L1、L2"
+        formula_general = "u<sub>Rw</sub> = √[(RSD<sub>L1</sub>² × (n<sub>L1</sub>-1) + RSD<sub>L2</sub>² × (n<sub>L2</sub>-1)) / (n<sub>L1</sub> + n<sub>L2</sub> - 2)]"
+        formula_numbers = f"= √[({_fmt(rsd1)}² × ({l1_n}-1) + {_fmt(rsd2)}² × ({l2_n}-1)) / ({l1_n}+{l2_n}-2)]"
+
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>测量不确定度评定报告 - {_esc(v.get('project_name'))}</title>
 <style>{_style()}</style></head><body>
 <h1>民航总医院检验科生化免疫组</h1>
@@ -108,10 +133,11 @@ def _report_single_html(v):
 <tr><th>水平</th><th>均值</th><th>标准差</th><th>u<sub>Rw</sub></th><th>相对标准差 RSD</th><th>测试数 n</th></tr>
 <tr><td>质控水平 1 (L1)</td><td>{_fmt(l1_mean)} {_esc(pv_unit)}</td><td>{_fmt(l1_sd)} {_esc(pv_unit)}</td><td>{_fmt(l1_sd)} {_esc(pv_unit)}</td><td>{_fmt(rsd1)}%</td><td>{l1_n}</td></tr>
 <tr><td>质控水平 2 (L2)</td><td>{_fmt(l2_mean)} {_esc(pv_unit)}</td><td>{_fmt(l2_sd)} {_esc(pv_unit)}</td><td>{_fmt(l2_sd)} {_esc(pv_unit)}</td><td>{_fmt(rsd2)}%</td><td>{l2_n}</td></tr>
+{l3_row}
 </table>
-<p><b>(2) 由不精密度引入的总不确定度（合并 L1、L2 RSD）</b></p>
-<p>u<sub>Rw</sub> = √[(RSD<sub>L1</sub>² × (n<sub>L1</sub>-1) + RSD<sub>L2</sub>² × (n<sub>L2</sub>-1)) / (n<sub>L1</sub> + n<sub>L2</sub> - 2)]</p>
-<p>= √[({_fmt(rsd1)}² × ({l1_n}-1) + {_fmt(rsd2)}² × ({l2_n}-1)) / ({l1_n}+{l2_n}-2)]</p>
+<p><b>(2) 由不精密度引入的总不确定度（合并 {l3_label} RSD）</b></p>
+<p>{formula_general}</p>
+<p>{formula_numbers}</p>
 <p>= <b>{_fmt(u_rw)}%</b></p>
 <h2>3. 偏倚引入测量不确定度分量</h2>
 <p><b>(1) 校准品定值引入的不确定度（u<sub>cal</sub>）：</b>来源：{_esc(ucal_source)}。校准品相对标准不确定度为 <b>{_fmt(ucal)}%</b>。</p>
@@ -141,13 +167,20 @@ def _report_multi_html(v):
     # 计算每个系统 RSD1/RSD2
     rows_sys = []
     per_sys_rsd_sq = []
+    l3_any = False
     l1_means, l2_means = [], []
     for s in systems:
         m1, sd1, n1 = float(s.get("l1_mean") or 0), float(s.get("l1_sd") or 0), int(s.get("l1_n") or 0)
         m2, sd2, n2 = float(s.get("l2_mean") or 0), float(s.get("l2_sd") or 0), int(s.get("l2_n") or 0)
         rsd1 = sd1 / m1 * 100 if m1 > 0 else 0
         rsd2 = sd2 / m2 * 100 if m2 > 0 else 0
-        u_rw_sys = math.sqrt((rsd1 ** 2 + rsd2 ** 2) / 2)
+        # 可选第三水平（L3）：该填了才纳入
+        m3, sd3, n3 = float(s.get("l3_mean") or 0), float(s.get("l3_sd") or 0), int(s.get("l3_n") or 0)
+        has_l3_sys = n3 >= 2 and m3 > 0
+        rsd3 = sd3 / m3 * 100 if has_l3_sys else 0
+        _rsds = [rsd1, rsd2] + ([rsd3] if has_l3_sys else [])
+        u_rw_sys = math.sqrt(sum(r ** 2 for r in _rsds) / len(_rsds))
+        l3_any = l3_any or has_l3_sys
         per_sys_rsd_sq.append(u_rw_sys ** 2)
         l1_means.append(m1)
         l2_means.append(m2)
@@ -193,9 +226,14 @@ def _report_multi_html(v):
     # 系统表
     sys_rows_html = "".join([
         f"<tr><td>{_esc(name)}</td><td>{n1}</td><td>{_fmt(m1)}</td><td>{_fmt(sd1)}</td><td>{_fmt(rsd1)}%</td>"
-        f"<td>{n2}</td><td>{_fmt(m2)}</td><td>{_fmt(sd2)}</td><td>{_fmt(rsd2)}%</td><td>{_fmt(u_sys, 4)}</td></tr>"
-        for (name, n1, m1, sd1, rsd1, m2, sd2, rsd2, u_sys) in rows_sys
+        f"<td>{n2}</td><td>{_fmt(m2)}</td><td>{_fmt(sd2)}</td><td>{_fmt(rsd2)}%</td>"
+        + (f"<td>{n3}</td><td>{_fmt(m3)}</td><td>{_fmt(sd3)}</td><td>{_fmt(rsd3)}%</td>" if l3_any else "")
+        + f"<td>{_fmt(u_sys, 4)}</td></tr>"
+        for (name, n1, m1, sd1, rsd1, m2, sd2, rsd2, u_sys, n3, m3, sd3, rsd3) in rows_sys
     ])
+    # L3 表头（仅当有系统填写 L3 时出现）
+    l3_head = ('<th colspan="4">L3 水平（可选）</th>' if l3_any else '')
+    l3_sub = ('<th>n<sub>L3</sub></th><th>均值</th><th>SD</th><th>RSD%</th>' if l3_any else '')
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>测量不确定度评定报告(多系统) - {_esc(v.get('project_name'))}</title>
 <style>{_style()}</style></head><body>
 <h1>民航总医院检验科生化免疫组</h1>
@@ -220,8 +258,8 @@ def _report_multi_html(v):
 <h2>2. 不精密度引入测量不确定度分量</h2>
 <p><b>(1) {len(systems)} 个测量系统测量室内质控数据</b></p>
 <table>
-<tr><th rowspan="2">测量系统</th><th colspan="4">L1 水平</th><th colspan="4">L2 水平</th><th rowspan="2">u<sub>Rw</sub>(系统, %)</th></tr>
-<tr><th>n<sub>L1</sub></th><th>均值</th><th>SD</th><th>RSD%</th><th>n<sub>L2</sub></th><th>均值</th><th>SD</th><th>RSD%</th></tr>
+<tr><th rowspan="2">测量系统</th><th colspan="4">L1 水平</th><th colspan="4">L2 水平</th>{l3_head}<th rowspan="2">u<sub>Rw</sub>(系统, %)</th></tr>
+<tr><th>n<sub>L1</sub></th><th>均值</th><th>SD</th><th>RSD%</th><th>n<sub>L2</sub></th><th>均值</th><th>SD</th><th>RSD%</th>{l3_sub}</tr>
 {sys_rows_html}
 </table>
 <p><b>(2) 计算各系统平均值的方差（系统间差异，水平内合并）</b></p>
