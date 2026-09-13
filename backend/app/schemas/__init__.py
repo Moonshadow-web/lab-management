@@ -637,6 +637,10 @@ class UncertaintyAssessmentBase(BaseModel):
     l2_mean: float = 0
     l2_sd: float = 0
     l2_n: int = 0
+    # 可选第三水平（L3）：不填保持 0，不参与计算
+    l3_mean: float = 0
+    l3_sd: float = 0
+    l3_n: int = 0
     # 多个系统：JSON 数组 [{name, l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n}]
     multi_systems: list = []
     # 计算结果
