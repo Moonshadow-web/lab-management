@@ -199,17 +199,29 @@ def _find_best_nccl(db, name: str):
     return None
 
 
-def calc_single_u_rw(l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n):
+def calc_single_u_rw(l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n,
+                     l3_mean=0, l3_sd=0, l3_n=0):
     """单个测量系统的不精密度 u_Rw(%)（图1公式）。
 
-    RSD1 = SD1/Mean1 * 100; RSD2 = SD2/Mean2 * 100
-    u_Rw = sqrt((RSD1²*(n1-1) + RSD2²*(n2-1)) / (n1+n2-2))
+    RSD_i = SD_i/Mean_i * 100
+    u_Rw = sqrt(Σ(RSD_i²*(n_i-1)) / Σ(n_i-1))   —— 参与水平为 2 个（L1/L2）或 3 个（L1/L2/L3）
+
+    L3 为**可选水平**：未填写（mean≤0 或 n<2）时自动忽略，公式退化为原来的两水平公式，
+    不影响既有记录的计算结果。
     """
-    if l1_n < 2 or l2_n < 2 or l1_mean <= 0 or l2_mean <= 0:
+    levels = []
+    for mean, sd, n in ((l1_mean, l1_sd, l1_n), (l2_mean, l2_sd, l2_n), (l3_mean, l3_sd, l3_n)):
+        try:
+            mean = float(mean or 0); sd = float(sd or 0); n = int(n or 0)
+        except (TypeError, ValueError):
+            continue
+        if n >= 2 and mean > 0:
+            levels.append((mean, sd, n))
+    if len(levels) < 2:
         return 0.0
-    rsd1 = l1_sd / l1_mean * 100
-    rsd2 = l2_sd / l2_mean * 100
-    return ((rsd1 ** 2 * (l1_n - 1) + rsd2 ** 2 * (l2_n - 1)) / (l1_n + l2_n - 2)) ** 0.5
+    num = sum((sd / mean * 100) ** 2 * (n - 1) for mean, sd, n in levels)
+    den = sum(n - 1 for _mean, _sd, n in levels)
+    return (num / den) ** 0.5 if den > 0 else 0.0
 
 
 def calc_multi_u_rw(systems):
@@ -232,8 +244,16 @@ def calc_multi_u_rw(systems):
             continue
         rsd1 = s.get("l1_sd", 0) / s["l1_mean"] * 100
         rsd2 = s.get("l2_sd", 0) / s["l2_mean"] * 100
-        # u²_Rw(系统) = (rsd1² + rsd2²) / 2（图2示例：0.16²+0.14²+0.18²)/3）
-        per_sys_rsd_sq.append((rsd1 ** 2 + rsd2 ** 2) / 2)
+        rsd_list = [rsd1, rsd2]
+        # 可选第三水平（L3）：填了才参与该系统的系统内不精密度
+        try:
+            l3m = float(s.get("l3_mean") or 0); l3s = float(s.get("l3_sd") or 0); l3n = int(s.get("l3_n") or 0)
+        except (TypeError, ValueError):
+            l3m, l3s, l3n = 0, 0, 0
+        if l3n >= 2 and l3m > 0:
+            rsd_list.append(l3s / l3m * 100)
+        # u²_Rw(系统) = 各水平 RSD² 的均值（2 水平时 = (rsd1²+rsd2²)/2，与原来一致）
+        per_sys_rsd_sq.append(sum(r ** 2 for r in rsd_list) / len(rsd_list))
         l1_means.append(s["l1_mean"])
         l2_means.append(s["l2_mean"])
     if not per_sys_rsd_sq:
@@ -287,6 +307,9 @@ def compute_record(payload: dict) -> dict:
             float(payload.get("l2_mean") or 0),
             float(payload.get("l2_sd") or 0),
             int(payload.get("l2_n") or 0),
+            float(payload.get("l3_mean") or 0),
+            float(payload.get("l3_sd") or 0),
+            int(payload.get("l3_n") or 0),
         )
     else:
         systems = payload.get("multi_systems") or []
@@ -474,6 +497,9 @@ def batch_uncertainty(
             l2_mean=float(payload.get("l2_mean") or 0),
             l2_sd=float(payload.get("l2_sd") or 0),
             l2_n=int(payload.get("l2_n") or 0),
+            l3_mean=float(payload.get("l3_mean") or 0),
+            l3_sd=float(payload.get("l3_sd") or 0),
+            l3_n=int(payload.get("l3_n") or 0),
             multi_systems=json.dumps(payload.get("multi_systems") or [], ensure_ascii=False),
             u_rw=float(payload.get("u_rw") or 0),
             u_c=float(payload.get("u_c") or 0),

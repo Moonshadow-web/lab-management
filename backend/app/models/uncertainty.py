@@ -42,6 +42,10 @@ class UncertaintyAssessment(Base):
     l2_mean: Mapped[float] = mapped_column(Float, default=0)
     l2_sd: Mapped[float] = mapped_column(Float, default=0)
     l2_n: Mapped[int] = mapped_column(Integer, default=0)
+    # ── 可选第三水平（L3）：不填则为 0，不参与计算 ──
+    l3_mean: Mapped[float] = mapped_column(Float, default=0)
+    l3_sd: Mapped[float] = mapped_column(Float, default=0)
+    l3_n: Mapped[int] = mapped_column(Integer, default=0)
     # ── 多个系统：JSON 数组（兼容老的 l1_values/l2_values）──
     # 结构：[{ name, l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n }, ...]
     multi_systems: Mapped[str] = mapped_column(Text, default="[]")

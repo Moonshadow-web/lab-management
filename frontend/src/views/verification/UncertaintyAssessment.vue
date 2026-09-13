@@ -185,9 +185,32 @@
                   </el-form-item>
                 </el-col>
               </el-row>
+              <!-- 可选第三水平 L3：部分项目有 3 个浓度水平，填了才参与计算 -->
+              <el-row :gutter="12" style="margin-top:6px">
+                <el-col :span="24">
+                  <div class="level-tag" style="background:#909399">L3 水平（可选，不填则不参与计算）</div>
+                </el-col>
+              </el-row>
+              <el-row :gutter="12">
+                <el-col :span="8">
+                  <el-form-item label="均值" label-width="60px">
+                    <el-input-number v-model="form.l3_mean" :min="0" :controls="false" :precision="4" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="标准差" label-width="60px">
+                    <el-input-number v-model="form.l3_sd" :min="0" :controls="false" :precision="4" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="测试数 n" label-width="60px">
+                    <el-input-number v-model="form.l3_n" :min="0" :controls="false" :precision="0" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
               <div v-if="singlePreview" class="formula">
-                u<sub>Rw</sub> = √[(RSD<sub>L1</sub>² × (n<sub>L1</sub>-1) + RSD<sub>L2</sub>² × (n<sub>L2</sub>-1)) / (n<sub>L1</sub>+n<sub>L2</sub>-2)]
-                = √[{{ singlePreview.rsd1 }}²×{{ singlePreview.l1_n-1 }} + {{ singlePreview.rsd2 }}²×{{ singlePreview.l2_n-1 }}] / {{ singlePreview.l1_n + singlePreview.l2_n - 2 }}
+                {{ singlePreview.formula1 }}
+                {{ singlePreview.formula2 }}
                 = <b>{{ singlePreview.u_rw }}%</b>
               </div>
             </div>
@@ -214,6 +237,13 @@
                   <el-col :span="5"><el-form-item label="L2 SD" label-position="top" label-width="0"><el-input-number v-model="s.l2_sd" :min="0" :precision="4" :controls="false" style="width:100%" /></el-form-item></el-col>
                   <el-col :span="4"><el-form-item label="L2 n" label-position="top" label-width="0"><el-input-number v-model="s.l2_n" :min="0" :precision="0" :controls="false" style="width:100%" /></el-form-item></el-col>
                   <el-col :span="6"><el-form-item label="L2 RSD%" label-position="top" label-width="0"><el-input :value="s.l2_mean > 0 ? ((s.l2_sd / s.l2_mean) * 100).toFixed(2) + '%' : ''" readonly /></el-form-item></el-col>
+                </el-row>
+                <el-row :gutter="16">
+                  <el-col :span="4"><el-form-item label="&nbsp;" label-position="top" label-width="0">&nbsp;</el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L3 均值(可选)" label-position="top" label-width="0"><el-input-number v-model="s.l3_mean" :min="0" :precision="4" :controls="false" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="5"><el-form-item label="L3 SD" label-position="top" label-width="0"><el-input-number v-model="s.l3_sd" :min="0" :precision="4" :controls="false" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="4"><el-form-item label="L3 n" label-position="top" label-width="0"><el-input-number v-model="s.l3_n" :min="0" :precision="0" :controls="false" style="width:100%" /></el-form-item></el-col>
+                  <el-col :span="6"><el-form-item label="L3 RSD%" label-position="top" label-width="0"><el-input :value="s.l3_mean > 0 ? ((s.l3_sd / s.l3_mean) * 100).toFixed(2) + '%' : ''" readonly /></el-form-item></el-col>
                 </el-row>
               </div>
               <el-button size="small" plain @click="addSystem">+ 增加测量系统</el-button>
@@ -439,6 +469,7 @@ const form = reactive({
   // 单系统
   l1_mean: 0, l1_sd: 0, l1_n: 0,
   l2_mean: 0, l2_sd: 0, l2_n: 0,
+  l3_mean: 0, l3_sd: 0, l3_n: 0,
   // 多系统
   multi_systems: defaultMultiSystems(),
   // 校准品
@@ -496,12 +527,32 @@ const rmsBias = computed(() => {
 // ───────── 实时预览（前端计算 + 后端 _preview） ─────────
 const singlePreview = computed(() => {
   if (form.mode !== 'single') return null
-  const { l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n } = form
+  const { l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n, l3_mean, l3_sd, l3_n } = form
   if (l1_n < 2 || l2_n < 2 || l1_mean <= 0 || l2_mean <= 0) return null
+  const lv = [
+    { rsd: l1_sd / l1_mean * 100, n: l1_n },
+    { rsd: l2_sd / l2_mean * 100, n: l2_n },
+  ]
+  // 可选第三水平：填了才参与
+  const hasL3 = l3_n >= 2 && l3_mean > 0
+  if (hasL3) lv.push({ rsd: l3_sd / l3_mean * 100, n: l3_n })
+  const num = lv.reduce((a, x) => a + x.rsd ** 2 * (x.n - 1), 0)
+  const den = lv.reduce((a, x) => a + (x.n - 1), 0)
+  const u_rw = den > 0 ? Math.sqrt(num / den) : 0
   const rsd1 = l1_sd / l1_mean * 100
   const rsd2 = l2_sd / l2_mean * 100
-  const u_rw = Math.sqrt((rsd1 ** 2 * (l1_n - 1) + rsd2 ** 2 * (l2_n - 1)) / (l1_n + l2_n - 2))
-  return { rsd1: rsd1.toFixed(2), rsd2: rsd2.toFixed(2), l1_n, l2_n, u_rw: u_rw.toFixed(2) }
+  const f1 = hasL3
+    ? `u_Rw = √[(RSD_L1² × (n1-1) + RSD_L2² × (n2-1) + RSD_L3² × (n3-1)) / (n1+n2+n3-3)]`
+    : `u_Rw = √[(RSD_L1² × (n1-1) + RSD_L2² × (n2-1)) / (n1+n2-2)]`
+  const parts = [`${rsd1.toFixed(2)}²×${l1_n - 1}`, `${rsd2.toFixed(2)}²×${l2_n - 1}`]
+  if (hasL3) parts.push(`${(l3_sd / l3_mean * 100).toFixed(2)}²×${l3_n - 1}`)
+  const denTxt = hasL3 ? (l1_n + l2_n + l3_n - 3) : (l1_n + l2_n - 2)
+  const f2 = `= √[${parts.join(' + ')}] / ${denTxt}`
+  return {
+    rsd1: rsd1.toFixed(2), rsd2: rsd2.toFixed(2), l1_n, l2_n,
+    hasL3, rsd3: hasL3 ? (l3_sd / l3_mean * 100).toFixed(2) : '', l3_n,
+    u_rw: u_rw.toFixed(2), formula1: f1, formula2: f2,
+  }
 })
 
 const multiPreview = computed(() => {
@@ -513,7 +564,9 @@ const multiPreview = computed(() => {
   for (const s of sys) {
     const rsd1 = s.l1_sd / s.l1_mean * 100
     const rsd2 = s.l2_sd / s.l2_mean * 100
-    per_sys_rsd_sq.push((rsd1 ** 2 + rsd2 ** 2) / 2)
+    const rsds = [rsd1, rsd2]
+    if (s.l3_n >= 2 && s.l3_mean > 0) rsds.push((s.l3_sd / s.l3_mean) * 100)
+    per_sys_rsd_sq.push(rsds.reduce((a, r) => a + r ** 2, 0) / rsds.length)
     l1_means.push(s.l1_mean); l2_means.push(s.l2_mean)
   }
   const u2_within = per_sys_rsd_sq.reduce((a, b) => a + b, 0) / per_sys_rsd_sq.length
