@@ -58,7 +58,7 @@
             <el-select v-model="sessionForm.tag" style="width:100%"><el-option label="组内培训" value="组内培训" /><el-option label="艾梅乙" value="艾梅乙" /></el-select>
           </el-form-item></el-col>
           <el-col :span="8"><el-form-item label="培训对象"><el-input v-model="sessionForm.target" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="时间"><el-input v-model="sessionForm.train_time" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="时间"><el-date-picker v-model="sessionForm.train_time" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="地点"><el-input v-model="sessionForm.location" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="培训内容"><el-input v-model="sessionForm.content" type="textarea" :rows="3" /></el-form-item>

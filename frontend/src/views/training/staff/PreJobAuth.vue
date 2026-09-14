@@ -54,7 +54,7 @@
             <el-tag size="small" type="info">{{ pc.methods.join(' / ') }}</el-tag>
           </div>
           <el-row :gutter="8" style="margin-bottom:8px;">
-            <el-col :span="6"><el-input v-model="examData[pc.post].trainTime" size="small" placeholder="培训时间" /></el-col>
+            <el-col :span="6"><el-date-picker v-model="examData[pc.post].trainTime" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" size="small" placeholder="培训时间 YYYY-MM-DD" style="width:100%" /></el-col>
             <el-col :span="6"><el-input v-model="examData[pc.post].trainPerson" size="small" placeholder="培训人" /></el-col>
             <el-col :span="12"><el-input v-model="examData[pc.post].trainContent" size="small" placeholder="培训内容" /></el-col>
           </el-row>
