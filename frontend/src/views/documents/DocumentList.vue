@@ -127,16 +127,16 @@
           <el-input v-model="editForm.approver" />
         </el-form-item>
         <el-form-item label="发布日期">
-          <el-input v-model="editForm.issued_date" placeholder="YYYY-MM-DD" />
+          <el-date-picker v-model="editForm.issued_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%"/>
         </el-form-item>
         <el-form-item label="审核日期">
-          <el-input v-model="editForm.audit_date" placeholder="YYYY-MM-DD" />
+          <el-date-picker v-model="editForm.audit_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%"/>
         </el-form-item>
         <el-form-item label="批准日期">
-          <el-input v-model="editForm.approve_date" placeholder="YYYY-MM-DD" />
+          <el-date-picker v-model="editForm.approve_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%"/>
         </el-form-item>
         <el-form-item label="实施日期">
-          <el-input v-model="editForm.effective_date" placeholder="YYYY-MM-DD" />
+          <el-date-picker v-model="editForm.effective_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%"/>
         </el-form-item>
         <el-form-item label="说明">
           <el-input v-model="editForm.description" type="textarea" :rows="2" />

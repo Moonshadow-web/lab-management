@@ -29,7 +29,7 @@
           <el-table-column label="带教老师" width="140"><template #default="{ row }"><el-input v-model="row.teacher" size="small" /></template></el-table-column>
           <el-table-column label="评价(1-5)" width="110"><template #default="{ row }"><el-input-number v-model="row.score" :min="0" :max="5" size="small" /></template></el-table-column>
           <el-table-column label="评价人" width="100"><template #default="{ row }"><el-input v-model="row.evaluator" size="small" /></template></el-table-column>
-          <el-table-column label="日期" width="120"><template #default="{ row }"><el-input v-model="row.date" size="small" /></template></el-table-column>
+          <el-table-column label="日期" width="120"><template #default="{ row }"><el-date-picker v-model="row.date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" size="small" placeholder="YYYY-MM-DD" style="width:100%" /></template></el-table-column>
         </el-table>
       </el-form>
       <template #footer>
@@ -46,7 +46,7 @@
           <el-col :span="8"><el-form-item label="类型">
             <el-select v-model="scoreForm.intern_type" style="width:100%"><el-option label="实习" value="实习" /><el-option label="进修" value="进修" /></el-select>
           </el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="考核日期"><el-input v-model="scoreForm.date" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="考核日期"><el-date-picker v-model="scoreForm.date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%"/></el-form-item></el-col>
         </el-row>
         <el-divider content-position="left">实操考核科目（BG-SM-PX-004）</el-divider>
         <el-table :data="scoreForm.subjects_json" border size="small">
@@ -59,7 +59,7 @@
         <el-form-item label="评语"><el-input v-model="scoreForm.overall_comment" type="textarea" :rows="2" /></el-form-item>
         <el-row :gutter="12">
           <el-col :span="12"><el-form-item label="组长签字"><el-input v-model="scoreForm.group_leader" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="日期"><el-input v-model="scoreForm.sign_date" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="日期"><el-date-picker v-model="scoreForm.sign_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%"/></el-form-item></el-col>
         </el-row>
       </el-form>
       <template #footer>

@@ -99,7 +99,7 @@
               <el-col :span="8" v-if="form.report_type === 'quantitative'"><el-form-item label="TEA"><el-input v-model="form.tea" /></el-form-item></el-col>
               <el-col :span="8" v-if="form.report_type === 'quantitative'"><el-form-item label="线性范围"><el-input v-model="form.linear_low" style="width:45%" /> ~ <el-input v-model="form.linear_high" style="width:45%" /></el-form-item></el-col>
               <el-col :span="8" v-if="form.report_type === 'quantitative'"><el-form-item label="稀释倍数"><el-input v-model="form.dilution" /></el-form-item></el-col>
-              <el-col :span="8"><el-form-item label="验证日期"><el-input v-model="form.verify_date" placeholder="如 2025.5.12-5.16" /></el-form-item></el-col>
+              <el-col :span="8"><el-form-item label="验证日期"><el-date-picker v-model="verifyRange" type="daterange" value-format="YYYY-MM-DD" format="YYYY-MM-DD" range-separator="~" start-placeholder="开始日期" end-placeholder="结束日期" style="width:100%" /></el-form-item></el-col>
               <el-col :span="8"><el-form-item label="操作人员"><el-input v-model="form.operator" /></el-form-item></el-col>
               <el-col :span="8"><el-form-item label="审核人员"><el-input v-model="form.reviewer" /></el-form-item></el-col>
               <el-col :span="24"><el-form-item label="验证方案/引用标准"><el-input v-model="form.plan_ref" type="textarea" :rows="2" placeholder="如：CNAS-GL037:2019 临床化学定量检验程序性能验证指南，WS/T 492-2016 精密度与正确度性能验证，WS/T 408-2024 分析性能验证指南" /></el-form-item></el-col>
@@ -439,6 +439,33 @@ const ITEM_ORDER = computed(() => form.report_type === 'qualitative'
   : ['precision', 'trueness', 'linearity', 'reportable', 'reference', 'specificity'])
 function stepNum(key) { return ITEM_ORDER.value.indexOf(key) + 3 }
 const form = reactive(defaultForm())
+
+// 验证日期：支持区间（存 '起~止' 或单日），兼容历史写法（2025.5.12-5.16 等）
+const verifyRange = computed({
+  get() {
+    const raw = String(form.verify_date || '').trim()
+    if (!raw) return null
+    const parts = raw.split(/[~～]|\s*至\s*/).map((x) => x.trim()).filter(Boolean)
+    const norm = (t) => {
+      const m = String(t).match(/^(\d{4})[.\-\/年](\d{1,2})(?:[.\-\/月](\d{1,2}))?/)
+      return m ? m[1] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[3] || '1').padStart(2, '0') : ''
+    }
+    let a = norm(parts[0] || '')
+    let b = parts[1] ? norm(parts[1]) : ''
+    if (!b) {
+      // 形如 2025.5.12-5.16（后半段没有年份）
+      const m = parts[0] && parts[0].match(/^(\d{4})[.\-\/年](\d{1,2})[.\-\/月](\d{1,2})\s*[-—]\s*(\d{1,2})[.\-\/月](\d{1,2})/)
+      if (m) { a = m[1] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[3]).padStart(2, '0'); b = m[1] + '-' + String(m[4]).padStart(2, '0') + '-' + String(m[5]).padStart(2, '0') }
+    }
+    if (a && b) return [a, b]
+    if (a) return [a, a]
+    return null
+  },
+  set(val) {
+    if (!val || !val.length) { form.verify_date = ''; return }
+    form.verify_date = val[0] === val[1] ? val[0] : val[0] + '~' + val[1]
+  },
+})
 function defaultForm() {
   return {
     report_type: 'qualitative', project_name: '', project_method: '', unit: '', reagent: '', reagent_lot: '', calibrator: '', calibrator_lot: '', qc: '', qc_lot: '',

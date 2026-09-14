@@ -26,7 +26,7 @@
               <el-table-column label="项目" min-width="160"><template #default="{ row }"><el-input v-model="row.item" size="small" /></template></el-table-column>
               <el-table-column label="目标" min-width="160"><template #default="{ row }"><el-input v-model="row.goal" size="small" /></template></el-table-column>
               <el-table-column label="培训人" width="110"><template #default="{ row }"><el-input v-model="row.trainer" size="small" /></template></el-table-column>
-              <el-table-column label="预计日期" width="120"><template #default="{ row }"><el-input v-model="row.expected_date" size="small" /></template></el-table-column>
+              <el-table-column label="预计日期" width="120"><template #default="{ row }"><el-date-picker v-model="row.expected_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" size="small" placeholder="YYYY-MM-DD" style="width:100%" /></template></el-table-column>
               <el-table-column label="" width="50" align="center"><template #default="{ row }"><el-button link type="danger" :icon="Delete" @click="removePlanItem(row)" /></template></el-table-column>
             </el-table>
           </el-form>
