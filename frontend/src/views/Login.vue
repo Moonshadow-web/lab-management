@@ -1,7 +1,7 @@
 <template>
   <div class="login-wrap">
     <el-card class="login-card">
-      <div class="login-title">民航总医院检验科</div>
+      <div class="login-title">检验科</div>
       <div class="login-title2">实验室管理系统</div>
       <div class="login-sub">请选择专业组后登录</div>
       <el-form :model="form" @submit.prevent="onSubmit">

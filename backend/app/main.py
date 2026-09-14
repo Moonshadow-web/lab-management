@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import event, inspect as sa_inspect
@@ -1001,6 +1001,38 @@ class AssetCacheMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(AssetCacheMiddleware)
+
+
+# ── 反搜索引擎收录（内部业务系统，不对外公开）──────────────────────
+# 三层防护：①响应头 X-Robots-Tag ②/robots.txt ③前端 index.html 的 meta robots
+# 避免暴露单位名称与登录入口。
+_NOINDEX_VALUE = "noindex, nofollow, noarchive"
+
+
+@app.middleware("http")
+async def noindex_middleware(request: Request, call_next):
+    """给所有响应加 X-Robots-Tag，指示爬虫不索引、不跟踪、不存档。"""
+    response = await call_next(request)
+    try:
+        response.headers["X-Robots-Tag"] = _NOINDEX_VALUE
+    except Exception:  # noqa: BLE001 响应头写入失败不应影响业务
+        pass
+    return response
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots_txt():
+    """禁止所有合规爬虫抓取。
+
+    必须注册在 SPA fallback（/{full_path:path}）之前，否则会被 index.html 拦截。
+    """
+    from fastapi.responses import PlainTextResponse
+
+    return PlainTextResponse(
+        "User-agent: *\nDisallow: /\n",
+        headers={"X-Robots-Tag": _NOINDEX_VALUE},
+    )
+
 
 app.include_router(api_router)
 from .api.v1.diag import router as diag_router, capture_exception  # noqa: E402 临时诊断路由（修复后删除）
