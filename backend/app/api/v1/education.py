@@ -210,10 +210,14 @@ def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = 
         from ...core.instrument_link import build_instrument_test_items_map
         from ...models.instrument import Instrument
         inst_map = build_instrument_test_items_map(db)
+        # 注意：授权书里存的仪器编号（如 MHZYY-JYK-SM-1016）在 Instrument 表里是 dept_no 字段，
+        # 不是 code 字段（code 常为空），此处两者都建映射，避免匹配不到 → 项目为空。
         by_code = {}
         for ins in db.query(Instrument).all():
-            if ins.code:
-                by_code[str(ins.code).strip()] = ins.id
+            for f in ("dept_no", "code"):
+                v = str(getattr(ins, f, "") or "").strip()
+                if v and v not in by_code:
+                    by_code[v] = ins.id
         seen, names = set(), []
         for i in instruments:
             iid = i.get("id") or by_code.get(str(i.get("code") or "").strip())
