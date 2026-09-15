@@ -3,7 +3,7 @@
 import re
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import List, Optional
 from collections import defaultdict
 
 from io import BytesIO
@@ -463,6 +463,76 @@ def normalize_stock(
     return {"dry_run": False, "changes": changes, "count": len(changes),
             "rows_before": len(rows), "rows_after": len(resolved),
             "deleted_rows": applied}
+
+
+class _StockBatchItem(BaseModel):
+    stock_id: int
+    batch_no: str
+    expiry_date: Optional[date] = None
+
+
+class _StockBatchUpdate(BaseModel):
+    updates: List[_StockBatchItem]
+    dry_run: bool = True
+
+
+@router.post("/stock/_set-batch", response_model=dict)
+def set_stock_batch(
+    body: _StockBatchUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+):
+    """管理员批量填写/修正库存行的批号与效期（默认 dry_run）。
+
+    用于把外部台账（如供应商预留库导出表）里的批号/效期批量回填到实时库存。
+    若同一 (试剂, 目标批号) 已存在另一条库存行，则合并到那一行（数量相加），
+    避免又产生重复行。
+    """
+    result, merged, skipped = [], 0, []
+    for u in body.updates:
+        row = db.query(ReagentStock).get(u.stock_id)
+        if not row:
+            skipped.append({"stock_id": u.stock_id, "reason": "库存行不存在"})
+            continue
+        new_b = _norm_batch(u.batch_no)
+        if not new_b:
+            skipped.append({"stock_id": u.stock_id, "reason": "目标批号为空"})
+            continue
+        old_b = _norm_batch(row.batch_no)
+        # 目标批号在该试剂下已存在另一行 → 合并
+        dup = None
+        if old_b != new_b:
+            dup = db.query(ReagentStock).filter(
+                ReagentStock.item_id == row.item_id,
+                ReagentStock.batch_no == new_b,
+                ReagentStock.id != row.id,
+            ).first()
+        result.append({
+            "stock_id": row.id, "item_id": row.item_id,
+            "old_batch": old_b, "new_batch": new_b,
+            "old_expiry": str(row.expiry_date) if row.expiry_date else "",
+            "new_expiry": str(u.expiry_date) if u.expiry_date else "",
+            "quantity": row.quantity,
+            "merge_into": dup.id if dup else None,
+        })
+        if body.dry_run:
+            continue
+        if dup:
+            dup.quantity = int(dup.quantity or 0) + int(row.quantity or 0)
+            if u.expiry_date:
+                dup.expiry_date = u.expiry_date
+            dup.last_updated = datetime.utcnow()
+            db.delete(row)
+            merged += 1
+        else:
+            row.batch_no = new_b
+            if u.expiry_date:
+                row.expiry_date = u.expiry_date
+            row.last_updated = datetime.utcnow()
+    if not body.dry_run:
+        db.commit()
+    return {"dry_run": body.dry_run, "changes": result, "count": len(result),
+            "merged": merged, "skipped": skipped}
 
 
 @router.delete("/stock/rows", response_model=dict)
