@@ -1106,6 +1106,13 @@ def export_order_form(
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
 
+    # 受控表格页脚（与打印版一致，便于纸质/电子表同源受控）
+    foot_row = ws.max_row + 2
+    ws.cell(row=foot_row, column=1,
+            value="表格编号：BG-SM-CZ-036　　民航总医院检验科生化免疫组　　生效日期：2026.9.1")
+    ws.cell(row=foot_row, column=1).font = Font(size=10, color="374151")
+    ws.merge_cells(start_row=foot_row, start_column=1, end_row=foot_row, end_column=len(headers))
+
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)

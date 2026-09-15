@@ -12,7 +12,15 @@ export function printHtml(title, html) {
   th { background: #f1f5f9; font-weight: 600; }
   .num { text-align: center; }
   .grp { color: #6b7280; font-size: 12px; margin: 2px 0 4px; }
-  @media print { body { padding: 8px; } }
+  /* 受控表格页脚：用 table-footer-group 保证【每页】都打印（position:fixed 在 Chrome 打印时只在首页出现） */
+  table.doc { border: 0; margin: 0; }
+  table.doc > * > tr > td { border: 0; padding: 0; }
+  .doc-foot { font-size: 12px; color: #374151; padding-top: 10px; }
+  @media print {
+    body { padding: 8px; }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+  }
 </style></head><body>${html}</body></html>`
 
   // 1) 首选：新窗口（用户可直接另存/预览）

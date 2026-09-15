@@ -32,9 +32,9 @@
       <el-table-column prop="operator" label="操作人" width="120" />
       <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
       <el-table-column prop="created_by" label="创建人" width="100" />
-      <el-table-column label="操作" width="230" fixed="right" v-if="canWrite">
+      <el-table-column label="操作" width="250" fixed="right" v-if="canWrite">
         <template #default="{ row }">
-          <el-button size="small" link type="primary" @click="onExport(row)">导出</el-button>
+          <el-button size="small" link type="primary" @click="onExport(row)">导出Excel</el-button>
           <el-button size="small" link type="primary" @click="onPrint(row)">打印</el-button>
           <el-button v-if="canEditRow(row)" size="small" link type="primary" @click="onEdit(row)">编辑</el-button>
           <el-button v-if="!row.is_confirmed" size="small" link type="success" @click="onConfirm(row)">确认</el-button>
@@ -138,6 +138,9 @@ import { useReagentStore } from '../../store/reagent'
 import { errText } from '../../utils/errText'
 import { printHtml } from '../../utils/printHtml'
 import LibraryTabs from '../../components/reagent/LibraryTabs.vue'
+
+// 受控表格页脚（与纸质/导出表保持一致）
+const DOC_FOOTER = '表格编号：BG-SM-CZ-036　　民航总医院检验科生化免疫组　　生效日期：2026.9.1'
 
 const auth = useAuthStore()
 const reagentStore = useReagentStore()
@@ -303,8 +306,13 @@ async function onPrint(row) {
       h += `<tr><td>${m.material_code || ''}</td><td>${m.name || it.item_id}</td><td>${m.spec || ''}</td><td>${m.unit || ''}</td><td class="num">${it.ordered_quantity}</td></tr>`
     }
     h += '</tbody></table>'
+    // 受控表格页脚：用 thead/tbody/tfoot 包裹，配合 table-footer-group 实现每页都打印
     printHtml(`试剂订购表 ${row.order_no}`,
-      `<h2>试剂订购表</h2><div class="meta">订单号：${row.order_no}　日期：${row.order_date}　责任库：${row.library || ''}　类型：${row.order_type}</div>${h}`)
+      `<table class="doc"><thead><tr><td>
+         <h2>试剂订购表</h2>
+         <div class="meta">订单号：${row.order_no}　日期：${row.order_date}　责任库：${row.library || ''}　类型：${row.order_type}</div>
+       </td></tr></thead><tbody><tr><td>${h}</td></tr></tbody>
+       <tfoot><tr><td><div class="doc-foot">${DOC_FOOTER}</div></td></tr></tfoot></table>`)
   } catch (e) { ElMessage.error('打印失败：' + errText(e)) }
 }
 
