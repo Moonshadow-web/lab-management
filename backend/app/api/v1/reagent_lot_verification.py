@@ -261,8 +261,10 @@ def list_verifications(
             | ReagentLotVerification.test_item_name.like(kw)
         )
     total = base.count()
+    # 注意：不能用 .nullslast()，MySQL 不支持 NULLS LAST 语法（会直接 500）。
+    # MySQL 里 DESC 排序时 NULL 天然排在最后，用 desc() 即可。
     rows = base.order_by(
-        ReagentLotVerification.change_date.desc().nullslast(),
+        ReagentLotVerification.change_date.desc(),
         ReagentLotVerification.id.desc(),
     ).offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size,

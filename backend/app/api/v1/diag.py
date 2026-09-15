@@ -131,7 +131,7 @@ def _generic_dump_recover(src_path: str, new_path: str, report: dict):
 
 
 # 构建标记：用于线上确认当前服役容器版本（免鉴权，仅返回字符串，无副作用）。
-_BUILD_MARK = "reagent-lot-verification-module-2026-09-16"
+_BUILD_MARK = "reagent-lot-verification-mysql-fix-2026-09-16"
 
 
 def get_build_mark() -> str:
@@ -456,7 +456,7 @@ def diag_lot_verif_debug(db: Session = Depends(get_db), _=Depends(get_current_us
                 text("SELECT COUNT(*) FROM reagent_lot_verifications")).scalar()
         from ...models.reagent_management import ReagentLotVerification
         q = db.query(ReagentLotVerification).order_by(
-            ReagentLotVerification.change_date.desc().nullslast(),
+            ReagentLotVerification.change_date.desc(),
             ReagentLotVerification.id.desc()).limit(1).all()
         out["query_ok"] = True
         out["ok"] = True
