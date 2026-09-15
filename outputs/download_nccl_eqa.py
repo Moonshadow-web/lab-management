@@ -19,7 +19,7 @@ import requests
 
 BASE_DIR = Path(__file__).resolve().parents[1]  # d:/workbuddyprojects/网页版-生免速查工具
 DB_PATH = BASE_DIR / "data" / "app.db"
-REPORT_DIR = BASE_DIR / "backend" / "data" / "eqa_reports"
+REPORT_DIR = BASE_DIR / "data" / "eqa_reports"  # 与后端 EQA_REPORT_DIR=DATA_DIR/"eqa_reports" 一致（backend/data/eqa_reports 已废弃）
 LINKS_FILE = BASE_DIR / "outputs" / "eqa_nccl_links.json"
 AUTH_FILE = Path("C:/Users/81526/.workbuddy/binaries/node/workspace/auth.json")
 

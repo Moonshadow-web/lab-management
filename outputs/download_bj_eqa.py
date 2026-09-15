@@ -91,12 +91,17 @@ def fetch_list(jar):
 
 
 def parse_links(html):
-    """返回 code -> {sub: href} 及完整链接列表。sub in {汇总, 定量, 定性}。"""
+    """返回 (code, times) -> {sub: href} 及完整链接列表。sub in {汇总, 定量, 定性}。
+    pname 格式为 {code}_{year}_{times}（如 01_2026_1）；按 (code, times) 建键，
+    避免同一项目第1/2次互相覆盖。"""
     by_code = {}
     all_links = []
     for m in re.finditer(r'<a\s+pname="([^"]+)"\s+href="([^"]+\.pdf[^"]*)"', html, re.I):
         pname, href = m.group(1), m.group(2)
-        code = pname.rsplit("_2026_", 1)[0]  # 01 / D3 / E7 / P8
+        m2 = re.match(r"^(.+?)_(\d{4})_(\d+)$", pname)
+        if not m2:
+            continue
+        code, _year, times = m2.group(1), m2.group(2), m2.group(3)
         if "/汇总/" in href:
             sub = "汇总"
         elif "/定量/" in href:
@@ -105,8 +110,8 @@ def parse_links(html):
             sub = "定性"
         else:
             sub = "?"
-        by_code.setdefault(code, {})[sub] = href
-        all_links.append({"pname": pname, "code": code, "sub": sub, "href": href})
+        by_code.setdefault((code, times), {})[sub] = href
+        all_links.append({"pname": pname, "code": code, "times": times, "sub": sub, "href": href})
     return by_code, all_links
 
 
@@ -203,14 +208,16 @@ def main():
             print(f"  [跳过] 项目不在官网映射：{p['program']} / {p['round_no']} (id={p['id']})")
             skipped += 1
             continue
-        if p["round_no"] != "第1次":
-            print(f"  [跳过] 官网仅第1次出分：{p['program']} / {p['round_no']} (id={p['id']})")
+        rm = re.match(r"第(\d+)次", p["round_no"])
+        if not rm:
+            print(f"  [跳过] 轮次无法解析：{p['program']} / {p['round_no']} (id={p['id']})")
             skipped += 1
             continue
-        links = by_code.get(code)
+        # 按轮次匹配官网 (code, times)——不再硬编码仅第1次（2026-09 官网已发布第2次）
+        links = by_code.get((code, rm.group(1)))
         if not links:
-            print(f"  [未匹配] 官网无该项目编码 {code}：{p['program']} (id={p['id']})")
-            unmatched += 1
+            print(f"  [跳过] 官网无该轮成绩：{p['program']} / {p['round_no']} 编码 {code}_{rm.group(1)} (id={p['id']})")
+            skipped += 1
             continue
         summary_href = links.get("汇总")            # 统计汇总表（已抓的"汇总页"）
         result_href = links.get("定量") or links.get("定性")  # 统计结果表

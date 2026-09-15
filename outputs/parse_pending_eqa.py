@@ -11,7 +11,7 @@ import sqlite3, os, re, fitz, json, csv
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(ROOT, "data", "app.db")
-REP = os.path.join(ROOT, "backend", "data", "eqa_reports")
+REP = os.path.join(ROOT, "data", "eqa_reports")  # 与后端 eqa.py 的 EQA_REPORT_DIR=DATA_DIR/"eqa_reports" 一致
 
 
 _NONAME = re.compile(
@@ -63,7 +63,8 @@ def _extract_nhc_blocks(lines):
             if _is_name_line(lines[j]):
                 name = lines[j].strip()
                 break
-        blocks.append((name, score, is_na))
+        is_survey = bool(name and re.search(r"调查", name))
+        blocks.append((name, score, is_na, is_survey))
     return blocks
 
 
@@ -92,6 +93,26 @@ def _extract_bj_lines(lines):
     return blocks
 
 
+def _bj_overall_score(txt: str) -> str:
+    """北京市报告整体得分%：优先『所有汇总 A/B』或『总成绩：N/M』计算百分比。
+
+    北京报告由汇总表（每项及格数/总数/得分%）+ 结果表（每组『总成绩：N/M』、文末『所有汇总 A/B』）
+    合成，整体得分% 取「所有汇总/总成绩」计算，而非逐项 100。
+    """
+    m = re.search(r'所有汇总\s*(\d+)\s*[/／]\s*(\d+)', txt)
+    if m and int(m.group(2)):
+        return str(round(int(m.group(1)) / int(m.group(2)) * 100))
+    m = re.search(r'总成绩[:：]\s*(\d+)\s*[/／]\s*(\d+)', txt)
+    if m and int(m.group(2)):
+        return str(round(int(m.group(1)) / int(m.group(2)) * 100))
+    # 退路：报告确有「满意/总成绩」语境时，取首个出现的 Z%
+    if '满意' in txt or '总成绩' in txt:
+        m = re.search(r'(\d{1,3})\s*%', txt)
+        if m:
+            return m.group(1)
+    return ""
+
+
 def parse_eqa_report(pdf_path: str, item_text: str = None) -> dict:
     """卫健委/北京市报告逐项解析，点名不适用或非满分(不满意)子项。"""
     try:
@@ -108,16 +129,23 @@ def parse_eqa_report(pdf_path: str, item_text: str = None) -> dict:
     bj = [b for b in _extract_bj_lines(lines) if b[0]]
 
     if nhc:
-        na_items = [n for n, s, na in nhc if na]
-        non100 = [(n, s) for n, s, na in nhc if s is not None and s != "100"]
+        na_items = [n for n, s, na, sv in nhc if na]
+        non100 = [(n, s) for n, s, na, sv in nhc if s is not None and s != "100"]
+        non100_real = [(n, s) for n, s, na, sv in nhc if s is not None and s != "100" and not sv]
         if na_items and not non100 and len(na_items) < len(nhc):
             note = "（" + "、".join(f"{n}不适用" for n in na_items) + "）"
             return {"result": "成绩100%" + note, "qualified": True, "score": "100",
                     "confidence": "high", "evidence": evidence}
-        if non100:
-            notes = [f"{n}不适用" for n in na_items] + [f"{n}({s}分)" for n, s in non100]
+        if non100_real:
+            notes = [f"{n}不适用" for n in na_items] + [f"{n}({s}分)" for n, s in non100_real]
             note = "（" + "、".join(notes) + "）"
-            return {"result": "成绩未达标" + note, "qualified": False, "score": non100[0][1],
+            return {"result": "成绩未达标" + note, "qualified": False, "score": non100_real[0][1],
+                    "confidence": "high", "evidence": evidence}
+        if non100 and not non100_real:
+            # 仅「调查项目」未满分，试点不计分，不影响整体合格判定
+            surv = [(n, s) for n, s, na, sv in nhc if sv and s is not None and s != "100"]
+            note = "（调查项目：" + "、".join(f"{n}({s}分)" for n, s in surv) + "，不计分）" if surv else ""
+            return {"result": "成绩100%" + note, "qualified": True, "score": "100",
                     "confidence": "high", "evidence": evidence}
         if na_items and len(na_items) == len(nhc):
             return {"result": "成绩不适用(不予评价)", "qualified": None, "score": "",
@@ -126,22 +154,23 @@ def parse_eqa_report(pdf_path: str, item_text: str = None) -> dict:
                 "confidence": "high", "evidence": evidence}
 
     if bj:
+        overall = _bj_overall_score(txt)
         unsat = [n for n, sat, _ in bj if sat is False]
         non100 = [(n, s) for n, sat, s in bj if s is not None and s != "100"]
         if unsat and not non100:
             note = "（" + "、".join(f"{n}不满意" for n in unsat) + "）"
-            return {"result": "不合格" + note, "qualified": False, "score": "",
+            return {"result": "不合格" + note, "qualified": False, "score": overall,
                     "confidence": "high", "evidence": evidence}
         if non100 and not unsat:
             note = "（" + "、".join(f"{n}({s}分)" for n, s in non100) + "）"
-            return {"result": "合格" + note, "qualified": True, "score": "",
+            return {"result": "合格" + note, "qualified": True, "score": overall,
                     "confidence": "high", "evidence": evidence}
         if unsat and non100:
             note = "（" + "、".join(f"{n}不满意" for n in unsat) + \
                    "｜非100：" + "、".join(f"{n}({s}分)" for n, s in non100) + "）"
-            return {"result": "不合格" + note, "qualified": False, "score": "",
+            return {"result": "不合格" + note, "qualified": False, "score": overall,
                     "confidence": "high", "evidence": evidence}
-        return {"result": "合格", "qualified": True, "score": "",
+        return {"result": "合格", "qualified": True, "score": overall,
                 "confidence": "high", "evidence": evidence}
 
     has_fail = bool(re.search(r"不通过|不合格|不及格|不满意|未通过|不达标", txt))
