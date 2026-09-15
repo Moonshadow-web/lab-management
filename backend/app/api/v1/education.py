@@ -203,11 +203,36 @@ def generate_prejob_auths(pid: int, db: Session = Depends(get_db), user: User = 
     except Exception:
         valid_until = ""
     inst_names = [i.get("name", "") for i in instruments]
+    # 自动带出「项目」：按授权仪器反查其关联项目（与前端详情/编辑的"项目（自动全带出）"同源），
+    # 不写这个字段会导致打印模板（用库里的 project 字段）项目为空。
+    project_text = ""
+    try:
+        from ...core.instrument_link import build_instrument_test_items_map
+        from ...models.instrument import Instrument
+        inst_map = build_instrument_test_items_map(db)
+        by_code = {}
+        for ins in db.query(Instrument).all():
+            if ins.code:
+                by_code[str(ins.code).strip()] = ins.id
+        seen, names = set(), []
+        for i in instruments:
+            iid = i.get("id") or by_code.get(str(i.get("code") or "").strip())
+            if not iid:
+                continue
+            for t in inst_map.get(int(iid), []) or []:
+                label = (f"{t.code or ''} {t.name or ''}").strip()
+                if label and label not in seen:
+                    seen.add(label)
+                    names.append(label)
+        project_text = "、".join(names)
+    except Exception:
+        project_text = ""
     db.add(AuthSheet(
         person_id=person.id if person else None,
         name=p.name,
         department="生化免疫组",
         post="、".join(positions)[:95],
+        project=project_text,
         instrument="、".join(inst_names)[:190],
         auth_scope="、".join(scopes)[:18],
         posts_json=json.dumps(positions, ensure_ascii=False),
