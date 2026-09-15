@@ -299,3 +299,58 @@ class InstrumentReagent(Base):
     __table_args__ = (
         UniqueConstraint("instrument_id", "reagent_item_id", name="uq_instrument_reagent"),
     )
+
+
+# =============================================================================
+# 10. 试剂批间性能验证（试剂验收）
+# =============================================================================
+
+class ReagentLotVerification(Base):
+    """试剂/质控品换批号时的批间性能验证（试剂验收）。
+
+    做法：同一项目用旧批号与新批号各测 5 个样本（质控品 + 患者样本），
+    计算相对偏倚 =（新批号结果 − 旧批号结果）/ 旧批号结果 × 100%，
+    与允许偏倚比较（WS/T 403-2024 允许偏倚，或卫健委 EQA 允许总误差的 1/2）。
+    **5 个样本中 ≥4 个相对偏倚 < 允许偏倚 → 符合要求**（与 WS/T 407/408 批间比对通行做法一致）。
+    """
+
+    __tablename__ = "reagent_lot_verifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("reagent_items.id"), nullable=False, index=True)
+    library: Mapped[str] = mapped_column(String(20), default="", index=True)  # 责任库
+    item_type: Mapped[str] = mapped_column(String(20), default="试剂")  # 试剂/质控品
+    reagent_name: Mapped[str] = mapped_column(String(200), default="")
+    spec: Mapped[str] = mapped_column(String(200), default="")
+    brand: Mapped[str] = mapped_column(String(100), default="")
+
+    old_batch_no: Mapped[str] = mapped_column(String(100), default="")
+    old_expiry_date: Mapped[date] = mapped_column(Date, nullable=True)
+    new_batch_no: Mapped[str] = mapped_column(String(100), default="")
+    new_expiry_date: Mapped[date] = mapped_column(Date, nullable=True)
+    change_date: Mapped[date] = mapped_column(Date, nullable=True, index=True)  # 批号变更日期
+
+    # 判定标准
+    test_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 关联检验项目（用于取允许偏倚）
+    test_item_name: Mapped[str] = mapped_column(String(200), default="")
+    criterion_source: Mapped[str] = mapped_column(String(40), default="")  # wst403-2024 / nccl-2026 / manual
+    criterion_label: Mapped[str] = mapped_column(String(200), default="")  # 展示用：如「WS/T 403-2024 允许偏倚 6.5%」
+    allow_bias_pct: Mapped[str] = mapped_column(String(50), default="")  # 允许相对偏倚%（文本，便于手填）
+
+    # 5 个样本：[{name, kind(质控/样本), old_value, new_value, bias_pct, passed}]
+    samples_json: Mapped[str] = mapped_column(Text, default="")
+    sample_count: Mapped[int] = mapped_column(Integer, default=5)
+    pass_count: Mapped[int] = mapped_column(Integer, default=0)
+    conclusion: Mapped[str] = mapped_column(String(40), default="待完成")  # 待完成/符合要求/不符合要求
+    status: Mapped[str] = mapped_column(String(20), default="待验证", index=True)  # 待验证/已完成
+
+    operator: Mapped[str] = mapped_column(String(100), default="")
+    verified_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    remark: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("item_id", "old_batch_no", "new_batch_no",
+                         name="uq_reagent_lot_verification"),
+    )

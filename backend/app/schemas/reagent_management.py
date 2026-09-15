@@ -285,6 +285,81 @@ class ReagentConsumptionRead(ReagentConsumptionBase):
         from_attributes = True
 
 
+# ── 试剂批间性能验证（试剂验收）──
+class LotSample(BaseModel):
+    """单个比对样本。"""
+    name: str = ""
+    kind: str = "样本"  # 质控 / 样本
+    old_value: Optional[float] = None
+    new_value: Optional[float] = None
+
+
+class ReagentLotVerificationBase(BaseModel):
+    item_id: int
+    library: str = ""
+    item_type: str = "试剂"
+    reagent_name: str = ""
+    spec: str = ""
+    brand: str = ""
+    old_batch_no: str = ""
+    old_expiry_date: Optional[date] = None
+    new_batch_no: str = ""
+    new_expiry_date: Optional[date] = None
+    change_date: Optional[date] = None
+    test_item_id: Optional[int] = None
+    test_item_name: str = ""
+    criterion_source: str = ""
+    criterion_label: str = ""
+    allow_bias_pct: str = ""
+    samples: list[LotSample] = []
+    sample_count: int = 5
+    operator: str = ""
+    remark: str = ""
+
+
+class ReagentLotVerificationCreate(ReagentLotVerificationBase):
+    pass
+
+
+class ReagentLotVerificationUpdate(BaseModel):
+    """部分更新：只传需要改的字段。"""
+    item_id: Optional[int] = None
+    library: Optional[str] = None
+    item_type: Optional[str] = None
+    reagent_name: Optional[str] = None
+    spec: Optional[str] = None
+    brand: Optional[str] = None
+    old_batch_no: Optional[str] = None
+    old_expiry_date: Optional[date] = None
+    new_batch_no: Optional[str] = None
+    new_expiry_date: Optional[date] = None
+    change_date: Optional[date] = None
+    test_item_id: Optional[int] = None
+    test_item_name: Optional[str] = None
+    criterion_source: Optional[str] = None
+    criterion_label: Optional[str] = None
+    allow_bias_pct: Optional[str] = None
+    samples: Optional[list[LotSample]] = None
+    sample_count: Optional[int] = None
+    operator: Optional[str] = None
+    remark: Optional[str] = None
+    status: Optional[str] = None
+
+
+class ReagentLotVerificationRead(ReagentLotVerificationBase):
+    id: int
+    samples_json: str = ""
+    pass_count: int = 0
+    conclusion: str = "待完成"
+    status: str = "待验证"
+    verified_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 # ── 分页通用 ──
 class PaginatedResponse(BaseModel):
     total: int

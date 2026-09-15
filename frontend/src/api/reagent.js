@@ -177,3 +177,39 @@ export function autoMatchAssociations(reset = false) {
 export function getAssociationSuggestions(params = {}) {
   return request.get('/api/v1/reagent/associations/suggestions', { params })
 }
+
+// ── 试剂验收（批间性能验证）──
+export function listLotVerifications(params) {
+  return request.get('/api/v1/reagent/lot-verifications', { params })
+}
+
+export function getLotVerification(id) {
+  return request.get(`/api/v1/reagent/lot-verifications/${id}`)
+}
+
+export function createLotVerification(data) {
+  return request.post('/api/v1/reagent/lot-verifications', data)
+}
+
+export function updateLotVerification(id, data) {
+  return request.put(`/api/v1/reagent/lot-verifications/${id}`, data)
+}
+
+export function deleteLotVerification(id) {
+  return request.delete(`/api/v1/reagent/lot-verifications/${id}`)
+}
+
+export function recalcLotVerification(id) {
+  return request.post(`/api/v1/reagent/lot-verifications/${id}/calc`)
+}
+
+export function getLotCriteria(itemId, testItemName = '') {
+  return request.get('/api/v1/reagent/lot-verifications/criteria', {
+    params: { item_id: itemId, test_item_name: testItemName },
+  })
+}
+
+export function generateLotVerifications(items, sampleCount = 5) {
+  return request.post('/api/v1/reagent/lot-verifications/_generate',
+    { items, sample_count: sampleCount })
+}

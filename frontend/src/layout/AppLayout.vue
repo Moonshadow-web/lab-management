@@ -112,6 +112,7 @@ const menus = computed(() => {
       { path: '/reagent/orders', title: '订购管理' },
       { path: '/reagent/consumption', title: '月消耗' },
       { path: '/reagent/associations', title: '项目与仪器关联' },
+      { path: '/reagent/lot-verification', title: '试剂验收' },
     ] },
     // 到货接收作为独立菜单：试剂配送角色（仅此页有权限）也能看到，且不与试剂管理父菜单耦合
     { path: '/reagent/receivings', title: '到货接收', icon: 'Box', moduleKey: 'reagent-receivings' },

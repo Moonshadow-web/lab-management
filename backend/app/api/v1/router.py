@@ -25,6 +25,7 @@ from . import (
 
     qc_summaries,
     reagent_management,
+    reagent_lot_verification,
     reagents,
     test_items,
     training,
@@ -52,6 +53,7 @@ api_router.include_router(eqa.router)
 api_router.include_router(eqa_associations.router)
 api_router.include_router(reagents.router)
 api_router.include_router(reagent_management.router)
+api_router.include_router(reagent_lot_verification.router)
 api_router.include_router(training.router)
 api_router.include_router(verification.router)
 api_router.include_router(nonconformity.router)

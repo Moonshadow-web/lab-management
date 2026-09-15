@@ -49,6 +49,7 @@ const routes = [
       { path: 'reagent/orders', name: 'reagent-orders', component: () => import('../views/reagent/ReagentOrders.vue'), meta: { title: '订购管理', moduleKey: 'reagent-orders' } },
       { path: 'reagent/receivings', name: 'reagent-receivings', component: () => import('../views/reagent/ReagentReceivings.vue'), meta: { title: '到货接收', moduleKey: 'reagent-receivings' } },
       { path: 'reagent/consumption', name: 'reagent-consumption', component: () => import('../views/reagent/ReagentConsumption.vue'), meta: { title: '月消耗', moduleKey: 'reagents' } },
+      { path: 'reagent/lot-verification', name: 'reagent-lot-verification', component: () => import('../views/reagent/ReagentLotVerification.vue'), meta: { title: '试剂验收', moduleKey: 'reagents' } },
       { path: 'reagent/associations', name: 'reagent-associations', component: () => import('../views/reagent/ReagentAssociations.vue'), meta: { title: '项目与仪器关联', moduleKey: 'reagents' } },
       { path: 'training', name: 'training', component: () => import('../views/training/StaffEducation.vue'), meta: { title: '人员能力管理', moduleKey: 'training' } },
       { path: 'verification', name: 'verification', component: () => import('../views/verification/VerificationList.vue'), meta: { title: '性能验证', moduleKey: 'verification' } },
@@ -68,6 +69,7 @@ const OTHER_GROUP_ALLOWED = new Set([
   '/dashboard', '/test-items', '/documents', '/instruments',
   '/reagent', '/reagent/items', '/reagent/stock', '/reagent/inventory',
   '/reagent/orders', '/reagent/consumption', '/reagent/associations',
+  '/reagent/lot-verification',
   '/reagent/receivings',
 ])
 
