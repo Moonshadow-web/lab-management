@@ -439,3 +439,29 @@ def migrate_attachments_to_cos(db: Session = Depends(get_db), user: User = Depen
                     report[label]["errors"].append(f"id#{obj.id}: {type(e).__name__}: {str(e)[:150]}")
 
     return {"ok": True, **report}
+
+
+@router.get("/lot-verif-debug")
+def diag_lot_verif_debug(db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """临时诊断：试剂验收表是否存在 + 查询是否报错。"""
+    out = {"ok": False}
+    try:
+        from sqlalchemy import inspect, text
+        insp = inspect(db.get_bind())
+        out["table_exists"] = insp.has_table("reagent_lot_verifications")
+        if out["table_exists"]:
+            cols = [c["name"] for c in insp.get_columns("reagent_lot_verifications")]
+            out["columns"] = cols
+            out["row_count"] = db.execute(
+                text("SELECT COUNT(*) FROM reagent_lot_verifications")).scalar()
+        from ...models.reagent_management import ReagentLotVerification
+        q = db.query(ReagentLotVerification).order_by(
+            ReagentLotVerification.change_date.desc().nullslast(),
+            ReagentLotVerification.id.desc()).limit(1).all()
+        out["query_ok"] = True
+        out["ok"] = True
+    except Exception as e:  # noqa: BLE001
+        import traceback
+        out["error"] = f"{type(e).__name__}: {e}"
+        out["trace"] = traceback.format_exc()[-1500:]
+    return out
