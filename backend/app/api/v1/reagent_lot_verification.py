@@ -53,11 +53,30 @@ def _pct(text: str) -> float:
 
 
 def _core(name: str) -> str:
-    """取项目中文主体，去括号内容：「白蛋白（ALB）」→「白蛋白」。"""
+    """取项目中文主体：去货号前缀、去括号内容、清理残留括号。
+
+    「33570/未结合雌三醇测定试剂盒（化学发光法））」→「未结合雌三醇测定试剂盒」
+    「OSR6107-丙氨酸氨基转移酶测定试剂盒（乳酸脱氢酶法）」→「丙氨酸氨基转移酶测定试剂盒」
+    「20007700/D-二聚体测定试剂盒（免疫比浊法）」→「D-二聚体测定试剂盒」（D 不能被吃掉）
+    """
     if not name:
         return ""
-    core = re.sub(r"[（(][^（）()]{0,20}[）)]", "", str(name)).strip()
-    return core or str(name).strip()
+    s = str(name).strip()
+    # ① 斜杠分隔的货号前缀
+    hit = False
+    for sep in ("/", "／"):
+        if sep in s:
+            s = s.split(sep)[-1]
+            hit = True
+            break
+    # ② 连字符分隔，且前缀像货号（长度≥3 且含数字）才去，避免误伤 D-二聚体
+    if not hit:
+        m = re.match(r"^([A-Za-z0-9][A-Za-z0-9.]*)[\-－]", s)
+        if m and len(m.group(1)) >= 3 and any(c.isdigit() for c in m.group(1)):
+            s = s[m.end():]
+    s = re.sub(r"[（(][^（）()]{0,20}[）)]", "", s)
+    s = re.sub(r"[（）()\[\]【】]", "", s)  # 清理未配对/多余括号
+    return s.strip() or str(name).strip()
 
 
 def _norm(s: str) -> str:
