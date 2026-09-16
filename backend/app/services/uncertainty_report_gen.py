@@ -304,6 +304,16 @@ def _report_qualitative_html(v: dict) -> str:
     lr = v.get("lr_value") or 0
     lrl = _esc(v.get("lr_level") or "")
     in_gray = v.get("gray_low", 0) <= r <= v.get("gray_high", 0) if r else False
+    # u_cal 缺失（厂家未提供）时的声明：top-down 法下期间精密度已包含校准变动影响
+    ucal_note = (
+        '<p class="note"><b>关于 u<sub>cal</sub> 的处理：</b>厂家未提供检测器/校准品的不确定度信息。'
+        '依据 CNAS-CL01-G003 6.3（无法严格评定时可基于理论原理与实践经验合理评定），'
+        '本评定以室内质控的<b>期间精密度 u<sub>rep</sub> 作为主要分量</b>——长期（≥6 个月）室内质控的标准差'
+        '已包含日常校准、试剂批号更换、校准品批号更换等变动引入的影响；'
+        '故未单独计入 u<sub>cal</sub>。提示：该处理使 U 相对保守偏小，临界区判读宜结合复检规则使用。</p>'
+        if float(v.get("ucal_abs") or 0) == 0 else
+        f'<p>u<sub>cal</sub> 来源：{_esc(v.get("ucal_source") or "厂家证书（U÷k）")}</p>'
+    )
     conclusion = (
         f"测值 {_fmt(r)} S/CO 落在灰区（{gl} ~ {gh}），结果不能判定，建议复检或采用确认试验。"
         if in_gray else
@@ -328,7 +338,8 @@ CNAS-CL01-G003 6.2：对阴性/阳性等非数值结果，宜采用其他方法�
 
 <h2>2. 不确定度分量（绝对单位：S/CO）</h2>
 <p>u<sub>rep</sub>（室内质控重复性，A类，由质控信号值标准差给出）= <b>{u_rep}</b> S/CO</p>
-<p>u<sub>cal</sub>（检测器/校准品标准不确定度，B类，厂家证书 U÷k）= <b>{u_cal}</b> S/CO</p>
+<p>u<sub>cal</sub>（检测器/校准品标准不确定度，B类）= <b>{u_cal}</b> S/CO</p>
+{ucal_note}
 
 <h2>3. 合成标准不确定度与扩展不确定度</h2>
 <p>u<sub>c</sub> = √(u<sub>rep</sub>² + u<sub>cal</sub>²) = √({u_rep}² + {u_cal}²) = <b>{u_c} S/CO</b></p>

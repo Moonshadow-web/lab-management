@@ -167,18 +167,37 @@
             <!-- 定性项目：S/CO 阈值判定 -->
             <div v-if="form.mode === 'qualitative'" class="data-block">
               <div class="data-block-title">🧪 定性项目数据（S/CO 或 COI，均为绝对值）</div>
+              <div class="mode-tip" style="margin-bottom:8px">
+                <b>u_cal（B类）取值方法</b>，按下述优先级：<br />
+                ① 厂家给<b>绝对 U</b> → <code>u_cal = U ÷ k</code>（k 常为 2）<br />
+                ② 厂家只给<b>相对 U(%)</b> → <code>u_cal = U% ÷ k × 质控均值 x̄</code><br />
+                ③ 厂家只给<b>允差/允许偏差 ±a</b> → 矩形分布 <code>u = a ÷ √3</code>（三角分布 ÷√6，95% 区间 ÷1.96）<br />
+                ④ <b>本室校准复现性</b>（推荐，最自主）：换校准品批号时，比较不同批号校准后同一质控的<b>均值离散</b>，其 SD 即反映校准品批间不确定度<br />
+                ⑤ <b>厂家完全没给</b> → 填 <b>0</b>：依据 CNAS-CL01-G003 6.3，以室内质控的<b>期间精密度</b>作主要分量（须确保 IQC 数据跨越过校准品/试剂批号更换），报告自动附声明
+              </div>
               <el-row :gutter="12">
-                <el-col :span="8">
+                <el-col :span="6">
                   <el-form-item label="判定阈值 cutoff" label-width="120px">
                     <el-input-number v-model="form.cutoff" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="8">
+                <el-col :span="6">
                   <el-form-item label="检测器 u_cal (S/CO)" label-width="140px">
                     <el-input-number v-model="form.ucal_abs" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="8">
+                <el-col :span="6">
+                  <el-form-item label="u_cal 来源" label-width="100px">
+                    <el-select v-model="form.ucal_source" style="width:100%">
+                      <el-option label="厂家证书（绝对 U÷k）" value="厂家" />
+                      <el-option label="厂家相对 U(%) 换算" value="厂家相对值" />
+                      <el-option label="允差 a/√3 估算" value="允差估算" />
+                      <el-option label="本室校准复现性" value="本室校准" />
+                      <el-option label="未提供（期间精密度替代）" value="未提供" />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="6">
                   <el-form-item label="待判读信号值 r" label-width="120px">
                     <el-input-number v-model="form.patient_value" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
