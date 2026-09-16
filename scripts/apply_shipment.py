@@ -124,12 +124,11 @@ def main():
         it = items.get(x["item_id"])
         if not it:
             continue
-        code = item_code(it.get("name"))
-        # 无货号的用「归一化名称主体」做键，才能把「丙型肝炎病毒抗体检测试剂盒」
-        # 与「…（化学发光法）」「…（电化学发光法）」这些重复目录条目合并
-        key = code if code else ("N:" + norm_name(it.get("name")))
-        if not code and not norm_name(it.get("name")):
-            key = f"__id{x['item_id']}"
+        # 分组键以「归一化名称主体」为主：能同时合并
+        # ① 有/无货号前缀的同名条目（SJ0H0122J/特异性生长因子 vs 特异性生长因子）
+        # ② 方法学后缀不同的条目（丙肝…（化学发光法） vs （电化学发光法））
+        nm = norm_name(it.get("name"))
+        key = nm if nm else (item_code(it.get("name")) or f"__id{x['item_id']}")
         key = (key, it.get("type") or "")   # 试剂/质控品/校准品 不混为一谈
         groups[(key, x["old_batch"], x["new_batch"])].append(x)
 
