@@ -24,6 +24,7 @@ from ...core.security import get_current_user, require_roles
 from ...models.quality_requirement import QualityRequirement
 from ...models.reagent_management import (
     ReagentItem, ReagentLotVerification, ReagentStock,
+    Receiving, ReceivingItem, TestItemReagent,
 )
 from ...models.test_item import TestItem
 from ...schemas.reagent_management import (
@@ -39,6 +40,26 @@ SOURCE_LABEL = {
     "nccl-2026": "卫健委 EQA 2026",
     "manual": "手工填写",
 }
+
+
+
+# ═══════════════════════════════════════════════════════════════
+#   验收范围：只针对「试剂」，不含校准品/质控品/耗材，也不含电解质类
+# ═══════════════════════════════════════════════════════════════
+EXCLUDE_KEYWORDS = ("电解质", "参比液", "内标液", "参比电极", "缓冲液")
+
+
+def in_scope(it: "ReagentItem") -> tuple:
+    """判断某试剂是否属于批间性能验证范围，返回 (是否纳入, 排除原因)。"""
+    if not it:
+        return False, "试剂不存在"
+    if (it.type or "") != "试剂":
+        return False, f"类型为「{it.type}」，本表仅针对试剂（不含校准品/质控品/耗材）"
+    nm = it.name or ""
+    for kw in EXCLUDE_KEYWORDS:
+        if kw in nm:
+            return False, f"含「{kw}」，电解质/辅助试剂不做批间验证"
+    return True, ""
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -257,14 +278,101 @@ def _load_samples(v: ReagentLotVerification) -> list:
 # ═══════════════════════════════════════════════════════════════
 #   API
 # ═══════════════════════════════════════════════════════════════
-@router.get("/criteria", response_model=dict)
-def get_criteria(
+@router.get("/_prepare", response_model=dict)
+def prepare_verification(
     item_id: int = Query(..., description="试剂目录 id"),
-    test_item_name: str = Query("", description="检验项目名（不传则用试剂名匹配）"),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """按项目自动解析允许偏倚（WS/T 403 允许偏倚 > 卫健委 EQA TEa 的 1/2）。"""
+    """表单预填：该试剂自动关联的检验项目、库存批号、最近到货批号、允许偏倚。
+
+    前端选完试剂调一次即可把「项目 / 旧批号 / 新批号候选 / 允许偏倚」都带出来，
+    不用手工再选项目、也不用手敲批号。
+    """
+    it = db.query(ReagentItem).get(item_id)
+    if not it:
+        raise HTTPException(404, "试剂未找到")
+
+    # ① 自动关联的检验项目（test_item_reagents 里 role=试剂）
+    links = (
+        db.query(TestItemReagent, TestItem)
+        .join(TestItem, TestItem.id == TestItemReagent.test_item_id)
+        .filter(TestItemReagent.reagent_item_id == item_id,
+                TestItemReagent.role == "试剂")
+        .all()
+    )
+    test_items = [{"id": ti.id, "name": ti.name} for _l, ti in links]
+
+    # ② 库存批号（旧批号 = 现存数量最大的批次，即当前在用的）
+    stock_rows = (db.query(ReagentStock)
+                  .filter(ReagentStock.item_id == item_id).all())
+    batches = sorted(
+        [{"batch_no": (s.batch_no or "").strip(),
+          "expiry_date": str(s.expiry_date) if s.expiry_date else "",
+          "quantity": int(s.quantity or 0)} for s in stock_rows if (s.batch_no or "").strip()],
+        key=lambda x: -x["quantity"])
+    old_batch = batches[0] if batches else None
+
+    # ③ 最近到货批号（已确认收货单，按收货日期倒序取不同批号，排除已在库的同批号）
+    in_stock = {(b["batch_no"] or "").upper() for b in batches}
+    recv_rows = (
+        db.query(ReceivingItem, Receiving)
+        .join(Receiving, Receiving.id == ReceivingItem.receiving_id)
+        .filter(ReceivingItem.item_id == item_id, Receiving.is_confirmed == True)
+        .order_by(Receiving.receipt_date.desc(), Receiving.id.desc())
+        .limit(50).all()
+    )
+    new_cands, seen = [], set()
+    for li, rec in recv_rows:
+        b = (li.batch_no or "").strip()
+        if not b or b.upper() in seen:
+            continue
+        seen.add(b.upper())
+        new_cands.append({
+            "batch_no": b,
+            "expiry_date": str(li.expiry_date) if li.expiry_date else "",
+            "receipt_date": str(rec.receipt_date),
+            "receipt_no": rec.receipt_no,
+            "already_in_stock": b.upper() in in_stock,
+        })
+        if len(new_cands) >= 5:
+            break
+
+    # ④ 允许偏倚（优先用关联项目名匹配）
+    r = resolve_allow_bias(db, item_id, test_items[0]["name"] if test_items else "")
+
+    ok, why = in_scope(it)
+    return {
+        "item_id": item_id, "reagent_name": it.name, "spec": it.spec or "",
+        "brand": it.brand or "", "library": it.library or "", "item_type": it.type or "",
+        "in_scope": ok, "exclude_reason": why,
+        "test_items": test_items,
+        "stock_batches": batches,
+        "old_batch": old_batch,
+        "new_batch_candidates": new_cands,
+        "allow_bias": r,
+    }
+
+
+@router.get("/criteria", response_model=dict)
+def get_criteria(
+    item_id: int = Query(..., description="试剂目录 id"),
+    test_item_name: str = Query("", description="检验项目名（不传则自动取关联项目/试剂名）"),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """按项目自动解析允许偏倚（WS/T 403 允许偏倚 > 卫健委 EQA TEa 的 1/2）。
+
+    不传 test_item_name 时，自动反查该试剂关联的检验项目名。
+    """
+    if not test_item_name:
+        link = (db.query(TestItem)
+                .join(TestItemReagent, TestItemReagent.test_item_id == TestItem.id)
+                .filter(TestItemReagent.reagent_item_id == item_id,
+                        TestItemReagent.role == "试剂")
+                .first())
+        if link:
+            test_item_name = link.name
     r = resolve_allow_bias(db, item_id, test_item_name)
     return r
 
@@ -323,6 +431,9 @@ def create_verification(
     it = db.query(ReagentItem).get(data.item_id)
     if not it:
         raise HTTPException(404, "试剂未找到")
+    ok, why = in_scope(it)
+    if not ok:
+        raise HTTPException(400, f"不在试剂批间验证范围：{why}")
     v = ReagentLotVerification(
         item_id=data.item_id,
         library=data.library or it.library or "",
@@ -347,7 +458,16 @@ def create_verification(
         operator=data.operator or (user.full_name if hasattr(user, "full_name") else ""),
         remark=data.remark or "",
     )
-    # 未指定判定标准时自动解析
+    # 未指定检验项目时自动关联；再自动解析判定标准
+    if not v.test_item_name:
+        link = (db.query(TestItem)
+                .join(TestItemReagent, TestItemReagent.test_item_id == TestItem.id)
+                .filter(TestItemReagent.reagent_item_id == v.item_id,
+                        TestItemReagent.role == "试剂")
+                .first())
+        if link:
+            v.test_item_id = link.id
+            v.test_item_name = link.name
     if not v.allow_bias_pct:
         r = resolve_allow_bias(db, v.item_id, v.test_item_name)
         if r["pct"] > 0:
@@ -453,6 +573,12 @@ def generate_verifications(
         it = db.query(ReagentItem).get(g.item_id)
         if not it:
             skipped.append({"item_id": g.item_id, "reason": "试剂未找到"})
+            continue
+        # 范围校验：仅试剂，排除校准品/质控品/耗材与电解质类
+        ok, why = in_scope(it)
+        if not ok:
+            skipped.append({"item_id": g.item_id, "reason": why,
+                            "reagent_name": it.name})
             continue
         exists = db.query(ReagentLotVerification).filter(
             ReagentLotVerification.item_id == g.item_id,

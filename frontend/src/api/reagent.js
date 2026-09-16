@@ -213,3 +213,9 @@ export function generateLotVerifications(items, sampleCount = 5) {
   return request.post('/api/v1/reagent/lot-verifications/_generate',
     { items, sample_count: sampleCount })
 }
+
+export function prepareLotVerification(itemId) {
+  return request.get('/api/v1/reagent/lot-verifications/_prepare', {
+    params: { item_id: itemId },
+  })
+}

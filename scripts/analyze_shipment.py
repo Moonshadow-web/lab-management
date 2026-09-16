@@ -58,6 +58,17 @@ def norm(name: str) -> str:
     return s.strip()
 
 
+# 非「试剂」的发货行关键词（本模块只验收试剂，不含校准品/质控品/电解质）
+NON_REAGENT_KW = ("校准", "定标", "质控", "标准品", "参考品", "电解质", "参比液",
+                  "内标液", "参比电极", "缓冲液")
+
+
+def is_reagent_row(name: str) -> bool:
+    """判断发货记录商品名是否为「试剂」（排除校准品/质控品/电解质等）。"""
+    n = str(name or "")
+    return not any(kw in n for kw in NON_REAGENT_KW)
+
+
 def read_excel(path):
     from openpyxl import load_workbook
     wb = load_workbook(path)
@@ -109,6 +120,7 @@ def main():
     # 按 item 归组
     by_item = defaultdict(list)
     unmatched = []
+    skipped_nonreagent = []
     for r in ship:
         hits = idx_code.get(r["code"], []) if r["code"] else []
         if not hits:
@@ -118,6 +130,14 @@ def main():
         hits = sorted(set(hits))
         if not hits:
             unmatched.append(r)
+            continue
+        # 只保留 type=试剂的目录项；发货记录本身是校准品/质控品/电解质的行直接跳过
+        hits = [i for i in hits if (items[i].get("type") or "") == "试剂"]
+        if not hits or not is_reagent_row(r["name"]):
+            if hits:
+                skipped_nonreagent.append(r)
+            else:
+                unmatched.append(r)
             continue
         # 只取在库里有库存行的
         with_stock = [i for i in hits if i in stock_by_item] or hits
@@ -191,11 +211,13 @@ def main():
 
     print()
     print(f"【C】2026 年只有一个批号（无需批间验证）：{len(unchanged)} 个")
-    print(f"【D】发货记录未匹配到系统试剂：{len(unmatched)} 行")
+    print(f"【D】发货记录本身是校准品/质控品/电解质等（按规则不验收）：{len(skipped_nonreagent)} 行")
+    print(f"【E】发货记录未匹配到系统试剂：{len(unmatched)} 行")
     for r in unmatched[:15]:
         print(f"  {r['code']:<12}{r['name'][:34]:<36}{r['batch_no']:<12}{r['date']}")
 
     json.dump({"changed": changed, "fill": fill, "unchanged": unchanged,
+               "skipped_nonreagent": len(skipped_nonreagent),
                "unmatched": [{"code": r["code"], "name": r["name"],
                               "batch": r["batch_no"], "date": r["date"]}
                              for r in unmatched]},

@@ -95,16 +95,38 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="检验项目">
-              <el-select v-model="form.test_item_id" filterable clearable placeholder="选择项目（用于取允许偏倚）"
+              <el-select v-model="form.test_item_id" filterable clearable
+                :placeholder="prep.test_items.length ? '自动关联（可改）' : '选择项目（用于取允许偏倚）'"
                 style="width:100%" @change="onPickTestItem">
-                <el-option v-for="t in testItems" :key="t.id" :label="t.name" :value="t.id" />
+                <el-option v-for="t in (prep.test_items.length ? prep.test_items : testItems)"
+                  :key="t.id" :label="t.name" :value="t.id" />
               </el-select>
+              <div v-if="prep.test_items.length" class="muted2" style="font-size:11px">
+                自动关联 {{ prep.test_items.length }} 个项目
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="6"><el-form-item label="旧批号"><el-input v-model="form.old_batch_no" /></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="新批号"><el-input v-model="form.new_batch_no" /></el-form-item></el-col>
+          <el-col :span="6">
+            <el-form-item label="旧批号">
+              <el-select v-model="form.old_batch_no" filterable allow-create default-first-option
+                placeholder="库存当前批次" style="width:100%" @change="onPickOldBatch">
+                <el-option v-for="b in prep.stock_batches" :key="b.batch_no"
+                  :label="b.batch_no + '（库存 ' + b.quantity + '）'" :value="b.batch_no" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item label="新批号">
+              <el-select v-model="form.new_batch_no" filterable allow-create default-first-option
+                placeholder="最近到货批次" style="width:100%" @change="onPickNewBatch">
+                <el-option v-for="c in prep.new_batch_candidates" :key="c.batch_no"
+                  :label="c.batch_no + (c.already_in_stock ? '（已在库）' : '') + (c.receipt_date ? ' ' + c.receipt_date : '')"
+                  :value="c.batch_no" />
+              </el-select>
+            </el-form-item>
+          </el-col>
           <el-col :span="6">
             <el-form-item label="变更日期">
               <el-date-picker v-model="form.change_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
@@ -203,7 +225,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import {
   listLotVerifications, createLotVerification, updateLotVerification,
-  deleteLotVerification, getLotCriteria,
+  deleteLotVerification, getLotCriteria, prepareLotVerification,
 } from '../../api/reagent'
 import { listAllReagentItems } from '../../api/reagent'
 import request from '../../utils/request'
@@ -223,7 +245,8 @@ const q = ref(''), filterStatus = ref(''), filterConclusion = ref('')
 const dlgVisible = ref(false), saving = ref(false), editing = ref(null)
 const reagentItems = ref([]), testItems = ref([])
 
-const FOOT = '表格编号：BG-SM-CZ-037　　民航总医院检验科生化免疫组　　生效日期：2026.9.1'
+const FOOT = '表格编号：BG-SM-CZ-029　　民航总医院检验科生化免疫组　　生效日期：2026.9.1'
+const DOC_TITLE = '生化免疫组试剂批间性能验证平行试验记录表'
 
 const emptyForm = () => ({
   item_id: null, library: '', item_type: '试剂', reagent_name: '', spec: '', brand: '',
@@ -299,19 +322,68 @@ async function ensureOptions() {
   }
 }
 
-function onPickReagent(id) {
+const prep = reactive({ test_items: [], stock_batches: [], new_batch_candidates: [] })
+
+async function onPickReagent(id) {
   const it = reagentItems.value.find(i => i.id === id)
   if (it) {
     form.reagent_name = it.name; form.spec = it.spec || ''
     form.brand = it.brand || ''; form.item_type = it.type || '试剂'
     form.library = it.library || ''
   }
-  reloadCriteria()
+  // 一次调用把「关联项目 / 库存批号 / 到货批号 / 允许偏倚」全部带出来
+  try {
+    const d = await prepareLotVerification(id)
+    prep.test_items = d.test_items || []
+    prep.stock_batches = d.stock_batches || []
+    prep.new_batch_candidates = d.new_batch_candidates || []
+    if (!d.in_scope) {
+      ElMessage.warning(d.exclude_reason || '该物品不在试剂批间验证范围')
+    }
+    // 自动关联项目（一个试剂可能对应多个项目，取第一个，仍可改）
+    if (!form.test_item_name && prep.test_items.length) {
+      form.test_item_id = prep.test_items[0].id
+      form.test_item_name = prep.test_items[0].name
+    }
+    // 旧批号自动取库存当前批次
+    if (!form.old_batch_no && d.old_batch) {
+      form.old_batch_no = d.old_batch.batch_no
+      form.old_expiry_date = d.old_batch.expiry_date || null
+    }
+    // 新批号若尚空，取「最近到货且不在库存中」的批号
+    if (!form.new_batch_no) {
+      const cand = prep.new_batch_candidates.find(c => !c.already_in_stock)
+        || prep.new_batch_candidates[0]
+      if (cand) {
+        form.new_batch_no = cand.batch_no
+        form.new_expiry_date = cand.expiry_date || null
+        if (!form.change_date) form.change_date = cand.receipt_date || form.change_date
+      }
+    }
+    if (d.allow_bias && d.allow_bias.pct > 0) {
+      form.criterion_source = d.allow_bias.source
+      form.criterion_label = d.allow_bias.label
+      form.allow_bias_pct = String(d.allow_bias.pct)
+    } else if (!form.allow_bias_pct) {
+      ElMessage.info('未匹配到行标/卫健委标准，请手工填写允许偏倚')
+    }
+  } catch (e) { ElMessage.error('带出试剂信息失败：' + errText(e)) }
 }
 function onPickTestItem(id) {
   const t = testItems.value.find(i => i.id === id)
   form.test_item_name = t ? t.name : ''
   reloadCriteria()
+}
+function onPickNewBatch(b) {
+  const c = prep.new_batch_candidates.find(x => x.batch_no === b)
+  if (c) {
+    form.new_expiry_date = c.expiry_date || null
+    if (!form.change_date) form.change_date = c.receipt_date || form.change_date
+  }
+}
+function onPickOldBatch(b) {
+  const c = prep.stock_batches.find(x => x.batch_no === b)
+  if (c) form.old_expiry_date = c.expiry_date || null
 }
 async function reloadCriteria() {
   if (!form.item_id) return
@@ -409,8 +481,8 @@ function onPrint(row) {
     + `检验项目：${row.test_item_name || '—'}　允许偏倚：<b>${allow}%</b>　`
     + `标准：${row.criterion_label || '手工填写'}<br>`
     + `结论：<b>${row.conclusion}</b>（合格 ${row.pass_count} / ${row.sample_count}）　操作人：${row.operator || ''}`
-  printHtml(`试剂批间性能验证 ${row.reagent_name}`,
-    `<table class="doc"><thead><tr><td><h2>试剂批间性能验证记录</h2><div class="meta">${meta}</div></td></tr></thead>`
+  printHtml(`${DOC_TITLE} ${row.reagent_name}`,
+    `<table class="doc"><thead><tr><td><h2>${DOC_TITLE}</h2><div class="meta">${meta}</div></td></tr></thead>`
     + `<tbody><tr><td>${h}</td></tr></tbody>`
     + `<tfoot><tr><td><div class="doc-foot">${FOOT}</div></td></tr></tfoot></table>`)
 }
