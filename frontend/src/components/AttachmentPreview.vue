@@ -19,6 +19,7 @@
         <el-button type="primary" @click="emit('download', file)">下载 {{ file?.original_name }}</el-button>
       </div>
       <div v-show="mode === 'pptx'" ref="pptxBox" class="preview-pptx" />
+      <div v-show="mode === 'pptx'" ref="pptxBox" class="preview-pptx" />
     </template>
   </el-dialog>
 </template>
