@@ -204,10 +204,12 @@ def calc_single_u_rw(l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n,
     """单个测量系统的不精密度 u_Rw(%)（图1公式）。
 
     RSD_i = SD_i/Mean_i * 100
-    u_Rw = sqrt(Σ(RSD_i²*(n_i-1)) / Σ(n_i-1))   —— 参与水平为 2 个（L1/L2）或 3 个（L1/L2/L3）
+    u_Rw = sqrt(Σ(RSD_i²*(n_i-1)) / Σ(n_i-1))   —— 参与水平 1~3 个（L1 / L1+L2 / L1+L2+L3）
 
-    L3 为**可选水平**：未填写（mean≤0 或 n<2）时自动忽略，公式退化为原来的两水平公式，
-    不影响既有记录的计算结果。
+    - L3 为**可选水平**：未填写（mean≤0 或 n<2）时自动忽略。
+    - **单水平（仅 L1）同样支持**：此时公式退化为 u_Rw = RSD_1 = SD_1/Mean_1×100。
+      这是合并公式的自然退化（分子分母的 (n-1) 约去），用于**定性项目**（如 HBsAg 的
+      S/CO 值）等只有单一水平室内质控的场景，结果单位与定量项目一致（相对 %）。
     """
     levels = []
     for mean, sd, n in ((l1_mean, l1_sd, l1_n), (l2_mean, l2_sd, l2_n), (l3_mean, l3_sd, l3_n)):
@@ -217,7 +219,7 @@ def calc_single_u_rw(l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n,
             continue
         if n >= 2 and mean > 0:
             levels.append((mean, sd, n))
-    if len(levels) < 2:
+    if len(levels) < 1:
         return 0.0
     num = sum((sd / mean * 100) ** 2 * (n - 1) for mean, sd, n in levels)
     den = sum(n - 1 for _mean, _sd, n in levels)

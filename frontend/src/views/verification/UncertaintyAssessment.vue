@@ -149,7 +149,9 @@
                 <el-radio-button value="multi">🔗 多个测量系统（合并评定）</el-radio-button>
               </el-radio-group>
               <div class="mode-tip" v-if="form.mode === 'single'">
-                💡 录入 L1/L2 两个水平室内质控的<b>均值、标准差、测试数</b>（一般采用 <b>≥6 个月</b> 的质控数据，保证长期精密度评估的代表性）
+                💡 录入室内质控的<b>均值、标准差、测试数</b>（一般采用 <b>≥6 个月</b> 的质控数据，保证长期精密度评估的代表性）<br />
+                · <b>定量项目</b>：通常录 L1、L2 两个水平<br />
+                · <b>定性项目</b>（如 HBsAg 等以 S/CO 报告的项目）：只有单一水平质控时，<b>只填 L1 即可</b>，u<sub>Rw</sub> = RSD<sub>L1</sub> = SD/均值×100；L2/L3 留空
               </div>
               <div class="mode-tip" v-else>
                 💡 工作量大的实验室可能使用几个相同的测量系统检测同一被测量。每个系统分别录入 L1/L2 的<b>均值、标准差、测试数</b>，系统内不精密度与系统间均值方差合并后算 u<sub>(pooled)</sub>
@@ -528,28 +530,39 @@ const rmsBias = computed(() => {
 const singlePreview = computed(() => {
   if (form.mode !== 'single') return null
   const { l1_mean, l1_sd, l1_n, l2_mean, l2_sd, l2_n, l3_mean, l3_sd, l3_n } = form
-  if (l1_n < 2 || l2_n < 2 || l1_mean <= 0 || l2_mean <= 0) return null
-  const lv = [
-    { rsd: l1_sd / l1_mean * 100, n: l1_n },
-    { rsd: l2_sd / l2_mean * 100, n: l2_n },
-  ]
-  // 可选第三水平：填了才参与
+  // L1 必填；L2/L3 可选 —— 定性项目（如 HBsAg 的 S/CO 值）常只有单一水平质控。
+  // 单水平时 u_Rw 自然退化为 RSD_L1 = SD1/Mean1×100。
+  if (l1_n < 2 || l1_mean <= 0) return null
+  const hasL2 = l2_n >= 2 && l2_mean > 0
   const hasL3 = l3_n >= 2 && l3_mean > 0
+  const lv = [{ rsd: l1_sd / l1_mean * 100, n: l1_n }]
+  if (hasL2) lv.push({ rsd: l2_sd / l2_mean * 100, n: l2_n })
   if (hasL3) lv.push({ rsd: l3_sd / l3_mean * 100, n: l3_n })
   const num = lv.reduce((a, x) => a + x.rsd ** 2 * (x.n - 1), 0)
   const den = lv.reduce((a, x) => a + (x.n - 1), 0)
   const u_rw = den > 0 ? Math.sqrt(num / den) : 0
   const rsd1 = l1_sd / l1_mean * 100
-  const rsd2 = l2_sd / l2_mean * 100
-  const f1 = hasL3
-    ? `u_Rw = √[(RSD_L1² × (n1-1) + RSD_L2² × (n2-1) + RSD_L3² × (n3-1)) / (n1+n2+n3-3)]`
-    : `u_Rw = √[(RSD_L1² × (n1-1) + RSD_L2² × (n2-1)) / (n1+n2-2)]`
-  const parts = [`${rsd1.toFixed(2)}²×${l1_n - 1}`, `${rsd2.toFixed(2)}²×${l2_n - 1}`]
-  if (hasL3) parts.push(`${(l3_sd / l3_mean * 100).toFixed(2)}²×${l3_n - 1}`)
-  const denTxt = hasL3 ? (l1_n + l2_n + l3_n - 3) : (l1_n + l2_n - 2)
+  const rsd2 = hasL2 ? l2_sd / l2_mean * 100 : 0
+  // 公式文本：按实际参与水平动态拼
+  const terms = ['RSD_L1² × (n1-1)']
+  const parts = [`${rsd1.toFixed(2)}²×${l1_n - 1}`]
+  let denTxt = l1_n - 1
+  if (hasL2) {
+    terms.push('RSD_L2² × (n2-1)')
+    parts.push(`${rsd2.toFixed(2)}²×${l2_n - 1}`)
+    denTxt += l2_n - 1
+  }
+  if (hasL3) {
+    terms.push('RSD_L3² × (n3-1)')
+    parts.push(`${(l3_sd / l3_mean * 100).toFixed(2)}²×${l3_n - 1}`)
+    denTxt += l3_n - 1
+  }
+  const f1 = hasL2
+    ? `u_Rw = √[(${terms.join(' + ')}) / ${denTxt}]`
+    : `u_Rw = RSD_L1 = √[(RSD_L1² × (n1-1)) / (n1-1)]（单水平）`
   const f2 = `= √[${parts.join(' + ')}] / ${denTxt}`
   return {
-    rsd1: rsd1.toFixed(2), rsd2: rsd2.toFixed(2), l1_n, l2_n,
+    rsd1: rsd1.toFixed(2), rsd2: rsd2.toFixed(2), l1_n, l2_n, hasL2,
     hasL3, rsd3: hasL3 ? (l3_sd / l3_mean * 100).toFixed(2) : '', l3_n,
     u_rw: u_rw.toFixed(2), formula1: f1, formula2: f2,
   }
