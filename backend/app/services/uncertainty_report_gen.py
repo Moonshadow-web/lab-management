@@ -289,11 +289,77 @@ def _report_multi_html(v):
 </body></html>"""
 
 
+def _report_qualitative_html(v: dict) -> str:
+    """定性项目报告：以 S/CO 等连续信号 + 阈值判定，用绝对不确定度与似然比判读。"""
+    today = datetime.now().strftime("%Y年%m月%d日")
+    proj = _esc(v.get("project_name"))
+    method = _esc(v.get("project_method") or v.get("instrument") or "")
+    cutoff = _fmt(v.get("cutoff"))
+    u_rep = _fmt(v.get("u_rw"))
+    u_cal = _fmt(v.get("ucal_abs"))
+    u_c = _fmt(v.get("u_c"))
+    u_ext = _fmt(v.get("u_ext_abs") or v.get("u_extended"))
+    gl, gh = _fmt(v.get("gray_low")), _fmt(v.get("gray_high"))
+    r = v.get("patient_value") or 0
+    lr = v.get("lr_value") or 0
+    lrl = _esc(v.get("lr_level") or "")
+    in_gray = v.get("gray_low", 0) <= r <= v.get("gray_high", 0) if r else False
+    conclusion = (
+        f"测值 {_fmt(r)} S/CO 落在灰区（{gl} ~ {gh}），结果不能判定，建议复检或采用确认试验。"
+        if in_gray else
+        (f"测值 {_fmt(r)} S/CO 的似然比 LR = {_fmt(lr)}，为<b>{lrl}</b>，该定性判读成立。" if r else
+         "未录入待判读信号值。评定结果可用于建立本项目的灰区（LR&lt;10 区间）。")
+    )
+    return f"""<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>{proj} 定性项目测量不确定度评定报告</title><style>{_style()}</style></head><body>
+<h1>民航总医院检验科生化免疫组</h1>
+<h1>{proj} 定性项目测量不确定度评定报告</h1>
+<table class="info-table">
+<tr><td>项目名称</td><td>{proj}</td><td>测量方法</td><td>{method}</td></tr>
+<tr><td>测量单位</td><td>S/CO（信号值/阈值比）</td><td>判定阈值 cutoff</td><td>{cutoff} S/CO</td></tr>
+<tr><td>评定人</td><td>{_esc(v.get('prepared_by'))}</td><td>审核人</td><td>{_esc(v.get('reviewed_by'))}</td></tr>
+<tr><td>评定日期</td><td>{_esc(v.get('eval_date') or today)}</td><td>数据周期</td><td>{_esc(v.get('cycle_months')) or 6} 个月室内质控</td></tr>
+</table>
+
+<h2>1. 评定依据</h2>
+<p>ISO 15189:2022 条款 7.3.4 f)：当定性检验结果基于定量输出数据并按阈值判定为阳性/阴性时，应估计输出量值的测量不确定度；
+CNAS-CL01-G003 6.2：对阴性/阳性等非数值结果，宜采用其他方法评估测量不确定度，例如<b>假阳性或假阴性的概率</b>。
+本报告以仪器输出信号（S/CO）为被测量，采用<b>绝对不确定度 + 似然比</b>判读。</p>
+
+<h2>2. 不确定度分量（绝对单位：S/CO）</h2>
+<p>u<sub>rep</sub>（室内质控重复性，A类，由质控信号值标准差给出）= <b>{u_rep}</b> S/CO</p>
+<p>u<sub>cal</sub>（检测器/校准品标准不确定度，B类，厂家证书 U÷k）= <b>{u_cal}</b> S/CO</p>
+
+<h2>3. 合成标准不确定度与扩展不确定度</h2>
+<p>u<sub>c</sub> = √(u<sub>rep</sub>² + u<sub>cal</sub>²) = √({u_rep}² + {u_cal}²) = <b>{u_c} S/CO</b></p>
+<p>U = k × u<sub>c</sub> = 2 × {u_c} = <span class="res">{u_ext} S/CO</span>（k=2，包含概率 P≈95%）</p>
+
+<h2>4. 阈值附近的判读（灰区）</h2>
+<p>本方法判定阈值 cutoff = {cutoff} S/CO。以似然比 LR=10（"中等支持"下限）为界，
+灰区（LR&lt;10，无法判定）为 <b>{gl} ~ {gh} S/CO</b>。</p>
+<p>说明：当测得信号落在该区间内，阳性与阴性判读的似然比均不足以支持结论，
+应复检或采用替代/确认方法。</p>
+
+<h2>5. 判读结果</h2>
+<p><b>结论：</b>{conclusion}</p>
+<table class="data-table">
+<tr><th>待判读信号值 r (S/CO)</th><th>似然比 LR</th><th>支持程度</th><th>是否落在灰区</th></tr>
+<tr><td>{_fmt(r)}</td><td>{_fmt(lr)}</td><td>{lrl or '—'}</td><td>{'是' if in_gray else '否'}</td></tr>
+</table>
+<p class="note">注：定性项目不适用允许总误差（TEa）判定。LR = 真阳性率 / 假阴性率，
+按正态分布由 z=(cutoff−r)/u<sub>c</sub> 计算；LR 越大对相应定性结论的支持越强。</p>
+
+<div style="margin-top:30px">评定人：____________　审核人：____________　日期：{today}</div>
+</body></html>"""
+
+
 def build_uncertainty_html(record: dict) -> bytes:
-    """按 record['mode'] 选择 single/multi 模板。"""
+    """按 record['mode'] 选择 single/multi/qualitative 模板。"""
     v = record
     if v.get("mode") == "multi":
         return _report_multi_html(v).encode("utf-8")
+    if v.get("mode") == "qualitative":
+        return _report_qualitative_html(v).encode("utf-8")
     return _report_single_html(v).encode("utf-8")
 
 

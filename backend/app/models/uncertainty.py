@@ -31,7 +31,17 @@ class UncertaintyAssessment(Base):
     prepared_by: Mapped[str] = mapped_column(String(100), default="")
     reviewed_by: Mapped[str] = mapped_column(String(100), default="")
     # ── 模式 ──
-    mode: Mapped[str] = mapped_column(String(10), default="single")  # single / multi
+    mode: Mapped[str] = mapped_column(String(10), default="single")  # single / multi / qualitative
+    # ── 定性项目（qualitative 模式）专用字段 ──
+    # 定性项目（如 HBsAg）以 S/CO（COI）等连续信号 + 阈值判定阴阳性，
+    # 其不确定度用**绝对单位**表示（S/CO），不用相对 %。
+    cutoff: Mapped[float] = mapped_column(Float, default=0)        # 判定阈值（如 1.0 S/CO）
+    ucal_abs: Mapped[float] = mapped_column(Float, default=0)      # 检测器/校准品绝对标准不确定度（S/CO，B类）
+    u_ext_abs: Mapped[float] = mapped_column(Float, default=0)     # 绝对扩展不确定度 U=2×u_c（S/CO，k=2）
+    gray_low: Mapped[float] = mapped_column(Float, default=0)      # 灰区下限 = cutoff − 1.3353×u_c
+    gray_high: Mapped[float] = mapped_column(Float, default=0)     # 灰区上限 = cutoff + 1.3353×u_c
+    lr_value: Mapped[float] = mapped_column(Float, default=0)      # 似然比 LR（针对 patient_value 处测值）
+    lr_level: Mapped[str] = mapped_column(String(30), default="")  # 支持程度（极强/非常强烈/强烈/中等偏强/中等/微弱）
     # ── 校准品不确定度（厂家提供相对标准不确定度）──
     ucal: Mapped[float] = mapped_column(Float, default=0)
     ucal_source: Mapped[str] = mapped_column(String(20), default="厂家")  # 厂家/有证标准物质

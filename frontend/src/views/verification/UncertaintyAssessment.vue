@@ -145,16 +145,75 @@
             <div class="data-block">
               <div class="data-block-title">🔬 测量系统模式</div>
               <el-radio-group v-model="form.mode" @change="onModeChange" style="width:100%">
-                <el-radio-button value="single">📊 单个测量系统</el-radio-button>
+                <el-radio-button value="single">📊 单个测量系统（定量）</el-radio-button>
                 <el-radio-button value="multi">🔗 多个测量系统（合并评定）</el-radio-button>
+                <el-radio-button value="qualitative">🧪 定性项目（S/CO 阈值判定）</el-radio-button>
               </el-radio-group>
               <div class="mode-tip" v-if="form.mode === 'single'">
                 💡 录入室内质控的<b>均值、标准差、测试数</b>（一般采用 <b>≥6 个月</b> 的质控数据，保证长期精密度评估的代表性）<br />
                 · <b>定量项目</b>：通常录 L1、L2 两个水平<br />
-                · <b>定性项目</b>（如 HBsAg 等以 S/CO 报告的项目）：只有单一水平质控时，<b>只填 L1 即可</b>，u<sub>Rw</sub> = RSD<sub>L1</sub> = SD/均值×100；L2/L3 留空
+                · <b>定性项目</b>（如 HBsAg 等以 S/CO 报告的项目）：请切换到「🧪 定性项目」模式
+              </div>
+              <div class="mode-tip" v-else-if="form.mode === 'qualitative'">
+                💡 <b>定性项目</b>（如 HBsAg/抗-HCV 等以 <b>S/CO、COI</b> 报告、按阈值判阴阳性的项目）。依据 ISO 15189 7.3.4 f) 与 CNAS-CL01-G003 6.2：<b>不套用 TEa</b>，改用<b>假阳性/假阴性概率与似然比(LR)</b>判读。<br />
+                · 质控信号值的 SD 即 u<sub>rep</sub>；检测器/校准品不确定度按 <b>S/CO 绝对值</b>录入<br />
+                · 结果给出 <b>U（S/CO）</b>、<b>灰区</b>与 <b>LR 支持程度</b>
               </div>
               <div class="mode-tip" v-else>
                 💡 工作量大的实验室可能使用几个相同的测量系统检测同一被测量。每个系统分别录入 L1/L2 的<b>均值、标准差、测试数</b>，系统内不精密度与系统间均值方差合并后算 u<sub>(pooled)</sub>
+              </div>
+            </div>
+
+            <!-- 定性项目：S/CO 阈值判定 -->
+            <div v-if="form.mode === 'qualitative'" class="data-block">
+              <div class="data-block-title">🧪 定性项目数据（S/CO 或 COI，均为绝对值）</div>
+              <el-row :gutter="12">
+                <el-col :span="8">
+                  <el-form-item label="判定阈值 cutoff" label-width="120px">
+                    <el-input-number v-model="form.cutoff" :min="0" :controls="false" :precision="4" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="检测器 u_cal (S/CO)" label-width="140px">
+                    <el-input-number v-model="form.ucal_abs" :min="0" :controls="false" :precision="4" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="待判读信号值 r" label-width="120px">
+                    <el-input-number v-model="form.patient_value" :min="0" :controls="false" :precision="4" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              <el-row :gutter="12">
+                <el-col :span="8">
+                  <el-form-item label="质控均值 x̄" label-width="120px">
+                    <el-input-number v-model="form.l1_mean" :min="0" :controls="false" :precision="4" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="质控 SD（=u_rep）" label-width="140px">
+                    <el-input-number v-model="form.l1_sd" :min="0" :controls="false" :precision="4" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="质控次数 n" label-width="120px">
+                    <el-input-number v-model="form.l1_n" :min="0" :controls="false" :precision="0" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              <div v-if="qualPreview" class="formula">
+                u_rep = <b>{{ qualPreview.u_rep }}</b> S/CO　|　u_cal = <b>{{ qualPreview.u_cal }}</b> S/CO<br />
+                u_c = √(u_rep² + u_cal²) = <b>{{ qualPreview.u_c }} S/CO</b><br />
+                U = 2 × u_c = <b>{{ qualPreview.U }} S/CO</b>（k=2，P≈95%）<br />
+                <template v-if="qualPreview.hasGray">
+                  灰区（LR &lt; 10，不能判定）= <b>{{ qualPreview.grayLow }} ~ {{ qualPreview.grayHigh }} S/CO</b><br />
+                </template>
+                <template v-if="qualPreview.hasR">
+                  测值 r = {{ form.patient_value }} → 似然比 LR = <b>{{ qualPreview.lr }}</b>（{{ qualPreview.lrLevel }}）<br />
+                  <b :style="{ color: qualPreview.inGray ? '#e6a23c' : '#67c23a' }">
+                    {{ qualPreview.inGray ? '⚠️ 落在灰区：结果不能判定，建议复检 / 做确认试验' : '✅ 该测值对定性判读的支持成立' }}
+                  </b>
+                </template>
               </div>
             </div>
 
@@ -468,6 +527,8 @@ const form = reactive({
   prepared_by: auth.user?.full_name || auth.user?.username || '金子铮',
   reviewed_by: '杨静',
   mode: 'single',
+  // 定性项目（S/CO 阈值判定）
+  cutoff: 1.0, ucal_abs: 0,
   // 单系统
   l1_mean: 0, l1_sd: 0, l1_n: 0,
   l2_mean: 0, l2_sd: 0, l2_n: 0,
@@ -565,6 +626,54 @@ const singlePreview = computed(() => {
     rsd1: rsd1.toFixed(2), rsd2: rsd2.toFixed(2), l1_n, l2_n, hasL2,
     hasL3, rsd3: hasL3 ? (l3_sd / l3_mean * 100).toFixed(2) : '', l3_n,
     u_rw: u_rw.toFixed(2), formula1: f1, formula2: f2,
+  }
+})
+
+// 误差函数 erf（Abramowitz & Stegun 7.1.26，精度≈1.5e-7）——用于正态分布累积概率
+function erf(x) {
+  const sign = x < 0 ? -1 : 1
+  x = Math.abs(x)
+  const t = 1 / (1 + 0.3275911 * x)
+  const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x)
+  return sign * y
+}
+
+// 定性项目实时预览：绝对单位（S/CO）的 u_c、U，灰区，似然比
+const qualPreview = computed(() => {
+  if (form.mode !== 'qualitative') return null
+  const sd = Number(form.l1_sd) || 0
+  const n = Number(form.l1_n) || 0
+  const ucalAbs = Number(form.ucal_abs) || 0
+  const cutoff = Number(form.cutoff) || 0
+  const uRep = (n >= 2 && sd > 0) ? sd : 0
+  const uC = Math.sqrt(uRep ** 2 + ucalAbs ** 2)
+  if (uC <= 0) return null
+  const U = 2 * uC
+  const Z10 = 1.3353 // LR=10 对应 |z|
+  const hasGray = cutoff > 0
+  const grayLow = hasGray ? Math.max(0, cutoff - Z10 * uC) : 0
+  const grayHigh = hasGray ? cutoff + Z10 * uC : 0
+  const r = Number(form.patient_value) || 0
+  const hasR = cutoff > 0 && r > 0
+  let lr = 0, lrLevel = '', inGray = false
+  if (hasR) {
+    const z = (cutoff - r) / uC
+    const phi = 0.5 * (1 + erf(z / Math.SQRT2))
+    if (r >= cutoff) {
+      const fnr = phi, tpr = 1 - phi
+      lr = fnr > 1e-15 ? tpr / fnr : 1e9
+    } else {
+      const fpr = 1 - phi, tnr = phi
+      lr = fpr > 1e-15 ? tnr / fpr : 1e9
+    }
+    inGray = r >= grayLow && r <= grayHigh
+    lrLevel = lr >= 1e6 ? '极强支持' : lr >= 1e4 ? '非常强烈支持' : lr >= 1e3 ? '强烈支持'
+      : lr >= 100 ? '中等偏强支持' : lr >= 10 ? '中等支持' : '微弱支持（灰区）'
+  }
+  return {
+    u_rep: uRep.toFixed(4), u_cal: ucalAbs.toFixed(4), u_c: uC.toFixed(4), U: U.toFixed(4),
+    hasGray, grayLow: grayLow.toFixed(4), grayHigh: grayHigh.toFixed(4),
+    hasR, lr: lr >= 1e9 ? '>1e9' : lr.toFixed(2), lrLevel, inGray,
   }
 })
 
@@ -775,6 +884,8 @@ async function save() {
     reviewed_by: form.reviewed_by || '杨静',
     mode: form.mode,
     ucal: form.ucal,
+    // 定性项目
+    cutoff: form.cutoff, ucal_abs: form.ucal_abs,
     ucal_source: form.ucal_source,
     l1_mean: form.l1_mean, l1_sd: form.l1_sd, l1_n: form.l1_n,
     l2_mean: form.l2_mean, l2_sd: form.l2_sd, l2_n: form.l2_n,

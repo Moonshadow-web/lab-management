@@ -628,8 +628,16 @@ class UncertaintyAssessmentBase(BaseModel):
     cycle_months: int = 6  # 评定周期（月，IQC 数据采集周期）
     prepared_by: str = ""
     reviewed_by: str = ""
-    # 模式：single / multi
+    # 模式：single / multi / qualitative
     mode: str = "single"
+    # 定性项目（qualitative）：以 S/CO 等连续信号 + 阈值判阴阳性，用绝对单位
+    cutoff: float = 0          # 判定阈值（如 1.0）
+    ucal_abs: float = 0        # 检测器/校准品绝对标准不确定度（S/CO）
+    u_ext_abs: float = 0       # 绝对扩展不确定度 U=2u_c（S/CO）
+    gray_low: float = 0        # 灰区下限
+    gray_high: float = 0       # 灰区上限
+    lr_value: float = 0        # 似然比
+    lr_level: str = ""         # 支持程度
     # 校准品不确定度
     ucal: float = 0
     ucal_source: str = "厂家"

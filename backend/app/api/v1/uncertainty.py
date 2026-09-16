@@ -297,10 +297,97 @@ def lookup_target_bias(db: Session, project_name: str) -> dict:
     return {"bias": 0, "text": "", "source": ""}
 
 
+def _lr_level(lr: float) -> str:
+    """似然比 -> 支持程度（ISO/TS 20914 与定性分析指南的 LR 等价表）。"""
+    if lr >= 1e6:
+        return "极强支持"
+    if lr >= 1e4:
+        return "非常强烈支持"
+    if lr >= 1e3:
+        return "强烈支持"
+    if lr >= 100:
+        return "中等偏强支持"
+    if lr >= 10:
+        return "中等支持"
+    return "微弱支持（灰区）"
+
+
+def _compute_qualitative(payload: dict) -> dict:
+    """定性项目的不确定度评定（以 S/CO、COI 等连续信号 + 阈值判阴阳性）。
+
+    依据：
+    - ISO 15189:2022 7.3.4 f)：定性结果基于定量输出数据并按阈值判定时，
+      应估计输出量值的测量不确定度。
+    - CNAS-CL01-G003 6.2：非数值结果（阴性/阳性）宜采用其他方法评估测量不确定度，
+      例如**假阳性或假阴性的概率**。
+
+    模型（各分量均为**绝对单位**，如 S/CO，不用相对 %）：
+      u_rep = 室内质控 S/CO 的标准差（A类）
+      u_cal = 检测器/校准品绝对标准不确定度（B类，厂家证书 U÷k）
+      u_c   = √(u_rep² + u_cal²)
+      U     = 2 × u_c                        （k=2, P≈95%）
+      灰区  = cutoff ± 1.3353 × u_c          （对应 LR=10 的边界）
+      对测值 r：z=(cutoff−r)/u_c；FNR=Φ(z)、TPR=1−Φ(z)（r≥cutoff 时）
+                LR = TPR/FNR；r<cutoff 时用 LR⁻ = TNR/FPR
+      判读：落在灰区 → 不能判定（需复检/确认试验）；否则为"强/中等支持"
+    """
+    from math import erf, sqrt as _sqrt
+
+    cutoff = float(payload.get("cutoff") or 0)
+    ucal_abs = float(payload.get("ucal_abs") or 0)
+    sd = float(payload.get("l1_sd") or 0)
+    n = int(payload.get("l1_n") or 0)
+    u_rep = sd if (n >= 2 and sd > 0) else 0.0
+    u_c = (u_rep ** 2 + ucal_abs ** 2) ** 0.5
+    u_ext = 2 * u_c
+
+    payload["u_rw"] = round(u_rep, 4)
+    payload["u_c"] = round(u_c, 4)
+    payload["u_extended"] = round(u_ext, 4)
+    payload["u_ext_abs"] = round(u_ext, 4)
+    payload["bias_rms"] = 0.0
+    payload["target_bias"] = 0.0
+    payload["target_bias_text"] = "定性项目不适用允许总误差（TEa）"
+    payload["target_bias_source"] = "定性项目（阈值+似然比判读）"
+
+    # 灰区：LR=10 边界对应 z = ±1.3353（Φ⁻¹(1/11)）
+    Z10 = 1.3353
+    if cutoff > 0 and u_c > 0:
+        payload["gray_low"] = round(cutoff - Z10 * u_c, 4)
+        payload["gray_high"] = round(cutoff + Z10 * u_c, 4)
+    else:
+        payload["gray_low"] = 0.0
+        payload["gray_high"] = 0.0
+
+    # 似然比与判读（针对 patient_value 处的实测信号值）
+    r = float(payload.get("patient_value") or 0)
+    payload["lr_value"] = 0.0
+    payload["lr_level"] = ""
+    payload["patient_extended_value"] = round(u_ext, 4)  # 复用：此处存 U（绝对量，S/CO）
+    if cutoff > 0 and u_c > 0 and r > 0:
+        z = (cutoff - r) / u_c
+        phi = 0.5 * (1 + erf(z / _sqrt(2)))
+        if r >= cutoff:
+            fnr, tpr = phi, 1 - phi
+            lr = (tpr / fnr) if fnr > 1e-15 else 1e9
+        else:
+            fpr, tnr = 1 - phi, phi
+            lr = (tnr / fpr) if fpr > 1e-15 else 1e9
+        payload["lr_value"] = round(lr, 2)
+        payload["lr_level"] = _lr_level(lr)
+        payload["passed"] = not (payload["gray_low"] <= r <= payload["gray_high"])
+    else:
+        payload["passed"] = False
+    return payload
+
+
 def compute_record(payload: dict) -> dict:
     """根据 mode 计算 u_Rw / u_c / U / target_bias / passed。"""
-    ucal = float(payload.get("ucal") or 0)
     mode = payload.get("mode") or "single"
+    # 定性项目：独立分支（绝对单位 + 阈值/似然比判读）
+    if mode == "qualitative":
+        return _compute_qualitative(payload)
+    ucal = float(payload.get("ucal") or 0)
     if mode == "single":
         u_rw = calc_single_u_rw(
             float(payload.get("l1_mean") or 0),
@@ -421,17 +508,20 @@ def api_preview(
     """实时预览计算（不存库），用于前端实时显示。"""
     p = dict(payload)
     p = compute_record(p)
+    # 定性项目：判读由「阈值 + 似然比 + 灰区」给出，不套用 TEa / U<15% 兜底
+    _is_qual = (p.get("mode") or "") == "qualitative"
     # 质量目标：前端手动选择优先（已带 target_bias 则不动）；否则自动查卫健委 EQA TEa
-    if p.get("project_name") and not p.get("target_bias"):
+    if not _is_qual and p.get("project_name") and not p.get("target_bias"):
         tg = lookup_target_bias(db, p["project_name"])
         p["target_bias"] = tg["bias"]
         p["target_bias_text"] = tg["text"]
         p["target_bias_source"] = tg["source"]
-    if p.get("target_bias") and p.get("u_extended"):
-        p["passed"] = p["u_extended"] < p["target_bias"]
-    elif p.get("u_extended"):
-        # 兜底：没找到目标时按 U<15% 算
-        p["passed"] = p["u_extended"] < 15
+    if not _is_qual:
+        if p.get("target_bias") and p.get("u_extended"):
+            p["passed"] = p["u_extended"] < p["target_bias"]
+        elif p.get("u_extended"):
+            # 兜底：没找到目标时按 U<15% 算
+            p["passed"] = p["u_extended"] < 15
     return p
 
 
@@ -471,13 +561,15 @@ def batch_uncertainty(
             continue
         payload = dict(raw)
         payload = compute_record(payload)
+        # 定性项目：判读由阈值/似然比给出，不套用 TEa
+        _is_qual = (payload.get("mode") or "") == "qualitative"
         # 批量时也查目标偏倚
-        if payload.get("project_name"):
+        if not _is_qual and payload.get("project_name"):
             tg = lookup_target_bias(db, payload["project_name"])
             payload["target_bias"] = tg["bias"]
             payload["target_bias_text"] = tg["text"]
             payload["target_bias_source"] = tg["source"]
-        if payload.get("target_bias") and payload.get("u_extended"):
+        if not _is_qual and payload.get("target_bias") and payload.get("u_extended"):
             payload["passed"] = payload["u_extended"] < payload["target_bias"]
         _calc_backward_compat(payload)
         # 保存到 DB
