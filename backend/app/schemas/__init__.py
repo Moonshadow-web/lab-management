@@ -170,6 +170,9 @@ class InstrumentBase(BaseModel):
     supplier: str = ""
     contact: str = ""
     qc_instrument: bool = False
+    # 专业组归属：sm=生化免疫组 / lj=临检组 / wsw=微生物组 / fz=分子组 / xk=血库。
+    # 空字符串或 NULL 表示不限制专业组（各分组均可见），用于兼容历史数据。
+    group_code: str = ""
 
     @field_validator("qc_instrument", mode="before")
     @classmethod
