@@ -12,12 +12,13 @@
       </div>
       <iframe v-else-if="mode === 'pdf'" :src="src" style="width: 100%; height: 75vh; border: 0" />
       <div v-else-if="mode === 'html'" class="preview-html" v-html="html" />
-      <div v-else-if="mode === 'pptx'" ref="pptxBox" class="preview-pptx" />
+
       <div v-else class="other-preview">
         <el-icon :size="64"><Document /></el-icon>
         <p>{{ fallbackMsg }}</p>
         <el-button type="primary" @click="emit('download', file)">下载 {{ file?.original_name }}</el-button>
       </div>
+      <div v-show="mode === 'pptx'" ref="pptxBox" class="preview-pptx" />
     </template>
   </el-dialog>
 </template>
@@ -106,14 +107,11 @@ async function load(f) {
       try {
         const blob = await fetchBlob(f.id)
         const arrayBuffer = await blob.arrayBuffer()
-        mode.value = 'pptx'                 // 先切模式，让容器 div 渲染出来
-        // 弹窗内容有过渡/懒渲染，需等容器真正挂载后再初始化（轮询最多 ~1s）
-        let box = null
-        for (let i = 0; i < 20 && !box; i++) {
-          await nextTick()
-          await new Promise((r) => setTimeout(r, 50))
-          box = pptxBox.value
-        }
+        mode.value = 'pptx'
+        // 容器常驻（v-show），等一次渲染即可取到
+        await nextTick()
+        await new Promise((r) => setTimeout(r, 50))
+        const box = pptxBox.value
         if (!box) throw new Error('预览容器未就绪')
         box.innerHTML = ''
         const mod = await import('pptx-preview')
