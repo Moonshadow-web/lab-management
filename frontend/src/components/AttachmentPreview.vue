@@ -12,6 +12,7 @@
       </div>
       <iframe v-else-if="mode === 'pdf'" :src="src" style="width: 100%; height: 75vh; border: 0" />
       <div v-else-if="mode === 'html'" class="preview-html" v-html="html" />
+      <div v-else-if="mode === 'pptx'" ref="pptxBox" class="preview-pptx" />
       <div v-else class="other-preview">
         <el-icon :size="64"><Document /></el-icon>
         <p>{{ fallbackMsg }}</p>
@@ -40,6 +41,8 @@ const mode = ref('other') // image | pdf | html | other
 const src = ref('')
 const html = ref('')
 const fallbackMsg = ref('')
+const pptxBox = ref(null)
+let pptxInstance = null
 
 function extOf(name) {
   const m = (name || '').toLowerCase().match(/\.([a-z0-9]+)$/)
@@ -55,6 +58,13 @@ async function fetchBlob(id) {
 }
 
 watch(
+  () => props.visible,
+  (v) => {
+    if (!v && pptxBox.value) { pptxBox.value.innerHTML = ''; pptxInstance = null }
+  }
+)
+
+watch(
   () => [props.visible, props.file],
   async ([vis, f]) => {
     if (!vis || !f) return
@@ -68,6 +78,9 @@ async function load(f) {
   mode.value = 'other'
   src.value = ''
   html.value = ''
+  // 清理上一份 pptx 渲染结果，避免重复预览时叠加
+  if (pptxBox.value) pptxBox.value.innerHTML = ''
+  pptxInstance = null
   fallbackMsg.value = '该类型文件无法在浏览器内直接预览，请点击下载查看。'
   const ext = extOf(f.original_name)
   try {
@@ -88,6 +101,26 @@ async function load(f) {
       html.value = res.value || '<p style="color:#909399">（文档内容为空）</p>'
       mode.value = 'html'
       return
+    }
+    if (ext === 'pptx') {
+      try {
+        const blob = await fetchBlob(f.id)
+        const arrayBuffer = await blob.arrayBuffer()
+        mode.value = 'pptx'                 // 先切模式，让容器 div 渲染出来
+        await new Promise((r) => setTimeout(r, 0))
+        const box = pptxBox.value
+        if (!box) throw new Error('预览容器未就绪')
+        box.innerHTML = ''
+        const mod = await import('pptx-preview')
+        const width = Math.max(320, Math.min(960, box.clientWidth || 960))
+        pptxInstance = mod.init(box, { width, height: Math.round((width * 9) / 16) })
+        await pptxInstance.preview(arrayBuffer)
+        return
+      } catch (e) {
+        fallbackMsg.value = 'PPT 预览失败：' + (e && e.message ? e.message : '格式不支持') + '，可点击下载查看。'
+        mode.value = 'other'
+        return
+      }
     }
     if (ext === 'xlsx' || ext === 'xls') {
       const blob = await fetchBlob(f.id)
@@ -131,8 +164,12 @@ async function load(f) {
       mode.value = 'html'
       return
     }
-    // doc / 其它：回退下载
-    fallbackMsg.value = '该类型文件无法在浏览器内直接预览，请点击下载查看。'
+    // doc / 旧版 ppt / 其它：回退下载
+    if (ext === 'ppt') {
+      fallbackMsg.value = '该 .ppt 为旧版 PowerPoint 格式，浏览器无法在线预览，请下载后查看（如另存为 .pptx 即可直接预览）。'
+    } else {
+      fallbackMsg.value = '该类型文件无法在浏览器内直接预览，请点击下载查看。'
+    }
     mode.value = 'other'
   } catch (e) {
     console.error(e)
@@ -151,6 +188,9 @@ async function load(f) {
 .preview-html :deep(td) { border: 1px solid #dcdfe6; padding: 4px 8px; }
 .preview-html :deep(th) { background: #f5f7fa; }
 .preview-html :deep(pre) { white-space: pre-wrap; word-break: break-all; }
+.preview-pptx { max-height: 75vh; overflow: auto; background: #f5f5f5; padding: 8px; }
+.preview-pptx :deep(canvas),
+.preview-pptx :deep(img) { max-width: 100%; }
 .other-preview { text-align: center; padding: 40px; color: #888; }
 .other-preview p { margin: 12px 0; }
 </style>
