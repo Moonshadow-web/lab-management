@@ -335,7 +335,9 @@ class ReagentLotVerification(Base):
     test_item_name: Mapped[str] = mapped_column(String(200), default="")
     criterion_source: Mapped[str] = mapped_column(String(40), default="")  # wst403-2024 / nccl-2026 / manual
     criterion_label: Mapped[str] = mapped_column(String(200), default="")  # 展示用：如「WS/T 403-2024 允许偏倚 6.5%」
-    allow_bias_pct: Mapped[str] = mapped_column(String(50), default="")  # 允许相对偏倚%（文本，便于手填）
+    allow_bias_pct: Mapped[str] = mapped_column(String(50), default="")  # 允许偏倚（文本，便于手填）
+    # 偏倚判读方式：relative=相对偏倚%（默认） / absolute=绝对偏倚（与结果同单位，如 CO2 的 ±5 mmHg）
+    bias_mode: Mapped[str] = mapped_column(String(20), default="relative", server_default="relative")
 
     # 5 个样本：[{name, kind(质控/样本), old_value, new_value, bias_pct, passed}]
     samples_json: Mapped[str] = mapped_column(Text, default="")

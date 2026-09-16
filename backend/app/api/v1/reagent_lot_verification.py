@@ -46,7 +46,9 @@ SOURCE_LABEL = {
 # ═══════════════════════════════════════════════════════════════
 #   验收范围：只针对「试剂」，不含校准品/质控品/耗材，也不含电解质类
 # ═══════════════════════════════════════════════════════════════
-EXCLUDE_KEYWORDS = ("电解质", "参比液", "内标液", "参比电极", "缓冲液")
+EXCLUDE_KEYWORDS = ("电解质", "参比液", "内标液", "参比电极", "缓冲液",
+                    # 科室明确不参与批间验证的项目
+                    "特异性生长因子", "抗凝血酶")
 
 
 def in_scope(it: "ReagentItem") -> tuple:
@@ -174,7 +176,8 @@ def resolve_allow_bias(db: Session, item_id: int,
 # ═══════════════════════════════════════════════════════════════
 #   相对偏倚计算与判定
 # ═══════════════════════════════════════════════════════════════
-def compute_samples(samples: list, allow_pct: float, need: int) -> tuple:
+def compute_samples(samples: list, allow_pct: float, need: int,
+                   mode: str = "relative") -> tuple:
     """计算每个样本的相对偏倚并判定，返回 (新样本列表, 合格数, 结论, 有效样本数)。
 
     结论规则（避免「样本还没填就判不符合」）：
@@ -191,8 +194,14 @@ def compute_samples(samples: list, allow_pct: float, need: int) -> tuple:
         try:
             if ov is not None and nv is not None and str(ov) != "" and str(nv) != "":
                 f_ov, f_nv = float(ov), float(nv)
-                if abs(f_ov) > 1e-12:
+                if mode == "absolute":
+                    # 绝对偏倚：与结果同单位（如 CO2 的 ±5 mmHg），旧值为 0 时也有效
+                    bias = round(f_nv - f_ov, 4)
+                elif abs(f_ov) > 1e-12:
                     bias = round((f_nv - f_ov) / abs(f_ov) * 100.0, 2)
+                else:
+                    bias = None
+                if bias is not None:
                     valid += 1
                     if allow_pct and allow_pct > 0:
                         ok = abs(bias) <= allow_pct + 1e-9
@@ -238,6 +247,7 @@ def _to_read(v: ReagentLotVerification) -> dict:
         "criterion_source": v.criterion_source,
         "criterion_label": v.criterion_label,
         "allow_bias_pct": v.allow_bias_pct,
+        "bias_mode": v.bias_mode or "relative",
         "samples": samples, "sample_count": v.sample_count,
         "samples_json": v.samples_json or "",
         "pass_count": v.pass_count, "conclusion": v.conclusion,
@@ -255,7 +265,9 @@ def _apply_calc(v: ReagentLotVerification) -> None:
         allow = 0.0
     n = int(v.sample_count or 5)
     need = max(1, n - 1)  # 默认 5 个里 ≥4 个
-    samples, passed, conclusion, _valid = compute_samples(_load_samples(v), allow, need)
+    mode = (v.bias_mode or "relative").strip() or "relative"
+    samples, passed, conclusion, _valid = compute_samples(
+        _load_samples(v), allow, need, mode)
     v.samples_json = json.dumps(samples, ensure_ascii=False)
     v.pass_count = passed
     v.conclusion = conclusion
@@ -322,8 +334,16 @@ def prepare_verification(
         .order_by(Receiving.receipt_date.desc(), Receiving.id.desc())
         .limit(50).all()
     )
+    # 同时纳入**未确认**的收货单（货可能已到、只是还没点确认），标注 confirmed 便于区分
+    pending = (
+        db.query(ReceivingItem, Receiving)
+        .join(Receiving, Receiving.id == ReceivingItem.receiving_id)
+        .filter(ReceivingItem.item_id == item_id, Receiving.is_confirmed == False)
+        .order_by(Receiving.receipt_date.desc(), Receiving.id.desc())
+        .limit(20).all()
+    )
     new_cands, seen = [], set()
-    for li, rec in recv_rows:
+    for li, rec in list(recv_rows) + list(pending):
         b = (li.batch_no or "").strip()
         if not b or b.upper() in seen:
             continue
@@ -333,10 +353,13 @@ def prepare_verification(
             "expiry_date": str(li.expiry_date) if li.expiry_date else "",
             "receipt_date": str(rec.receipt_date),
             "receipt_no": rec.receipt_no,
+            "confirmed": bool(rec.is_confirmed),
             "already_in_stock": b.upper() in in_stock,
         })
-        if len(new_cands) >= 5:
-            break
+    # 优先展示「尚未入库」的批号（那才是待验证的新批号）
+    new_cands.sort(key=lambda x: (x["already_in_stock"], not x["confirmed"],
+                                  x["receipt_date"]), reverse=False)
+    new_cands = new_cands[:8]
 
     # ④ 允许偏倚（优先用关联项目名匹配）
     r = resolve_allow_bias(db, item_id, test_items[0]["name"] if test_items else "")
@@ -451,6 +474,7 @@ def create_verification(
         criterion_source=data.criterion_source or "",
         criterion_label=data.criterion_label or "",
         allow_bias_pct=data.allow_bias_pct or "",
+        bias_mode=(data.bias_mode or "relative"),
         samples_json=json.dumps(
             [s.model_dump() if hasattr(s, "model_dump") else s
              for s in (data.samples or [])], ensure_ascii=False),
@@ -493,8 +517,8 @@ def update_verification(
     for f in ("item_id", "library", "item_type", "reagent_name", "spec", "brand",
               "old_batch_no", "old_expiry_date", "new_batch_no", "new_expiry_date",
               "change_date", "test_item_id", "test_item_name", "criterion_source",
-              "criterion_label", "allow_bias_pct", "sample_count", "operator",
-              "remark"):
+              "criterion_label", "allow_bias_pct", "bias_mode", "sample_count",
+              "operator", "remark"):
         val = getattr(data, f, None)
         if val is not None:
             setattr(v, f, val)
@@ -622,6 +646,7 @@ def generate_verifications(
                         "old_batch_no": v.old_batch_no,
                         "new_batch_no": v.new_batch_no,
                         "allow_bias_pct": v.allow_bias_pct,
+        "bias_mode": v.bias_mode or "relative",
                         "criterion_label": v.criterion_label})
     db.commit()
     return {"created": created, "created_count": len(created),

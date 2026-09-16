@@ -4,7 +4,7 @@
       <h2 class="title">试剂验收</h2>
       <p class="sub">
         试剂 / 质控品更换批号时的批间性能验证：同一项目用旧、新批号各测 {{ defaultSampleCount }} 个样本（可选质控品 + 患者样本），
-        计算相对偏倚；<b>{{ defaultSampleCount }} 个中 ≥ {{ defaultSampleCount - 1 }} 个相对偏倚 ≤ 允许偏倚</b> 判定为符合要求。
+        计算偏倚（相对% 或 绝对，如 CO₂ 的 ±5 mmHg）；<b>{{ defaultSampleCount }} 个中 ≥ {{ defaultSampleCount - 1 }} 个 |偏倚| ≤ 允许偏倚</b> 判定为符合要求。
       </p>
     </div>
     <LibraryTabs @change="refresh" />
@@ -56,7 +56,9 @@
       </el-table-column>
       <el-table-column label="允许偏倚" width="150">
         <template #default="{ row }">
-          <div v-if="row.allow_bias_pct"><b>{{ row.allow_bias_pct }}%</b></div>
+          <div v-if="row.allow_bias_pct"><b>{{ row.allow_bias_pct }}{{ (row.bias_mode || 'relative') === 'absolute' ? '' : '%' }}</b>
+            <el-tag v-if="row.bias_mode === 'absolute'" size="small" type="warning" style="margin-left:4px">绝对</el-tag>
+          </div>
           <div class="muted2" style="font-size:11px">{{ row.criterion_label || '手工填写' }}</div>
         </template>
       </el-table-column>
@@ -139,13 +141,21 @@
           </el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="10">
-            <el-form-item label="允许偏倚%">
+          <el-col :span="6">
+            <el-form-item label="偏倚方式">
+              <el-radio-group v-model="form.bias_mode" size="small">
+                <el-radio-button label="relative">相对%</el-radio-button>
+                <el-radio-button label="absolute">绝对</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item :label="form.bias_mode === 'absolute' ? '允许绝对偏倚' : '允许偏倚%'">
               <el-input v-model="form.allow_bias_pct" placeholder="自动带出，可改" style="width:120px" />
               <el-button v-if="form.item_id" size="small" style="margin-left:8px" @click="reloadCriteria">重新取标准</el-button>
             </el-form-item>
           </el-col>
-          <el-col :span="14">
+          <el-col :span="10">
             <el-form-item label="判定标准">
               <span class="muted2">{{ form.criterion_label || '—' }}</span>
             </el-form-item>
@@ -181,7 +191,7 @@
             <el-input-number v-model="row.new_value" :controls="false" size="small" style="width:110px" />
           </template>
         </el-table-column>
-        <el-table-column label="相对偏倚%" width="110" align="center">
+        <el-table-column :label="form.bias_mode === 'absolute' ? '绝对偏倚' : '相对偏倚%'" width="110" align="center">
           <template #default="{ row }">
             <span :class="biasCls(row)">{{ biasOf(row) === null ? '—' : biasOf(row) + '%' }}</span>
           </template>
@@ -203,7 +213,7 @@
         <span>合格 <b>{{ localPass }}</b> / {{ form.samples.length }} 个</span>
         <el-tag :type="tagType(localConclusion)" style="margin-left:12px">{{ localConclusion }}</el-tag>
         <span class="muted2" style="margin-left:12px;font-size:12px">
-          判定：相对偏倚绝对值 ≤ 允许偏倚，且合格数 ≥ {{ Math.max(1, form.samples.length - 1) }}
+          判定：|偏倚| ≤ 允许偏倚（{{ form.bias_mode === 'absolute' ? '绝对' : '相对%' }}），且合格数 ≥ {{ Math.max(1, form.samples.length - 1) }}
         </span>
       </div>
       <el-form size="small" label-width="92px" style="margin-top:10px">
@@ -252,7 +262,7 @@ const emptyForm = () => ({
   item_id: null, library: '', item_type: '试剂', reagent_name: '', spec: '', brand: '',
   old_batch_no: '', old_expiry_date: null, new_batch_no: '', new_expiry_date: null,
   change_date: null, test_item_id: null, test_item_name: '',
-  criterion_source: '', criterion_label: '', allow_bias_pct: '',
+  criterion_source: '', criterion_label: '', allow_bias_pct: '', bias_mode: 'relative',
   samples: [], sample_count: defaultSampleCount, operator: '', remark: '',
 })
 const form = reactive(emptyForm())
@@ -266,6 +276,9 @@ function mkSamples(n) {
 function biasOf(r) {
   const ov = r.old_value, nv = r.new_value
   if (ov === null || ov === undefined || nv === null || nv === undefined) return null
+  if (form.bias_mode === 'absolute') {
+    return Math.round((Number(nv) - Number(ov)) * 10000) / 10000
+  }
   if (Math.abs(Number(ov)) < 1e-12) return null
   return Math.round(((Number(nv) - Number(ov)) / Math.abs(Number(ov))) * 10000) / 100
 }
@@ -435,6 +448,7 @@ async function onSave() {
       test_item_id: form.test_item_id, test_item_name: form.test_item_name,
       criterion_source: form.criterion_source, criterion_label: form.criterion_label,
       allow_bias_pct: form.allow_bias_pct,
+      bias_mode: form.bias_mode || 'relative',
       samples: form.samples.map(s => ({
         name: s.name, kind: s.kind,
         old_value: s.old_value === '' ? null : s.old_value,
@@ -462,10 +476,11 @@ async function onDelete(row) {
 
 function onPrint(row) {
   const samples = row.samples || []
-  const allow = row.allow_bias_pct || '—'
+  const isAbs = (row.bias_mode || 'relative') === 'absolute'
+  const allow = (row.allow_bias_pct || '—') + (isAbs ? '' : '%')
   let h = '<table><thead><tr><th>序号</th><th>样本名称</th><th>类型</th>'
     + '<th class="num">旧批号结果</th><th class="num">新批号结果</th>'
-    + '<th class="num">相对偏倚%</th><th class="num">是否合格</th></tr></thead><tbody>'
+    + `<th class="num">${isAbs ? '绝对偏倚' : '相对偏倚%'}</th><th class="num">是否合格</th></tr></thead><tbody>`
   samples.forEach((s, i) => {
     const b = s.bias_pct
     const ok = s.passed
@@ -478,7 +493,7 @@ function onPrint(row) {
   const meta = `试剂：${row.reagent_name}　规格：${row.spec || ''}　品牌：${row.brand || ''}<br>`
     + `批号变更：${row.old_batch_no || '—'} → <b>${row.new_batch_no || '—'}</b>　变更日期：${row.change_date || '—'}`
     + `　新批号效期：${row.new_expiry_date || '—'}<br>`
-    + `检验项目：${row.test_item_name || '—'}　允许偏倚：<b>${allow}%</b>　`
+    + `检验项目：${row.test_item_name || '—'}　允许偏倚：<b>${allow}</b>　`
     + `标准：${row.criterion_label || '手工填写'}<br>`
     + `结论：<b>${row.conclusion}</b>（合格 ${row.pass_count} / ${row.sample_count}）　操作人：${row.operator || ''}`
   printHtml(`${DOC_TITLE} ${row.reagent_name}`,

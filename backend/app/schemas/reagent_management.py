@@ -311,6 +311,7 @@ class ReagentLotVerificationBase(BaseModel):
     criterion_source: str = ""
     criterion_label: str = ""
     allow_bias_pct: str = ""
+    bias_mode: str = "relative"  # relative / absolute
     samples: list[LotSample] = []
     sample_count: int = 5
     operator: str = ""
@@ -339,6 +340,7 @@ class ReagentLotVerificationUpdate(BaseModel):
     criterion_source: Optional[str] = None
     criterion_label: Optional[str] = None
     allow_bias_pct: Optional[str] = None
+    bias_mode: Optional[str] = None
     samples: Optional[list[LotSample]] = None
     sample_count: Optional[int] = None
     operator: Optional[str] = None
