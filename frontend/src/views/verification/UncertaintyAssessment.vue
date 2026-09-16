@@ -136,7 +136,7 @@
               <el-col :span="12"><el-form-item label="审核人">
                 <el-input v-model="form.reviewed_by" />
               </el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="患者结果">
+              <el-col :span="12" v-if="form.mode !== 'qualitative'"><el-form-item label="患者结果">
                 <el-input-number v-model="form.patient_value" :min="0" :precision="4" :controls="false" style="width:100%" />
               </el-form-item></el-col>
             </el-row>
@@ -175,19 +175,19 @@
                 ④ <b>本室校准复现性</b>（推荐，最自主）：换校准品批号时，比较不同批号校准后同一质控的<b>均值离散</b>，其 SD 即反映校准品批间不确定度<br />
                 ⑤ <b>厂家完全没给</b> → 填 <b>0</b>：依据 CNAS-CL01-G003 6.3，以室内质控的<b>期间精密度</b>作主要分量（须确保 IQC 数据跨越过校准品/试剂批号更换），报告自动附声明
               </div>
-              <el-row :gutter="12">
-                <el-col :span="6">
-                  <el-form-item label="判定阈值 cutoff" label-width="120px">
+              <el-row :gutter="16">
+                <el-col :span="8">
+                  <el-form-item label="判定阈值 cutoff" label-width="130px">
                     <el-input-number v-model="form.cutoff" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="6">
-                  <el-form-item label="检测器 u_cal (S/CO)" label-width="140px">
+                <el-col :span="8">
+                  <el-form-item label="检测器 u_cal (S/CO)" label-width="150px">
                     <el-input-number v-model="form.ucal_abs" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="6">
-                  <el-form-item label="u_cal 来源" label-width="100px">
+                <el-col :span="8">
+                  <el-form-item label="u_cal 来源" label-width="110px">
                     <el-select v-model="form.ucal_source" style="width:100%">
                       <el-option label="厂家证书（绝对 U÷k）" value="厂家" />
                       <el-option label="厂家相对 U(%) 换算" value="厂家相对值" />
@@ -197,27 +197,52 @@
                     </el-select>
                   </el-form-item>
                 </el-col>
-                <el-col :span="6">
-                  <el-form-item label="待判读信号值 r" label-width="120px">
+              </el-row>
+              <el-row :gutter="16">
+                <el-col :span="8">
+                  <el-form-item label="待判读信号值 r" label-width="130px">
                     <el-input-number v-model="form.patient_value" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
-              </el-row>
-              <el-row :gutter="12">
                 <el-col :span="8">
-                  <el-form-item label="质控均值 x̄" label-width="120px">
+                  <el-form-item label="L1 质控均值 x̄" label-width="150px">
                     <el-input-number v-model="form.l1_mean" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
-                  <el-form-item label="质控 SD（=u_rep）" label-width="140px">
+                  <el-form-item label="L1 质控 SD（=u_rep）" label-width="110px">
                     <el-input-number v-model="form.l1_sd" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
+              </el-row>
+              <el-row :gutter="16">
                 <el-col :span="8">
-                  <el-form-item label="质控次数 n" label-width="120px">
+                  <el-form-item label="L1 质控次数 n" label-width="130px">
                     <el-input-number v-model="form.l1_n" :min="0" :controls="false" :precision="0" style="width:100%" />
                   </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="L2 质控均值（可选）" label-width="150px">
+                    <el-input-number v-model="form.l2_mean" :min="0" :controls="false" :precision="4" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="L2 质控 SD（可选）" label-width="110px">
+                    <el-input-number v-model="form.l2_sd" :min="0" :controls="false" :precision="4" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              <el-row :gutter="16">
+                <el-col :span="8">
+                  <el-form-item label="L2 质控次数 n（可选）" label-width="130px">
+                    <el-input-number v-model="form.l2_n" :min="0" :controls="false" :precision="0" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="16">
+                  <div class="mode-tip" style="margin-top:4px">
+                    有<b>两个水平质控</b>时 L2 也填 → u<sub>rep</sub> 按<b>合并标准差</b> √[Σs<sub>i</sub>²(n<sub>i</sub>−1) / Σ(n<sub>i</sub>−1)] 计算。
+                    建议以<b>接近 cutoff 的弱阳性质控</b>为主（它才代表临界区精密度）。
+                  </div>
                 </el-col>
               </el-row>
               <div v-if="qualPreview" class="formula">
@@ -296,7 +321,7 @@
             </div>
 
             <!-- 多个系统：每个系统录 L1/L2 -->
-            <div v-else class="data-block">
+            <div v-else-if="form.mode === 'multi'" class="data-block">
               <div class="data-block-title">🔗 多系统室内质控数据（每个系统分别录入 L1/L2）</div>
               <div class="mode-tip">系统名称（如 A/B/C），每个系统分别录入其 L1、L2 的均值/标准差/测试数。</div>
               <div v-for="(s, idx) in form.multi_systems" :key="idx" class="sys-row">
@@ -660,11 +685,18 @@ function erf(x) {
 // 定性项目实时预览：绝对单位（S/CO）的 u_c、U，灰区，似然比
 const qualPreview = computed(() => {
   if (form.mode !== 'qualitative') return null
-  const sd = Number(form.l1_sd) || 0
-  const n = Number(form.l1_n) || 0
   const ucalAbs = Number(form.ucal_abs) || 0
   const cutoff = Number(form.cutoff) || 0
-  const uRep = (n >= 2 && sd > 0) ? sd : 0
+  // u_rep：L1 必填、L2 可选，合并标准差（绝对单位）
+  const lv = []
+  if ((Number(form.l1_n) || 0) >= 2 && (Number(form.l1_sd) || 0) > 0) lv.push([Number(form.l1_sd), Number(form.l1_n)])
+  if ((Number(form.l2_n) || 0) >= 2 && (Number(form.l2_sd) || 0) > 0) lv.push([Number(form.l2_sd), Number(form.l2_n)])
+  let uRep = 0
+  if (lv.length) {
+    const num = lv.reduce((a, [s, n]) => a + s * s * (n - 1), 0)
+    const den = lv.reduce((a, [, n]) => a + (n - 1), 0)
+    uRep = den > 0 ? Math.sqrt(num / den) : 0
+  }
   const uC = Math.sqrt(uRep ** 2 + ucalAbs ** 2)
   if (uC <= 0) return null
   const U = 2 * uC

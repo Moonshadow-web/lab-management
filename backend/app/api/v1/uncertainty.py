@@ -322,7 +322,8 @@ def _compute_qualitative(payload: dict) -> dict:
       例如**假阳性或假阴性的概率**。
 
     模型（各分量均为**绝对单位**，如 S/CO，不用相对 %）：
-      u_rep = 室内质控 S/CO 的标准差（A类）
+      u_rep = 室内质控信号值的**合并标准差**（A类；单水平时即该水平 SD，两水平时按
+              √[Σs²(n−1)/Σ(n−1)] 合并，与定量项目的 RSD 合并同构、但用绝对 SD）
       u_cal = 检测器/校准品绝对标准不确定度（B类，厂家证书 U÷k）
       u_c   = √(u_rep² + u_cal²)
       U     = 2 × u_c                        （k=2, P≈95%）
@@ -330,14 +331,30 @@ def _compute_qualitative(payload: dict) -> dict:
       对测值 r：z=(cutoff−r)/u_c；FNR=Φ(z)、TPR=1−Φ(z)（r≥cutoff 时）
                 LR = TPR/FNR；r<cutoff 时用 LR⁻ = TNR/FPR
       判读：落在灰区 → 不能判定（需复检/确认试验）；否则为"强/中等支持"
+
+    注：有 2 个水平质控时应以**接近 cutoff 的水平**为主；L2 为可选，未填则只用 L1。
     """
     from math import erf, sqrt as _sqrt
 
     cutoff = float(payload.get("cutoff") or 0)
     ucal_abs = float(payload.get("ucal_abs") or 0)
-    sd = float(payload.get("l1_sd") or 0)
-    n = int(payload.get("l1_n") or 0)
-    u_rep = sd if (n >= 2 and sd > 0) else 0.0
+    # u_rep：L1 必填、L2 可选，按合并标准差（绝对单位）计算
+    levels = []
+    for sd_raw, n_raw in ((payload.get("l1_sd"), payload.get("l1_n")),
+                          (payload.get("l2_sd"), payload.get("l2_n"))):
+        try:
+            sd_i = float(sd_raw or 0)
+            n_i = int(n_raw or 0)
+        except (TypeError, ValueError):
+            continue
+        if n_i >= 2 and sd_i > 0:
+            levels.append((sd_i, n_i))
+    if levels:
+        num = sum(s ** 2 * (n - 1) for s, n in levels)
+        den = sum(n - 1 for _, n in levels)
+        u_rep = (num / den) ** 0.5 if den > 0 else 0.0
+    else:
+        u_rep = 0.0
     u_c = (u_rep ** 2 + ucal_abs ** 2) ** 0.5
     u_ext = 2 * u_c
 
