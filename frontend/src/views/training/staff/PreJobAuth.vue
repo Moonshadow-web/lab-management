@@ -510,7 +510,7 @@ async function printForm(row) {
       员工签字：　　　　　　　　组长签字：　　　　　　　　日期：
     </div>
     <div style="margin-top:30px;padding-top:6px;border-top:1px solid #999;font-size:11px;color:#333;text-align:center;">
-      表格编号：BG-SM-PX-002　　　　民航总医院检验科生化免疫组　　　　失效日期：2026.9.15
+      表格编号：BG-SM-PX-002　　　　民航总医院检验科生化免疫组　　　　生效日期：2026.9.15
     </div>
     ${pageBreak}`
 
