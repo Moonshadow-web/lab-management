@@ -13,12 +13,13 @@
       <iframe v-else-if="mode === 'pdf'" :src="src" style="width: 100%; height: 75vh; border: 0" />
       <div v-else-if="mode === 'html'" class="preview-html" v-html="html" />
 
-      <div v-else class="other-preview">
+      <div v-show="mode === 'pptx'" ref="pptxBox" class="preview-pptx" />
+
+      <div v-if="mode === 'other'" class="other-preview">
         <el-icon :size="64"><Document /></el-icon>
         <p>{{ fallbackMsg }}</p>
         <el-button type="primary" @click="emit('download', file)">下载 {{ file?.original_name }}</el-button>
       </div>
-      <div v-show="mode === 'pptx'" ref="pptxBox" class="preview-pptx" />
     </template>
   </el-dialog>
 </template>
