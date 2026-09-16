@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { Document } from '@element-plus/icons-vue'
 import mammoth from 'mammoth'
 
@@ -107,8 +107,13 @@ async function load(f) {
         const blob = await fetchBlob(f.id)
         const arrayBuffer = await blob.arrayBuffer()
         mode.value = 'pptx'                 // 先切模式，让容器 div 渲染出来
-        await new Promise((r) => setTimeout(r, 0))
-        const box = pptxBox.value
+        // 弹窗内容有过渡/懒渲染，需等容器真正挂载后再初始化（轮询最多 ~1s）
+        let box = null
+        for (let i = 0; i < 20 && !box; i++) {
+          await nextTick()
+          await new Promise((r) => setTimeout(r, 50))
+          box = pptxBox.value
+        }
         if (!box) throw new Error('预览容器未就绪')
         box.innerHTML = ''
         const mod = await import('pptx-preview')
