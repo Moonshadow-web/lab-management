@@ -154,8 +154,16 @@ def resolve_allow_bias(db: Session, item_id: int,
 #   相对偏倚计算与判定
 # ═══════════════════════════════════════════════════════════════
 def compute_samples(samples: list, allow_pct: float, need: int) -> tuple:
-    """计算每个样本的相对偏倚并判定，返回 (新样本列表, 合格数, 结论)。"""
-    out, passed = [], 0
+    """计算每个样本的相对偏倚并判定，返回 (新样本列表, 合格数, 结论, 有效样本数)。
+
+    结论规则（避免「样本还没填就判不符合」）：
+      - 允许偏倚未填              → 待完成
+      - 有效样本数为 0（未录入）    → 待完成
+      - 合格数 ≥ 需合格数          → 符合要求
+      - 样本已全部录入但仍不达标    → 不符合要求
+      - 其余（录了一部分）          → 待完成
+    """
+    out, passed, valid = [], 0, 0
     for s in samples or []:
         ov, nv = s.get("old_value"), s.get("new_value")
         bias, ok = None, None
@@ -164,6 +172,7 @@ def compute_samples(samples: list, allow_pct: float, need: int) -> tuple:
                 f_ov, f_nv = float(ov), float(nv)
                 if abs(f_ov) > 1e-12:
                     bias = round((f_nv - f_ov) / abs(f_ov) * 100.0, 2)
+                    valid += 1
                     if allow_pct and allow_pct > 0:
                         ok = abs(bias) <= allow_pct + 1e-9
                         if ok:
@@ -178,11 +187,18 @@ def compute_samples(samples: list, allow_pct: float, need: int) -> tuple:
             "bias_pct": bias,
             "passed": ok,
         })
+    total = len(samples or [])
     if not allow_pct or allow_pct <= 0:
         conclusion = "待完成"
+    elif valid == 0:
+        conclusion = "待完成"          # 还没录入结果
+    elif passed >= need:
+        conclusion = "符合要求"
+    elif total > 0 and valid >= total:
+        conclusion = "不符合要求"       # 全部录完仍不达标
     else:
-        conclusion = "符合要求" if passed >= need else "不符合要求"
-    return out, passed, conclusion
+        conclusion = "待完成"          # 只录了一部分
+    return out, passed, conclusion, valid
 
 
 def _to_read(v: ReagentLotVerification) -> dict:
@@ -218,7 +234,7 @@ def _apply_calc(v: ReagentLotVerification) -> None:
         allow = 0.0
     n = int(v.sample_count or 5)
     need = max(1, n - 1)  # 默认 5 个里 ≥4 个
-    samples, passed, conclusion = compute_samples(_load_samples(v), allow, need)
+    samples, passed, conclusion, _valid = compute_samples(_load_samples(v), allow, need)
     v.samples_json = json.dumps(samples, ensure_ascii=False)
     v.pass_count = passed
     v.conclusion = conclusion

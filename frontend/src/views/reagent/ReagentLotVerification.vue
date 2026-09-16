@@ -258,11 +258,16 @@ function biasCls(r) {
   return p ? 'ok' : 'bad'
 }
 const localPass = computed(() => form.samples.filter(r => passOf(r) === true).length)
+const validCount = computed(() => form.samples.filter(r => biasOf(r) !== null).length)
 const localConclusion = computed(() => {
   const allow = parseFloat(form.allow_bias_pct)
   if (!allow) return '待完成'
-  const need = Math.max(1, form.samples.length - 1)
-  return localPass.value >= need ? '符合要求' : '不符合要求'
+  const total = form.samples.length
+  const need = Math.max(1, total - 1)
+  if (validCount.value === 0) return '待完成'          // 还没录结果
+  if (localPass.value >= need) return '符合要求'
+  if (total > 0 && validCount.value >= total) return '不符合要求'  // 全录完仍不达标
+  return '待完成'                                      // 只录了一部分
 })
 
 function tagType(c) {

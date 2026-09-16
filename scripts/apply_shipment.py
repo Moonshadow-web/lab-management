@@ -151,7 +151,14 @@ def main():
     print()
     print(f"【② 生成待验收记录】{len(data['changed'])} 条 → 去重后 {len(gen_items)} 条"
           f"（合并掉 {sum(d[3] for d in dropped)} 条重复目录条目）")
-    if gen_items:
+    if not apply_changes:
+        for g in gen_items[:10]:
+            it = items.get(g["item_id"], {})
+            print(f"      [预演] {str(it.get('name'))[:28]:<30} "
+                  f"{g['old_batch_no']} → {g['new_batch_no']}  变更日期 {g['change_date']}")
+        if len(gen_items) > 10:
+            print(f"      ... 共 {len(gen_items)} 条")
+    if gen_items and apply_changes:
         code, r = post(tok, "/api/v1/reagent/lot-verifications/_generate",
                        {"items": gen_items, "sample_count": 5})
         print(f"    接口返回 HTTP {code}：新建 {r.get('created_count')} 条，"
@@ -164,8 +171,8 @@ def main():
         miss = [c for c in (r.get("created") or []) if not c.get("allow_bias_pct")]
         if miss:
             print(f"    ⚠ 其中 {len(miss)} 条未自动匹配到判定标准，需手工填允许偏倚：")
-            for c in miss[:10]:
-                print(f"      #{c['id']} {str(c['reagent_name'])[:30]}")
+            for c in miss[:12]:
+                print(f"      #{c['id']} {str(c['reagent_name'])[:32]}")
 
     print()
     print("模式:", "已执行" if apply_changes else "仅预演（未改数据）")
