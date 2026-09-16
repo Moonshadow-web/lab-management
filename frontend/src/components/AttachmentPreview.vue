@@ -108,10 +108,15 @@ async function load(f) {
         const blob = await fetchBlob(f.id)
         const arrayBuffer = await blob.arrayBuffer()
         mode.value = 'pptx'
-        // 容器常驻（v-show），等一次渲染即可取到
-        await nextTick()
-        await new Promise((r) => setTimeout(r, 50))
-        const box = pptxBox.value
+        // 必须先结束 loading，否则模板走 v-if 分支、内容区（含预览容器）尚未渲染
+        loading.value = false
+        let box = null
+        for (let i = 0; i < 60; i++) {
+          await nextTick()
+          box = pptxBox.value
+          if (box) break
+          await new Promise((r) => setTimeout(r, 50))
+        }
         if (!box) throw new Error('预览容器未就绪')
         box.innerHTML = ''
         const mod = await import('pptx-preview')
