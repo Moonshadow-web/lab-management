@@ -97,6 +97,39 @@ def _doc_visible(doc, group: str) -> bool:
     return "KS" in str(num)
 
 
+@router.get("/_diag/manual-link")
+def diag_manual_link(doc_id: int = 0, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """诊断：查看 test_items.manual_doc_ids 的运行时真实类型与解析结果
+    （定位「显式关联不生效」问题；不影响业务）。"""
+    rows = db.query(TestItem.id, TestItem.name, TestItem.manual_doc_ids).all()
+    hits = []
+    samples = []
+    for tid, name, mdid in rows:
+        parsed = None
+        err = None
+        if mdid:
+            try:
+                if isinstance(mdid, (str, bytes, bytearray)):
+                    parsed = json.loads(mdid)
+                else:
+                    parsed = mdid
+            except Exception as e:  # noqa: BLE001
+                err = str(e)[:100]
+        if len(samples) < 6:
+            samples.append({
+                "tid": tid, "name": name,
+                "raw_type": type(mdid).__name__, "raw": str(mdid)[:50],
+                "parsed_type": type(parsed).__name__ if parsed is not None else None,
+                "err": err,
+            })
+        if doc_id and isinstance(parsed, list):
+            norm = [int(x) if str(x).strip().isdigit() else x for x in parsed]
+            if doc_id in norm:
+                hits.append({"tid": tid, "name": name, "raw": str(mdid)[:50]})
+    return {"doc_id": doc_id, "hits": hits, "samples": samples,
+            "total_rows": len(rows), "with_mdoc": sum(1 for r in rows if r[2])}
+
+
 @router.get("/project-manuals")
 def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """返回全部「项目说明书」文档，并归一化匹配到项目查询(test_items)，
