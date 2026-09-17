@@ -297,6 +297,32 @@ def _ensure_missing_columns():
         except Exception as e:  # noqa: BLE001
             logger.warning("修正 uncertainty_assessments.instrument 可空失败(忽略): %s", e)
 
+    # 2026-09-17 修正：uncertainty_assessments.mode 原为 VARCHAR(10)，
+    # 新增定性项目模式 mode="qualitative"（11 字符）会超长导致 MySQL 写入 500。
+    # 自愈加列只 ADD 不改长度，故此处显式 MODIFY 扩容（幂等）。
+    if engine.dialect.name == "mysql":
+        try:
+            with engine.connect() as c:
+                cols = c.exec_driver_sql(
+                    "SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='uncertainty_assessments' "
+                    "AND COLUMN_NAME='mode'"
+                ).fetchall()
+            for row in cols:
+                try:
+                    cur_len = int(row[0]) if row[0] is not None else 0
+                except (TypeError, ValueError):
+                    cur_len = 0
+                if cur_len and cur_len < 20:
+                    with engine.begin() as conn:
+                        conn.exec_driver_sql(
+                            "ALTER TABLE uncertainty_assessments MODIFY mode VARCHAR(20) NULL DEFAULT 'single'"
+                        )
+                    logger.info("修正 uncertainty_assessments.mode 长度为 VARCHAR(20)")
+                    break
+        except Exception as e:  # noqa: BLE001
+            logger.warning("修正 uncertainty_assessments.mode 长度失败(忽略): %s", e)
+
     # 2026-07-31 修正：人员继续教育(personnel_edu_exp)的 train_date 存放完整起止区间
     # （如 '2019.11.19-2019.11.23'，21 字符），原 VARCHAR(20) 会触发 MySQL
     # "Data too long" 导致写入 500。扩宽为 VARCHAR(40)。幂等（仅当当前长度 < 40 时改）。

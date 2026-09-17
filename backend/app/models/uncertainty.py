@@ -31,7 +31,8 @@ class UncertaintyAssessment(Base):
     prepared_by: Mapped[str] = mapped_column(String(100), default="")
     reviewed_by: Mapped[str] = mapped_column(String(100), default="")
     # ── 模式 ──
-    mode: Mapped[str] = mapped_column(String(10), default="single")  # single / multi / qualitative
+    # 注：长度需容纳 "qualitative"（11 字符），原 String(10) 会致 MySQL 写入 500
+    mode: Mapped[str] = mapped_column(String(20), default="single")  # single / multi / qualitative
     # ── 定性项目（qualitative 模式）专用字段 ──
     # 定性项目（如 HBsAg）以 S/CO（COI）等连续信号 + 阈值判定阴阳性，
     # 其不确定度用**绝对单位**表示（S/CO），不用相对 %。
