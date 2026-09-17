@@ -990,7 +990,7 @@ async function save() {
       }
     } else {
       rec = await request.post('/api/v1/uncertainty', full)
-      ElMessage.success('保存成功')
+      ElMessage.success('保存成功（模式：' + MODE_NAME[form.mode] + '）')
     }
     current.value = rec
     editingId.value = null
@@ -1041,6 +1041,10 @@ function loadProject(p) {
   form.reviewed_by = p.reviewed_by || '杨静'
   form.ucal = p.ucal || 0
   form.ucal_source = p.ucal_source || '厂家'
+  // 定性项目字段（原缺失 → 编辑定性记录时会丢失，导致误存为定量）
+  form.cutoff = (p.cutoff != null ? p.cutoff : 1.0)
+  form.ucal_abs = p.ucal_abs || 0
+  form.u_rep_mode = p.u_rep_mode || 'l1_only'
   form.l1_mean = p.l1_mean || 0; form.l1_sd = p.l1_sd || 0; form.l1_n = p.l1_n || 0
   form.l2_mean = p.l2_mean || 0; form.l2_sd = p.l2_sd || 0; form.l2_n = p.l2_n || 0
   try {
@@ -1068,6 +1072,13 @@ async function delProject(p) {
   ElMessage.success('已删除')
   await loadProjects()
 }
+// 模式显示名（保存提示用，避免"填了定性数据却存成定量"的混淆）
+const MODE_NAME = {
+  single: '单个测量系统（定量）',
+  multi: '多个测量系统',
+  qualitative: '定性项目（S/CO 阈值判定）',
+}
+
 function cancelEdit() { editingId.value = null; clearForm() }
 function clearForm() {
   editingId.value = null
@@ -1078,8 +1089,11 @@ function clearForm() {
     prepared_by: auth.user?.full_name || auth.user?.username || '金子铮',
     reviewed_by: '杨静',
     mode: 'single',
+    // 定性项目字段（原缺失 → 新建时会残留上一条的值，容易误存）
+    cutoff: 1.0, ucal_abs: 0, u_rep_mode: 'l1_only',
     l1_mean: 0, l1_sd: 0, l1_n: 0,
     l2_mean: 0, l2_sd: 0, l2_n: 0,
+    l3_mean: 0, l3_sd: 0, l3_n: 0,
     multi_systems: defaultMultiSystems(),
     ucal: 0, ucal_source: '厂家',
     patient_value: 0, patient_unit: '',
