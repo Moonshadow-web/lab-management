@@ -362,8 +362,11 @@ def _report_qualitative_html(v: dict) -> str:
 <tr><th>水平</th><th>质控均值 x̄ (S/CO)</th><th>标准差 SD (S/CO)</th><th>测试数 n</th></tr>
 {lv_rows}
 </table>
-<p>u<sub>rep</sub>（合并标准差）= √[Σs<sub>i</sub>²(n<sub>i</sub>−1) / Σ(n<sub>i</sub>−1)] = <b>{u_rep} S/CO</b></p>
-<p class="note">说明：为保证对临界区（cutoff 附近）的代表性，宜以<b>接近 cutoff 的弱阳性质控</b>为主要水平；若仅单一水平质控，u<sub>rep</sub> 即该水平的标准差。</p>
+<p>u<sub>rep</sub>（{ '合并标准差，L1+L2' if (v.get('u_rep_mode') or 'l1_only') == 'pooled' else '取自 L1（接近 cutoff 的弱阳性质控）' }）
+= <b>{u_rep} S/CO</b></p>
+<p class="note">说明：为保证对临界区（cutoff 附近）的代表性，宜以<b>接近 cutoff 的弱阳性质控</b>为主要水平；
+若仅单一水平质控，u<sub>rep</sub> 即该水平的标准差。合并高值水平会因其 SD 较大而<b>削弱临界区判读力</b>，
+故定性项目推荐只采用弱阳性水平（本报告计算方式见上）。</p>
 
 <h2>3. 校准/检测器引入测量不确定度分量 u<sub>cal</sub></h2>
 <p>u<sub>cal</sub> = <b>{u_cal} S/CO</b>　（来源：{_esc(v.get('ucal_source') or '厂家')}）</p>
@@ -408,20 +411,37 @@ def _summary_html(rows):
     items = []
     for i, p in enumerate(rows, 1):
         v = p if isinstance(p, dict) else {c.name: getattr(p, c.name) for c in p.__table__.columns}
+        is_q = (v.get("mode") or "") == "qualitative"
+        if is_q:
+            # 定性项目：U 为绝对值(S/CO)，不适用 TEa，按灰区+似然比判读
+            typ = "定性"
+            u_txt = f'{_fmt(v.get("u_ext_abs") or v.get("u_extended"))} S/CO'
+            tgt = "—（不适用）"
+            src = _esc(v.get("target_bias_source") or "定性项目（阈值+似然比）")
+            judge = "支持判读" if v.get("passed") else "落灰区·需复核"
+        else:
+            typ = "定量"
+            u_txt = f'{_fmt(v.get("u_extended"))}%'
+            tgt = f'{_fmt(v.get("target_bias"))}%'
+            src = _esc(v.get("target_bias_source"))
+            judge = "符合" if v.get("passed") else "未达标"
         items.append(
-            f'<tr><td>{i}</td><td>{_esc(v.get("project_name"))}</td><td>{_esc(v.get("project_method") or v.get("instrument"))}</td>'
-            f'<td>{_fmt(v.get("u_extended"))}</td><td>{_fmt(v.get("target_bias"))}</td>'
-            f'<td>{_esc(v.get("target_bias_source"))}</td>'
-            f'<td>{"符合" if v.get("passed") else "未达标"}</td><td>{_esc(v.get("eval_date"))}</td></tr>'
+            f'<tr><td>{i}</td><td>{_esc(v.get("project_name"))}</td><td>{typ}</td>'
+            f'<td>{_esc(v.get("project_method") or v.get("instrument"))}</td>'
+            f'<td>{u_txt}</td><td>{tgt}</td><td>{src}</td>'
+            f'<td>{judge}</td><td>{_esc(v.get("eval_date"))}</td></tr>'
         )
     return (
         f'<!DOCTYPE html><html><head><meta charset="UTF-8"><title>测量不确定度评定汇总表</title>'
         f'<style>{_style()}</style></head><body>'
         f'<h1>民航总医院检验科生化免疫组</h1><h1>测量不确定度评定汇总表</h1>'
         f'<p>表格编号：BG-SM-GL-020 | 编制日期：{datetime.now().strftime("%Y年%m月%d日")}</p>'
-        f'<table><tr><th>序号</th><th>项目名称</th><th>测量方法</th><th>U(%)</th><th>目标偏倚(%)</th><th>目标来源</th><th>判定</th><th>评定日期</th></tr>'
+        f'<table><tr><th>序号</th><th>项目名称</th><th>类型</th><th>测量方法</th>'
+        f'<th>U</th><th>目标</th><th>目标来源</th><th>判定</th><th>评定日期</th></tr>'
         f'{"".join(items)}</table>'
-        f'<p style="margin-top:14px">目标偏倚优先级：WS/T 403-2024（行标） &gt; 2025 北京市互认 &gt; 1/2 × NCCL EQA 允许总误差。</p>'
+        f'<p style="margin-top:14px"><b>判定说明：</b>定量项目 U 以相对值(%)表示，判定标准 U &lt; TEa（允许总误差）；'
+        f'定性项目 U 以绝对值(S/CO)表示，按判定阈值附近的<b>灰区（LR&lt;10）与似然比</b>判读，不适用 TEa。</p>'
+        f'<p>目标偏倚优先级：WS/T 403-2024（行标） &gt; 2025 北京市互认 &gt; 1/2 × NCCL EQA 允许总误差。</p>'
         f'</body></html>'
     )
 

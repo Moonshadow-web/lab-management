@@ -338,10 +338,16 @@ def _compute_qualitative(payload: dict) -> dict:
 
     cutoff = float(payload.get("cutoff") or 0)
     ucal_abs = float(payload.get("ucal_abs") or 0)
-    # u_rep：L1 必填、L2 可选，按合并标准差（绝对单位）计算
+    # u_rep 计算方式（u_rep_mode）：
+    #   l1_only（默认，推荐）：只用 L1 —— 应以**接近 cutoff 的弱阳性质控**作 L1，
+    #       因其才代表临界区的精密度；高值质控的 SD 会稀释临界区判读力。
+    #   pooled：合并 L1+L2（√[Σs²(n−1)/Σ(n−1)]，绝对单位）
+    u_rep_mode = (payload.get("u_rep_mode") or "l1_only").strip().lower()
+    pairs = [(payload.get("l1_sd"), payload.get("l1_n"))]
+    if u_rep_mode == "pooled":
+        pairs.append((payload.get("l2_sd"), payload.get("l2_n")))
     levels = []
-    for sd_raw, n_raw in ((payload.get("l1_sd"), payload.get("l1_n")),
-                          (payload.get("l2_sd"), payload.get("l2_n"))):
+    for sd_raw, n_raw in pairs:
         try:
             sd_i = float(sd_raw or 0)
             n_i = int(n_raw or 0)
@@ -355,6 +361,7 @@ def _compute_qualitative(payload: dict) -> dict:
         u_rep = (num / den) ** 0.5 if den > 0 else 0.0
     else:
         u_rep = 0.0
+    payload["u_rep_mode"] = u_rep_mode
     u_c = (u_rep ** 2 + ucal_abs ** 2) ** 0.5
     u_ext = 2 * u_c
 

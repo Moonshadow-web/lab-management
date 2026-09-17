@@ -632,6 +632,7 @@ class UncertaintyAssessmentBase(BaseModel):
     mode: str = "single"
     # 定性项目（qualitative）：以 S/CO 等连续信号 + 阈值判阴阳性，用绝对单位
     cutoff: float = 0          # 判定阈值（如 1.0）
+    u_rep_mode: str = "l1_only"  # l1_only=只用 L1 / pooled=合并 L1+L2
     ucal_abs: float = 0        # 检测器/校准品绝对标准不确定度（S/CO）
     u_ext_abs: float = 0       # 绝对扩展不确定度 U=2u_c（S/CO）
     gray_low: float = 0        # 灰区下限

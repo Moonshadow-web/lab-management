@@ -37,6 +37,8 @@ class UncertaintyAssessment(Base):
     # 定性项目（如 HBsAg）以 S/CO（COI）等连续信号 + 阈值判定阴阳性，
     # 其不确定度用**绝对单位**表示（S/CO），不用相对 %。
     cutoff: Mapped[float] = mapped_column(Float, default=0)        # 判定阈值（如 1.0 S/CO）
+    # u_rep 计算方式：l1_only=只用 L1（弱阳性质控，推荐）/ pooled=合并 L1+L2
+    u_rep_mode: Mapped[str] = mapped_column(String(20), default="l1_only")
     ucal_abs: Mapped[float] = mapped_column(Float, default=0)      # 检测器/校准品绝对标准不确定度（S/CO，B类）
     u_ext_abs: Mapped[float] = mapped_column(Float, default=0)     # 绝对扩展不确定度 U=2×u_c（S/CO，k=2）
     gray_low: Mapped[float] = mapped_column(Float, default=0)      # 灰区下限 = cutoff − 1.3353×u_c

@@ -205,7 +205,13 @@
                 </el-col>
               </el-row>
 
-              <div style="font-size:12px;color:#606266;font-weight:600;margin:10px 0 4px">室内质控水平（L1 必填；有第二水平再填 L2）</div>
+              <div style="font-size:12px;color:#606266;font-weight:600;margin:10px 0 4px">
+                室内质控水平（L1 必填；有第二水平再填 L2）
+                <el-radio-group v-model="form.u_rep_mode" size="small" style="margin-left:12px">
+                  <el-radio-button value="l1_only">只用 L1（弱阳性，推荐）</el-radio-button>
+                  <el-radio-button value="pooled">合并 L1+L2</el-radio-button>
+                </el-radio-group>
+              </div>
               <el-row :gutter="16">
                 <el-col :span="6">
                   <el-form-item label="L1 均值 x̄" label-position="top" label-width="0">
@@ -573,7 +579,7 @@ const form = reactive({
   reviewed_by: '杨静',
   mode: 'single',
   // 定性项目（S/CO 阈值判定）
-  cutoff: 1.0, ucal_abs: 0,
+  cutoff: 1.0, ucal_abs: 0, u_rep_mode: 'l1_only',
   // 单系统
   l1_mean: 0, l1_sd: 0, l1_n: 0,
   l2_mean: 0, l2_sd: 0, l2_n: 0,
@@ -688,10 +694,13 @@ const qualPreview = computed(() => {
   if (form.mode !== 'qualitative') return null
   const ucalAbs = Number(form.ucal_abs) || 0
   const cutoff = Number(form.cutoff) || 0
-  // u_rep：L1 必填、L2 可选，合并标准差（绝对单位）
+  // u_rep：按 u_rep_mode 决定只用 L1（默认，弱阳性质控）还是合并 L1+L2
   const lv = []
   if ((Number(form.l1_n) || 0) >= 2 && (Number(form.l1_sd) || 0) > 0) lv.push([Number(form.l1_sd), Number(form.l1_n)])
-  if ((Number(form.l2_n) || 0) >= 2 && (Number(form.l2_sd) || 0) > 0) lv.push([Number(form.l2_sd), Number(form.l2_n)])
+  if (form.u_rep_mode === 'pooled'
+      && (Number(form.l2_n) || 0) >= 2 && (Number(form.l2_sd) || 0) > 0) {
+    lv.push([Number(form.l2_sd), Number(form.l2_n)])
+  }
   let uRep = 0
   if (lv.length) {
     const num = lv.reduce((a, [s, n]) => a + s * s * (n - 1), 0)
@@ -944,7 +953,7 @@ async function save() {
     mode: form.mode,
     ucal: form.ucal,
     // 定性项目
-    cutoff: form.cutoff, ucal_abs: form.ucal_abs,
+    cutoff: form.cutoff, ucal_abs: form.ucal_abs, u_rep_mode: form.u_rep_mode,
     ucal_source: form.ucal_source,
     l1_mean: form.l1_mean, l1_sd: form.l1_sd, l1_n: form.l1_n,
     l2_mean: form.l2_mean, l2_sd: form.l2_sd, l2_n: form.l2_n,
