@@ -167,27 +167,28 @@
             <!-- 定性项目：S/CO 阈值判定 -->
             <div v-if="form.mode === 'qualitative'" class="data-block">
               <div class="data-block-title">🧪 定性项目数据（S/CO 或 COI，均为绝对值）</div>
-              <div class="mode-tip" style="margin-bottom:8px">
+              <div class="mode-tip" style="margin-bottom:12px">
                 <b>u_cal（B类）取值方法</b>，按下述优先级：<br />
-                ① 厂家给<b>绝对 U</b> → <code>u_cal = U ÷ k</code>（k 常为 2）<br />
+                ① 厂家给<b>绝对 U</b> → <code>u_cal = U ÷ k</code>（k 常为 2）　
                 ② 厂家只给<b>相对 U(%)</b> → <code>u_cal = U% ÷ k × 质控均值 x̄</code><br />
-                ③ 厂家只给<b>允差/允许偏差 ±a</b> → 矩形分布 <code>u = a ÷ √3</code>（三角分布 ÷√6，95% 区间 ÷1.96）<br />
-                ④ <b>本室校准复现性</b>（推荐，最自主）：换校准品批号时，比较不同批号校准后同一质控的<b>均值离散</b>，其 SD 即反映校准品批间不确定度<br />
-                ⑤ <b>厂家完全没给</b> → 填 <b>0</b>：依据 CNAS-CL01-G003 6.3，以室内质控的<b>期间精密度</b>作主要分量（须确保 IQC 数据跨越过校准品/试剂批号更换），报告自动附声明
+                ③ 厂家只给<b>允差 ±a</b> → 矩形分布 <code>u = a ÷ √3</code>（三角分布 ÷√6，95% 区间 ÷1.96）　
+                ④ <b>本室校准复现性</b>：换校准品批号时比较各批号校准后同一质控的<b>均值离散</b><br />
+                ⑤ <b>厂家完全没给</b> → 填 <b>0</b>：依 CNAS-CL01-G003 6.3 以室内质控的<b>期间精密度</b>作主要分量，报告自动附声明
               </div>
+
               <el-row :gutter="16">
-                <el-col :span="8">
-                  <el-form-item label="判定阈值 cutoff" label-width="130px">
+                <el-col :span="6">
+                  <el-form-item label="判定阈值 cutoff" label-position="top" label-width="0">
                     <el-input-number v-model="form.cutoff" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="8">
-                  <el-form-item label="检测器 u_cal (S/CO)" label-width="150px">
+                <el-col :span="6">
+                  <el-form-item label="检测器 u_cal（S/CO）" label-position="top" label-width="0">
                     <el-input-number v-model="form.ucal_abs" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="8">
-                  <el-form-item label="u_cal 来源" label-width="110px">
+                <el-col :span="6">
+                  <el-form-item label="u_cal 来源" label-position="top" label-width="0">
                     <el-select v-model="form.ucal_source" style="width:100%">
                       <el-option label="厂家证书（绝对 U÷k）" value="厂家" />
                       <el-option label="厂家相对 U(%) 换算" value="厂家相对值" />
@@ -197,50 +198,50 @@
                     </el-select>
                   </el-form-item>
                 </el-col>
-              </el-row>
-              <el-row :gutter="16">
-                <el-col :span="8">
-                  <el-form-item label="待判读信号值 r" label-width="130px">
+                <el-col :span="6">
+                  <el-form-item label="待判读信号值 r" label-position="top" label-width="0">
                     <el-input-number v-model="form.patient_value" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="8">
-                  <el-form-item label="L1 质控均值 x̄" label-width="150px">
+              </el-row>
+
+              <div style="font-size:12px;color:#606266;font-weight:600;margin:10px 0 4px">室内质控水平（L1 必填；有第二水平再填 L2）</div>
+              <el-row :gutter="16">
+                <el-col :span="6">
+                  <el-form-item label="L1 均值 x̄" label-position="top" label-width="0">
                     <el-input-number v-model="form.l1_mean" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="8">
-                  <el-form-item label="L1 质控 SD（=u_rep）" label-width="110px">
+                <el-col :span="6">
+                  <el-form-item label="L1 标准差 SD（=u_rep）" label-position="top" label-width="0">
                     <el-input-number v-model="form.l1_sd" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
-              </el-row>
-              <el-row :gutter="16">
-                <el-col :span="8">
-                  <el-form-item label="L1 质控次数 n" label-width="130px">
+                <el-col :span="6">
+                  <el-form-item label="L1 测试数 n" label-position="top" label-width="0">
                     <el-input-number v-model="form.l1_n" :min="0" :controls="false" :precision="0" style="width:100%" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="8">
-                  <el-form-item label="L2 质控均值（可选）" label-width="150px">
+                <el-col :span="6">
+                  <el-form-item label="L2 均值 x̄（可选）" label-position="top" label-width="0">
                     <el-input-number v-model="form.l2_mean" :min="0" :controls="false" :precision="4" style="width:100%" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="8">
-                  <el-form-item label="L2 质控 SD（可选）" label-width="110px">
-                    <el-input-number v-model="form.l2_sd" :min="0" :controls="false" :precision="4" style="width:100%" />
                   </el-form-item>
                 </el-col>
               </el-row>
               <el-row :gutter="16">
-                <el-col :span="8">
-                  <el-form-item label="L2 质控次数 n（可选）" label-width="130px">
+                <el-col :span="6">
+                  <el-form-item label="L2 标准差 SD（可选）" label-position="top" label-width="0">
+                    <el-input-number v-model="form.l2_sd" :min="0" :controls="false" :precision="4" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="6">
+                  <el-form-item label="L2 测试数 n（可选）" label-position="top" label-width="0">
                     <el-input-number v-model="form.l2_n" :min="0" :controls="false" :precision="0" style="width:100%" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="16">
-                  <div class="mode-tip" style="margin-top:4px">
-                    有<b>两个水平质控</b>时 L2 也填 → u<sub>rep</sub> 按<b>合并标准差</b> √[Σs<sub>i</sub>²(n<sub>i</sub>−1) / Σ(n<sub>i</sub>−1)] 计算。
+                <el-col :span="12">
+                  <div class="mode-tip" style="margin-top:22px">
+                    有两个水平时 u<sub>rep</sub> 按<b>合并标准差</b> √[Σs<sub>i</sub>²(n<sub>i</sub>−1) / Σ(n<sub>i</sub>−1)] 计算；
                     建议以<b>接近 cutoff 的弱阳性质控</b>为主（它才代表临界区精密度）。
                   </div>
                 </el-col>
