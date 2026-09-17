@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, RedirectResponse, Response, Streamin
 from sqlalchemy.orm import Session
 from sqlalchemy import case, func, text
 from sqlalchemy.orm import defer
+import json
 import re
 
 from ...core.crud_base import paginate, write_audit
@@ -167,7 +168,7 @@ def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_curr
             mdocs = it.get("mdoc_ids_str", "")
             if mdocs:
                 try:
-                    mdoc_list = json.loads(mdocs)
+                    mdoc_list = list(mdocs) if isinstance(mdocs, (list, tuple)) else json.loads(mdocs)
                     if isinstance(mdoc_list, list) and did in mdoc_list:
                         linked_projects.append(it["oname"])
                         if best is None:
