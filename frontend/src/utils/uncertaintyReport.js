@@ -158,16 +158,98 @@ ${targetBias > 0 ? `<p><b>质量目标：</b>目标允许总误差 TEa（来源�
 </body></html>`
 }
 
+export function buildQualitativeReport(p) {
+  const cutoff = Number(p.cutoff || 0)
+  const uRep = Number(p.u_rw || 0)
+  const uCal = Number(p.ucal_abs || 0)
+  const uC = Number(p.u_c || 0)
+  const uExt = Number(p.u_ext_abs || p.u_extended || 0)
+  const gl = Number(p.gray_low || 0), gh = Number(p.gray_high || 0)
+  const r = Number(p.patient_value || 0)
+  const lr = Number(p.lr_value || 0)
+  const lrl = p.lr_level || ''
+  const inGray = r > 0 && r >= gl && r <= gh
+  const method = p.project_method || p.instrument || '该检测方法'
+  const sample = p.sample_type || '血清'
+  const projName = p.project_name || ''
+  const pooled = (p.u_rep_mode || 'l1_only') === 'pooled'
+  // 质控明细行
+  const lvRows = []
+  ;[['L1', 'l1_mean', 'l1_sd', 'l1_n'], ['L2', 'l2_mean', 'l2_sd', 'l2_n']].forEach(([nm, mk, sk, nk]) => {
+    const n = Number(p[nk] || 0), sd = Number(p[sk] || 0)
+    if (n >= 2 && sd > 0) {
+      lvRows.push(`<tr><td>${nm}</td><td>${Number(p[mk] || 0).toFixed(2)}</td><td>${sd.toFixed(4)}</td><td>${n}</td></tr>`)
+    }
+  })
+  const lvHtml = lvRows.length ? lvRows.join('') : '<tr><td>L1</td><td>—</td><td>—</td><td>—</td></tr>'
+  const ucalNote = uCal === 0
+    ? `<div class="note"><b>关于 u<sub>cal</sub> 的处理：</b>厂家未提供检测器/校准品的不确定度信息。依据 CNAS-CL01-G003 6.3（无法严格评定时可基于理论原理与实践经验合理评定），本评定以室内质控的<b>期间精密度 u<sub>rep</sub> 作为主要分量</b>——长期（≥6 个月）室内质控的标准差已包含日常校准、试剂批号更换等变动引入的影响；故未单独计入 u<sub>cal</sub>。提示：该处理使 U 相对保守偏小，临界区判读宜结合复检规则使用。</div>`
+    : `<p>u<sub>cal</sub> 来源：${esc(p.ucal_source || '厂家证书（U÷k）')}</p>`
+  const conclusionText = inGray
+    ? `测值 ${r.toFixed(2)} S/CO 落在灰区（${gl.toFixed(4)} ~ ${gh.toFixed(4)}），结果不能判定，建议复检或采用确认试验。`
+    : (r > 0
+        ? `测值 ${r.toFixed(2)} S/CO 的似然比 LR = ${lr.toFixed(2)}，为<b>${esc(lrl)}</b>，该定性判读成立。`
+        : '未录入待判读信号值。评定结果可用于建立本项目的灰区（LR&lt;10 区间）。')
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>定性项目测量不确定度评定报告 - ${esc(projName)}</title><style>${reportStyle()}</style></head><body>
+<h1>民航总医院检验科生化免疫组</h1>
+<h1>${esc(projName)} 定性项目测量不确定度评定报告</h1>
+<table class="info-table">
+<tr><td><b>表格编号</b></td><td>BG-SM-CZ-072</td><td><b>版本号</b></td><td>01</td></tr>
+<tr><td><b>项目名称</b></td><td>${esc(projName)}</td><td><b>测量方法</b></td><td>${esc(method)}</td></tr>
+<tr><td><b>标本类型</b></td><td>${esc(sample)}</td><td><b>测量单位</b></td><td>S/CO（信号值/阈值比）</td></tr>
+<tr><td><b>试剂</b></td><td>${esc(p.reagent || '-')}</td><td><b>校准品</b></td><td>${esc(p.calibrator || '-')}</td></tr>
+<tr><td><b>判定阈值 cutoff</b></td><td>${cutoff.toFixed(2)} S/CO</td><td><b>数据周期</b></td><td>${p.cycle_months || 6} 个月室内质控</td></tr>
+<tr><td><b>评定人</b></td><td>${esc(p.prepared_by || '金子铮')}</td><td><b>审核人</b></td><td>${esc(p.reviewed_by || '杨静')}</td></tr>
+<tr><td><b>评定日期</b></td><td colspan="3">${esc(p.eval_date || '-')}</td></tr>
+</table>
+<h2>1. 定义被测量</h2>
+<p>本项目的定性结果（阳性/阴性）由仪器输出信号 <b>S/CO</b>（信号值/阈值比，亦称 COI）与判定阈值 <b>cutoff = ${cutoff.toFixed(2)} S/CO</b> 比较得出。因此本评定以<b>仪器输出信号 S/CO 的量值</b>为被测量，其测量不确定度以<b>绝对单位（S/CO）</b>表示。</p>
+<p>依据 ISO 15189:2022 条款 7.3.4 f)：当定性检验结果基于定量输出数据并按阈值判定为阳性或阴性时，应用有代表性的阳性和阴性样品估计输出量值的测量不确定度；CNAS-CL01-G003 6.2 规定，对阴性/阳性等非数值结果宜采用其他方法评估测量不确定度，例如<b>假阳性或假阴性的概率</b>。故本报告采用<b>绝对不确定度 + 似然比（LR）</b>判读，不使用允许总误差（TEa）。</p>
+<h2>2. 不精密度引入测量不确定度分量 u<sub>rep</sub></h2>
+<p>数据来源：室内质控（IQC）信号值，覆盖 ${p.cycle_months || 6} 个月，以期间精密度评定。</p>
+<table class="data-table"><tr><th>水平</th><th>质控均值 x̄ (S/CO)</th><th>标准差 SD (S/CO)</th><th>测试数 n</th></tr>${lvHtml}</table>
+<p>u<sub>rep</sub>（${pooled ? '合并标准差，L1+L2' : '取自 L1（接近 cutoff 的弱阳性质控）'}）= <b>${uRep.toFixed(4)} S/CO</b></p>
+<div class="note">说明：为保证对临界区（cutoff 附近）的代表性，宜以<b>接近 cutoff 的弱阳性质控</b>为主要水平；合并高值水平会因其 SD 较大而<b>削弱临界区判读力</b>，故定性项目推荐只采用弱阳性水平。</div>
+<h2>3. 校准/检测器引入测量不确定度分量 u<sub>cal</sub></h2>
+<p>u<sub>cal</sub> = <b>${uCal.toFixed(4)} S/CO</b>（来源：${esc(p.ucal_source || '厂家')}）</p>
+${ucalNote}
+<h2>4. 计算合成标准不确定度</h2>
+<p>u<sub>c</sub> = √(u<sub>rep</sub>² + u<sub>cal</sub>²) = √(${uRep.toFixed(4)}² + ${uCal.toFixed(4)}²) = <b>${uC.toFixed(4)} S/CO</b></p>
+<h2>5. 计算扩展不确定度</h2>
+<p>U = k × u<sub>c</sub> = 2 × ${uC.toFixed(4)} = <strong>${uExt.toFixed(4)} S/CO</strong>（k=2，包含概率 P≈95%）</p>
+<h2>6. 判定阈值附近的判读（灰区与似然比）</h2>
+<p>以似然比 LR=10（"中等支持"下限）为界，<b>灰区</b>（LR&lt;10，无法判定的信号区间）为 <b>${gl.toFixed(4)} ~ ${gh.toFixed(4)} S/CO</b>。当测得信号落于该区间时，阳性与阴性判读的似然比均不足以支持结论，应复检或采用替代/确认方法。</p>
+<table class="data-table"><tr><th>待判读信号值 r (S/CO)</th><th>似然比 LR</th><th>支持程度</th><th>是否落在灰区</th></tr>
+<tr><td>${r > 0 ? r.toFixed(2) : '—'}</td><td>${r > 0 ? lr.toFixed(2) : '—'}</td><td>${esc(lrl) || '—'}</td><td>${inGray ? '是' : '否'}</td></tr></table>
+<div class="note">注：LR = 真阳性率 / 假阴性率，按正态分布由 z=(cutoff−r)/u<sub>c</sub> 计算：r≥cutoff 时 TPR=1−Φ(z)、FNR=Φ(z)，LR=TPR/FNR；r&lt;cutoff 时以 TNR/FPR 表示。LR 越大对相应定性结论的支持越强（1–10 微弱、10–100 中等、100–1000 中等偏强、1000–10⁴ 强烈、10⁴–10⁶ 非常强烈、&gt;10⁶ 极强）。</div>
+<h2>7. 结论</h2>
+<p>${conclusionText}</p>
+<div class="sign"><div>评定人签字：____________</div><div>审核人签字：____________</div></div>
+</body></html>`
+}
+
+
 export function buildSummaryReport(list) {
   const rows = list.map((p, i) => {
+    const isQ = p.mode === 'qualitative'
+    const tag = isQ
+      ? ' <span style="color:#67c23a;font-size:11px">[定性]</span>'
+      : (p.mode === 'multi' ? ' <span style="color:#e6a23c;font-size:11px">[多系统]</span>' : '')
+    const uTxt = isQ
+      ? `${Number(p.u_ext_abs ?? p.u_extended ?? 0).toFixed(4)} S/CO`
+      : `${Number(p.u_extended || 0).toFixed(2)}%`
+    const tgtTxt = isQ ? '—（不适用）' : `${Number(p.target_bias || 0).toFixed(2)}%`
+    const judge = isQ
+      ? (p.passed ? '支持判读' : '落灰区')
+      : (p.passed ? '符合' : '未达标')
     return `<tr>
     <td>${i + 1}</td>
-    <td>${esc(p.project_name)}${p.mode === 'multi' ? ' <span style="color:#e6a23c;font-size:11px">[多系统]</span>' : ''}</td>
+    <td>${esc(p.project_name)}${tag}</td>
     <td>${esc(p.project_method || p.instrument || '-')}</td>
-    <td>${(p.u_extended || 0).toFixed(2)}</td>
-    <td>${(p.target_bias || 0).toFixed(2)}</td>
+    <td>${uTxt}</td>
+    <td>${tgtTxt}</td>
     <td>${esc(p.target_bias_source || '-')}</td>
-    <td>${p.passed ? '符合' : '未达标'}</td>
+    <td>${judge}</td>
     <td>${esc(p.eval_date || '-')}</td>
     <td>${esc(p.prepared_by || '')}</td>
   </tr>`}).join('')
@@ -175,8 +257,9 @@ export function buildSummaryReport(list) {
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>测量不确定度评定汇总表</h1>
 <p>表格编号：BG-SM-GL-020 | 编制日期：${todayStr()}</p>
-<table><tr><th>序号</th><th>项目</th><th>测量方法</th><th>U(%)</th><th>允许总误差 TEa(%)</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>评定人</th></tr>${rows}</table>
-<p style="margin-top:14px">质量目标：卫健委 EQA 允许总误差（NCCL），U &lt; TEa 判为符合要求。</p>
+<table><tr><th>序号</th><th>项目</th><th>测量方法</th><th>U</th><th>目标</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>评定人</th></tr>${rows}</table>
+<p style="margin-top:14px"><b>判定说明：</b>定量项目 U 以相对值(%)表示，判定标准 U &lt; TEa（允许总误差）；定性项目 U 以绝对值(S/CO)表示，按判定阈值附近的<b>灰区（LR&lt;10）与似然比</b>判读，不适用 TEa。</p>
+<p>质量目标：卫健委 EQA 允许总误差（NCCL），U &lt; TEa 判为符合要求。</p>
 <div class="sign"><div>评定人签字：____________</div><div>审核人签字：____________</div></div>
 </body></html>`
 }
@@ -185,7 +268,9 @@ export function buildAllReports(list) {
   // 把多条「完整评定报告」拼成一个连续 HTML，每条另起一页（A4），
   // 便于一次性打印/另存为单个 PDF 归档。
   const parts = (list || []).map((p) => {
-    const html = p.mode === 'multi' ? buildMultiReport(p) : buildSingleReport(p)
+    const html = p.mode === 'multi'
+      ? buildMultiReport(p)
+      : (p.mode === 'qualitative' ? buildQualitativeReport(p) : buildSingleReport(p))
     const m = /<body>([\s\S]*?)<\/body>/.exec(html)
     return m ? m[1] : ''
   }).filter(Boolean)

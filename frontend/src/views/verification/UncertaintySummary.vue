@@ -32,25 +32,36 @@
     <!-- 汇总列表（所有已生成报告） -->
     <el-table :data="paged" stripe border class="sum-table" v-loading="loading">
       <el-table-column type="index" label="序号" width="60" align="center" :index="indexMethod" />
-      <el-table-column prop="project_name" label="项目名称" min-width="160" align="center">
+      <el-table-column prop="project_name" label="项目名称" min-width="170" align="center">
         <template #default="{ row }">
           {{ row.project_name }}
-          <el-tag v-if="row.mode === 'multi'" size="small" type="warning" style="margin-left:4px">多系统</el-tag>
+          <el-tag v-if="row.mode === 'qualitative'" size="small" type="success" style="margin-left:4px">定性</el-tag>
+          <el-tag v-else-if="row.mode === 'multi'" size="small" type="warning" style="margin-left:4px">多系统</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="测量方法" min-width="140" align="center">
+      <el-table-column label="测量方法" min-width="130" align="center">
         <template #default="{ row }">{{ row.project_method || row.instrument || '-' }}</template>
       </el-table-column>
-      <el-table-column label="U(%)" width="90" align="center">
-        <template #default="{ row }">{{ fmtPct(row.u_extended) }}</template>
-      </el-table-column>
-      <el-table-column label="目标偏倚(%)" width="110" align="center">
-        <template #default="{ row }">{{ fmtPct(row.target_bias) }}</template>
-      </el-table-column>
-      <el-table-column prop="target_bias_source" label="目标来源" min-width="160" align="center" show-overflow-tooltip />
-      <el-table-column label="判定" width="90" align="center">
+      <el-table-column label="U" width="115" align="center">
         <template #default="{ row }">
-          <span :class="row.passed ? 'judge-ok' : 'judge-fail'">{{ row.passed ? '符合' : '未达标' }}</span>
+          <span v-if="row.mode === 'qualitative'">{{ fmtAbs(row.u_ext_abs ?? row.u_extended) }} S/CO</span>
+          <span v-else>{{ fmtPct(row.u_extended) }}%</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="目标" width="115" align="center">
+        <template #default="{ row }">
+          <span v-if="row.mode === 'qualitative'" style="color:#909399">—（不适用）</span>
+          <span v-else>{{ fmtPct(row.target_bias) }}%</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="target_bias_source" label="目标来源" min-width="150" align="center" show-overflow-tooltip />
+      <el-table-column label="判定" width="105" align="center">
+        <template #default="{ row }">
+          <span :class="row.passed ? 'judge-ok' : 'judge-fail'">{{
+            row.mode === 'qualitative'
+              ? (row.passed ? '支持判读' : '落灰区')
+              : (row.passed ? '符合' : '未达标')
+          }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="eval_date" label="评定日期" width="120" align="center" />
@@ -92,6 +103,7 @@ import {
   todayStr,
   buildSingleReport,
   buildMultiReport,
+  buildQualitativeReport,
   buildSummaryReport,
   buildAllReports,
   printOrSavePdf,
@@ -131,6 +143,12 @@ function fmtPct(v) {
   return n ? n.toFixed(2) : '0.00'
 }
 
+// 定性项目：U 为绝对量（S/CO），保留 4 位小数
+function fmtAbs(v) {
+  const n = Number(v || 0)
+  return n ? n.toFixed(4) : '0.0000'
+}
+
 function onSearch() {
   page.value = 1
 }
@@ -149,7 +167,9 @@ async function loadProjects() {
 
 function previewOne(p) {
   previewTitle.value = `测量不确定度评定报告 - ${p.project_name}`
-  previewHtml.value = p.mode === 'multi' ? buildMultiReport(p) : buildSingleReport(p)
+  previewHtml.value = p.mode === 'multi'
+    ? buildMultiReport(p)
+    : (p.mode === 'qualitative' ? buildQualitativeReport(p) : buildSingleReport(p))
   previewOpen.value = true
 }
 
@@ -161,7 +181,9 @@ function previewSummary() {
 
 function downloadOne(p) {
   printOrSavePdf(
-    p.mode === 'multi' ? buildMultiReport(p) : buildSingleReport(p),
+    p.mode === 'multi'
+      ? buildMultiReport(p)
+      : (p.mode === 'qualitative' ? buildQualitativeReport(p) : buildSingleReport(p)),
     `测量不确定度评定报告_${p.project_name || '项目'}_${todayStr()}`,
   )
 }
