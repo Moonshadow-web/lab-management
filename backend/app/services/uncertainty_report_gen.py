@@ -320,39 +320,69 @@ def _report_qualitative_html(v: dict) -> str:
         (f"测值 {_fmt(r)} S/CO 的似然比 LR = {_fmt(lr)}，为<b>{lrl}</b>，该定性判读成立。" if r else
          "未录入待判读信号值。评定结果可用于建立本项目的灰区（LR&lt;10 区间）。")
     )
+    # 质控水平明细行（L1 必填、L2 可选）
+    lv_rows = ""
+    for _nm, _mk, _sk, _nk in (("L1", "l1_mean", "l1_sd", "l1_n"),
+                               ("L2", "l2_mean", "l2_sd", "l2_n")):
+        try:
+            _n = int(v.get(_nk) or 0)
+            _sd = float(v.get(_sk) or 0)
+        except (TypeError, ValueError):
+            _n, _sd = 0, 0.0
+        if _n >= 2 and _sd > 0:
+            lv_rows += f'<tr><td>{_nm}</td><td>{_fmt(v.get(_mk))}</td><td>{_fmt(_sd)}</td><td>{_n}</td></tr>'
+    if not lv_rows:
+        lv_rows = '<tr><td>L1</td><td>—</td><td>—</td><td>—</td></tr>'
     return f"""<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
 <title>{proj} 定性项目测量不确定度评定报告</title><style>{_style()}</style></head><body>
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>{proj} 定性项目测量不确定度评定报告</h1>
 <table class="info-table">
 <tr><td>项目名称</td><td>{proj}</td><td>测量方法</td><td>{method}</td></tr>
-<tr><td>测量单位</td><td>S/CO（信号值/阈值比）</td><td>判定阈值 cutoff</td><td>{cutoff} S/CO</td></tr>
+<tr><td>标本类型</td><td>{_esc(v.get('sample_type') or '血清')}</td><td>测量单位</td><td>S/CO（信号值/阈值比）</td></tr>
+<tr><td>检测系统/仪器</td><td>{_esc(v.get('instrument') or '—')}</td><td>判定阈值 cutoff</td><td>{cutoff} S/CO</td></tr>
+<tr><td>试剂</td><td colspan="3">{_esc(v.get('reagent') or '—')}</td></tr>
+<tr><td>校准品</td><td colspan="3">{_esc(v.get('calibrator') or '—')}</td></tr>
 <tr><td>评定人</td><td>{_esc(v.get('prepared_by'))}</td><td>审核人</td><td>{_esc(v.get('reviewed_by'))}</td></tr>
 <tr><td>评定日期</td><td>{_esc(v.get('eval_date') or today)}</td><td>数据周期</td><td>{_esc(v.get('cycle_months')) or 6} 个月室内质控</td></tr>
 </table>
 
-<h2>1. 评定依据</h2>
-<p>ISO 15189:2022 条款 7.3.4 f)：当定性检验结果基于定量输出数据并按阈值判定为阳性/阴性时，应估计输出量值的测量不确定度；
-CNAS-CL01-G003 6.2：对阴性/阳性等非数值结果，宜采用其他方法评估测量不确定度，例如<b>假阳性或假阴性的概率</b>。
-本报告以仪器输出信号（S/CO）为被测量，采用<b>绝对不确定度 + 似然比</b>判读。</p>
+<h2>1. 定义被测量</h2>
+<p>本项目的定性结果（阳性/阴性）由仪器输出信号 <b>S/CO</b>（信号值/阈值比，亦称 COI）与判定阈值
+<b>cutoff = {cutoff} S/CO</b> 比较得出。因此本评定以<b>仪器输出信号 S/CO 的量值</b>为被测量，
+其测量不确定度以<b>绝对单位（S/CO）</b>表示。</p>
+<p>依据 ISO 15189:2022 条款 7.3.4 f)：当定性检验结果基于定量输出数据并按阈值判定为阳性或阴性时，
+应用有代表性的阳性和阴性样品估计输出量值的测量不确定度；CNAS-CL01-G003 6.2 规定，对阴性/阳性等
+非数值结果宜采用其他方法评估测量不确定度，例如<b>假阳性或假阴性的概率</b>。故本报告采用
+<b>绝对不确定度 + 似然比（LR）</b>判读，不使用允许总误差（TEa）。</p>
 
-<h2>2. 不确定度分量（绝对单位：S/CO）</h2>
-<p>u<sub>rep</sub>（室内质控重复性，A类，由质控信号值标准差给出）= <b>{u_rep}</b> S/CO</p>
-<p>u<sub>cal</sub>（检测器/校准品标准不确定度，B类）= <b>{u_cal}</b> S/CO</p>
+<h2>2. 不精密度引入测量不确定度分量 u<sub>rep</sub></h2>
+<p>数据来源：室内质控（IQC）信号值，覆盖 {_esc(v.get('cycle_months')) or 6} 个月，以期间精密度评定。</p>
+<table class="data-table">
+<tr><th>水平</th><th>质控均值 x̄ (S/CO)</th><th>标准差 SD (S/CO)</th><th>测试数 n</th></tr>
+{lv_rows}
+</table>
+<p>u<sub>rep</sub>（合并标准差）= √[Σs<sub>i</sub>²(n<sub>i</sub>−1) / Σ(n<sub>i</sub>−1)] = <b>{u_rep} S/CO</b></p>
+<p class="note">说明：为保证对临界区（cutoff 附近）的代表性，宜以<b>接近 cutoff 的弱阳性质控</b>为主要水平；若仅单一水平质控，u<sub>rep</sub> 即该水平的标准差。</p>
+
+<h2>3. 校准/检测器引入测量不确定度分量 u<sub>cal</sub></h2>
+<p>u<sub>cal</sub> = <b>{u_cal} S/CO</b>　（来源：{_esc(v.get('ucal_source') or '厂家')}）</p>
 {ucal_note}
 
-<h2>3. 合成标准不确定度与扩展不确定度</h2>
+<h2>4. 计算合成标准不确定度</h2>
 <p>u<sub>c</sub> = √(u<sub>rep</sub>² + u<sub>cal</sub>²) = √({u_rep}² + {u_cal}²) = <b>{u_c} S/CO</b></p>
+
+<h2>5. 计算扩展不确定度</h2>
 <p>U = k × u<sub>c</sub> = 2 × {u_c} = <span class="res">{u_ext} S/CO</span>（k=2，包含概率 P≈95%）</p>
 
-<h2>4. 阈值附近的判读（灰区）</h2>
+<h2>6. 判定阈值附近的判读（灰区与似然比）</h2>
 <p>本方法判定阈值 cutoff = {cutoff} S/CO。以似然比 LR=10（"中等支持"下限）为界，
 灰区（LR&lt;10，无法判定）为 <b>{gl} ~ {gh} S/CO</b>。</p>
 <p>说明：当测得信号落在该区间内，阳性与阴性判读的似然比均不足以支持结论，
 应复检或采用替代/确认方法。</p>
 
-<h2>5. 判读结果</h2>
-<p><b>结论：</b>{conclusion}</p>
+<h2>7. 结论</h2>
+<p>{conclusion}</p>
 <table class="data-table">
 <tr><th>待判读信号值 r (S/CO)</th><th>似然比 LR</th><th>支持程度</th><th>是否落在灰区</th></tr>
 <tr><td>{_fmt(r)}</td><td>{_fmt(lr)}</td><td>{lrl or '—'}</td><td>{'是' if in_gray else '否'}</td></tr>
