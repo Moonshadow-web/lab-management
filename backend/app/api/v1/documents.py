@@ -100,7 +100,10 @@ def _doc_visible(doc, group: str) -> bool:
 @router.get("/project-manuals")
 def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """返回全部「项目说明书」文档，并归一化匹配到项目查询(test_items)，
-    供项目卡片点击预览。每项含 linked_project（关联项目名）与 brand（品牌）。"""
+    供项目卡片点击预览。每项含 linked_projects（关联项目名列表，支持一份说明书
+    挂多个项目）、linked_project（列表首项，兼容旧调用方）与 brand（品牌）。
+    关联优先级：① manual_doc_ids 显式关联（可多项目，全部采纳）；② 标题核心名
+    与项目名/别名精确匹配；③ 长度比例受限的子串匹配（仅取唯一最佳，避免误挂）。"""
     items = db.query(TestItem.id, TestItem.name, TestItem.aliases, TestItem.brand, TestItem.manual_doc_ids).all()
     index = []
     for _tid, name, aliases, brand, manual_doc_ids in items:
@@ -118,25 +121,27 @@ def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_curr
 
     docs = (
         db.query(Document.id, Document.title, Document.original_filename)
-        .filter(Document.category == "项目说明书")
+        .filter(Document.category.in_(["项目说明书", "溯源性文件"]))
         .all()
     )
     out = []
     for did, title, fn in docs:
         core = _manual_core(title)
         best = None
-        # 0) 优先通过 manual_doc_ids 显式关联（直接按 doc id 匹配）
+        linked_projects = []
+        # 0) 优先通过 manual_doc_ids 显式关联（直接按 doc id 匹配，命中多个则全部采纳）
         for it in index:
             mdocs = it.get("mdoc_ids_str", "")
             if mdocs:
                 try:
                     mdoc_list = json.loads(mdocs)
-                    if did in mdoc_list:
-                        best = it
-                        break
+                    if isinstance(mdoc_list, list) and did in mdoc_list:
+                        linked_projects.append(it["oname"])
+                        if best is None:
+                            best = it
                 except Exception:
                     pass
-        if core and not best:
+        if not linked_projects and core:
             core_nh = core.replace("-", "")
             # 1) 精确命中 名称/别名（含拆分片段）：如「磷」「pct」「高敏肌钙蛋白I」
             for it in index:
@@ -159,7 +164,9 @@ def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_curr
                             break
                     if best:
                         break
-        linked = best["oname"] if best else None
+            if best:
+                linked_projects = [best["oname"]]
+        linked = linked_projects[0] if linked_projects else None
         linked_brand = best["brand"] if best else ""
         brand = _brand_heuristic(title, fn, linked_brand)
         ext = (fn or title or "").split(".")[-1].lower()
@@ -168,6 +175,7 @@ def project_manuals(db: Session = Depends(get_db), user: User = Depends(get_curr
             "title": title,
             "brand": brand,
             "linked_project": linked,
+            "linked_projects": linked_projects,
             "ext": ext,
             "is_pdf": ext == "pdf",
         })

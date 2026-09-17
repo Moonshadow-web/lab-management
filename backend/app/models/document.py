@@ -7,7 +7,7 @@ from ..core.database import Base
 
 
 # 文件分类枚举（5 类）
-DOC_CATEGORIES = ["通用SOP", "项目SOP", "仪器SOP", "记录表格", "项目说明书"]
+DOC_CATEGORIES = ["通用SOP", "项目SOP", "仪器SOP", "记录表格", "项目说明书", "溯源性文件"]
 DOC_STATUS = ["草稿", "生效", "作废"]
 
 

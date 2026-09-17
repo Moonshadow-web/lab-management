@@ -257,7 +257,7 @@ import { useAuthStore } from '../../store/auth'
 
 const crud = ref(null)
 const auth = useAuthStore()
-const categories = ['通用SOP', '项目SOP', '仪器SOP', '记录表格', '项目说明书']
+const categories = ['通用SOP', '项目SOP', '仪器SOP', '记录表格', '项目说明书', '溯源性文件']
 const statuses = ['草稿', '生效', '作废']
 
 const docExtraParams = reactive({ category: '', hide_invalid: false })

@@ -471,8 +471,13 @@ async function fetchProjectManuals() {
     const list = await listProjectManuals()
     const m = {}
     for (const d of list) {
-      if (!d.linked_project) continue
-      ;(m[d.linked_project] = m[d.linked_project] || []).push(d)
+      // 兼容：新版 linked_projects（可多项目），旧版仅 linked_project
+      const lp = (Array.isArray(d.linked_projects) && d.linked_projects.length)
+        ? d.linked_projects
+        : (d.linked_project ? [d.linked_project] : [])
+      for (const p of lp) {
+        ;(m[p] = m[p] || []).push(d)
+      }
     }
     manualMap.value = m
   } catch (e) {
