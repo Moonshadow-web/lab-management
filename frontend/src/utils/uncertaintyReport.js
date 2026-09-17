@@ -238,7 +238,11 @@ export function buildSummaryReport(list) {
     const uTxt = isQ
       ? `${Number(p.u_ext_abs ?? p.u_extended ?? 0).toFixed(4)} S/CO`
       : `${Number(p.u_extended || 0).toFixed(2)}%`
-    const tgtTxt = isQ ? '—（不适用）' : `${Number(p.target_bias || 0).toFixed(2)}%`
+    // 定性项目的"目标"即灰区（LR<10 不能判定的信号区间）
+    const gl = Number(p.gray_low || 0), gh = Number(p.gray_high || 0)
+    const tgtTxt = isQ
+      ? ((gl || gh) ? `${gl.toFixed(4)} ~ ${gh.toFixed(4)} S/CO` : '—（未算）')
+      : `${Number(p.target_bias || 0).toFixed(2)}%`
     const judge = isQ
       ? (p.passed ? '支持判读' : '落灰区')
       : (p.passed ? '符合' : '未达标')
@@ -257,8 +261,8 @@ export function buildSummaryReport(list) {
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>测量不确定度评定汇总表</h1>
 <p>表格编号：BG-SM-GL-020 | 编制日期：${todayStr()}</p>
-<table><tr><th>序号</th><th>项目</th><th>测量方法</th><th>U</th><th>目标</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>评定人</th></tr>${rows}</table>
-<p style="margin-top:14px"><b>判定说明：</b>定量项目 U 以相对值(%)表示，判定标准 U &lt; TEa（允许总误差）；定性项目 U 以绝对值(S/CO)表示，按判定阈值附近的<b>灰区（LR&lt;10）与似然比</b>判读，不适用 TEa。</p>
+<table><tr><th>序号</th><th>项目</th><th>测量方法</th><th>U</th><th>目标 / 灰区</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>评定人</th></tr>${rows}</table>
+<p style="margin-top:14px"><b>判定说明：</b>定量项目 U 以相对值(%)表示，判定标准 U &lt; TEa（允许总误差）；定性项目 U 以绝对值(S/CO)表示，<b>「目标 / 灰区」列给出灰区区间</b>（LR&lt;10 不能判定的信号范围），按似然比判读，不适用 TEa。</p>
 <p>质量目标：卫健委 EQA 允许总误差（NCCL），U &lt; TEa 判为符合要求。</p>
 <div class="sign"><div>评定人签字：____________</div><div>审核人签字：____________</div></div>
 </body></html>`

@@ -375,9 +375,10 @@ def _compute_qualitative(payload: dict) -> dict:
     payload["target_bias_source"] = "定性项目（阈值+似然比判读）"
 
     # 灰区：LR=10 边界对应 z = ±1.3353（Φ⁻¹(1/11)）
+    # 下限截断为 0（S/CO 信号值不可能为负；SD 较大时 cutoff−1.3353u_c 可能为负）
     Z10 = 1.3353
     if cutoff > 0 and u_c > 0:
-        payload["gray_low"] = round(cutoff - Z10 * u_c, 4)
+        payload["gray_low"] = round(max(0.0, cutoff - Z10 * u_c), 4)
         payload["gray_high"] = round(cutoff + Z10 * u_c, 4)
     else:
         payload["gray_low"] = 0.0

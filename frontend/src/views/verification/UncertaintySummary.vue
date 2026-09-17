@@ -48,9 +48,14 @@
           <span v-else>{{ fmtPct(row.u_extended) }}%</span>
         </template>
       </el-table-column>
-      <el-table-column label="目标" width="115" align="center">
+      <el-table-column label="目标 / 灰区" width="160" align="center">
         <template #default="{ row }">
-          <span v-if="row.mode === 'qualitative'" style="color:#909399">—（不适用）</span>
+          <span v-if="row.mode === 'qualitative'">
+            <span v-if="row.gray_low || row.gray_high" style="color:#606266">
+              {{ fmtAbs(row.gray_low) }} ~ {{ fmtAbs(row.gray_high) }} S/CO
+            </span>
+            <span v-else style="color:#909399">—（未算）</span>
+          </span>
           <span v-else>{{ fmtPct(row.target_bias) }}%</span>
         </template>
       </el-table-column>

@@ -413,10 +413,11 @@ def _summary_html(rows):
         v = p if isinstance(p, dict) else {c.name: getattr(p, c.name) for c in p.__table__.columns}
         is_q = (v.get("mode") or "") == "qualitative"
         if is_q:
-            # 定性项目：U 为绝对值(S/CO)，不适用 TEa，按灰区+似然比判读
+            # 定性项目：U 为绝对值(S/CO)，"目标"即**灰区**（LR<10 不能判定的信号区间）
             typ = "定性"
             u_txt = f'{_fmt(v.get("u_ext_abs") or v.get("u_extended"))} S/CO'
-            tgt = "—（不适用）"
+            _gl, _gh = v.get("gray_low") or 0, v.get("gray_high") or 0
+            tgt = f'{_fmt(_gl)} ~ {_fmt(_gh)} S/CO' if (_gl or _gh) else "—（未算）"
             src = _esc(v.get("target_bias_source") or "定性项目（阈值+似然比）")
             judge = "支持判读" if v.get("passed") else "落灰区·需复核"
         else:
@@ -437,10 +438,11 @@ def _summary_html(rows):
         f'<h1>民航总医院检验科生化免疫组</h1><h1>测量不确定度评定汇总表</h1>'
         f'<p>表格编号：BG-SM-GL-020 | 编制日期：{datetime.now().strftime("%Y年%m月%d日")}</p>'
         f'<table><tr><th>序号</th><th>项目名称</th><th>类型</th><th>测量方法</th>'
-        f'<th>U</th><th>目标</th><th>目标来源</th><th>判定</th><th>评定日期</th></tr>'
+        f'<th>U</th><th>目标 / 灰区</th><th>目标来源</th><th>判定</th><th>评定日期</th></tr>'
         f'{"".join(items)}</table>'
         f'<p style="margin-top:14px"><b>判定说明：</b>定量项目 U 以相对值(%)表示，判定标准 U &lt; TEa（允许总误差）；'
-        f'定性项目 U 以绝对值(S/CO)表示，按判定阈值附近的<b>灰区（LR&lt;10）与似然比</b>判读，不适用 TEa。</p>'
+        f'定性项目 U 以绝对值(S/CO)表示，<b>「目标 / 灰区」列给出灰区区间</b>（LR&lt;10 不能判定的信号范围），'
+        f'按似然比判读，不适用 TEa。</p>'
         f'<p>目标偏倚优先级：WS/T 403-2024（行标） &gt; 2025 北京市互认 &gt; 1/2 × NCCL EQA 允许总误差。</p>'
         f'</body></html>'
     )
