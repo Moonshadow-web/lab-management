@@ -780,7 +780,7 @@ function printRepairSummary909() {
   const html = `
   <style>@page { size: A4 landscape; margin: 8mm; }</style>
   <h2 style="text-align:center;margin:0 0 6px;font-size:16px;">仪器维修记录表</h2>
-  <div style="font-size:11px;margin-bottom:4px;">实验室/专业组：检验科生化免疫组　　　　　共 ${(summaryRows.value || []).length} 条</div>
+  <div style="font-size:11px;margin-bottom:4px;">实验室/专业组：检验科${auth.groupName}　　　　　共 ${(summaryRows.value || []).length} 条</div>
   <table style="border-collapse:collapse;width:100%;font-size:9px;">
     <tr>
       <th style="border:1px solid #333;padding:3px;width:3%;">序号</th>
