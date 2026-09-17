@@ -917,8 +917,15 @@ async function save() {
   if (!form.project_name.trim()) { ElMessage.warning('请输入项目名称'); return }
   // 模式数据校验
   if (form.mode === 'single') {
-    if (form.l1_n < 2 || form.l2_n < 2) { ElMessage.warning('L1/L2 测试数 n 必须 ≥ 2（建议 ≥ 6 个月数据）'); return }
-    if (form.l1_mean <= 0 || form.l2_mean <= 0) { ElMessage.warning('请填入 L1/L2 的均值（>0）'); return }
+    // L1 必填；L2/L3 可选 —— 单一水平质控同样支持（定性/单水平项目）
+    if (form.l1_n < 2) { ElMessage.warning('L1 测试数 n 必须 ≥ 2（建议 ≥ 6 个月数据）'); return }
+    if (form.l1_mean <= 0) { ElMessage.warning('请填入 L1 的均值（>0）'); return }
+    if (form.l2_n >= 2 && form.l2_mean <= 0) { ElMessage.warning('已填 L2 测试数，请同时填入 L2 均值（>0）'); return }
+  } else if (form.mode === 'qualitative') {
+    // 定性项目：cutoff 与 L1（可选 L2）必填
+    if (form.cutoff <= 0) { ElMessage.warning('请填入判定阈值 cutoff（>0）'); return }
+    if (form.l1_n < 2 || form.l1_sd <= 0) { ElMessage.warning('请填入 L1 质控的 SD 与测试数 n（n≥2）'); return }
+    if (form.l2_n >= 2 && form.l2_sd <= 0) { ElMessage.warning('已填 L2 测试数，请同时填入 L2 的 SD'); return }
   } else {
     const valid = form.multi_systems.filter(s => s.l1_mean > 0 && s.l2_mean > 0)
     if (valid.length < 2) { ElMessage.warning('多系统模式至少需要 2 个有效测量系统'); return }
