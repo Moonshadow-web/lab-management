@@ -20,6 +20,10 @@ from collections import defaultdict
 H = "http://lab-management-282724-9-1408547492.sh.run.tcloudbase.com"
 SRC = "outputs/shipment_analysis.json"
 
+# 允许用 --src <file> 指定其他分析结果（如多表合并分析）
+if "--src" in sys.argv:
+    SRC = sys.argv[sys.argv.index("--src") + 1]
+
 
 def login():
     data = urllib.parse.urlencode(
@@ -59,33 +63,9 @@ def paged(tok, path, size=200):
     return out
 
 
-METHOD_KW = ("化学发光", "电化学发光", "酶法", "免疫比浊", "凝固法", "发色底物",
-             "胶乳", "比色", "电泳", "层析", "速率法", "底物法", "尿素酶",
-             "己糖激酶", "乳酸脱氢酶法", "磷钼酸盐", "溴甲酚绿", "重氮盐",
-             "NPP", "GPO", "PNP", "MDH", "TPTZ", "Nitroso", "酶循坏", "酶循环",
-             "免疫比浊法", "胶乳增强", "尿酸酶", "胆固醇氧化酶")
-
-
-def norm_name(name: str) -> str:
-    """归一化名称，识别系统目录里同一试剂的重复条目。
-
-    **只去掉「方法学」括号**（如「（化学发光法）」「（酶法）」），
-    保留有区分意义的括号（如质控品的「（540-1）」），避免误合并。
-    """
-    if not name:
-        return ""
-    t = re.split(r"[/／]", str(name))[-1]
-
-    def _strip(m):
-        inner = m.group(1)
-        return "" if any(k.lower() in inner.lower() for k in METHOD_KW) else m.group(0)
-
-    t = re.sub(r"[（(]([^（）()]*)[）)]", _strip, t)
-    t = re.sub(r"[\s　]", "", t).upper()
-    for kw in ("测定试剂盒", "检测试剂盒", "诊断试剂盒", "测定试剂", "检测试剂",
-               "试剂盒", "试剂"):
-        t = t.replace(kw, "")
-    return t.strip()
+# 去重用的归一化函数直接复用多表分析脚本的实现，保证口径一致
+sys.path.insert(0, "scripts")
+from analyze_shipments_multi import norm_name  # noqa: E402
 
 
 def item_code(name: str) -> str:
@@ -103,14 +83,17 @@ def main():
 
     # ── ① 补批号 ──────────────────────────────────────────────
     fill = [x for x in data["fill"] if x.get("stock_id")]
+    # 注意：expiry_date 是 Optional[date]，不能传空字符串（会 422），要转成 None
     ups = [{"stock_id": x["stock_id"], "batch_no": x["batch_no"],
-            "expiry_date": x["expiry"]} for x in fill]
+            "expiry_date": (x["expiry"] or None)} for x in fill]
     print(f"【① 补批号】待补 {len(ups)} 条")
     if ups:
         code, r = post(tok, "/api/v1/reagent/stock/_set-batch",
                        {"updates": ups, "dry_run": not apply_changes})
         print(f"    接口返回 HTTP {code}：count={r.get('count')} merged={r.get('merged')} "
               f"skipped={len(r.get('skipped') or [])}")
+        if code != 200:
+            print("    错误详情:", str(r.get("detail"))[:300])
         for c in (r.get("changes") or [])[:5]:
             print(f"      stock{c['stock_id']} item{c['item_id']}: "
                   f"'{c['old_batch'] or '(空)'}' → '{c['new_batch']}' {c['new_expiry']}")
