@@ -99,11 +99,25 @@ def _core(name: str) -> str:
             s = s[m.end():]
     s = re.sub(r"[（(][^（）()]{0,20}[）)]", "", s)
     s = re.sub(r"[（）()\[\]【】]", "", s)  # 清理未配对/多余括号
+    # 去掉通用后缀：标准库里叫「醛固酮(ALD)」，试剂名却是「醛固酮检测试剂盒」，
+    # 不去后缀就永远匹配不到（此前 23 项免疫项目全军覆没的根因）
+    for kw in ("检测试剂盒", "测定试剂盒", "诊断试剂盒", "检测试剂", "测定试剂",
+               "试剂盒", "试剂"):
+        s = s.replace(kw, "")
+    # 去掉系统名尾部的英文缩写（total P1NP / HBeAg / Anti-HBc 等），否则与标准库名对不上
+    s = re.sub(r"(TOTAL-?P1NP|P1NP|HBEAG|ANTI-?HBS|ANTI-?HBC|ANTI-?HBE|HBSAG|HBCAB|HBSAB)$",
+               "", s, flags=re.I)
     return s.strip() or str(name).strip()
 
 
+_ROMAN = {"Ⅰ": "I", "Ⅱ": "II", "Ⅲ": "III", "Ⅳ": "IV", "Ⅴ": "V", "Ⅵ": "VI"}
+
+
 def _norm(s: str) -> str:
-    return re.sub(r"[\s\-‐—()（）\[\]【】　/]", "", str(s or "")).lower()
+    t = str(s or "")
+    for k, v in _ROMAN.items():
+        t = t.replace(k, v)     # 罗马数字→拉丁字母：总Ⅰ型 ↔ 总I型
+    return re.sub(r"[\s\-‐—()（）\[\]【】　/]", "", t).lower()
 
 
 def _find_qr(db: Session, source: str, names: list) -> Optional[QualityRequirement]:
