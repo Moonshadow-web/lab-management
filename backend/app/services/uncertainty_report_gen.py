@@ -110,7 +110,7 @@ def _report_single_html(v):
 <style>{_style()}</style></head><body>
 <h1>民航总医院检验科生化免疫组</h1>
 <h1>测量不确定度评定报告</h1>
-<h1 class="s">单个测量系统测量不确定度评定范例</h1>
+<h1 class="s">单个测量系统{_esc(v.get('project_method') or '该检测方法')}测量人{_esc(v.get('sample_type') or '血清')}{_esc(v.get('analyte') or v.get('project_name') or '')}测量结果不确定度的评定</h1>
 <table class="info">
 <tr><td><b>表格编号</b></td><td>{REPORT_CODE}</td><td><b>版本号</b></td><td>{REPORT_VERSION}</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">{_esc(v.get('project_name'))}</td></tr>
@@ -184,7 +184,8 @@ def _report_multi_html(v):
         per_sys_rsd_sq.append(u_rw_sys ** 2)
         l1_means.append(m1)
         l2_means.append(m2)
-        rows_sys.append((s.get("name") or "—", n1, m1, sd1, rsd1, m2, sd2, rsd2, u_rw_sys))
+        # 注：须与下方 sys_rows_html 的 13 元组解包保持一致（含可选 L3，未填时为 0）
+        rows_sys.append((s.get("name") or "—", n1, m1, sd1, rsd1, m2, sd2, rsd2, u_rw_sys, n3, m3, sd3, rsd3))
     # 系统内不精密度方差 = 各系统 RSD² 均值
     u2_within = sum(per_sys_rsd_sq) / len(per_sys_rsd_sq) if per_sys_rsd_sq else 0
     # 均值方差（按相对 RSD）
