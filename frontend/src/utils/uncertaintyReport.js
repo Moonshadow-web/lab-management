@@ -198,7 +198,7 @@ export function buildQualitativeReport(p) {
 <tr><td><b>项目名称</b></td><td>${esc(projName)}</td><td><b>测量方法</b></td><td>${esc(method)}</td></tr>
 <tr><td><b>标本类型</b></td><td>${esc(sample)}</td><td><b>测量单位</b></td><td>S/CO（信号值/阈值比）</td></tr>
 <tr><td><b>试剂</b></td><td>${esc(p.reagent || '-')}</td><td><b>校准品</b></td><td>${esc(p.calibrator || '-')}</td></tr>
-<tr><td><b>判定阈值 cutoff</b></td><td>${cutoff.toFixed(2)} S/CO</td><td><b>数据周期</b></td><td>${p.cycle_months || 6} 个月室内质控</td></tr>
+<tr><td><b>判定阈值 cutoff</b></td><td>${cutoff.toFixed(2)} S/CO</td><td><b>评定周期</b></td><td>${p.cycle_months || 6} 个月室内质控</td></tr>
 <tr><td><b>评定人</b></td><td>${esc(p.prepared_by || '金子铮')}</td><td><b>审核人</b></td><td>${esc(p.reviewed_by || '杨静')}</td></tr>
 <tr><td><b>评定日期</b></td><td colspan="3">${esc(p.eval_date || '-')}</td></tr>
 </table>

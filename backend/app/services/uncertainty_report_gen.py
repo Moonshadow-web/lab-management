@@ -345,7 +345,7 @@ def _report_qualitative_html(v: dict) -> str:
 <tr><td>试剂</td><td colspan="3">{_esc(v.get('reagent') or '—')}</td></tr>
 <tr><td>校准品</td><td colspan="3">{_esc(v.get('calibrator') or '—')}</td></tr>
 <tr><td>评定人</td><td>{_esc(v.get('prepared_by'))}</td><td>审核人</td><td>{_esc(v.get('reviewed_by'))}</td></tr>
-<tr><td>评定日期</td><td>{_esc(v.get('eval_date') or today)}</td><td>数据周期</td><td>{_esc(v.get('cycle_months')) or 6} 个月室内质控</td></tr>
+<tr><td>评定日期</td><td>{_esc(v.get('eval_date') or today)}</td><td>评定周期</td><td>{_esc(v.get('cycle_months')) or 6} 个月室内质控</td></tr>
 </table>
 
 <h2>1. 定义被测量</h2>
