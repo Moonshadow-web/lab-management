@@ -457,34 +457,70 @@
           <div v-if="current" class="result-box">
             <div class="res-row"><span>项目</span><b>{{ current.project_name }}</b></div>
             <div class="res-row"><span>模式</span>
-              <el-tag size="small">{{ current.mode === 'multi' ? '多测量系统' : '单测量系统' }}</el-tag>
+              <el-tag size="small" :type="current.mode === 'qualitative' ? 'success' : 'primary'">
+                {{ current.mode === 'qualitative' ? '定性项目' : (current.mode === 'multi' ? '多测量系统' : '单测量系统') }}
+              </el-tag>
             </div>
-            <div class="res-row"><span>不精密度 u<sub>Rw</sub></span><b>{{ fmtPct(current.u_rw) }}</b></div>
-            <div class="res-row"><span>校准品不确定度 u<sub>cal</sub></span><b>{{ fmtPct(current.ucal) }}</b></div>
-            <div class="res-row"><span>合成不确定度 u<sub>c</sub></span><b>{{ fmtPct(current.u_c) }}</b></div>
-            <div class="res-row"><span>扩展不确定度 U (k=2)</span><b class="hl">{{ fmtPct(current.u_extended) }}</b></div>
-            <div class="divider"></div>
-            <div class="res-row" v-if="current.target_bias">
-              <span>质量目标（允许总误差）</span>
-              <b class="hl2">{{ fmtPct(current.target_bias) }}</b>
-            </div>
-            <div class="res-row" v-if="current.target_bias_source" style="font-size:12px;color:#909399">
-              <span>来源</span>
-              <span>{{ current.target_bias_source }}（{{ current.target_bias_text }}）</span>
-            </div>
-            <div class="res-row" v-if="!current.target_bias">
-              <span>质量目标</span>
-              <el-tag type="info" size="small">未查到允许总误差（兜底按 U&lt;15% 判定）</el-tag>
-            </div>
-            <div class="res-row">
-              <span>结论</span>
-              <el-tag v-if="current.passed" type="success" size="small">✅ 符合要求</el-tag>
-              <el-tag v-else type="danger" size="small">❌ 未达标</el-tag>
-            </div>
-            <div v-if="form.patient_value > 0" class="res-row" style="background:#f0f9ff;padding:6px 10px;margin:4px 0;border-radius:4px">
-              <span>患者结果</span>
-              <span><b>{{ form.patient_value }}</b> ± <b>{{ (form.patient_value * current.u_extended / 100).toFixed(4) }}</b> {{ form.patient_unit || '—' }}</span>
-            </div>
+
+            <!-- 定性项目：绝对单位（S/CO）+ 灰区 + 似然比 -->
+            <template v-if="current.mode === 'qualitative'">
+              <div class="res-row"><span>不精密度 u<sub>rep</sub></span><b>{{ fmtAbs(current.u_rw) }} S/CO</b></div>
+              <div class="res-row"><span>检测器 u<sub>cal</sub></span><b>{{ fmtAbs(current.ucal_abs) }} S/CO</b></div>
+              <div class="res-row"><span>合成不确定度 u<sub>c</sub></span><b>{{ fmtAbs(current.u_c) }} S/CO</b></div>
+              <div class="res-row"><span>扩展不确定度 U (k=2)</span><b class="hl">{{ fmtAbs(current.u_ext_abs ?? current.u_extended) }} S/CO</b></div>
+              <div class="divider"></div>
+              <div class="res-row">
+                <span>灰区（LR&lt;10 不能判定）</span>
+                <b class="hl2">{{ fmtAbs(current.gray_low) }} ~ {{ fmtAbs(current.gray_high) }} S/CO</b>
+              </div>
+              <div class="res-row" style="font-size:12px;color:#909399">
+                <span>来源</span>
+                <span>{{ current.target_bias_source || '定性项目（阈值+似然比判读）' }}</span>
+              </div>
+              <div class="res-row" v-if="current.lr_level">
+                <span>似然比 LR</span>
+                <b>{{ current.lr_value }}（{{ current.lr_level }}）</b>
+              </div>
+              <div class="res-row">
+                <span>结论</span>
+                <el-tag v-if="current.passed" type="success" size="small">✅ 支持判读</el-tag>
+                <el-tag v-else type="warning" size="small">⚠️ 落灰区·需复核</el-tag>
+              </div>
+              <div v-if="form.patient_value > 0" class="res-row" style="background:#f0f9ff;padding:6px 10px;margin:4px 0;border-radius:4px">
+                <span>待判读测值</span>
+                <span><b>{{ form.patient_value }}</b> ± <b>{{ fmtAbs(current.u_ext_abs ?? current.u_extended) }}</b> S/CO</span>
+              </div>
+            </template>
+
+            <!-- 定量/多系统：相对单位（%）+ TEa -->
+            <template v-else>
+              <div class="res-row"><span>不精密度 u<sub>Rw</sub></span><b>{{ fmtPct(current.u_rw) }}</b></div>
+              <div class="res-row"><span>校准品不确定度 u<sub>cal</sub></span><b>{{ fmtPct(current.ucal) }}</b></div>
+              <div class="res-row"><span>合成不确定度 u<sub>c</sub></span><b>{{ fmtPct(current.u_c) }}</b></div>
+              <div class="res-row"><span>扩展不确定度 U (k=2)</span><b class="hl">{{ fmtPct(current.u_extended) }}</b></div>
+              <div class="divider"></div>
+              <div class="res-row" v-if="current.target_bias">
+                <span>质量目标（允许总误差）</span>
+                <b class="hl2">{{ fmtPct(current.target_bias) }}</b>
+              </div>
+              <div class="res-row" v-if="current.target_bias_source" style="font-size:12px;color:#909399">
+                <span>来源</span>
+                <span>{{ current.target_bias_source }}（{{ current.target_bias_text }}）</span>
+              </div>
+              <div class="res-row" v-if="!current.target_bias">
+                <span>质量目标</span>
+                <el-tag type="info" size="small">未查到允许总误差（兜底按 U&lt;15% 判定）</el-tag>
+              </div>
+              <div class="res-row">
+                <span>结论</span>
+                <el-tag v-if="current.passed" type="success" size="small">✅ 符合要求</el-tag>
+                <el-tag v-else type="danger" size="small">❌ 未达标</el-tag>
+              </div>
+              <div v-if="form.patient_value > 0" class="res-row" style="background:#f0f9ff;padding:6px 10px;margin:4px 0;border-radius:4px">
+                <span>患者结果</span>
+                <span><b>{{ form.patient_value }}</b> ± <b>{{ (form.patient_value * current.u_extended / 100).toFixed(4) }}</b> {{ form.patient_unit || '—' }}</span>
+              </div>
+            </template>
             <div class="btn-row" style="margin-top:10px">
               <el-button size="small" type="primary" @click="previewOne(current)">📄 预览报告</el-button>
               <el-button size="small" type="success" @click="downloadOne(current)">⬇️ 下载 PDF / 打印</el-button>
@@ -500,10 +536,16 @@
               <div class="p-info">
                 <div class="p-name">
                   {{ p.project_name }}
-                  <el-tag v-if="p.mode === 'multi'" size="small" type="warning" style="margin-left:4px">多系统</el-tag>
+                  <el-tag v-if="p.mode === 'qualitative'" size="small" type="success" style="margin-left:4px">定性</el-tag>
+                  <el-tag v-else-if="p.mode === 'multi'" size="small" type="warning" style="margin-left:4px">多系统</el-tag>
                 </div>
                 <div class="p-meta">
-                  {{ p.eval_date || '未设日期' }} | U={{ fmtPct(p.u_extended) }} | 目标={{ fmtPct(p.target_bias) }}
+                  <template v-if="p.mode === 'qualitative'">
+                    {{ p.eval_date || '未设日期' }} | U={{ fmtAbs(p.u_ext_abs ?? p.u_extended) }} S/CO | 灰区={{ fmtAbs(p.gray_low) }}~{{ fmtAbs(p.gray_high) }}
+                  </template>
+                  <template v-else>
+                    {{ p.eval_date || '未设日期' }} | U={{ fmtPct(p.u_extended) }} | 目标={{ fmtPct(p.target_bias) }}
+                  </template>
                   <el-tag v-if="p.passed" type="success" size="small" style="margin-left:4px">✅</el-tag>
                   <el-tag v-else type="danger" size="small" style="margin-left:4px">❌</el-tag>
                 </div>
@@ -538,7 +580,7 @@ import request from '../../utils/request'
 import { downloadReportArchive } from '../../api/reportArchives'
 import { useAuthStore } from '../../store/auth'
 // 报告 HTML 构建 / 打印 / 下载已抽到共享工具（不确定度汇总页复用同一份）
-import { esc, todayStr, reportStyle, buildSingleReport, buildMultiReport, buildSummaryReport, printOrSavePdf, downloadHtml } from '../../utils/uncertaintyReport'
+import { esc, todayStr, reportStyle, buildSingleReport, buildMultiReport, buildQualitativeReport, buildSummaryReport, printOrSavePdf, downloadHtml } from '../../utils/uncertaintyReport'
 
 // 常用试剂品牌兜底（项目库 reagent 字段普遍为空，保证下拉有候选可选）
 const COMMON_REAGENTS = ['贝克曼', '罗氏', '西门子', '雅培', '迈瑞', '积水', '柏定', '德赛', '九强', '安图', '奥森多', '强生', '迈克', '中生北控']
@@ -618,6 +660,12 @@ function defaultBiasLevels() {
 function fmtPct(v) {
   if (v == null || v === '' || isNaN(Number(v))) return '—'
   return Number(v).toFixed(2) + '%'
+}
+
+// 定性项目：绝对量（S/CO），保留 4 位小数（不带单位，模板中另加 S/CO）
+function fmtAbs(v) {
+  if (v == null || v === '' || isNaN(Number(v))) return '—'
+  return Number(v).toFixed(4)
 }
 
 // ───────── 室间质评偏倚（5 水平 → RMS 相对偏倚） ─────────
@@ -805,7 +853,8 @@ async function onProjectChange() {
       } else {
         ElMessage.warning('未在系统找到该项目，请手动填写测量方法')
       }
-      // 2) 搜索卫健委 EQA 质量目标
+      // 2) 搜索卫健委 EQA 质量目标（定性项目不适用 TEa，跳过）
+      if (form.mode === 'qualitative') return
       await searchTargets(form.project_name)
       if (targetOptions.value.length) {
         selectedTargetId.value = targetOptions.value[0].id
@@ -1111,11 +1160,15 @@ function clearForm() {
 
 function previewOne(p) {
   previewTitle.value = `测量不确定度评定报告 - ${p.project_name}`
-  previewHtml.value = p.mode === 'multi' ? buildMultiReport(p) : buildSingleReport(p)
+  previewHtml.value = p.mode === 'multi'
+    ? buildMultiReport(p)
+    : (p.mode === 'qualitative' ? buildQualitativeReport(p) : buildSingleReport(p))
   previewOpen.value = true
 }
 function downloadOne(p) {
-  const html = p.mode === 'multi' ? buildMultiReport(p) : buildSingleReport(p)
+  const html = p.mode === 'multi'
+    ? buildMultiReport(p)
+    : (p.mode === 'qualitative' ? buildQualitativeReport(p) : buildSingleReport(p))
   printOrSavePdf(html, `测量不确定度评定报告_${p.project_name || '项目'}_${todayStr()}`)
 }
 function downloadCurrentHtml() {
