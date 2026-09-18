@@ -283,7 +283,7 @@ def _is_target(model: str, no: str) -> bool:
     return ((model or "").strip() in _TARGET_MODELS) or ((no or "").strip() in _TARGET_NOS)
 
 
-# 申请 CNAS 认可的项目（认可能力范围：AC临床化学 28 项 + AD临床免疫学传染病项目；统一大写比较）
+# 申请 CNAS 认可的项目（历史缩写白名单；现以「认可能力范围」表动态匹配为主，此处仅兜底兼容早期模板命名）
 _CNAS_ABBR = {
     "NA", "K", "CL", "GLU", "UREA", "CREZ", "UA", "CA", "MG", "P",
     "ALT", "AST", "TP", "ALB", "TBIL", "DBIL", "ALP", "GGT",
@@ -294,9 +294,89 @@ _CNAS_ABBR = {
 }
 _CNAS_NAME_KEYWORDS = ("C反应蛋白", "表面抗体", "肝炎病毒抗体", "HIV", "梅毒")  # 无括号缩写项目
 
+# 项目名常见修饰词（"边缘包含"匹配时，残余部分需落在这些词里才算合理）
+_PROJECT_MODIFIERS = (
+    "超敏", "高敏", "全段", "游离", "总", "结合", "非结合", "直接", "间接",
+    "活性", "免疫", "定量", "定性", "β", "α", "尿", "血", "血清", "血浆",
+)
 
-def _is_cnas(project_name: str) -> bool:
+# 报告项目名 ↔ 认可能力范围项目名（文字差异较大、无法靠包含关系命中的）
+_CNAS_ALIAS_PAIRS = [
+    ("乙肝表面抗原", "乙型肝炎病毒表面抗原"),
+    ("乙肝e抗原", "乙型肝炎病毒e抗原"),
+    ("乙肝e抗体", "抗乙型肝炎病毒e抗体"),
+    ("乙肝核心抗体", "抗乙型肝炎病毒核心抗体"),
+    ("β人绒毛膜促性腺激素", "绒毛膜促性腺激素β"),
+    ("绒毛膜促性腺激素β", "β人绒毛膜促性腺激素"),
+    ("抗丙性肝炎病毒抗体", "抗丙型肝炎病毒抗体"),  # 报告模板里的「丙性」错别字
+]
+
+
+def _norm_project_name(s: str) -> str:
+    """项目名归一化：去括号内容、去空格、罗马数字/破折号统一、转小写。"""
+    s = (s or "").strip()
+    s = re.sub(r"[（(][^）)]*[）)]", "", s)
+    s = s.replace("　", "").replace(" ", "")
+    s = s.replace("Ⅰ", "I").replace("Ⅱ", "II").replace("Ⅲ", "III")
+    s = s.replace("－", "-").replace("—", "-").replace("–", "-")
+    return s.lower()
+
+
+def _edge_match(short: str, long: str) -> bool:
+    """短名是否位于长名的开头或结尾，且去掉后的残余部分是"合理修饰"。
+
+    仅"边缘"还不够，还要看残余内容，避免：
+      - 「白蛋白」误命中「前白蛋白」（残余"前"不是修饰词）
+      - 「甲状腺球蛋白」误命中「抗甲状腺球蛋白抗体」（非边缘，直接拒绝）
+    纯英文/数字残余（如 CK-MB、II）视为修饰。
+    """
+    if not short or len(short) >= len(long):
+        return False
+    if long.startswith(short):
+        rest = long[len(short):]
+    elif long.endswith(short):
+        rest = long[:len(long) - len(short)]
+    else:
+        return False
+    if not rest:
+        return True
+    if re.fullmatch(r"[\x00-\x7f]+", rest):
+        return True
+    return any(rest.startswith(m) or rest.endswith(m) for m in _PROJECT_MODIFIERS)
+
+
+def _load_cnas_names(db) -> set:
+    """从「认可能力范围」表加载认可项目名的归一化集合（权威来源，随能力范围更新自动生效）。"""
+    try:
+        from ...models.iso15189 import AccreditedScope
+        rows = db.query(AccreditedScope.item_name).distinct().all()
+        return {_norm_project_name(r[0]) for r in rows if r[0]}
+    except Exception:
+        return set()
+
+
+def _is_cnas(project_name: str, acc_names: set | None = None) -> bool:
+    """是否属于申请 CNAS 认可的项目。
+
+    ① 优先用「认可能力范围」表的项目名动态匹配（覆盖 AC 临床化学 / AD 临床免疫学 / AA 等全部认可项目）
+    ② 老缩写白名单 + 名称关键词兜底（兼容早期模板的项目命名）
+    """
     pn = project_name or ""
+    core = _norm_project_name(pn)
+    names = acc_names or set()
+    if core and names:
+        for n in names:
+            if not n:
+                continue
+            if core == n:
+                return True
+            if len(n) >= 3 and _edge_match(n, core):
+                return True
+            if len(core) >= 3 and _edge_match(core, n):
+                return True
+        for a, b in _CNAS_ALIAS_PAIRS:
+            if a in core and b in names:
+                return True
     m = re.search(r"[（(]([^）)]+)[）)]", pn)
     if m and m.group(1).strip().upper() in _CNAS_ABBR:
         return True
@@ -371,6 +451,7 @@ def list_by_project(
                  latest_is_target, verify_items, latest_summary, history_count,
                  all_records: [{..., is_target}], ...}]
     """
+    cnas_names = _load_cnas_names(db)  # 认可项目名集合（来自认可能力范围表）
     q = db.query(VerificationReport)
     if keyword:
         kw = f"%{keyword}%"
@@ -436,7 +517,7 @@ def list_by_project(
         )
         archive.append({
             "project_name": pname,
-            "is_cnas": _is_cnas(pname),
+            "is_cnas": _is_cnas(pname, cnas_names),
             "latest_id": latest.id,
             "latest_date": latest.verify_date,
             "latest_instrument": f"{latest.instrument_model or ''} {latest.instrument_no or ''}".strip(),
