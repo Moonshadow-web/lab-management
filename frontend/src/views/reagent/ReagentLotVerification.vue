@@ -4,7 +4,9 @@
       <h2 class="title">试剂验收</h2>
       <p class="sub">
         试剂 / 质控品更换批号时的批间性能验证：同一项目用旧、新批号各测 {{ defaultSampleCount }} 个样本（可选质控品 + 患者样本），
-        计算偏倚（相对% 或 绝对，如 CO₂ 的 ±5 mmHg）；<b>{{ defaultSampleCount }} 个中 ≥ {{ defaultSampleCount - 1 }} 个 |偏倚| ≤ 允许偏倚</b> 判定为符合要求。
+        <b>定量 + 定性双轨判读</b>：填旧/新批号结果算偏倚（相对% 或绝对），或填阴阳性判一致性；
+        <b>两者任一满足即该样本合格</b>，{{ defaultSampleCount }} 个中 ≥ {{ defaultSampleCount - 1 }} 个合格即符合要求。
+        定性项目（乙肝/丙肝/梅毒/HIV/戊肝等）可只填阴阳性。
       </p>
     </div>
     <LibraryTabs @change="refresh" />
@@ -191,15 +193,38 @@
             <el-input-number v-model="row.new_value" :controls="false" size="small" style="width:110px" />
           </template>
         </el-table-column>
+        <el-table-column label="旧批号定性" width="104">
+          <template #default="{ row }">
+            <el-select v-model="row.old_qual" size="small" clearable placeholder="—" style="width:88px">
+              <el-option label="阳性" value="阳性" /><el-option label="阴性" value="阴性" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="新批号定性" width="104">
+          <template #default="{ row }">
+            <el-select v-model="row.new_qual" size="small" clearable placeholder="—" style="width:88px">
+              <el-option label="阳性" value="阳性" /><el-option label="阴性" value="阴性" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="定性一致" width="86" align="center">
+          <template #default="{ row }">
+            <span v-if="qualOk(row) === null" class="muted2">—</span>
+            <el-tag v-else size="small" :type="qualOk(row) ? 'success' : 'danger'">{{ qualOk(row) ? '一致' : '不一致' }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column :label="form.bias_mode === 'absolute' ? '绝对偏倚' : '相对偏倚%'" width="110" align="center">
           <template #default="{ row }">
             <span :class="biasCls(row)">{{ biasOf(row) === null ? '—' : biasOf(row) + '%' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="是否合格" width="90" align="center">
+        <el-table-column label="是否合格" width="118" align="center">
           <template #default="{ row }">
             <span v-if="passOf(row) === null" class="muted2">—</span>
-            <el-tag v-else size="small" :type="passOf(row) ? 'success' : 'danger'">{{ passOf(row) ? '合格' : '不合格' }}</el-tag>
+            <template v-else>
+              <el-tag size="small" :type="passOf(row) ? 'success' : 'danger'">{{ passOf(row) ? '合格' : '不合格' }}</el-tag>
+              <div class="muted2" style="font-size:10px">{{ passWhy(row) }}</div>
+            </template>
           </template>
         </el-table-column>
         <el-table-column label="" width="60">
@@ -213,7 +238,7 @@
         <span>合格 <b>{{ localPass }}</b> / {{ form.samples.length }} 个</span>
         <el-tag :type="tagType(localConclusion)" style="margin-left:12px">{{ localConclusion }}</el-tag>
         <span class="muted2" style="margin-left:12px;font-size:12px">
-          判定：|偏倚| ≤ 允许偏倚（{{ form.bias_mode === 'absolute' ? '绝对' : '相对%' }}），且合格数 ≥ {{ Math.max(1, form.samples.length - 1) }}
+          判定：<b>|偏倚| ≤ 允许偏倚</b> 或 <b>新旧批号阴阳性一致</b>（任一满足即合格），合格数 ≥ {{ Math.max(1, form.samples.length - 1) }}
         </span>
       </div>
       <el-form size="small" label-width="92px" style="margin-top:10px">
@@ -270,6 +295,7 @@ const form = reactive(emptyForm())
 function mkSamples(n) {
   return Array.from({ length: n }, (_, i) => ({
     name: `样本${i + 1}`, kind: '样本', old_value: null, new_value: null,
+    old_qual: '', new_qual: '',
   }))
 }
 
@@ -282,11 +308,29 @@ function biasOf(r) {
   if (Math.abs(Number(ov)) < 1e-12) return null
   return Math.round(((Number(nv) - Number(ov)) / Math.abs(Number(ov))) * 10000) / 100
 }
-function passOf(r) {
+function biasOk(r) {
   const b = biasOf(r)
   const allow = parseFloat(form.allow_bias_pct)
   if (b === null || !allow) return null
   return Math.abs(b) <= allow + 1e-9
+}
+function qualOk(r) {
+  const a = (r.old_qual || '').trim(), b = (r.new_qual || '').trim()
+  if (!a || !b) return null
+  return a === b
+}
+// 双轨判读：定量偏倚合格 或 定性阴阳性一致，任一满足即该样本合格
+function passOf(r) {
+  const bo = biasOk(r), qo = qualOk(r)
+  if (bo === null && qo === null) return null
+  return !!(bo || qo)
+}
+function passWhy(r) {
+  const bo = biasOk(r), qo = qualOk(r)
+  if (bo === true && qo === true) return '偏倚+定性'
+  if (bo === true) return '偏倚合格'
+  if (qo === true) return '定性一致'
+  return ''
 }
 function biasCls(r) {
   const p = passOf(r)
@@ -294,7 +338,7 @@ function biasCls(r) {
   return p ? 'ok' : 'bad'
 }
 const localPass = computed(() => form.samples.filter(r => passOf(r) === true).length)
-const validCount = computed(() => form.samples.filter(r => biasOf(r) !== null).length)
+const validCount = computed(() => form.samples.filter(r => passOf(r) !== null).length)
 const localConclusion = computed(() => {
   const allow = parseFloat(form.allow_bias_pct)
   if (!allow) return '待完成'
@@ -412,7 +456,7 @@ async function reloadCriteria() {
   } catch (e) { /* 静默 */ }
 }
 
-function addSample() { form.samples.push({ name: `样本${form.samples.length + 1}`, kind: '样本', old_value: null, new_value: null }) }
+function addSample() { form.samples.push({ name: `样本${form.samples.length + 1}`, kind: '样本', old_value: null, new_value: null, old_qual: '', new_qual: '' }) }
 function resetSamples() { form.samples = mkSamples(form.sample_count || defaultSampleCount) }
 
 async function onNew() {
@@ -453,6 +497,7 @@ async function onSave() {
         name: s.name, kind: s.kind,
         old_value: s.old_value === '' ? null : s.old_value,
         new_value: s.new_value === '' ? null : s.new_value,
+        old_qual: s.old_qual || '', new_qual: s.new_qual || '',
       })),
       sample_count: form.samples.length,
       operator: form.operator, remark: form.remark,
@@ -480,14 +525,22 @@ function onPrint(row) {
   const allow = (row.allow_bias_pct || '—') + (isAbs ? '' : '%')
   let h = '<table><thead><tr><th>序号</th><th>样本名称</th><th>类型</th>'
     + '<th class="num">旧批号结果</th><th class="num">新批号结果</th>'
+    + '<th class="num">旧批号定性</th><th class="num">新批号定性</th>'
     + `<th class="num">${isAbs ? '绝对偏倚' : '相对偏倚%'}</th><th class="num">是否合格</th></tr></thead><tbody>`
   samples.forEach((s, i) => {
     const b = s.bias_pct
     const ok = s.passed
+    let why = ''
+    if (ok === true) {
+      if (s.bias_ok === true && s.qual_ok === true) why = '偏倚+定性'
+      else if (s.bias_ok === true) why = '偏倚合格'
+      else if (s.qual_ok === true) why = '定性一致'
+    }
     h += `<tr><td class="num">${i + 1}</td><td>${s.name || ''}</td><td>${s.kind || ''}</td>`
       + `<td class="num">${s.old_value ?? ''}</td><td class="num">${s.new_value ?? ''}</td>`
+      + `<td class="num">${s.old_qual || ''}</td><td class="num">${s.new_qual || ''}</td>`
       + `<td class="num">${b === null || b === undefined ? '' : b}</td>`
-      + `<td class="num">${ok === null || ok === undefined ? '' : (ok ? '合格' : '不合格')}</td></tr>`
+      + `<td class="num">${ok === null || ok === undefined ? '' : (ok ? '合格' : '不合格')}${why ? '<br/>' + why : ''}</td></tr>`
   })
   h += '</tbody></table>'
   const meta = `试剂：${row.reagent_name}　规格：${row.spec || ''}　品牌：${row.brand || ''}<br>`

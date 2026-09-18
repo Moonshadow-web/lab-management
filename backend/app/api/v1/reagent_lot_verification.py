@@ -192,54 +192,72 @@ def resolve_allow_bias(db: Session, item_id: int,
 # ═══════════════════════════════════════════════════════════════
 def compute_samples(samples: list, allow_pct: float, need: int,
                    mode: str = "relative") -> tuple:
-    """计算每个样本的相对偏倚并判定，返回 (新样本列表, 合格数, 结论, 有效样本数)。
+    """计算每个样本的定量偏倚 + 定性一致性并判定。
+
+    **双轨判读**（科室需求）：定量相对/绝对偏倚合格 **或** 新旧批号阴阳性一致，
+    任一满足即视为该样本合格 —— 定性项目（乙肝/丙肝/梅毒/HIV/戊肝等）用阴阳性判读更贴切，
+    定量项目仍按偏倚判读，两轨可同时填写、也可只填其一。
 
     结论规则（避免「样本还没填就判不符合」）：
-      - 允许偏倚未填              → 待完成
-      - 有效样本数为 0（未录入）    → 待完成
-      - 合格数 ≥ 需合格数          → 符合要求
-      - 样本已全部录入但仍不达标    → 不符合要求
-      - 其余（录了一部分）          → 待完成
+      - 允许偏倚未填、且无定性结果  → 待完成
+      - 有效样本数为 0（完全未录入）→ 待完成
+      - 合格数 ≥ 需合格数            → 符合要求
+      - 样本已全部录入但仍不达标     → 不符合要求
+      - 其余（录了一部分）           → 待完成
     """
     out, passed, valid = [], 0, 0
     for s in samples or []:
         ov, nv = s.get("old_value"), s.get("new_value")
-        bias, ok = None, None
+        oq = str(s.get("old_qual") or "").strip()
+        nq = str(s.get("new_qual") or "").strip()
+
+        # ── 轨一：定量相对/绝对偏倚 ──
+        bias, bias_ok = None, None
         try:
             if ov is not None and nv is not None and str(ov) != "" and str(nv) != "":
                 f_ov, f_nv = float(ov), float(nv)
                 if mode == "absolute":
-                    # 绝对偏倚：与结果同单位（如 CO2 的 ±5 mmHg），旧值为 0 时也有效
-                    bias = round(f_nv - f_ov, 4)
+                    bias = round(f_nv - f_ov, 4)     # 与结果同单位，旧值为 0 也有效
                 elif abs(f_ov) > 1e-12:
                     bias = round((f_nv - f_ov) / abs(f_ov) * 100.0, 2)
-                else:
-                    bias = None
-                if bias is not None:
-                    valid += 1
-                    if allow_pct and allow_pct > 0:
-                        ok = abs(bias) <= allow_pct + 1e-9
-                        if ok:
-                            passed += 1
+                if bias is not None and allow_pct and allow_pct > 0:
+                    bias_ok = abs(bias) <= allow_pct + 1e-9
         except (TypeError, ValueError):
-            bias, ok = None, None
+            bias, bias_ok = None, None
+
+        # ── 轨二：定性阴阳性一致性 ──
+        qual_ok = None
+        if oq and nq:
+            qual_ok = (oq == nq)
+
+        # ── 综合：任一轨满足即合格 ──
+        if bias_ok is None and qual_ok is None:
+            ok = None
+        else:
+            ok = bool(bias_ok) or bool(qual_ok)
+            valid += 1
+            if ok:
+                passed += 1
+
         out.append({
             "name": s.get("name", ""),
             "kind": s.get("kind", "样本"),
-            "old_value": ov,
-            "new_value": nv,
-            "bias_pct": bias,
+            "old_value": ov, "new_value": nv,
+            "bias_pct": bias, "bias_ok": bias_ok,
+            "old_qual": oq, "new_qual": nq, "qual_ok": qual_ok,
             "passed": ok,
         })
+
     total = len(samples or [])
-    if not allow_pct or allow_pct <= 0:
+    has_any_criterion = bool(allow_pct and allow_pct > 0)
+    if valid == 0:
         conclusion = "待完成"
-    elif valid == 0:
-        conclusion = "待完成"          # 还没录入结果
     elif passed >= need:
         conclusion = "符合要求"
     elif total > 0 and valid >= total:
         conclusion = "不符合要求"       # 全部录完仍不达标
+    elif not has_any_criterion:
+        conclusion = "待完成"
     else:
         conclusion = "待完成"          # 只录了一部分
     return out, passed, conclusion, valid
@@ -277,6 +295,7 @@ def _apply_calc(v: ReagentLotVerification) -> None:
         allow = float(str(v.allow_bias_pct or "").strip() or 0)
     except ValueError:
         allow = 0.0
+    # 注：allow=0 时定量轨不判，但仍可用定性轨判定（定性项目无需允许偏倚）
     n = int(v.sample_count or 5)
     need = max(1, n - 1)  # 默认 5 个里 ≥4 个
     mode = (v.bias_mode or "relative").strip() or "relative"
