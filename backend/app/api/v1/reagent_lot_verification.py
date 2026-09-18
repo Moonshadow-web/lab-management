@@ -191,7 +191,7 @@ def resolve_allow_bias(db: Session, item_id: int,
 #   相对偏倚计算与判定
 # ═══════════════════════════════════════════════════════════════
 def compute_samples(samples: list, allow_pct: float, need: int,
-                   mode: str = "relative") -> tuple:
+                   mode: str = "relative", allow_abs: float = 0.0) -> tuple:
     """计算每个样本的定量偏倚 + 定性一致性并判定。
 
     **双轨判读**（科室需求）：定量相对/绝对偏倚合格 **或** 新旧批号阴阳性一致，
@@ -211,17 +211,21 @@ def compute_samples(samples: list, allow_pct: float, need: int,
         oq = str(s.get("old_qual") or "").strip()
         nq = str(s.get("new_qual") or "").strip()
 
-        # ── 轨一：定量相对/绝对偏倚 ──
+        # ── 轨一：定量偏倚（**每行可各自选相对/绝对**，留空则用记录级默认）──
+        # 科室实际场景：同一批 5 个样本可能 1 个按绝对、4 个按相对（如低值样本用绝对）
+        row_mode = str(s.get("bias_mode") or "").strip() or mode
+        # 该行用哪个允许值：绝对模式用 allow_abs，相对模式用 allow_pct
+        row_allow = allow_abs if row_mode == "absolute" else allow_pct
         bias, bias_ok = None, None
         try:
             if ov is not None and nv is not None and str(ov) != "" and str(nv) != "":
                 f_ov, f_nv = float(ov), float(nv)
-                if mode == "absolute":
+                if row_mode == "absolute":
                     bias = round(f_nv - f_ov, 4)     # 与结果同单位，旧值为 0 也有效
                 elif abs(f_ov) > 1e-12:
                     bias = round((f_nv - f_ov) / abs(f_ov) * 100.0, 2)
-                if bias is not None and allow_pct and allow_pct > 0:
-                    bias_ok = abs(bias) <= allow_pct + 1e-9
+                if bias is not None and row_allow and row_allow > 0:
+                    bias_ok = abs(bias) <= row_allow + 1e-9
         except (TypeError, ValueError):
             bias, bias_ok = None, None
 
@@ -243,13 +247,14 @@ def compute_samples(samples: list, allow_pct: float, need: int,
             "name": s.get("name", ""),
             "kind": s.get("kind", "样本"),
             "old_value": ov, "new_value": nv,
-            "bias_pct": bias, "bias_ok": bias_ok,
+            "bias_pct": bias, "bias_ok": bias_ok, "bias_mode": row_mode,
+            "row_allow": row_allow or None,
             "old_qual": oq, "new_qual": nq, "qual_ok": qual_ok,
             "passed": ok,
         })
 
     total = len(samples or [])
-    has_any_criterion = bool(allow_pct and allow_pct > 0)
+    has_any_criterion = bool((allow_pct and allow_pct > 0) or (allow_abs and allow_abs > 0))
     if valid == 0:
         conclusion = "待完成"
     elif passed >= need:
@@ -279,7 +284,9 @@ def _to_read(v: ReagentLotVerification) -> dict:
         "criterion_source": v.criterion_source,
         "criterion_label": v.criterion_label,
         "allow_bias_pct": v.allow_bias_pct,
+        "allow_bias_abs": getattr(v, "allow_bias_abs", "") or "",
         "bias_mode": v.bias_mode or "relative",
+        "judge_mode": v.judge_mode or "quantitative",
         "samples": samples, "sample_count": v.sample_count,
         "samples_json": v.samples_json or "",
         "pass_count": v.pass_count, "conclusion": v.conclusion,
@@ -299,8 +306,12 @@ def _apply_calc(v: ReagentLotVerification) -> None:
     n = int(v.sample_count or 5)
     need = max(1, n - 1)  # 默认 5 个里 ≥4 个
     mode = (v.bias_mode or "relative").strip() or "relative"
+    try:
+        allow_abs = float(str(getattr(v, "allow_bias_abs", "") or "").strip() or 0)
+    except ValueError:
+        allow_abs = 0.0
     samples, passed, conclusion, _valid = compute_samples(
-        _load_samples(v), allow, need, mode)
+        _load_samples(v), allow, need, mode, allow_abs)
     v.samples_json = json.dumps(samples, ensure_ascii=False)
     v.pass_count = passed
     v.conclusion = conclusion
@@ -507,7 +518,9 @@ def create_verification(
         criterion_source=data.criterion_source or "",
         criterion_label=data.criterion_label or "",
         allow_bias_pct=data.allow_bias_pct or "",
+        allow_bias_abs=data.allow_bias_abs or "",
         bias_mode=(data.bias_mode or "relative"),
+        judge_mode=(data.judge_mode or "quantitative"),
         samples_json=json.dumps(
             [s.model_dump() if hasattr(s, "model_dump") else s
              for s in (data.samples or [])], ensure_ascii=False),
@@ -550,8 +563,9 @@ def update_verification(
     for f in ("item_id", "library", "item_type", "reagent_name", "spec", "brand",
               "old_batch_no", "old_expiry_date", "new_batch_no", "new_expiry_date",
               "change_date", "test_item_id", "test_item_name", "criterion_source",
-              "criterion_label", "allow_bias_pct", "bias_mode", "sample_count",
-              "operator", "remark"):
+              "criterion_label", "allow_bias_pct", "allow_bias_abs",
+              "bias_mode", "judge_mode",
+              "sample_count", "operator", "remark"):
         val = getattr(data, f, None)
         if val is not None:
             setattr(v, f, val)
@@ -692,7 +706,9 @@ def generate_verifications(
                         "old_batch_no": v.old_batch_no,
                         "new_batch_no": v.new_batch_no,
                         "allow_bias_pct": v.allow_bias_pct,
+        "allow_bias_abs": getattr(v, "allow_bias_abs", "") or "",
         "bias_mode": v.bias_mode or "relative",
+        "judge_mode": v.judge_mode or "quantitative",
                         "criterion_label": v.criterion_label})
     db.commit()
     return {"created": created, "created_count": len(created),

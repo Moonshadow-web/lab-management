@@ -292,6 +292,9 @@ class LotSample(BaseModel):
     kind: str = "样本"  # 质控 / 样本
     old_value: Optional[float] = None
     new_value: Optional[float] = None
+    old_qual: str = ""   # 阳性/阴性
+    new_qual: str = ""   # 阳性/阴性
+    bias_mode: str = ""  # 本行偏倚方式，留空则继承记录级（relative/absolute）
 
 
 class ReagentLotVerificationBase(BaseModel):
@@ -311,7 +314,9 @@ class ReagentLotVerificationBase(BaseModel):
     criterion_source: str = ""
     criterion_label: str = ""
     allow_bias_pct: str = ""
-    bias_mode: str = "relative"  # relative / absolute
+    allow_bias_abs: str = ""      # 允许绝对偏倚（与结果同单位）
+    bias_mode: str = "relative"  # 记录级默认：relative / absolute
+    judge_mode: str = "quantitative"  # quantitative / qualitative / both
     samples: list[LotSample] = []
     sample_count: int = 5
     operator: str = ""
@@ -340,7 +345,9 @@ class ReagentLotVerificationUpdate(BaseModel):
     criterion_source: Optional[str] = None
     criterion_label: Optional[str] = None
     allow_bias_pct: Optional[str] = None
+    allow_bias_abs: Optional[str] = None
     bias_mode: Optional[str] = None
+    judge_mode: Optional[str] = None
     samples: Optional[list[LotSample]] = None
     sample_count: Optional[int] = None
     operator: Optional[str] = None

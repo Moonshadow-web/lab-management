@@ -335,9 +335,17 @@ class ReagentLotVerification(Base):
     test_item_name: Mapped[str] = mapped_column(String(200), default="")
     criterion_source: Mapped[str] = mapped_column(String(40), default="")  # wst403-2024 / nccl-2026 / manual
     criterion_label: Mapped[str] = mapped_column(String(200), default="")  # 展示用：如「WS/T 403-2024 允许偏倚 6.5%」
-    allow_bias_pct: Mapped[str] = mapped_column(String(50), default="")  # 允许偏倚（文本，便于手填）
+    allow_bias_pct: Mapped[str] = mapped_column(String(50), default="")  # 允许**相对**偏倚 %
+    # 允许**绝对**偏倚（与结果同单位，如 CO₂ 的 5 mmHg）。样本行选了「绝对」时用这个值，
+    # 选了「相对」时用 allow_bias_pct —— 同一批样本可混用两种方式，各按各的允许值判。
+    allow_bias_abs: Mapped[str] = mapped_column(String(50), default="", server_default="")
     # 偏倚判读方式：relative=相对偏倚%（默认） / absolute=绝对偏倚（与结果同单位，如 CO2 的 ±5 mmHg）
+    # 说明：这是**记录级默认值**，每个样本行可各自覆盖（samples[].bias_mode）
     bias_mode: Mapped[str] = mapped_column(String(20), default="relative", server_default="relative")
+    # 判读方式（控制前端显示与打印的列）：
+    #   quantitative=定量（只看偏倚） / qualitative=定性（只看阴阳性） / both=定量+定性双轨
+    judge_mode: Mapped[str] = mapped_column(String(20), default="quantitative",
+                                            server_default="quantitative")
 
     # 5 个样本：[{name, kind(质控/样本), old_value, new_value, bias_pct, passed}]
     samples_json: Mapped[str] = mapped_column(Text, default="")
