@@ -646,9 +646,22 @@ def generate_verifications(
             skipped.append({"item_id": g.item_id, "reason": "已存在", "id": exists.id})
             continue
         tname = g.test_item_name or ""
+        tid = g.test_item_id
         if g.test_item_id and not tname:
             ti = db.query(TestItem).get(g.test_item_id)
             tname = ti.name if ti else ""
+        if not tname:
+            # 自动关联：按 test_item_reagents 里 role=试剂 的第一个项目
+            # （此前批量生成漏了这步，导致 95 条记录的「检验项目」全为空）
+            link = (db.query(TestItem)
+                    .join(TestItemReagent, TestItemReagent.test_item_id == TestItem.id)
+                    .filter(TestItemReagent.reagent_item_id == it.id,
+                            TestItemReagent.role == "试剂")
+                    .order_by(TestItem.id)
+                    .first())
+            if link:
+                tid = link.id
+                tname = link.name
         v = ReagentLotVerification(
             item_id=g.item_id, library=it.library or "",
             item_type=it.type or "试剂",
@@ -658,7 +671,7 @@ def generate_verifications(
             new_batch_no=g.new_batch_no or "",
             new_expiry_date=g.new_expiry_date,
             change_date=g.change_date,
-            test_item_id=g.test_item_id, test_item_name=tname,
+            test_item_id=tid, test_item_name=tname,
             sample_count=body.sample_count or 5,
             samples_json=json.dumps(
                 [{"name": f"样本{i+1}", "kind": "样本",
