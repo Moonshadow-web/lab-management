@@ -211,20 +211,30 @@ def _read_summary(wb, info: dict) -> dict:
             elif result:
                 # 兜底：只有 1 个干扰物具体值时用旧逻辑
                 result = f"干扰物：{'、'.join(names) if names else ''}（实测：{result}）"
-        # 参考区间行：把具体区间（如"男 0-19.8 / 女 0-11.6pg/mL"）拼入 result，
+        # 参考区间行：把具体区间（如"男/女：1.0-4.2 g/L"、"男 0-19.8/女 0-11.6pg/mL"）拼入 result，
         # 使页面显示"参考区间：xxx；超出参考区间 0个"，而非只有"超出参考区间 0个"。
-        # 注意：多数模板把区间文本写在 B 列（即与"参考区间"标签同列的说明文字），
-        # 此时它会被当成 content、requirement 为空 —— 需回退用 content_raw 取值。
-        if content in ('参考范围', '参考区间') and (requirement or content_raw):
+        # 兼容两种模板写法：
+        #   ① 区间文本直接写在要求列（B 列）→ requirement 为空、文本被当作 content；
+        #   ② 区间写在"参考区间：xxx"里，下面另起一行只写判定要求（如"…共计超出参考区间的不多于2个"）
+        #      —— 这种"纯要求行"没有验证结果，必须跳过，否则会用"的不多于2个"覆盖真实区间。
+        if content in ('参考范围', '参考区间'):
             src = requirement or content_raw
             m = re.search(r'参考(?:范围|区间)[:：]?\s*([\s\S]+)', src)
             seg = m.group(1) if m else src
-            # 截掉后面的判定要求文字（如"20个标本中超出参考区间不多于2"）
-            seg = re.split(r'\d+\s*个?\s*标本|标本中超出|超出参考区间', seg)[0]
+            # 截掉判定要求文字（如"20个标本中超出参考区间不多于2"）
+            seg = re.split(r'\d+\s*个?\s*标本|标本中超出|超出参考区间|不多于', seg)[0]
             seg = re.sub(r'^参考(?:范围|区间)[:：]?\s*', '', seg)
-            seg = re.sub(r'\s+', ' ', seg).strip(' ,，;；')
-            if seg and seg not in result:
-                result = f"参考区间：{seg}；{result}"
+            seg = re.sub(r'\s+', ' ', seg).strip(' ,，；;')
+            good = bool(seg and re.search(r'\d', seg)
+                        and not re.search(r'不多于|标本|超出|符合要求', seg))
+            if good:
+                if seg not in result:
+                    result = f"参考区间：{seg}；{result}"
+            elif not requirement and re.search(r'不多于|标本|要求', src):
+                # 要求列没有区间文本，本行提取到的又只是判定要求（如
+                # "男女两组各10个标本中，共计超出参考区间的不多于2个"）——
+                # 这是纯要求行，丢弃以免覆盖上一行的真实区间。
+                continue
         # 触发判定条件：content 或 result 或 conclusion 任一非空
         if content or result or conclusion:
             rows.append({
