@@ -182,7 +182,8 @@ def _read_summary(wb, info: dict) -> dict:
         elif content and not _content_to_key(content):
             # content 拿到了但不是标准验证项目名（是产品名/项目名等），改用行号推导
             content = _content_from_requirement(requirement) if requirement else (_content_from_row(r) or content)
-        # 标准化 content 为简短标签
+        # 标准化 content 为简短标签（content_raw 保留归一化前原文，供参考区间等提取用）
+        content_raw = content
         content = _normalize_content(content) if content else ''
         # 跳过表头行（R17 在 ALB 模板是"验证要求/验证结果/验证结论"表头）
         header_words = ('验证要求', '验证结果', '验证结论', '验证内容')
@@ -210,11 +211,18 @@ def _read_summary(wb, info: dict) -> dict:
             elif result:
                 # 兜底：只有 1 个干扰物具体值时用旧逻辑
                 result = f"干扰物：{'、'.join(names) if names else ''}（实测：{result}）"
-        # 参考区间行（R24）：把 requirement（B 列）里的"参考区间：137-147"拼入 result
-        if content in ('参考范围', '参考区间') and requirement:
-            m = re.search(r'参考(?:范围|区间)[:：]?\s*([^\n]+)', requirement)
-            seg = (m.group(1).strip() if m else requirement.split('\n')[0].strip())
+        # 参考区间行：把具体区间（如"男 0-19.8 / 女 0-11.6pg/mL"）拼入 result，
+        # 使页面显示"参考区间：xxx；超出参考区间 0个"，而非只有"超出参考区间 0个"。
+        # 注意：多数模板把区间文本写在 B 列（即与"参考区间"标签同列的说明文字），
+        # 此时它会被当成 content、requirement 为空 —— 需回退用 content_raw 取值。
+        if content in ('参考范围', '参考区间') and (requirement or content_raw):
+            src = requirement or content_raw
+            m = re.search(r'参考(?:范围|区间)[:：]?\s*([\s\S]+)', src)
+            seg = m.group(1) if m else src
+            # 截掉后面的判定要求文字（如"20个标本中超出参考区间不多于2"）
+            seg = re.split(r'\d+\s*个?\s*标本|标本中超出|超出参考区间', seg)[0]
             seg = re.sub(r'^参考(?:范围|区间)[:：]?\s*', '', seg)
+            seg = re.sub(r'\s+', ' ', seg).strip(' ,，;；')
             if seg and seg not in result:
                 result = f"参考区间：{seg}；{result}"
         # 触发判定条件：content 或 result 或 conclusion 任一非空
