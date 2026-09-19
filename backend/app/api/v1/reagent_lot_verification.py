@@ -51,8 +51,8 @@ SOURCE_LABEL = {
 # ═══════════════════════════════════════════════════════════════
 def _cnas_checker():
     try:
-        from .verification_reports import _is_cnas, _load_cnas_names
-        return _is_cnas, _load_cnas_names
+        from .verification_reports import _is_cnas, _load_cnas_map
+        return _is_cnas, _load_cnas_map
     except Exception:
         return None, None
 
@@ -63,7 +63,8 @@ def is_accredited_item(db, test_item_name: str) -> bool:
     if not fn or not loader:
         return False
     try:
-        return bool(fn(test_item_name or "", loader(db)))
+        m = loader(db)
+        return bool(fn(test_item_name or "", set(m.keys()), m))
     except Exception:
         return False
 
@@ -504,8 +505,9 @@ def list_verifications(
     ).all()
     # 「申请 CNAS 认可的项目」排前面；Python 的 sort 是稳定排序，组内保持原时间倒序
     fn, loader = _cnas_checker()
-    acc_names = loader(db) if loader else set()
-    flagged = [(r, bool(fn(r.test_item_name or "", acc_names)) if fn else False)
+    acc_map = loader(db) if loader else {}
+    acc_names = set(acc_map.keys())
+    flagged = [(r, bool(fn(r.test_item_name or "", acc_names, acc_map)) if fn else False)
                for r in all_rows]
     flagged.sort(key=lambda t: (not t[1],))
     total = len(flagged)

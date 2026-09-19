@@ -354,25 +354,39 @@ def _edge_match(short: str, long: str) -> bool:
 _SPECIMEN_PREFIXES = ("尿液", "血清", "血浆", "全血", "尿", "脑脊液", "胸腹水", "粪便")
 
 
-def _strip_specimen(core: str) -> str:
-    """剥离开头的标本类型词，返回剩余部分（无变化则原样返回）。"""
+def _strip_specimen(core: str) -> tuple:
+    """剥离开头的标本类型词，返回 (剩余部分, 被剥掉的标本词)；无剥离则 (core, "")。"""
     for w in _SPECIMEN_PREFIXES:
         if core.startswith(w) and len(core) > len(w) + 1:
-            return core[len(w):]
-    return core
+            return core[len(w):], w
+    return core, ""
+
+
+def _load_cnas_map(db) -> dict:
+    """加载「认可能力范围」表 → {归一化项目名: 标本类型}（权威来源，随能力范围更新自动生效）。"""
+    try:
+        from ...models.iso15189 import AccreditedScope
+        rows = db.query(AccreditedScope.item_name, AccreditedScope.sample_type).all()
+        out = {}
+        for nm, st in rows:
+            k = _norm_project_name(nm)
+            if k and k not in out:
+                out[k] = (st or "")
+        return out
+    except Exception:
+        return {}
 
 
 def _load_cnas_names(db) -> set:
-    """从「认可能力范围」表加载认可项目名的归一化集合（权威来源，随能力范围更新自动生效）。"""
+    """兼容旧调用：返回归一化项目名集合。"""
     try:
-        from ...models.iso15189 import AccreditedScope
-        rows = db.query(AccreditedScope.item_name).distinct().all()
-        return {_norm_project_name(r[0]) for r in rows if r[0]}
+        return set(_load_cnas_map(db).keys())
     except Exception:
         return set()
 
 
-def _is_cnas(project_name: str, acc_names: set | None = None) -> bool:
+def _is_cnas(project_name: str, acc_names: set | None = None,
+             acc_map: dict | None = None) -> bool:
     """是否属于申请 CNAS 认可的项目。
 
     ① 优先用「认可能力范围」表的项目名动态匹配（覆盖 AC 临床化学 / AD 临床免疫学 / AA 等全部认可项目）
@@ -382,14 +396,20 @@ def _is_cnas(project_name: str, acc_names: set | None = None) -> bool:
     core = _norm_project_name(pn)
     names = acc_names or set()
     if core and names:
-        stripped = _strip_specimen(core)
+        stripped, spec_word = _strip_specimen(core)
         for n in names:
             if not n:
                 continue
             if core == n:
                 return True
-            # 去掉开头标本词后精确相等 → 同一项目（如「血浆D-二聚体」vs「D-二聚体」）
+            # 去掉开头标本词后精确相等 → 同一项目，但**标本类型必须兼容**：
+            #   「血浆D-二聚体」vs「D-二聚体(血浆)」→ 兼容 ✓
+            #   「尿免疫球蛋白G」vs「免疫球蛋白G(血清)」→ 尿≠血清 → 不算同一项目 ✗
             if stripped != core and stripped == n:
+                if spec_word and acc_map:
+                    st = acc_map.get(n, "")
+                    if st and spec_word not in st:
+                        continue
                 return True
             if len(n) >= 3 and _edge_match(n, core):
                 return True
@@ -472,7 +492,8 @@ def list_by_project(
                  latest_is_target, verify_items, latest_summary, history_count,
                  all_records: [{..., is_target}], ...}]
     """
-    cnas_names = _load_cnas_names(db)  # 认可项目名集合（来自认可能力范围表）
+    cnas_map = _load_cnas_map(db)      # 认可项目 {名: 标本类型}（来自认可能力范围表）
+    cnas_names = set(cnas_map.keys())
     q = db.query(VerificationReport)
     if keyword:
         kw = f"%{keyword}%"
@@ -538,7 +559,7 @@ def list_by_project(
         )
         archive.append({
             "project_name": pname,
-            "is_cnas": _is_cnas(pname, cnas_names),
+            "is_cnas": _is_cnas(pname, cnas_names, cnas_map),
             "latest_id": latest.id,
             "latest_date": latest.verify_date,
             "latest_instrument": f"{latest.instrument_model or ''} {latest.instrument_no or ''}".strip(),
