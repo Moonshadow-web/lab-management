@@ -1167,7 +1167,22 @@ def get_receiving(receiving_id: int, db: Session = Depends(get_db), _=Depends(ge
     r = db.query(Receiving).get(receiving_id)
     if not r:
         raise HTTPException(404, "收货记录未找到")
-    return r
+    out = ReceivingRead.model_validate(r)
+    # 标记「新批号」：本单之外，该试剂 + 该批号没有任何其他收货记录 → 属首次到货的新批号
+    raw_items = list(r.items or [])
+    for idx, li in enumerate(raw_items):
+        if idx >= len(out.items):
+            break
+        b = (li.batch_no or "").strip()
+        if not b:
+            continue
+        existed = (db.query(ReceivingItem.id)
+                   .filter(ReceivingItem.item_id == li.item_id,
+                           ReceivingItem.batch_no == b,
+                           ReceivingItem.receiving_id != r.id)
+                   .first()) is not None
+        out.items[idx].is_new_batch = not existed
+    return out
 
 
 @router.post("/receivings", response_model=ReceivingRead)

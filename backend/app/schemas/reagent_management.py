@@ -236,6 +236,9 @@ class ReceivingItemCreate(ReceivingItemBase):
 class ReceivingItemRead(ReceivingItemBase):
     id: int
     receiving_id: int
+    # 该批号是否为「新批号」：本单之外没有任何其他收货记录用过它。
+    # 打印收货单时会醒目备注，提醒该批号需要做批间性能验证。
+    is_new_batch: bool = False
 
     class Config:
         from_attributes = True

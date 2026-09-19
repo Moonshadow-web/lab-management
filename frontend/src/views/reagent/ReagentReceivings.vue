@@ -125,12 +125,19 @@
             <tr v-for="(it, i) in printData.items || []" :key="it.id">
               <td>{{ i + 1 }}</td>
               <td>{{ itemName(it.item_id) }}</td>
-              <td>{{ it.batch_no || '—' }}</td>
+              <td>
+                <span :class="{ 'nb-batch': it.is_new_batch }">{{ it.batch_no || '—' }}</span>
+                <span v-if="it.is_new_batch" class="nb-tag">新批号</span>
+              </td>
               <td>{{ it.expiry_date || '—' }}</td>
               <td>{{ it.quantity }}</td>
             </tr>
           </tbody>
         </table>
+        <div v-if="newBatchList.length" class="nb-alert">
+          ★ 本单含 <b>{{ newBatchList.length }}</b> 个<b>新批号</b>：{{ newBatchList.join('；') }}
+          <br/>请及时安排<b>批间性能验证</b>（试剂管理 → 试剂验收）。
+        </div>
         <div class="receipt-foot">
           <span>收货人签字：________________</span>
           <span>日期：______年____月____日</span>
@@ -342,6 +349,13 @@ async function onPrint(row) {
 }
 function doPrint() { window.print() }
 
+// 本单中的「新批号」明细（打印时醒目提示）
+const newBatchList = computed(() =>
+  (printData.value.items || [])
+    .filter(x => x.is_new_batch)
+    .map(x => `${itemName(x.item_id)}（批号 ${x.batch_no || '—'}）`)
+)
+
 // 管理员删除收货单（已确认的会回退库存）
 async function onDelete(row) {
   if (!auth.isAdmin) return
@@ -391,6 +405,18 @@ onMounted(refresh)
 .receipt-items { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
 .receipt-items th, .receipt-items td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
 .receipt-items th { background: #f1f5f9; }
+/* 新批号醒目提示（打印收货单用） */
+.nb-batch { font-weight: 700; color: #d32f2f; letter-spacing: .3px; }
+.nb-tag {
+  display: inline-block; margin-left: 5px; padding: 0 4px;
+  border: 1px solid #d32f2f; border-radius: 2px;
+  color: #d32f2f; font-size: 8pt; font-weight: 700; vertical-align: middle;
+}
+.nb-alert {
+  margin-top: 10px; padding: 8px 10px;
+  border: 2px solid #d32f2f; background: #fff5f5;
+  color: #c62828; font-weight: 700; font-size: 10.5pt; line-height: 1.6;
+}
 .receipt-foot { display: flex; justify-content: space-between; margin-top: 24px; font-size: 13px; }
 </style>
 <style>
