@@ -577,15 +577,23 @@ function onPrint(row) {
     h += `<td class="num">${ok === null || ok === undefined ? '' : (ok ? '合格' : '不合格')}${why ? '<br/>' + why : ''}</td></tr>`
   })
   h += '</tbody></table>'
-  const meta = `试剂：${row.reagent_name}　规格：${row.spec || ''}　品牌：${row.brand || ''}<br>`
-    + `批号变更：${row.old_batch_no || '—'} → <b>${row.new_batch_no || '—'}</b>　变更日期：${row.change_date || '—'}`
-    + `　新批号效期：${row.new_expiry_date || '—'}<br>`
-    + `检验项目：${row.test_item_name || '—'}　允许偏倚：<b>${allowTxt}</b>　`
-    + `判读方式：${{ quantitative: '定量', qualitative: '定性', both: '定量+定性' }[jm] || '定量'}　`
-    + `标准：${row.criterion_label || '手工填写'}<br>`
-    + `结论：<b>${row.conclusion}</b>（合格 ${row.pass_count} / ${row.sample_count}）　操作人：${row.operator || ''}`
+  // 表头信息区：用表格排版更整齐；不显示「规格」；字号放大到 13px
+  const jmTxt = { quantitative: '定量', qualitative: '定性', both: '定量+定性' }[jm] || '定量'
+  const mks = 'width:96px;background:#f4f5f7;text-align:center;white-space:nowrap;padding:7px 8px;border:1px solid #b9b9b9;font-size:13px;'
+  const mvs = 'padding:7px 10px;border:1px solid #b9b9b9;font-size:13px;text-align:left;word-break:break-all;'
+  const kv = (k, v) => `<td style="${mks}">${k}</td><td style="${mvs}">${v}</td>`
+  const meta = `<table style="border-collapse:collapse;width:100%;margin:0 0 10px;">`
+    + `<tr>${kv('试剂', row.reagent_name || '—')}${kv('品牌', row.brand || '—')}</tr>`
+    + `<tr>${kv('批号变更', `${row.old_batch_no || '—'} → <b>${row.new_batch_no || '—'}</b>`)}${kv('变更日期', row.change_date || '—')}</tr>`
+    + `<tr>${kv('新批号效期', row.new_expiry_date || '—')}${kv('检验项目', row.test_item_name || '—')}</tr>`
+    + `<tr>${kv('允许偏倚', `<b>${allowTxt}</b>`)}${kv('判读方式', jmTxt)}</tr>`
+    + `<tr><td style="${mks}">判定标准</td><td colspan="3" style="${mvs}">${row.criterion_label || '手工填写'}</td></tr>`
+    + `<tr><td style="${mks}">结论</td><td colspan="3" style="${mvs}">`
+    + `<b style="font-size:14px">${row.conclusion || ''}</b>　合格 <b>${row.pass_count ?? 0}</b> / ${row.sample_count ?? 0}`
+    + `　　操作人：${row.operator || ''}</td></tr>`
+    + `</table>`
   printHtml(`${DOC_TITLE} ${row.reagent_name}`,
-    `<table class="doc"><thead><tr><td><h2>${DOC_TITLE}</h2><div class="meta">${meta}</div></td></tr></thead>`
+    `<table class="doc"><thead><tr><td><h2>${DOC_TITLE}</h2><div class="meta" style="font-size:13px;line-height:1.7;">${meta}</div></td></tr></thead>`
     + `<tbody><tr><td>${h}</td></tr></tbody>`
     + `<tfoot><tr><td><div class="doc-foot">${FOOT}</div></td></tr></tfoot></table>`)
 }
