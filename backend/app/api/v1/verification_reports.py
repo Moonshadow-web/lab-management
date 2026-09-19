@@ -295,9 +295,12 @@ _CNAS_ABBR = {
 _CNAS_NAME_KEYWORDS = ("C反应蛋白", "表面抗体", "肝炎病毒抗体", "HIV", "梅毒")  # 无括号缩写项目
 
 # 项目名常见修饰词（"边缘包含"匹配时，残余部分需落在这些词里才算合理）
+# ⚠️ 2026-09-19 移除「尿 / 血 / 血清 / 血浆」：它们是**标本类型**而非无意义修饰，
+#    留在里面会造成误判——如「尿微量白蛋白」被当成「白蛋白」、「尿转铁蛋白」被当成「铁蛋白」。
+#    标本类型不同的项目临床意义不同，必须靠能力范围表里的精确名称匹配，不能靠边缘包含。
 _PROJECT_MODIFIERS = (
     "超敏", "高敏", "全段", "游离", "总", "结合", "非结合", "直接", "间接",
-    "活性", "免疫", "定量", "定性", "β", "α", "尿", "血", "血清", "血浆",
+    "活性", "免疫", "定量", "定性", "β", "α",
 )
 
 # 报告项目名 ↔ 认可能力范围项目名（文字差异较大、无法靠包含关系命中的）
@@ -345,6 +348,20 @@ def _edge_match(short: str, long: str) -> bool:
     return any(rest.startswith(m) or rest.endswith(m) for m in _PROJECT_MODIFIERS)
 
 
+# 标本类型前缀。「尿微量白蛋白」≠「白蛋白」（不同项目），但「血浆D-二聚体」=「D-二聚体」（同一项目）。
+# 判别规则：**去掉开头标本词后若能精确等于能力范围里的项目名**，才视为同一项目；
+# 否则不允许靠"边缘包含"蒙混（这正是「尿微量白蛋白→白蛋白」「尿转铁蛋白→铁蛋白」误判的来源）。
+_SPECIMEN_PREFIXES = ("尿液", "血清", "血浆", "全血", "尿", "脑脊液", "胸腹水", "粪便")
+
+
+def _strip_specimen(core: str) -> str:
+    """剥离开头的标本类型词，返回剩余部分（无变化则原样返回）。"""
+    for w in _SPECIMEN_PREFIXES:
+        if core.startswith(w) and len(core) > len(w) + 1:
+            return core[len(w):]
+    return core
+
+
 def _load_cnas_names(db) -> set:
     """从「认可能力范围」表加载认可项目名的归一化集合（权威来源，随能力范围更新自动生效）。"""
     try:
@@ -365,10 +382,14 @@ def _is_cnas(project_name: str, acc_names: set | None = None) -> bool:
     core = _norm_project_name(pn)
     names = acc_names or set()
     if core and names:
+        stripped = _strip_specimen(core)
         for n in names:
             if not n:
                 continue
             if core == n:
+                return True
+            # 去掉开头标本词后精确相等 → 同一项目（如「血浆D-二聚体」vs「D-二聚体」）
+            if stripped != core and stripped == n:
                 return True
             if len(n) >= 3 and _edge_match(n, core):
                 return True
