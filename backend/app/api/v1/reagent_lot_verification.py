@@ -43,6 +43,31 @@ SOURCE_LABEL = {
 
 
 
+
+# ═══════════════════════════════════════════════════════════════
+#   「申请 CNAS 认可的项目」判定
+#   直接复用 verification_reports 里那套（认可能力范围表动态匹配 + 别名 + 缩写兜底），
+#   避免同一套匹配规则维护两份。惰性导入防止模块级循环依赖。
+# ═══════════════════════════════════════════════════════════════
+def _cnas_checker():
+    try:
+        from .verification_reports import _is_cnas, _load_cnas_names
+        return _is_cnas, _load_cnas_names
+    except Exception:
+        return None, None
+
+
+def is_accredited_item(db, test_item_name: str) -> bool:
+    """该检验项目是否属于申请 CNAS 认可的项目。"""
+    fn, loader = _cnas_checker()
+    if not fn or not loader:
+        return False
+    try:
+        return bool(fn(test_item_name or "", loader(db)))
+    except Exception:
+        return False
+
+
 # ═══════════════════════════════════════════════════════════════
 #   验收范围：只针对「试剂」，不含校准品/质控品/耗材，也不含电解质类
 # ═══════════════════════════════════════════════════════════════
@@ -268,7 +293,7 @@ def compute_samples(samples: list, allow_pct: float, need: int,
     return out, passed, conclusion, valid
 
 
-def _to_read(v: ReagentLotVerification) -> dict:
+def _to_read(v: ReagentLotVerification, is_cnas: bool = False) -> dict:
     try:
         samples = json.loads(v.samples_json or "[]")
     except Exception:
@@ -287,6 +312,7 @@ def _to_read(v: ReagentLotVerification) -> dict:
         "allow_bias_abs": getattr(v, "allow_bias_abs", "") or "",
         "bias_mode": v.bias_mode or "relative",
         "judge_mode": v.judge_mode or "quantitative",
+        "is_cnas": bool(is_cnas),   # 检验项目是否属申请 CNAS 认可的项目
         "samples": samples, "sample_count": v.sample_count,
         "samples_json": v.samples_json or "",
         "pass_count": v.pass_count, "conclusion": v.conclusion,
@@ -470,15 +496,22 @@ def list_verifications(
             | ReagentLotVerification.old_batch_no.like(kw)
             | ReagentLotVerification.test_item_name.like(kw)
         )
-    total = base.count()
     # 注意：不能用 .nullslast()，MySQL 不支持 NULLS LAST 语法（会直接 500）。
     # MySQL 里 DESC 排序时 NULL 天然排在最后，用 desc() 即可。
-    rows = base.order_by(
+    all_rows = base.order_by(
         ReagentLotVerification.change_date.desc(),
         ReagentLotVerification.id.desc(),
-    ).offset((page - 1) * page_size).limit(page_size).all()
+    ).all()
+    # 「申请 CNAS 认可的项目」排前面；Python 的 sort 是稳定排序，组内保持原时间倒序
+    fn, loader = _cnas_checker()
+    acc_names = loader(db) if loader else set()
+    flagged = [(r, bool(fn(r.test_item_name or "", acc_names)) if fn else False)
+               for r in all_rows]
+    flagged.sort(key=lambda t: (not t[1],))
+    total = len(flagged)
+    page_rows = flagged[(page - 1) * page_size: page * page_size]
     return {"total": total, "page": page, "page_size": page_size,
-            "items": [_to_read(r) for r in rows]}
+            "items": [_to_read(r, flag) for r, flag in page_rows]}
 
 
 @router.get("/{vid}", response_model=dict)
@@ -487,7 +520,7 @@ def get_verification(vid: int, db: Session = Depends(get_db),
     v = db.query(ReagentLotVerification).get(vid)
     if not v:
         raise HTTPException(404, "验收记录未找到")
-    return _to_read(v)
+    return _to_read(v, is_accredited_item(db, v.test_item_name))
 
 
 @router.post("", response_model=dict)
@@ -709,6 +742,7 @@ def generate_verifications(
         "allow_bias_abs": getattr(v, "allow_bias_abs", "") or "",
         "bias_mode": v.bias_mode or "relative",
         "judge_mode": v.judge_mode or "quantitative",
+        "is_cnas": bool(is_cnas),   # 检验项目是否属申请 CNAS 认可的项目
                         "criterion_label": v.criterion_label})
     db.commit()
     return {"created": created, "created_count": len(created),

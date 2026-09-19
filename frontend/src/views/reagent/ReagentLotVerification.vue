@@ -53,8 +53,11 @@
       <el-table-column label="效期（新批号）" width="120">
         <template #default="{ row }">{{ row.new_expiry_date || '—' }}</template>
       </el-table-column>
-      <el-table-column prop="test_item_name" label="检验项目" width="150">
-        <template #default="{ row }">{{ row.test_item_name || '—' }}</template>
+      <el-table-column prop="test_item_name" label="检验项目" width="188">
+        <template #default="{ row }">
+          <el-tag v-if="row.is_cnas" size="small" type="success" effect="dark" style="margin-right:4px">认可</el-tag>
+          <span>{{ row.test_item_name || '—' }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="允许偏倚" width="150">
         <template #default="{ row }">
@@ -585,7 +588,7 @@ function onPrint(row) {
   const meta = `<table style="border-collapse:collapse;width:100%;margin:0 0 10px;">`
     + `<tr>${kv('试剂', row.reagent_name || '—')}${kv('品牌', row.brand || '—')}</tr>`
     + `<tr>${kv('批号变更', `${row.old_batch_no || '—'} → <b>${row.new_batch_no || '—'}</b>`)}${kv('变更日期', row.change_date || '—')}</tr>`
-    + `<tr>${kv('新批号效期', row.new_expiry_date || '—')}${kv('检验项目', row.test_item_name || '—')}</tr>`
+    + `<tr>${kv('新批号效期', row.new_expiry_date || '—')}${kv('检验项目', (row.is_cnas ? '<b style="color:#1a7f37">【认可】</b>' : '') + (row.test_item_name || '—'))}</tr>`
     + `<tr>${kv('允许偏倚', `<b>${allowTxt}</b>`)}${kv('判读方式', jmTxt)}</tr>`
     + `<tr><td style="${mks}">判定标准</td><td colspan="3" style="${mvs}">${row.criterion_label || '手工填写'}</td></tr>`
     + `<tr><td style="${mks}">结论</td><td colspan="3" style="${mvs}">`
