@@ -19,7 +19,7 @@ const FALLBACK_MODULE_WRITE_ROLES = {
   'comparison-edit': ['admin', 'qc_manager'],
   'interlab': ['admin', 'qc_manager', 'technical_support'],
   'interlab-edit': ['admin', 'qc_manager'],
-  'reagents': ['admin', 'reagent_manager'],
+  'reagents': ['admin', 'reagent_manager', 'specialty_leader'],
   'reagents_delete': ['admin', 'reagent_manager'],
   'reagent-receivings': ['admin', 'reagent_manager', 'reagent_delivery'],
   'reagent-orders': ['admin', 'reagent_manager'],

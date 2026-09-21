@@ -21,7 +21,7 @@ const FALLBACK = {
   'interlab':             ['admin', 'qc_manager', 'technical_support', 'member', 'staff'],
   'interlab-create':      ['admin', 'qc_manager', 'technical_support'],
   'interlab-edit':        ['admin', 'qc_manager'],
-  'reagents':             ['admin', 'reagent_manager'],
+  'reagents':             ['admin', 'reagent_manager', 'specialty_leader'],
   'reagents_delete':      ['admin', 'reagent_manager'],
   'training':             ['admin', 'training_manager'],
   'training_delete':      ['admin', 'training_manager'],

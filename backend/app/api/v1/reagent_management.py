@@ -45,6 +45,27 @@ router = APIRouter(prefix="/reagent", tags=["reagent-management"])
 # 1. 试剂目录 CRUD
 # =============================================================================
 
+def _item_in_scope(item, group: str) -> bool:
+    """该试剂是否属于当前专业组的可操作范围（与列表 _rg_scope 口径保持一致）：
+    本组 / 生免组兼容历史空值 / 材料编码含 KS 的科室共享试剂。"""
+    g = (group or "sm").strip().lower()
+    ig = (item.group_code or "").strip().lower()
+    if ig == g:
+        return True
+    if g == "sm" and ig in ("", "sm"):
+        return True
+    if "KS" in (item.material_code or "").upper():
+        return True
+    return False
+
+
+def _is_admin(user) -> bool:
+    try:
+        return "admin" in set(user_roles_list(user))
+    except Exception:
+        return False
+
+
 def _rg_scope(query, Model, group: str):
     """按专业组过滤试剂相关列表：本组 或 材料编码含 KS（科室共享）；生免组兼容历史空值。"""
     col = getattr(Model, "group_code", None)
@@ -151,7 +172,7 @@ def get_reagent_item(item_id: int, db: Session = Depends(get_db), _=Depends(get_
 def create_reagent_item(
     data: ReagentItemCreate, db: Session = Depends(get_db),
     group: str = Depends(get_current_group),
-    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician", "specialty_leader")),
 ):
     _d = data.model_dump()
     if group:
@@ -166,11 +187,15 @@ def create_reagent_item(
 @router.put("/items/{item_id}", response_model=ReagentItemRead)
 def update_reagent_item(
     item_id: int, data: ReagentItemUpdate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
+    group: str = Depends(get_current_group),
+    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician", "specialty_leader")),
 ):
     item = db.query(ReagentItem).get(item_id)
     if not item:
         raise HTTPException(404, "试剂未找到")
+    # 非管理员只能维护本专业组（含 KS 共享）的试剂，防止跨组越权
+    if not _is_admin(user) and not _item_in_scope(item, group):
+        raise HTTPException(403, "只能维护本专业组的试剂")
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(item, k, v)
     db.commit()
@@ -1545,7 +1570,8 @@ def calculate_consumption(
 @router.post("/items/_import-excel", response_model=ImportResult)
 def import_reagent_from_excel(
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "specialty_leader")),
+    group: str = Depends(get_current_group),
     file: UploadFile = File(...),
 ):
     """从 Excel 导入试剂目录（要求：第1行表头，需含 'name' 或 '试剂名称' 列）。"""
@@ -1629,6 +1655,10 @@ def import_reagent_from_excel(
             if existing is None:
                 existing = db.query(ReagentItem).filter(ReagentItem.name == name).first()
             if existing:
+                # 跨组保护：非管理员只能更新本专业组（含 KS 共享）的记录，其余跳过
+                if not _is_admin(user) and not _item_in_scope(existing, group):
+                    skipped += 1
+                    continue
                 # 已存在：用本次导入信息补全/覆盖目录字段
                 for key in ("material_code", "spec", "brand", "unit", "category", "library",
                             "type", "unit_price", "manufacturer", "supplier", "remark"):
@@ -1655,7 +1685,7 @@ def import_reagent_from_excel(
                         setattr(existing, key, str(v).strip())
                 skipped += 1
                 continue
-            item = ReagentItem(name=name)
+            item = ReagentItem(name=name, group_code=(group or "sm").strip().lower())
             if "type" in col_map:
                 item.type = str(row[col_map["type"]] or "试剂").strip()
             else:
