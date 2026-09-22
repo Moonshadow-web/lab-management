@@ -1216,9 +1216,13 @@ def create_receiving(
     group: str = Depends(get_current_group),
     user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
 ):
+    # 目标专业组：有 admin/reagent_manager 角色时可指定他组（如把货直接入到分子组），
+    # 否则固定用当前登录人所在组，避免越权。
+    owned = set(user_roles_list(user))
+    tg = (getattr(data, "target_group", "") or "").strip().lower()
+    use_group = tg if (tg and ("admin" in owned or "reagent_manager" in owned)) else (group or "sm").strip().lower()
     rec = Receiving(
-        group_code=(group or "sm").strip().lower(),
-    
+        group_code=use_group,
         receipt_no=data.receipt_no, receipt_date=data.receipt_date,
         order_id=data.order_id, delivery_person=data.delivery_person,
         receiver=data.receiver or "",  # 新建/编辑时保存用户实际填入值（可空，由确认时填入确认人）
@@ -1230,6 +1234,7 @@ def create_receiving(
         db.add(ReceivingItem(
             receiving_id=rec.id, item_id=it.item_id, batch_no=it.batch_no,
             expiry_date=it.expiry_date, quantity=it.quantity, remark=it.remark,
+            group_code=use_group,   # 修复：此前漏设 → 明细一律落到默认 sm 组
         ))
     # 注意：新建时**不**直接入库存，待「确认接收」后才写入实时库存（避免未确认单据污染库存）
     db.commit()
@@ -1366,9 +1371,13 @@ def confirm_receiving(
     # 接收人在「确认接收」时强制填入当前登录人（即便保存时已有人工填值）
     r.receiver = user.full_name or user.username
     for it in r.items:
+        # 库存按专业组归类：优先明细的组，回退到单据的组
+        # （修复：此前漏设 group_code → 分子组的货全被计到生免组库存里）
+        g = (it.group_code or r.group_code or "sm").strip().lower()
         stock = db.query(ReagentStock).filter(
             ReagentStock.item_id == it.item_id,
             ReagentStock.batch_no == it.batch_no,
+            ReagentStock.group_code == g,
         ).first()
         if stock:
             stock.quantity += it.quantity
@@ -1377,6 +1386,7 @@ def confirm_receiving(
             db.add(ReagentStock(
                 item_id=it.item_id, batch_no=it.batch_no,
                 expiry_date=it.expiry_date, quantity=it.quantity,
+                group_code=g,
             ))
     r.is_confirmed = True
     r.confirmed_at = datetime.utcnow()

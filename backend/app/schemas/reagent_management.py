@@ -254,6 +254,9 @@ class ReceivingBase(BaseModel):
 
 
 class ReceivingCreate(ReceivingBase):
+    # 目标专业组：留空=当前登录人所在组。仅 admin / reagent_manager 可指定为他组
+    # （用于把货直接入到分子组等其他专业组的库里）。
+    target_group: str = ""
     items: list[ReceivingItemCreate] = []
 
 

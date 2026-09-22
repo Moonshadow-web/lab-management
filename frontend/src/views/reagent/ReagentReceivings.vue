@@ -62,7 +62,18 @@
         </el-row>
         <el-row :gutter="12">
           <el-col :span="8"><el-form-item label="接收人"><el-input v-model="form.receiver" placeholder="确认接收时自动填入当前登录人" /></el-form-item></el-col>
+          <el-col :span="8" v-if="canPickGroup && !editingId">
+            <el-form-item label="入库专业组">
+              <el-select v-model="form.target_group" clearable placeholder="默认：我所在的组" style="width:100%">
+                <el-option v-for="g in (auth.switchableGroups || [])" :key="g"
+                           :label="GROUP_NAMES[g] || g" :value="g" />
+              </el-select>
+            </el-form-item>
+          </el-col>
         </el-row>
+        <el-alert v-if="canPickGroup && !editingId && form.target_group"
+                  :title="`该收货单的明细与确认后的库存都会计入「${GROUP_NAMES[form.target_group] || form.target_group}」，请确认无误`"
+                  type="warning" :closable="false" show-icon style="margin-bottom:10px" />
         <el-form-item label="备注"><el-input v-model="form.remark" /></el-form-item>
       </el-form>
       <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
@@ -176,7 +187,11 @@ const confirmedFilter = ref('')
 const dialogVisible = ref(false), submitting = ref(false), editingId = ref(null)
 const allItems = ref([]), searchSel = ref(''), searchResults = ref([]), searching = ref(false)
 const loadedLib = ref('')
-const form = ref({ receipt_no: '', receipt_date: '', delivery_person: '', receiver: '', remark: '' })
+const form = ref({ receipt_no: '', receipt_date: '', delivery_person: '', receiver: '', remark: '', target_group: '' })
+// 专业组名称（用于「入库专业组」下拉）
+const GROUP_NAMES = { sm: '生化免疫组', lj: '临检组', wsw: '微生物组', fz: '分子组', xk: '血库' }
+// 仅可切换专业组的角色（管理员/试剂管理员）能指定入库到别的组
+const canPickGroup = computed(() => !!auth.canSwitchGroup)
 const items = ref([])
 const printVisible = ref(false), printData = ref({})
 
