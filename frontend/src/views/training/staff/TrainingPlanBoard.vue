@@ -1,5 +1,11 @@
 <template>
   <div class="plan-board">
+    <div v-if="current" class="pb-sign">
+      <span>制定人：<b>{{ current.maker || '—' }}</b></span>
+      <span>制定日期：<b>{{ current.made_date || '—' }}</b></span>
+      <span>批准人：<b>{{ current.approver || '—' }}</b></span>
+      <span>批准日期：<b>{{ current.approved_date || '—' }}</b></span>
+    </div>
     <div class="pb-toolbar">
       <el-select v-model="year" size="small" style="width: 112px" @change="onYearChange">
         <el-option v-for="y in yearOptions" :key="y" :label="y + ' 年'" :value="y" />
@@ -245,6 +251,8 @@ onMounted(async () => {
 
 <style scoped>
 .plan-board { margin-top: 8px; }
+.pb-sign { display: flex; flex-wrap: wrap; gap: 26px; font-size: 13px; color: #606266; padding: 6px 2px 10px; }
+.pb-sign b { color: #303133; font-weight: 600; }
 .pb-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .pb-empty { padding: 8px 0; }
 .pb-name { font-weight: 600; }

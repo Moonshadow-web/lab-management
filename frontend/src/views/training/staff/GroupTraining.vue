@@ -20,6 +20,20 @@
               <el-col :span="8"><el-form-item label="年份"><el-input v-model="planForm.year" /></el-form-item></el-col>
               <el-col :span="16"><el-form-item label="计划标题"><el-input v-model="planForm.title" /></el-form-item></el-col>
             </el-row>
+            <el-row :gutter="12">
+              <el-col :span="6"><el-form-item label="制定人"><el-input v-model="planForm.maker" placeholder="如 金子铮" /></el-form-item></el-col>
+              <el-col :span="6">
+                <el-form-item label="制定日期">
+                  <el-date-picker v-model="planForm.made_date" type="date" value-format="YYYY.M.D" format="YYYY.M.D" placeholder="YYYY.M.D" style="width:100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="6"><el-form-item label="批准人"><el-input v-model="planForm.approver" placeholder="如 王学晶" /></el-form-item></el-col>
+              <el-col :span="6">
+                <el-form-item label="批准日期">
+                  <el-date-picker v-model="planForm.approved_date" type="date" value-format="YYYY.M.D" format="YYYY.M.D" placeholder="YYYY.M.D" style="width:100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
             <el-divider content-position="left">计划内容</el-divider>
             <div class="plan-toolbar"><el-button :icon="Plus" @click="addPlanItem">加一行</el-button></div>
             <el-table :data="planForm.items_json" border size="small">
@@ -125,9 +139,13 @@ const planRef = ref(null)
 const sessionRef = ref(null)
 
 const planColumns = [
-  { prop: 'year', label: '年份', width: 90 },
-  { prop: 'title', label: '计划标题', minWidth: 200 },
-  { prop: 'remark', label: '备注', minWidth: 160 },
+  { prop: 'year', label: '年份', width: 80 },
+  { prop: 'title', label: '计划标题', minWidth: 180 },
+  { prop: 'maker', label: '制定人', width: 88, formatter: (r) => r.maker || '—' },
+  { prop: 'made_date', label: '制定日期', width: 106, formatter: (r) => r.made_date || '—' },
+  { prop: 'approver', label: '批准人', width: 88, formatter: (r) => r.approver || '—' },
+  { prop: 'approved_date', label: '批准日期', width: 106, formatter: (r) => r.approved_date || '—' },
+  { prop: 'remark', label: '备注', minWidth: 140 },
 ]
 const sessionColumns = [
   { prop: 'name', label: '培训名称', minWidth: 200 },
@@ -143,7 +161,7 @@ const sessionColumns = [
 // 计划
 const planVisible = ref(false)
 const planForm = ref(blankPlan())
-function blankPlan() { return { id: null, year: new Date().getFullYear(), title: '', items_json: [], remark: '' } }
+function blankPlan() { return { id: null, year: new Date().getFullYear(), title: '', items_json: [], remark: '', maker: '', made_date: '', approver: '', approved_date: '' } }
 function openPlan(row) { planForm.value = row ? { ...row, items_json: row.items_json ? [...row.items_json] : [] } : blankPlan(); planVisible.value = true }
 function addPlanItem() { planForm.value.items_json.push({ item: '', goal: '', trainer: '', expected_date: '', remark: '' }) }
 function removePlanItem(r) { planForm.value.items_json = planForm.value.items_json.filter((x) => x !== r) }

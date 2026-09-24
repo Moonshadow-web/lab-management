@@ -331,6 +331,11 @@ class TrainingPlan(Base):
     title: Mapped[str] = mapped_column(String(200), default="")  # 计划标题（如"2026年度生免组培训计划"）
     items_json: Mapped[str] = mapped_column(Text, default="[]")  # [{item, goal, trainer, expected_date, remark}]
     remark: Mapped[str] = mapped_column(String(500), default="")
+    # ===== 表单签署栏（计划表页脚：制定人/制定日期/批准人/批准日期） =====
+    maker: Mapped[str] = mapped_column(String(50), default="")  # 制定人
+    made_date: Mapped[str] = mapped_column(String(20), default="")  # 制定日期
+    approver: Mapped[str] = mapped_column(String(50), default="")  # 批准人
+    approved_date: Mapped[str] = mapped_column(String(20), default="")  # 批准日期
     created_by: Mapped[str] = mapped_column(String(100), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
