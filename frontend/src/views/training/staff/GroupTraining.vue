@@ -10,7 +10,7 @@
         <CrudTable
           :columns="planColumns" :fetch="fetchPlan"
           search-placeholder="搜索计划标题"
-          :extra-params="{ year: '' }"
+          :extra-params="{}"
           :can-write="canWrite"
           @add="openPlan()" @edit="openPlan" @delete="onDeletePlan" ref="planRef"
         />
