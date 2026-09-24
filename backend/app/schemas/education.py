@@ -369,6 +369,11 @@ class TrainingPlanBase(BaseModel):
     title: str = ""
     items_json: list[dict] = []
     remark: str = ""
+    # 表单签署栏
+    maker: str = ""
+    made_date: str = ""
+    approver: str = ""
+    approved_date: str = ""
 
     @field_validator("items_json", mode="before")
     @classmethod
