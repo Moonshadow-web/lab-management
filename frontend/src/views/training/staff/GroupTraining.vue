@@ -35,10 +35,10 @@
             <el-button type="primary" @click="savePlan">保存</el-button>
           </template>
         </el-dialog>
+        <TrainingPlanBoard />
       </el-collapse-item>
 
-      <el-collapse-item :title="tag + '记录'" name="session">
-        <CrudTable
+      <el-collapse-item :title="tag + '记录'" name="session">        <CrudTable
           :columns="sessionColumns" :fetch="fetchSession"
           :search-placeholder="'搜索' + tag + '名称'"
           :extra-params="{ tag }"
@@ -108,6 +108,7 @@ import { Plus, Delete } from '@element-plus/icons-vue'
 import CrudTable from '../../../components/CrudTable.vue'
 import SignInSheet from '../SignInSheet.vue'
 import EducationAttachmentList from '../EducationAttachmentList.vue'
+import TrainingPlanBoard from './TrainingPlanBoard.vue'
 import {
   listTrainingPlan, createTrainingPlan, updateTrainingPlan, deleteTrainingPlan,
   listTrainingSession, getTrainingSession, createTrainingSession, updateTrainingSession, deleteTrainingSession,
