@@ -63,9 +63,15 @@
           <span v-else>{{ row.expected_date }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="完成情况" width="168" align="center">
+      <el-table-column label="完成情况" width="232" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.done" type="success" size="small" effect="dark">已完成 {{ row.done_date }}</el-tag>
+          <template v-if="row.done">
+            <el-tag type="success" size="small" effect="dark">已完成 {{ row.done_date }}</el-tag>
+            <div v-if="sessionName(row)" class="pb-link" :title="'关联的组内培训记录：' + sessionName(row)">
+              ↳ {{ sessionName(row) }}
+            </div>
+            <div v-else-if="row.remark" class="pb-link">{{ row.remark }}</div>
+          </template>
           <el-tag v-else type="info" size="small" effect="plain">待实施</el-tag>
         </template>
       </el-table-column>
@@ -85,7 +91,7 @@
           <el-date-picker v-model="dlgDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
         </el-form-item>
         <el-form-item label="关联培训记录">
-          <el-select v-model="dlgSessionId" clearable placeholder="可关联「组内培训」里的记录（自动带出讲师/内容）" style="width: 100%">
+          <el-select v-model="dlgSessionId" clearable placeholder="选一条组内培训记录（关联后计划表会显示它，便于调取课件/签到/考卷）" style="width: 100%">
             <el-option v-for="s in sessions" :key="s.id" :label="`${s.train_time} ${s.name}`" :value="s.id" />
           </el-select>
         </el-form-item>
@@ -132,6 +138,13 @@ const progressText = computed(() => {
 
 function rowClass({ row }) {
   return row.done ? 'pb-done-row' : ''
+}
+
+// 关联的组内培训记录名（按 session_id 反查）
+function sessionName(row) {
+  if (!row || !row.session_id) return ''
+  const s = sessions.value.find((x) => x.id === row.session_id)
+  return s ? `${s.train_time || ''} ${s.name || ''}`.trim() : `记录 #${row.session_id}`
 }
 
 async function load() {
@@ -253,6 +266,7 @@ onMounted(async () => {
 .plan-board { margin-top: 8px; }
 .pb-sign { display: flex; flex-wrap: wrap; gap: 26px; font-size: 13px; color: #606266; padding: 6px 2px 10px; }
 .pb-sign b { color: #303133; font-weight: 600; }
+.pb-link { font-size: 12px; color: #909399; margin-top: 2px; line-height: 1.35; word-break: break-all; }
 .pb-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .pb-empty { padding: 8px 0; }
 .pb-name { font-weight: 600; }

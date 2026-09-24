@@ -153,6 +153,7 @@ const sessionColumns = [
   { prop: 'train_time', label: '时间', width: 140 },
   { prop: 'location', label: '地点', width: 140 },
   { prop: 'tag', label: '类别', width: 90 },
+  { prop: 'plan_item_name', label: '对应年度计划项', minWidth: 190, formatter: (r) => r.plan_item_name || '—' },
   { prop: 'exam_person_count', label: '考核人数', width: 90, formatter: (r) => r.exam_person_count ?? '—' },
   { prop: 'exam_pass_rate', label: '合格率', width: 90, formatter: (r) => r.exam_pass_rate != null ? r.exam_pass_rate + '%' : '—' },
   { prop: 'eval_satisfy_rate', label: '满意率', width: 90, formatter: (r) => r.eval_satisfy_rate != null ? r.eval_satisfy_rate + '%' : '—' },
@@ -217,7 +218,33 @@ async function saveSession() {
 async function onDeleteSession(row) {
   try { await ElMessageBox.confirm('确认删除？', '提示', { type: 'warning' }); await deleteTrainingSession(row.id); ElMessage.success('已删除'); sessionRef.value?.refresh() } catch (e) {}
 }
-function fetchSession(params) { return listTrainingSession(params) }
+// 培训记录 ↔ 年度计划项 的反向关联（按 items_json 里的 session_id 反查）
+const sessionPlanMap = ref({})
+async function buildSessionPlanMap() {
+  try {
+    const res = await listTrainingPlan({ page: 1, page_size: 100 })
+    const list = res?.items || res || []
+    const m = {}
+    for (const p of list) {
+      const its = Array.isArray(p.items_json) ? p.items_json : []
+      for (const it of its) {
+        if (it && it.session_id) {
+          m[it.session_id] = { year: p.year, item: it.item, done_date: it.done_date || '' }
+        }
+      }
+    }
+    sessionPlanMap.value = m
+  } catch (e) { /* 忽略 */ }
+}
+async function fetchSession(params) {
+  await buildSessionPlanMap()
+  const res = await listTrainingSession(params)
+  const items = (res?.items || []).map((s) => {
+    const hit = sessionPlanMap.value[s.id]
+    return { ...s, plan_item_name: hit ? `${hit.year}年 · ${hit.item}` : '' }
+  })
+  return { ...(res || {}), items }
+}
 </script>
 
 <style scoped>
