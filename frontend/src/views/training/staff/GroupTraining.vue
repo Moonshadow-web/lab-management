@@ -236,7 +236,7 @@ async function buildSessionPlanMap() {
     sessionPlanMap.value = m
   } catch (e) { /* 忽略 */ }
 }
-function fetchSession(params) {
+async function fetchSession(params) {
   await buildSessionPlanMap()
   const res = await listTrainingSession(params)
   const items = (res?.items || []).map((s) => {
