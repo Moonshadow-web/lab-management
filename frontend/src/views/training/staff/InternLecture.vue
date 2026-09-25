@@ -2,12 +2,17 @@
   <div class="intern-lecture">
     <!-- ===== 讲课计划 ===== -->
     <div class="no-print toolbar">
-      <el-alert
-        type="info" :closable="false" show-icon
-        :title="`实习生讲课计划　已完成 ${doneCount} / ${rows.length} 项（${rate}%）`"
-      >
-        面向实习/进修人员的科室讲课安排；讲课结束后点「记录完成」填写实际日期，并可打印下方签到表留存。
-      </el-alert>
+      <div class="actions year-row">
+        <el-select v-model="year" size="small" style="width: 132px" @change="onYearChange">
+          <el-option v-for="y in yearOptions" :key="y" :label="y + ' 年度'" :value="y" />
+        </el-select>
+        <el-alert
+          type="info" :closable="false" show-icon
+          :title="`${year} 年度实习生讲课计划　已完成 ${doneCount} / ${rows.length} 项（${rate}%）`"
+        >
+          按年度分别维护（跨年实习期归入起始年度）；讲课结束后点「记录完成」填写实际日期，并可打印下方签到表留存。
+        </el-alert>
+      </div>
       <div class="actions">
         <el-button v-if="canWrite" type="primary" :icon="Check" :disabled="!dirty" @click="save">保存计划</el-button>
         <el-button v-if="canWrite" :icon="Plus" @click="addItem">加一条</el-button>
@@ -174,6 +179,9 @@ const auth = useAuthStore()
 const canWrite = ref(auth.canWrite('training'))
 
 const TAG = '实习讲课'
+const curYear = new Date().getFullYear()
+const year = ref(curYear)
+const yearOptions = ref([curYear, curYear - 1, curYear + 1])
 const loading = ref(false)
 const dirty = ref(false)
 const planId = ref(null)
@@ -221,7 +229,7 @@ async function load() {
   try {
     const res = await listTrainingPlan({ page: 1, page_size: 100 })
     const list = res?.items || res || []
-    const hit = list.find((p) => p.tag === TAG)
+    const hit = list.find((p) => p.tag === TAG && Number(p.year) === Number(year.value))
     if (hit) {
       planId.value = hit.id
       const its = Array.isArray(hit.items_json) ? hit.items_json : []
@@ -243,7 +251,8 @@ async function load() {
       }
     } else {
       planId.value = null
-      rows.value = seedRows()
+      // 种子数据只在 2026 年度（首次录入那批）预填；其它年度留空由用户自行添加
+      rows.value = Number(year.value) === 2026 ? seedRows() : []
     }
     dirty.value = false
   } catch (e) {
@@ -273,6 +282,13 @@ function addMember() {
 
 function addItem() { rows.value.push({ teacher: '', date: '', topic: '', done: false, done_date: '', remark: '' }); dirty.value = true }
 function removeItem(i) { rows.value.splice(i, 1); dirty.value = true }
+// 切换年度：重新加载该年度的讲课计划与签到名单（各年度互不影响）
+async function onYearChange() {
+  membersLoaded.value = false
+  members.value = []
+  await load()
+  await loadMembers()
+}
 function removeMember(r) {
   members.value = members.value.filter((x) => x !== r)
   dirty.value = true
@@ -280,8 +296,8 @@ function removeMember(r) {
 
 async function save(silent = false) {
   const payload = {
-    year: new Date().getFullYear(),
-    title: '实习生讲课计划',
+    year: Number(year.value),
+    title: `${year.value}年度实习生讲课计划`,
     tag: TAG,
     remark: '实习/进修人员科室讲课安排（签到表见本页下方）',
     items_json: rows.value.map((r) => ({
@@ -363,6 +379,8 @@ onMounted(async () => {
 .intern-lecture { padding: 4px 0; }
 .toolbar { margin-bottom: 12px; }
 .actions { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
+.year-row { align-items: flex-start; margin-top: 0; }
+.year-row :deep(.el-alert) { flex: 1; }
 .hint { font-size: 12px; color: #909399; }
 .dlg-name { font-weight: 600; }
 .sheet { margin-top: 12px; }
