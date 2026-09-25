@@ -1,8 +1,8 @@
 <template>
   <div class="sign-in-sheet">
     <div class="no-print toolbar">
-      <el-alert type="info" :closable="false" title="打印空白签到表 → 现场签名 → 扫描后上传到「签到扫描件」页签留存">
-        打印后手工签名，再将扫描件上传到上方"课件 / 通知 / 考题 / 效果评价 / 签到 存档"的「签到扫描件」页签，即完成 BG-SM-PX-006 签到表归档。
+      <el-alert type="info" :closable="false" :title="`打印空白签到表 → 现场签名 → 扫描后上传到「签到扫描件」页签留存`">
+        {{ tipText }}
         <div class="fe-ver">页面版本：FE {{ feChunk || '…' }} · BE {{ beMark || '…' }}（若与最新不符请强刷 Ctrl+F5）</div>
       </el-alert>
       <div class="sheet-actions">
@@ -14,8 +14,19 @@
 
     <!-- 屏显预览（打印时隐藏） -->
     <div class="sheet preview no-print" v-if="rows.length">
-      <h2 class="sheet-title">生化免疫组培训签到表</h2>
-      <table class="sheet-head">
+      <h2 class="sheet-title">{{ sheetTitle }}</h2>
+      <!-- 科内培训（BG-KS-PX-807）：科室/日期/课程名称 一行三格 -->
+      <table class="sheet-head" v-if="isKs">
+        <tr>
+          <td class="lbl">科室</td>
+          <td>{{ header.department || '检验科' }}</td>
+          <td class="lbl">日期</td>
+          <td>{{ header.train_time || '　' }}</td>
+          <td class="lbl">课程名称</td>
+          <td>{{ header.name || '　' }}</td>
+        </tr>
+      </table>
+      <table class="sheet-head" v-else>
         <tr>
           <td class="lbl">培训名称</td>
           <td>{{ header.name || '　' }}</td>
@@ -36,8 +47,8 @@
       <table class="sign-grid">
         <thead>
           <tr>
-            <th>姓名</th><th>职称</th><th>签到</th>
-            <th>姓名</th><th>职称</th><th>签到</th>
+            <th>姓　名</th><th>职 称</th><th>签 到</th>
+            <th>姓　名</th><th>职 称</th><th>签 到</th>
           </tr>
         </thead>
         <tbody>
@@ -52,14 +63,27 @@
             <template v-else><td></td><td></td><td class="sign-cell"></td></template>
           </tr>
         </tbody>
+        <tfoot v-if="isKs">
+          <tr><td colspan="6" class="sign-foot">科室负责人签字：＿＿＿＿＿＿＿＿＿＿</td></tr>
+        </tfoot>
       </table>
     </div>
 
     <!-- 打印专用：Teleport 到 body，仅打印时显示，规避 el-dialog fixed 浮层打印空白 -->
     <Teleport to="body">
       <div class="print-root sheet" v-if="rows.length">
-        <h2 class="sheet-title">生化免疫组培训签到表</h2>
-        <table class="sheet-head">
+        <h2 class="sheet-title">{{ sheetTitle }}</h2>
+        <table class="sheet-head" v-if="isKs">
+          <tr>
+            <td class="lbl">科室</td>
+            <td>{{ header.department || '检验科' }}</td>
+            <td class="lbl">日期</td>
+            <td>{{ header.train_time || '　' }}</td>
+            <td class="lbl">课程名称</td>
+            <td>{{ header.name || '　' }}</td>
+          </tr>
+        </table>
+        <table class="sheet-head" v-else>
           <tr>
             <td class="lbl">培训名称</td>
             <td>{{ header.name || '　' }}</td>
@@ -80,8 +104,8 @@
         <table class="sign-grid">
           <thead>
             <tr>
-              <th>姓名</th><th>职称</th><th>签到</th>
-              <th>姓名</th><th>职称</th><th>签到</th>
+              <th>姓　名</th><th>职 称</th><th>签 到</th>
+              <th>姓　名</th><th>职 称</th><th>签 到</th>
             </tr>
           </thead>
           <tbody>
@@ -97,7 +121,8 @@
             </tr>
           </tbody>
           <tfoot>
-            <tr><td colspan="6" class="foot-cell">表格编号：BG-SM-PX-006　　检验科生化免疫组　　生效日期：2026.9.1</td></tr>
+            <tr v-if="isKs"><td colspan="6" class="sign-foot">科室负责人签字：＿＿＿＿＿＿＿＿＿＿</td></tr>
+            <tr><td colspan="6" class="foot-cell">{{ footText }}</td></tr>
           </tfoot>
         </table>
       </div>
@@ -107,8 +132,8 @@
       <el-divider content-position="left">编辑签到名单（打印前可调）</el-divider>
       <el-table :data="uniqueRows" border size="small">
         <el-table-column label="姓名" width="160">
-          <template #default="{ row, $index }">
-            <el-input v-model="row.name" placeholder="姓名" @input="persistHeader()" />
+          <template #default="{ row }">
+            <el-input v-model="row.name" placeholder="姓名" />
           </template>
         </el-table-column>
         <el-table-column label="职称" width="160">
@@ -137,7 +162,31 @@ const props = defineProps({
   canWrite: { type: Boolean, default: true },
   // 已保存的签到名单（数组 [{name,title}]）；有则优先使用，避免手动改动丢失
   savedNames: { type: Array, default: null },
+  // 版式：sm = 组内培训（BG-SM-PX-006，生化免疫组）；ks = 科内培训（BG-KS-PX-807，检验科）
+  variant: { type: String, default: 'sm' },
 })
+
+const isKs = computed(() => props.variant === 'ks')
+const sheetTitle = computed(() => (isKs.value ? '民航总医院检验科继续教育培训签到表' : '生化免疫组培训签到表'))
+const footText = computed(() => (isKs.value
+  ? '表格编号：BG-KS-PX-807　　民航总医院检验科　　生效日期：2025.04.01'
+  : '表格编号：BG-SM-PX-006　　检验科生化免疫组　　生效日期：2026.9.1'))
+const tipText = computed(() => (isKs.value
+  ? '打印后手工签名，再将扫描件上传到「签到扫描件」页签，即完成 BG-KS-PX-807 签到表归档。'
+  : '打印后手工签名，再将扫描件上传到上方"课件 / 通知 / 考题 / 效果评价 / 签到 存档"的「签到扫描件」页签，即完成 BG-SM-PX-006 签到表归档。'))
+
+// BG-KS-PX-807 固定名单（检验科全科，取自已归档的签到表模板）
+const KS_NAMES = [
+  ['王学晶', ''], ['陈剑', ''], ['张鲲', ''], ['龚珂', ''], ['刘书理', ''], ['王广进', ''],
+  ['赵华', ''], ['张妹', ''], ['徐晓琳', ''], ['尹海珊', ''], ['张莹', ''], ['郑蕊', ''],
+  ['朱金曼', ''], ['梁音', ''], ['孙碧璇', ''], ['赵爽', ''], ['张贺然', ''], ['李东', ''],
+  ['时琰丽', ''], ['王杉', ''], ['崔彦超', ''], ['王晓倩', ''], ['赵瑞', ''], ['高宏进文', ''],
+  ['常昊宇', ''], ['陆雨晴', ''], ['吴英', ''], ['张岩', ''], ['杨静', ''], ['王春馨', ''],
+  ['王淑华', ''], ['张婵媛', ''], ['姚建民', ''], ['贾国伟', ''], ['赵海元', ''], ['朱春阳', ''],
+  ['郑飞', ''], ['夏立娇', ''], ['张洪顺', ''], ['秦东芳', ''], ['孔亚龙', ''], ['杨越屹', ''],
+  ['李昊峻', ''], ['秦满红', ''], ['宋浩', ''], ['吴朋', ''], ['代鹏', ''], ['吕文娟', ''],
+  ['金子铮', ''], ['赵慧君', ''], ['翟晓丹', ''],
+]
 
 const rows = ref([])
 const feChunk = ref('')
@@ -159,7 +208,6 @@ async function loadVersionTag() {
 loadVersionTag()
 
 // 渲染层强制去重：无论内存 rows 来源如何（预填/手动/历史残留），屏显与打印均不出现同名重复行
-// 注意：空名单行必须保留——否则「加一行」新增的空行会被过滤掉，表现为点了没反应
 const uniqueRows = computed(() => {
   const seen = new Set()
   return rows.value.filter((r) => {
@@ -173,12 +221,11 @@ const uniqueRows = computed(() => {
 
 const pairedRows = computed(() => {
   const out = []
-  // 两两配对：奇数长度时循环本身已把最后一人放到 left（right=null），切勿再重复 push
   for (let i = 0; i < uniqueRows.value.length; i += 2) {
     out.push({ left: uniqueRows.value[i], right: uniqueRows.value[i + 1] || null })
   }
-  // 保证至少 30 行（与原表行数相当）
-  while (out.length < 30) out.push({ left: null, right: null })
+  // 保证至少 26 行（一页即可容纳）
+  while (out.length < 26) out.push({ left: null, right: null })
   return out
 })
 
@@ -186,12 +233,7 @@ function addRow() { rows.value.push({ name: '', title: '' }) }
 function removeRow(r) { rows.value = rows.value.filter((x) => x !== r) }
 function clearRows() { rows.value = [] }
 
-function persistHeader() {
-  // 名单变化不影响 header，但保留钩子便于扩展
-}
-
 async function doPrint() {
-  // 保存当前名单到 session 的 sign_in_header（通过父组件），再打印
   emitSaveHeader()
   await new Promise((r) => setTimeout(r, 100))
   window.print()
@@ -199,11 +241,10 @@ async function doPrint() {
 
 const emit = defineEmits(['save-header'])
 function emitSaveHeader() {
-  // 持久化前再次去重，确保存库名单不含重复姓名
   emit('save-header', { names: dedupeNames(uniqueRows.value.map((r) => ({ name: r.name, title: r.title }))) })
 }
 
-// 排除“培训老师”本人，并去重（避免编辑记录里出现两个金子铮）
+// 排除“培训老师”本人，并去重
 function excludeTeacher(list) {
   const t = (props.header && props.header.teacher) || ''
   const seen = new Set()
@@ -219,8 +260,10 @@ function excludeTeacher(list) {
 onMounted(async () => {
   if (props.savedNames && props.savedNames.length) {
     rows.value = dedupeNames(props.savedNames.map((n) => ({ name: n.name || '', title: n.title || '' })))
+  } else if (isKs.value) {
+    // 科内培训：用 BG-KS-PX-807 的检验科全科名单
+    rows.value = KS_NAMES.map(([name, title]) => ({ name, title }))
   } else {
-    // 预填生免室人员名单（去重 + 排除培训老师）
     try {
       const res = await listPersonnel({ page: 1, page_size: 200 })
       const people = (res.items || []).map((p) => ({ name: p.name, title: p.title }))
@@ -254,18 +297,14 @@ function dedupeNames(list) {
 .sign-grid th, .sign-grid td { border: 1px solid #333; padding: 8px 10px; font-size: 14px; text-align: center; height: 34px; }
 .sign-grid th { background: #f5f5f5; }
 .sign-cell { height: 34px; }
-/* 表格编号行：用 <tfoot> 实现——跨页打印时浏览器自动在每页重复，且表格行永远在其上方，不可能重叠 */
+.sign-foot { border: none !important; text-align: left; font-size: 13px; padding: 8px 2px !important; height: auto !important; }
 .foot-cell { border: none !important; text-align: center; font-size: 12px; color: #333; letter-spacing: 1px; padding-top: 10px !important; height: auto !important; }
 
-/* 打印专用副本：屏显隐藏，仅打印时通过 Teleport 到 body 显示 */
 .print-root { display: none; }
 
 @media print {
   .no-print { display: none !important; }
-  /* 底边距 26mm：内容区止于此线之上，编号页脚 fixed 在该线处，永不与表格重叠；
-     浏览器自带的 网址/页码 在更下方的页边距里 */
   @page { size: A4; margin: 14mm 12mm 26mm 12mm; }
-  /* print-root 已 Teleport 到 body，直接隐藏其它 body 子元素，避免 el-dialog fixed 浮层打印空白 */
   body > *:not(.print-root) { display: none !important; }
   .print-root {
     display: block !important;

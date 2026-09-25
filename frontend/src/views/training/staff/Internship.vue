@@ -9,6 +9,9 @@
         <CrudTable :columns="scoreCols" :fetch="fetchScore" search-placeholder="搜索姓名"
           :can-write="canWrite" @add="openScore()" @edit="openScore" @delete="onDeleteScore" ref="scoreRef" />
       </el-tab-pane>
+      <el-tab-pane label="讲课计划（实习生）" name="lecture">
+        <InternLecture />
+      </el-tab-pane>
     </el-tabs>
 
     <!-- PX-003 -->
@@ -74,6 +77,7 @@
 import { ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../../components/CrudTable.vue'
+import InternLecture from './InternLecture.vue'
 import {
   listMentor, createMentor, updateMentor, deleteMentor,
   listScore, createScore, updateScore, deleteScore,
