@@ -4,9 +4,9 @@
     <div class="no-print toolbar">
       <el-alert
         type="info" :closable="false" show-icon
-        :title="`实习生讲课计划（共 ${rows.length} 条）`"
+        :title="`实习生讲课计划　已完成 ${doneCount} / ${rows.length} 项（${rate}%）`"
       >
-        面向实习/进修人员的科室讲课安排；讲课结束后可由带教老师打印下方签到表留存。
+        面向实习/进修人员的科室讲课安排；讲课结束后点「记录完成」填写实际日期，并可打印下方签到表留存。
       </el-alert>
       <div class="actions">
         <el-button v-if="canWrite" type="primary" :icon="Check" :disabled="!dirty" @click="save">保存计划</el-button>
@@ -14,28 +14,36 @@
       </div>
     </div>
 
-    <el-table :data="rows" border size="small" v-loading="loading">
+    <el-table :data="rows" border size="small" v-loading="loading" :row-class-name="rowClass">
       <el-table-column type="index" label="序号" width="60" align="center" />
-      <el-table-column label="讲课教师" width="130">
+      <el-table-column label="讲课教师" width="120">
         <template #default="{ row }">
           <el-input v-if="canWrite" v-model="row.teacher" size="small" placeholder="教师姓名" />
           <span v-else>{{ row.teacher }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="讲课日期" width="140">
+      <el-table-column label="计划讲课日期" width="140">
         <template #default="{ row }">
           <el-input v-if="canWrite" v-model="row.date" size="small" placeholder="如 2026.7" />
           <span v-else>{{ row.date }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="讲课题目" min-width="300">
+      <el-table-column label="讲课题目" min-width="280">
         <template #default="{ row }">
           <el-input v-if="canWrite" v-model="row.topic" size="small" placeholder="讲课题目" />
           <span v-else>{{ row.topic }}</span>
         </template>
       </el-table-column>
-      <el-table-column v-if="canWrite" label="操作" width="80" align="center">
-        <template #default="{ $index }">
+      <el-table-column label="完成情况" width="150" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.done" type="success" size="small" effect="dark">已完成 {{ row.done_date }}</el-tag>
+          <el-tag v-else type="info" size="small" effect="plain">待实施</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column v-if="canWrite" label="操作" width="170" align="center" fixed="right">
+        <template #default="{ row, $index }">
+          <el-button v-if="!row.done" link type="primary" size="small" @click="openComplete(row)">记录完成</el-button>
+          <el-button v-else link type="warning" size="small" @click="undoComplete(row)">撤销完成</el-button>
           <el-button link type="danger" size="small" @click="removeItem($index)">删除</el-button>
         </template>
       </el-table-column>
@@ -130,6 +138,24 @@
         </el-table-column>
       </el-table>
     </div>
+
+    <!-- 记录完成 -->
+    <el-dialog v-model="dlgVisible" title="记录讲课完成" width="520px">
+      <el-form label-width="104px">
+        <el-form-item label="讲课题目"><div class="dlg-name">{{ dlgRow?.topic }}</div></el-form-item>
+        <el-form-item label="计划日期"><div>{{ dlgRow?.date || '—' }}</div></el-form-item>
+        <el-form-item label="实际完成日期">
+          <el-date-picker v-model="dlgDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="dlgRemark" type="textarea" :rows="2" placeholder="如签到人数、留存情况，可留空" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dlgVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmComplete">确认并保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -167,15 +193,20 @@ const SEED = [
 ]
 
 function seedRows() {
-  return SEED.map(([teacher, date, topic]) => ({ teacher, date, topic }))
+  return SEED.map(([teacher, date, topic]) => ({ teacher, date, topic, done: false, done_date: '', remark: '' }))
 }
+
+const doneCount = computed(() => rows.value.filter((r) => r.done).length)
+const rate = computed(() => (rows.value.length ? Math.round((doneCount.value / rows.value.length) * 100) : 0))
+
+function rowClass({ row }) { return row.done ? 'il-done-row' : '' }
 
 const pairedRows = computed(() => {
   const out = []
   for (let i = 0; i < members.value.length; i += 2) {
     out.push({ left: members.value[i], right: members.value[i + 1] || null })
   }
-  // 打印空表一页：补足到 20 行（含 4 名实习生后仍留手写位）
+  // 打印空表一页：补足到 20 行（含实习生后仍留手写位）
   while (out.length < 20) out.push({ left: null, right: null })
   return out
 })
@@ -189,7 +220,16 @@ async function load() {
     if (hit) {
       planId.value = hit.id
       const its = Array.isArray(hit.items_json) ? hit.items_json : []
-      rows.value = its.length ? its.map((x) => ({ teacher: x.teacher || x.trainer || '', date: x.date || x.expected_date || '', topic: x.topic || x.item || '' })) : seedRows()
+      rows.value = its.length
+        ? its.map((x) => ({
+            teacher: x.teacher || x.trainer || '',
+            date: x.date || x.expected_date || '',
+            topic: x.topic || x.item || '',
+            done: !!x.done,
+            done_date: x.done_date || '',
+            remark: x.remark || '',
+          }))
+        : seedRows()
     } else {
       planId.value = null
       rows.value = seedRows()
@@ -214,11 +254,11 @@ async function loadMembers() {
   if (!members.value.length) members.value = [{ name: '', org: '' }]
 }
 
-function addItem() { rows.value.push({ teacher: '', date: '', topic: '' }); dirty.value = true }
+function addItem() { rows.value.push({ teacher: '', date: '', topic: '', done: false, done_date: '', remark: '' }); dirty.value = true }
 function removeItem(i) { rows.value.splice(i, 1); dirty.value = true }
 function removeMember(r) { members.value = members.value.filter((x) => x !== r) }
 
-async function save() {
+async function save(silent = false) {
   const payload = {
     year: new Date().getFullYear(),
     title: '实习生讲课计划',
@@ -227,6 +267,7 @@ async function save() {
     items_json: rows.value.map((r) => ({
       item: r.topic, topic: r.topic, trainer: r.teacher, teacher: r.teacher,
       expected_date: r.date, date: r.date, form: '科室讲课', target: '实习/进修人员',
+      done: !!r.done, done_date: r.done_date || '', remark: r.remark || '',
     })),
   }
   try {
@@ -236,10 +277,49 @@ async function save() {
       planId.value = res?.id ?? res
     }
     dirty.value = false
-    ElMessage.success('讲课计划已保存')
+    if (!silent) ElMessage.success('讲课计划已保存')
+    await load()
   } catch (e) {
     ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message))
   }
+}
+
+// ---- 记录完成 ----
+const dlgVisible = ref(false)
+const dlgRow = ref(null)
+const dlgDate = ref('')
+const dlgRemark = ref('')
+
+function today() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function openComplete(row) {
+  dlgRow.value = row
+  dlgDate.value = today()
+  dlgRemark.value = row.remark || ''
+  dlgVisible.value = true
+}
+
+async function confirmComplete() {
+  if (!dlgDate.value) return ElMessage.warning('请选择实际完成日期')
+  const row = dlgRow.value
+  row.done = true
+  row.done_date = dlgDate.value
+  row.remark = dlgRemark.value
+  dlgVisible.value = false
+  dirty.value = true
+  await save(true)
+  ElMessage.success(`已记录完成时间：${row.done_date}`)
+}
+
+async function undoComplete(row) {
+  row.done = false
+  row.done_date = ''
+  dirty.value = true
+  await save(true)
+  ElMessage.success('已撤销完成标记')
 }
 
 async function doPrint() {
@@ -258,6 +338,7 @@ onMounted(async () => {
 .toolbar { margin-bottom: 12px; }
 .actions { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
 .hint { font-size: 12px; color: #909399; }
+.dlg-name { font-weight: 600; }
 .sheet { margin-top: 12px; }
 .sheet-title { text-align: center; font-size: 21px; letter-spacing: 3px; margin: 8px 0 14px; }
 .sheet-head { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
@@ -269,6 +350,7 @@ onMounted(async () => {
 .sign-cell { height: 30px; }
 .sign-foot { border: none !important; text-align: left; font-size: 13px; padding: 8px 2px !important; height: auto !important; }
 .foot-cell { border: none !important; text-align: center; font-size: 12px; color: #333; padding-top: 8px !important; height: auto !important; }
+:deep(.il-done-row) { background: #f0f9eb; }
 
 .print-root { display: none; }
 @media print {
