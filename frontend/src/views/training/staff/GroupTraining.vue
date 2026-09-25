@@ -2,7 +2,7 @@
   <div class="group-training">
     <el-tabs v-model="tag">
       <el-tab-pane label="组内培训" name="组内培训" />
-      <el-tab-pane label="艾梅乙培训" name="艾梅乙" />
+      <el-tab-pane label="科内培训" name="科内培训" />
     </el-tabs>
 
     <el-collapse v-model="active">
@@ -10,7 +10,7 @@
         <CrudTable
           :columns="planColumns" :fetch="fetchPlan"
           search-placeholder="搜索计划标题"
-          :extra-params="{}"
+          :extra-params="{ tag }"
           :can-write="canWrite"
           @add="openPlan()" @edit="openPlan" @delete="onDeletePlan" ref="planRef"
         />
@@ -49,7 +49,7 @@
             <el-button type="primary" @click="savePlan">保存</el-button>
           </template>
         </el-dialog>
-        <TrainingPlanBoard />
+        <TrainingPlanBoard :tag="tag" />
       </el-collapse-item>
 
       <el-collapse-item :title="tag + '记录'" name="session">        <CrudTable
@@ -69,7 +69,7 @@
           <el-col :span="8"><el-form-item label="培训名称"><el-input v-model="sessionForm.name" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="培训老师"><el-input v-model="sessionForm.teacher" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="类别">
-            <el-select v-model="sessionForm.tag" style="width:100%"><el-option label="组内培训" value="组内培训" /><el-option label="艾梅乙" value="艾梅乙" /></el-select>
+            <el-select v-model="sessionForm.tag" style="width:100%"><el-option label="组内培训" value="组内培训" /><el-option label="科内培训" value="科内培训" /></el-select>
           </el-form-item></el-col>
           <el-col :span="8"><el-form-item label="培训对象"><el-input v-model="sessionForm.target" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="时间"><el-date-picker v-model="sessionForm.train_time" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
@@ -116,7 +116,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import CrudTable from '../../../components/CrudTable.vue'
@@ -162,7 +162,7 @@ const sessionColumns = [
 // 计划
 const planVisible = ref(false)
 const planForm = ref(blankPlan())
-function blankPlan() { return { id: null, year: new Date().getFullYear(), title: '', items_json: [], remark: '', maker: '', made_date: '', approver: '', approved_date: '' } }
+function blankPlan() { return { id: null, year: new Date().getFullYear(), title: '', tag: tag.value, items_json: [], remark: '', maker: '', made_date: '', approver: '', approved_date: '' } }
 function openPlan(row) { planForm.value = row ? { ...row, items_json: row.items_json ? [...row.items_json] : [] } : blankPlan(); planVisible.value = true }
 function addPlanItem() { planForm.value.items_json.push({ item: '', goal: '', trainer: '', expected_date: '', remark: '' }) }
 function removePlanItem(r) { planForm.value.items_json = planForm.value.items_json.filter((x) => x !== r) }
@@ -181,7 +181,7 @@ function fetchPlan(params) { return listTrainingPlan(params) }
 // 培训记录
 const sessionVisible = ref(false)
 const sessionForm = ref(blankSession())
-function blankSession() { return { id: null, name: '', teacher: '', target: '', train_time: '', location: '', content: '', effect_eval: '', tag: '组内培训', sign_in_header: {} } }
+function blankSession() { return { id: null, name: '', teacher: '', target: '', train_time: '', location: '', content: '', effect_eval: '', tag: tag.value, sign_in_header: {} } }
 function openSession(row) { sessionForm.value = row ? { ...row, sign_in_header: row.sign_in_header || {} } : blankSession(); sessionVisible.value = true }
 const sessionHeader = computed(() => ({
   name: sessionForm.value.name, teacher: sessionForm.value.teacher,
@@ -236,7 +236,7 @@ async function buildSessionPlanMap() {
     sessionPlanMap.value = m
   } catch (e) { /* 忽略 */ }
 }
-async function fetchSession(params) {
+function fetchSession(params) {
   await buildSessionPlanMap()
   const res = await listTrainingSession(params)
   const items = (res?.items || []).map((s) => {
@@ -245,6 +245,12 @@ async function fetchSession(params) {
   })
   return { ...(res || {}), items }
 }
+
+// 切换「组内培训 / 科内培训」时，两套界面各自刷新（计划与记录均按 tag 隔离）
+watch(tag, () => {
+  planRef.value?.refresh()
+  sessionRef.value?.refresh()
+})
 </script>
 
 <style scoped>

@@ -106,7 +106,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Check } from '@element-plus/icons-vue'
 import {
@@ -114,6 +114,9 @@ import {
   listTrainingSession,
 } from '../../../api/education'
 import { useAuthStore } from '../../../store/auth'
+
+// 计划按类别隔离：组内培训 / 科内培训 各有一套独立的年度计划
+const props = defineProps({ tag: { type: String, default: '组内培训' } })
 
 const auth = useAuthStore()
 const canWrite = ref(auth.canWrite('training'))
@@ -152,7 +155,7 @@ async function load() {
   try {
     const res = await listTrainingPlan({ page: 1, page_size: 100 })
     const items = res?.items || res || []
-    const hit = items.find((p) => Number(p.year) === Number(year.value))
+    const hit = items.find((p) => Number(p.year) === Number(year.value) && (p.tag || '组内培训') === props.tag)
     current.value = hit || null
     rows.value = hit ? (hit.items_json ? JSON.parse(JSON.stringify(hit.items_json)) : []) : []
     dirty.value = false
@@ -167,7 +170,8 @@ function onYearChange() { load() }
 
 function createPlan() {
   rows.value = [blankItem()]
-  current.value = { id: null, year: year.value, title: `${year.value}年度生免组继续教育培训计划`, items_json: [], remark: '' }
+  const pfx = props.tag === '组内培训' ? '生免组' : '全科'
+  current.value = { id: null, year: year.value, title: `${year.value}年度${pfx}${props.tag}计划`, items_json: [], remark: '', tag: props.tag }
   dirty.value = true
 }
 
@@ -191,7 +195,8 @@ async function save(silent = false) {
   const payload = {
     ...current.value,
     year: Number(year.value),
-    title: current.value.title || `${year.value}年度生免组继续教育培训计划`,
+    tag: props.tag,
+    title: current.value.title || `${year.value}年度${props.tag}计划`,
     items_json: rows.value,
   }
   try {
@@ -260,6 +265,9 @@ onMounted(async () => {
     sessions.value = res?.items || res || []
   } catch (e) { /* 忽略 */ }
 })
+
+// 切换「组内培训 / 科内培训」时重新加载对应类别的计划
+watch(() => props.tag, () => { load() })
 </script>
 
 <style scoped>

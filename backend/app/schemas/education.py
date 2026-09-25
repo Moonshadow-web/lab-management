@@ -367,6 +367,7 @@ class TrainingPlanBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     year: int = 0
     title: str = ""
+    tag: str = "组内培训"
     items_json: list[dict] = []
     remark: str = ""
     # 表单签署栏
