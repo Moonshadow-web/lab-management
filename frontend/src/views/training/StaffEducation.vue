@@ -36,7 +36,7 @@
           </el-tab-pane>
         </el-tabs>
       </el-tab-pane>
-      <el-tab-pane label="组内培训 / 艾梅乙" name="group">
+      <el-tab-pane label="组内培训 / 科内培训" name="group">
         <GroupTraining />
       </el-tab-pane>
       <el-tab-pane label="实习进修带教" name="internship">

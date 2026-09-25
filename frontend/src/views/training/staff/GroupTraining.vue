@@ -116,7 +116,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import CrudTable from '../../../components/CrudTable.vue'
@@ -247,7 +247,9 @@ async function fetchSession(params) {
 }
 
 // 切换「组内培训 / 科内培训」时，两套界面各自刷新（计划与记录均按 tag 隔离）
-watch(tag, () => {
+// 注意：必须等 nextTick —— 子组件 props 尚未更新时调 refresh 会仍用旧 tag 请求
+watch(tag, async () => {
+  await nextTick()
   planRef.value?.refresh()
   sessionRef.value?.refresh()
 })

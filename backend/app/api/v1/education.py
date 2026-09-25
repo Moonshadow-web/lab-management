@@ -130,7 +130,7 @@ comparison_router = make_router(
 # D/E/F. 培训计划 / 培训记录 / 实习带教
 plan_router = make_router(
     TrainingPlan, TrainingPlanRead, TrainingPlanCreate, TrainingPlanUpdate,
-    filter_fields=["year"], order_by=[TrainingPlan.year.desc()],
+    filter_fields=["year", "tag"], order_by=[TrainingPlan.year.desc()],
     prefix="/training-plans", write_roles=("admin", "training_manager"),
     json_fields=["items_json"],
 )
