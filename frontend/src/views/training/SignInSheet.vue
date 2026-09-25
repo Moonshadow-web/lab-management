@@ -71,7 +71,7 @@
 
     <!-- 打印专用：Teleport 到 body，仅打印时显示，规避 el-dialog fixed 浮层打印空白 -->
     <Teleport to="body">
-      <div class="print-root sheet" v-if="rows.length">
+      <div class="print-root sheet" :class="isKs ? 'pr-ks' : 'pr-sm'" v-if="rows.length">
         <h2 class="sheet-title">{{ sheetTitle }}</h2>
         <table class="sheet-head" v-if="isKs">
           <tr>
@@ -235,8 +235,12 @@ function clearRows() { rows.value = [] }
 
 async function doPrint() {
   emitSaveHeader()
+  // 只打印本组件这一张：给 body 打标记，打印样式据此只显示对应的 print-root
+  document.body.dataset.printTarget = isKs.value ? 'ks' : 'sm'
   await new Promise((r) => setTimeout(r, 100))
   window.print()
+  // 打印后复位，避免影响其它打印组件（能力评估/新员工培训等）
+  delete document.body.dataset.printTarget
 }
 
 const emit = defineEmits(['save-header'])
@@ -306,8 +310,12 @@ function dedupeNames(list) {
   .no-print { display: none !important; }
   @page { size: A4; margin: 14mm 12mm 26mm 12mm; }
   body > *:not(.print-root) { display: none !important; }
+  /* 关键：页面可能同时挂着多张打印副本（组内/科内签到表、实习讲课签到表），
+     只显示当前点「打印」的那一张；未设标记时不影响其它打印组件 */
+  body[data-print-target] > .print-root { display: none !important; }
+  body[data-print-target="sm"] > .print-root.pr-sm,
+  body[data-print-target="ks"] > .print-root.pr-ks { display: block !important; }
   .print-root {
-    display: block !important;
     position: static !important;
     width: 100% !important;
     visibility: visible !important;

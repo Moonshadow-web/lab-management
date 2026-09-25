@@ -92,7 +92,7 @@
 
     <!-- 打印专用副本 -->
     <Teleport to="body">
-      <div class="print-root sheet">
+      <div class="print-root sheet pr-il">
         <h2 class="sheet-title">民航总医院检验科实习生讲课签到表</h2>
         <table class="sheet-head">
           <tr>
@@ -323,8 +323,12 @@ async function undoComplete(row) {
 }
 
 async function doPrint() {
+  // 只打印本组件这一张：给 body 打标记，打印样式据此只显示对应的 print-root
+  document.body.dataset.printTarget = 'il'
   await new Promise((r) => setTimeout(r, 100))
   window.print()
+  // 打印后复位，避免影响其它打印组件（能力评估/新员工培训等）
+  delete document.body.dataset.printTarget
 }
 
 onMounted(async () => {
@@ -357,6 +361,9 @@ onMounted(async () => {
   .no-print { display: none !important; }
   @page { size: A4; margin: 14mm 12mm 20mm 12mm; }
   body > *:not(.print-root) { display: none !important; }
-  .print-root { display: block !important; position: static !important; width: 100% !important; visibility: visible !important; }
+  /* 只显示当前点「打印」的那一张打印副本；未设标记时不影响其它打印组件 */
+  body[data-print-target] > .print-root { display: none !important; }
+  body[data-print-target="il"] > .print-root.pr-il { display: block !important; }
+  .print-root { position: static !important; width: 100% !important; visibility: visible !important; }
 }
 </style>
