@@ -369,6 +369,7 @@ class TrainingPlanBase(BaseModel):
     title: str = ""
     tag: str = "组内培训"
     items_json: list[dict] = []
+    members_json: list[dict] = []
     remark: str = ""
     # 表单签署栏
     maker: str = ""

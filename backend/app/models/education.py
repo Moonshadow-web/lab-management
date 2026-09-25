@@ -331,6 +331,7 @@ class TrainingPlan(Base):
     title: Mapped[str] = mapped_column(String(200), default="")  # 计划标题（如"2026年度生免组培训计划"）
     tag: Mapped[str] = mapped_column(String(50), default="组内培训", index=True)  # 组内培训 / 科内培训
     items_json: Mapped[str] = mapped_column(Text, default="[]")  # [{item, goal, trainer, expected_date, remark}]
+    members_json: Mapped[str] = mapped_column(Text, default="[]")  # 签到名单 [{name, org}]（实习讲课等按需维护）
     remark: Mapped[str] = mapped_column(String(500), default="")
     # ===== 表单签署栏（计划表页脚：制定人/制定日期/批准人/批准日期） =====
     maker: Mapped[str] = mapped_column(String(50), default="")  # 制定人

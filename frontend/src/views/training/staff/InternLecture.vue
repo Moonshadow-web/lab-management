@@ -124,12 +124,16 @@
 
     <div class="no-print">
       <el-divider content-position="left">编辑签到名单（打印前可调）</el-divider>
+      <div class="actions">
+        <el-button :icon="Plus" @click="addMember">加一名学生</el-button>
+        <span class="hint">新增或修改后，点上方「保存计划」即可长期保留</span>
+      </div>
       <el-table :data="members" border size="small">
         <el-table-column label="姓名" width="170">
-          <template #default="{ row }"><el-input v-model="row.name" size="small" /></template>
+          <template #default="{ row }"><el-input v-model="row.name" size="small" placeholder="姓名" @input="dirty = true" /></template>
         </el-table-column>
         <el-table-column label="学校 / 专业" min-width="220">
-          <template #default="{ row }"><el-input v-model="row.org" size="small" /></template>
+          <template #default="{ row }"><el-input v-model="row.org" size="small" placeholder="如 某某医学院 / 医学检验" @input="dirty = true" /></template>
         </el-table-column>
         <el-table-column label="操作" width="80" align="center">
           <template #default="{ row }">
@@ -175,6 +179,7 @@ const dirty = ref(false)
 const planId = ref(null)
 const rows = ref([])
 const members = ref([])
+const membersLoaded = ref(false)  // 名单是否已由计划里保存的数据载入（载入后不再用档案覆盖）
 
 // 图片里的 12 条实习生讲课计划（原文 "2026.1"/"2026..12" 为笔误，按月份序修正）
 const SEED = [
@@ -230,6 +235,12 @@ async function load() {
             remark: x.remark || '',
           }))
         : seedRows()
+      // 名单：优先用计划里保存过的，没有才回落到实习生档案
+      const saved = Array.isArray(hit.members_json) ? hit.members_json : []
+      if (saved.length) {
+        members.value = saved.map((m) => ({ name: m.name || '', org: m.org || '' }))
+        membersLoaded.value = true
+      }
     } else {
       planId.value = null
       rows.value = seedRows()
@@ -243,6 +254,7 @@ async function load() {
 }
 
 async function loadMembers() {
+  if (membersLoaded.value) return  // 计划里已有保存的名单，不再用实习生档案覆盖
   try {
     const res = await listMentor({ page: 1, page_size: 200 })
     const list = res?.items || res || []
@@ -254,9 +266,17 @@ async function loadMembers() {
   if (!members.value.length) members.value = [{ name: '', org: '' }]
 }
 
+function addMember() {
+  members.value.push({ name: '', org: '' })
+  dirty.value = true
+}
+
 function addItem() { rows.value.push({ teacher: '', date: '', topic: '', done: false, done_date: '', remark: '' }); dirty.value = true }
 function removeItem(i) { rows.value.splice(i, 1); dirty.value = true }
-function removeMember(r) { members.value = members.value.filter((x) => x !== r) }
+function removeMember(r) {
+  members.value = members.value.filter((x) => x !== r)
+  dirty.value = true
+}
 
 async function save(silent = false) {
   const payload = {
@@ -269,6 +289,8 @@ async function save(silent = false) {
       expected_date: r.date, date: r.date, form: '科室讲课', target: '实习/进修人员',
       done: !!r.done, done_date: r.done_date || '', remark: r.remark || '',
     })),
+    // 签到名单一并保存，避免刷新后新增的学生丢失
+    members_json: members.value.map((m) => ({ name: m.name || '', org: m.org || '' })),
   }
   try {
     if (planId.value) await updateTrainingPlan(planId.value, payload)

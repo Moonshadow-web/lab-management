@@ -132,7 +132,7 @@ plan_router = make_router(
     TrainingPlan, TrainingPlanRead, TrainingPlanCreate, TrainingPlanUpdate,
     filter_fields=["year", "tag"], order_by=[TrainingPlan.year.desc()],
     prefix="/training-plans", write_roles=("admin", "training_manager"),
-    json_fields=["items_json"],
+    json_fields=["items_json", "members_json"],
 )
 session_router = make_router(
     TrainingSession, TrainingSessionRead, TrainingSessionCreate, TrainingSessionUpdate,
