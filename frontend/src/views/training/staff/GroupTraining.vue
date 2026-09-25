@@ -103,7 +103,7 @@
           </el-tab-pane>
         </el-tabs>
 
-        <el-divider content-position="left">签到表（BG-SM-PX-006）</el-divider>
+        <el-divider content-position="left">签到表（{{ tag === '科内培训' ? 'BG-KS-PX-807' : 'BG-SM-PX-006' }}）</el-divider>
         <SignInSheet :key="sessionForm.id + '-' + tag" :owner-id="sessionForm.id" :header="sessionHeader" :can-write="canWrite" :saved-names="(sessionForm.sign_in_header && sessionForm.sign_in_header.names) || null" :variant="tag === '科内培训' ? 'ks' : 'sm'" @save-header="onSaveHeader" />
       </template>
 
