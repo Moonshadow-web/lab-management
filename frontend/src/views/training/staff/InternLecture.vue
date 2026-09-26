@@ -82,10 +82,11 @@
               <el-tag v-else type="info" size="small" effect="plain">待实施</el-tag>
             </template>
           </el-table-column>
-          <el-table-column v-if="canWrite" label="操作" width="170" align="center" fixed="right">
+          <el-table-column v-if="canWrite" label="操作" width="250" align="center" fixed="right">
             <template #default="{ row, $index }">
               <el-button v-if="!row.done" link type="primary" size="small" @click="openComplete(row)">记录完成</el-button>
               <el-button v-else link type="warning" size="small" @click="undoComplete(row)">撤销完成</el-button>
+              <el-button link type="primary" size="small" @click="openAttachments(row)">课件/签到</el-button>
               <el-button link type="danger" size="small" @click="removeItem($index)">删除</el-button>
             </template>
           </el-table-column>
@@ -200,6 +201,33 @@
         <el-button type="primary" @click="confirmComplete">确认并保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 课件 / 签到附件（挂在自动创建的「讲课记录」上，可预览） -->
+    <el-dialog v-model="attVisible" :title="`讲课附件 —— ${attRow?.topic || ''}`" width="900px" top="4vh" destroy-on-close>
+      <el-alert
+        type="info" :closable="false" show-icon
+        title="上传本次讲课的课件与签到表扫描件；扫描件建议先打印下方空白签到表现场签名后扫描上传"
+        style="margin-bottom: 10px"
+      />
+      <el-tabs v-model="attKind">
+        <el-tab-pane label="课件" name="courseware">
+          <EducationAttachmentList
+            v-if="attVisible && attKind === 'courseware'"
+            owner-type="training_session" :owner-id="attSessionId" kind="courseware"
+            label="课件" :can-write="canWrite"
+            hint="支持 ppt / pptx / pdf / doc / docx，可在列表里直接预览"
+          />
+        </el-tab-pane>
+        <el-tab-pane label="签到表扫描件" name="sign_in">
+          <EducationAttachmentList
+            v-if="attVisible && attKind === 'sign_in'"
+            owner-type="training_session" :owner-id="attSessionId" kind="sign_in"
+            label="签到表" :can-write="canWrite"
+            hint="打印空白签到表 → 现场签名 → 扫描/拍照上传（jpg / png / pdf）"
+          />
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
   </div>
 </template>
 
@@ -208,9 +236,10 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Printer, Check } from '@element-plus/icons-vue'
 import CrudTable from '../../../components/CrudTable.vue'
+import EducationAttachmentList from '../EducationAttachmentList.vue'
 import {
   listTrainingPlan, createTrainingPlan, updateTrainingPlan, deleteTrainingPlan,
-  listMentor,
+  createTrainingSession, listMentor,
 } from '../../../api/education'
 import { useAuthStore } from '../../../store/auth'
 
@@ -347,6 +376,7 @@ async function loadBoard() {
             date: x.date || x.expected_date || '',
             topic: x.topic || x.item || '',
             done: !!x.done, done_date: x.done_date || '', remark: x.remark || '',
+            session_id: x.session_id || null,
           }))
         : (Number(year.value) === 2026 && !its.length ? seedRows() : [])
       const saved = Array.isArray(hit.members_json) ? hit.members_json : []
@@ -408,6 +438,7 @@ async function save(silent = false) {
       item: r.topic, topic: r.topic, trainer: r.teacher, teacher: r.teacher,
       expected_date: r.date, date: r.date, form: '科室讲课', target: '实习/进修人员',
       done: !!r.done, done_date: r.done_date || '', remark: r.remark || '',
+      session_id: r.session_id || null,
     })),
     members_json: members.value.map((m) => ({ name: m.name || '', org: m.org || '' })),
   }
@@ -459,6 +490,42 @@ async function undoComplete(row) {
   dirty.value = true
   await save(true)
   ElMessage.success('已撤销完成标记')
+}
+
+// ---- 课件 / 签到附件 ----
+// 附件要挂在「培训记录」上（education_attachments.owner_id 是整型），
+// 因此首次点开时自动为该条讲课创建一条 training_session（tag=实习讲课）作为容器，
+// 并把 session_id 存回计划条目，之后所有上传/预览都走这条记录。
+const attVisible = ref(false)
+const attRow = ref(null)
+const attSessionId = ref(null)
+const attKind = ref('courseware')
+
+async function openAttachments(row) {
+  if (!row.session_id) {
+    try {
+      const res = await createTrainingSession({
+        plan_id: planId.value,
+        name: row.topic || '实习生讲课',
+        teacher: row.teacher || '',
+        target: '实习/进修人员',
+        train_time: row.done_date || row.date || '',
+        location: '检验科会议室',
+        content: row.topic || '',
+        tag: '实习讲课',
+      })
+      row.session_id = res?.id ?? res
+      dirty.value = true
+      await save(true)
+    } catch (e) {
+      ElMessage.error('创建讲课记录失败：' + (e.response?.data?.detail || e.message))
+      return
+    }
+  }
+  attRow.value = row
+  attSessionId.value = row.session_id
+  attKind.value = 'courseware'
+  attVisible.value = true
 }
 
 async function doPrint() {
