@@ -13,6 +13,7 @@
       @delete="onDelete"
     >
       <template #toolbar-extra>
+        <el-button type="success" plain @click="downloadAllCards" :loading="cardsLoading">设备卡片集</el-button>
         <el-button type="warning" plain @click="openRepairSummary">汇总维修记录</el-button>
         <el-button v-if="auth.canWrite('instruments')" @click="importVisible = true">批量导入档案</el-button>
         <el-switch
@@ -35,6 +36,7 @@
         </el-button>
         <el-button link type="primary" @click="openArchive(row)">档案</el-button>
         <el-button link type="warning" @click="openRepair(row)">维修记录</el-button>
+        <el-button link type="success" @click="downloadOneCard(row)">设备卡片</el-button>
       </template>
     </CrudTable>
 
@@ -355,6 +357,7 @@ import {
   uploadCalibrationReport, downloadCalibrationReport, deleteCalibrationReport, getCalibrationsStatus,
   uploadInstrumentArchive, getInstrumentArchiveInfo, downloadInstrumentArchive,
   deleteInstrumentArchive, getArchivesStatus, importArchivesFolder,
+  downloadInstrumentCard, downloadAllInstrumentCards,
   getInstrumentTestItems, getInstrumentDocuments, getInstrumentSopDocuments,
   listRepairs, createRepair, updateRepair, deleteRepair, createRepairInvite, listAllRepairs,
 } from '../../api/instruments'
@@ -742,6 +745,30 @@ const summaryRows = ref([])
 const summaryLoading = ref(false)
 const repairDetailOpen = ref(false)
 const repairDetailRow = ref(null)
+// ---------------- 设备卡片（仪器标识卡 + 维修二维码） ----------------
+const cardsLoading = ref(false)
+async function downloadOneCard(row) {
+  if (!row) return
+  try {
+    const blob = await downloadInstrumentCard(row.id)
+    triggerDownload(blob, `设备卡片_${row.name || row.dept_no || row.id}.docx`)
+  } catch (e) {
+    ElMessage.error('生成设备卡片失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  }
+}
+
+async function downloadAllCards() {
+  cardsLoading.value = true
+  try {
+    const blob = await downloadAllInstrumentCards()
+    triggerDownload(blob, '设备卡片集.docx')
+  } catch (e) {
+    ElMessage.error('生成设备卡片集失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    cardsLoading.value = false
+  }
+}
+
 async function openRepairSummary() {
   summaryOpen.value = true
   summaryLoading.value = true

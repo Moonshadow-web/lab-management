@@ -880,3 +880,87 @@ def debug_instruments_raw(db: Session = Depends(get_db), user: User = Depends(ge
                 "error": repr(e),
             })
     return {"total": len(rows), "problems": problems}
+
+
+# ---------------- 设备卡片（仪器标识卡 + 维修二维码） ----------------
+def _card_host(request: Request) -> str:
+    return (os.getenv("LAB_PUBLIC_HOST") or str(request.base_url)).rstrip("/")
+
+
+def _collect_card_items(db: Session, group_code: str, only_id=None):
+    """按专业组收集卡片要素，并附带每台仪器的最新校准记录"""
+    q = db.query(Instrument)
+    if group_code:
+        q = q.filter(or_(Instrument.group_code == group_code,
+                         Instrument.group_code.is_(None),
+                         Instrument.group_code == "",
+                         Instrument.group_code == "ks"))
+    if only_id:
+        q = q.filter(Instrument.id == only_id)
+    insts = q.order_by(Instrument.dept_no).all()
+    if not insts:
+        return []
+    ids = [x.id for x in insts]
+    cals = {}
+    rows = (db.query(CalibrationRecord)
+              .filter(CalibrationRecord.instrument_id.in_(ids))
+              .order_by(CalibrationRecord.calibration_date.desc())
+              .all())
+    for r in rows:
+        cals.setdefault(r.instrument_id, r)
+    items = []
+    for x in insts:
+        c = cals.get(x.id)
+        items.append({
+            "dept_no": x.dept_no or "",
+            "name": x.name or "",
+            "model": x.model or "",
+            "status": x.status or "在用",
+            "owner": x.owner or "",
+            "start_date": x.start_date or "",
+            "cal_date": (c.calibration_date if c else "") or "",
+            "next_cal_date": (c.next_due_date if c else "") or "",
+            "repair_contact": getattr(x, "repair_contact", None) or "3000",
+        })
+    return items
+
+
+@router.get("/cards/all")
+def download_all_cards(request: Request, db: Session = Depends(get_db),
+                       user: User = Depends(get_current_user)):
+    """全部设备卡片（一个 Word 文档，可下载 / 打印）"""
+    from fastapi import Response
+    from ...services.device_card import build_docx
+    group_code = get_current_group(user)
+    items = _collect_card_items(db, group_code)
+    if not items:
+        raise HTTPException(status_code=404, detail="当前专业组暂无仪器档案")
+    qr_dir = os.path.join(os.getenv("CARD_QR_DIR", "/app/data/card_qr"), "qr")
+    data = build_docx(items, _card_host(request), qr_dir)
+    fname = "设备卡片集.docx"
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": "attachment; filename*=UTF-8''" + fname},
+    )
+
+
+@router.get("/{instrument_id}/card")
+def download_one_card(instrument_id: int, request: Request, db: Session = Depends(get_db),
+                      user: User = Depends(get_current_user)):
+    """单台仪器的设备卡片（Word）"""
+    from fastapi import Response
+    from ...services.device_card import build_docx, safe_filename
+    group_code = get_current_group(user)
+    items = _collect_card_items(db, group_code, only_id=instrument_id)
+    if not items:
+        raise HTTPException(status_code=404, detail="仪器不存在")
+    item = items[0]
+    qr_dir = os.path.join(os.getenv("CARD_QR_DIR", "/app/data/card_qr"), "qr")
+    data = build_docx([item], _card_host(request), qr_dir)
+    fname = safe_filename("设备卡片_" + item["name"] + "_" + item["dept_no"] + ".docx")
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": "attachment; filename*=UTF-8''" + fname},
+    )

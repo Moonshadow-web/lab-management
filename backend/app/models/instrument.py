@@ -29,6 +29,7 @@ class Instrument(Base):
     supplier: Mapped[str] = mapped_column(String(200), default="")  # 供货商名称
     contact: Mapped[str] = mapped_column(String(200), default="")  # 联系人及电话
     qc_instrument: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否室内质控受控仪器（月结下拉限定）
+    repair_contact: Mapped[str] = mapped_column(String(50), default="3000")  # 设备卡片-设备维修联系方式（默认 3000，可改）
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

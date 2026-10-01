@@ -80,6 +80,13 @@ export function downloadInstrumentArchive(id) {
 export function deleteInstrumentArchive(id) {
   return request.delete(`/api/v1/instruments/${id}/archive`)
 }
+// 设备卡片（仪器标识卡 + 维修二维码）：单台 / 全部
+export function downloadInstrumentCard(id) {
+  return request.get(`/api/v1/instruments/${id}/card`, { responseType: 'blob' })
+}
+export function downloadAllInstrumentCards() {
+  return request.get('/api/v1/instruments/cards/all', { responseType: 'blob' })
+}
 export function getArchivesStatus() {
   return request.get('/api/v1/instruments/archives/status')
 }
