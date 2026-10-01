@@ -927,11 +927,11 @@ def _collect_card_items(db: Session, group_code: str, only_id=None):
 
 @router.get("/cards/all")
 def download_all_cards(request: Request, db: Session = Depends(get_db),
-                       user: User = Depends(get_current_user)):
+                       user: User = Depends(get_current_user),
+                       group_code: str = Depends(get_current_group)):
     """全部设备卡片（一个 Word 文档，可下载 / 打印）"""
     from fastapi import Response
     from ...services.device_card import build_docx
-    group_code = get_current_group(user)
     items = _collect_card_items(db, group_code)
     if not items:
         raise HTTPException(status_code=404, detail="当前专业组暂无仪器档案")
@@ -947,11 +947,11 @@ def download_all_cards(request: Request, db: Session = Depends(get_db),
 
 @router.get("/{instrument_id}/card")
 def download_one_card(instrument_id: int, request: Request, db: Session = Depends(get_db),
-                      user: User = Depends(get_current_user)):
+                      user: User = Depends(get_current_user),
+                      group_code: str = Depends(get_current_group)):
     """单台仪器的设备卡片（Word）"""
     from fastapi import Response
     from ...services.device_card import build_docx, safe_filename
-    group_code = get_current_group(user)
     items = _collect_card_items(db, group_code, only_id=instrument_id)
     if not items:
         raise HTTPException(status_code=404, detail="仪器不存在")
