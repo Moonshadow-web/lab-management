@@ -944,10 +944,11 @@ def download_all_cards(request: Request, db: Session = Depends(get_db),
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"CARD_ERR[{type(e).__name__}]: {e} || {traceback.format_exc()[-500:]}")
     fname = "设备卡片集.docx"
+    from urllib.parse import quote
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": "attachment; filename*=UTF-8''" + fname},
+        headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(fname)},
     )
 
 
@@ -965,8 +966,9 @@ def download_one_card(instrument_id: int, request: Request, db: Session = Depend
     qr_dir = os.path.join(os.getenv("CARD_QR_DIR", "/app/data/card_qr"), "qr")
     data = build_docx([item], _card_host(request), qr_dir)
     fname = safe_filename("设备卡片_" + item["name"] + "_" + item["dept_no"] + ".docx")
+    from urllib.parse import quote
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": "attachment; filename*=UTF-8''" + fname},
+        headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(fname)},
     )
