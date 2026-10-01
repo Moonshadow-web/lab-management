@@ -930,17 +930,19 @@ def download_all_cards(request: Request, db: Session = Depends(get_db),
                        user: User = Depends(get_current_user),
                        group_code: str = Depends(get_current_group)):
     """全部设备卡片（一个 Word 文档，可下载 / 打印）"""
+    import traceback
     from fastapi import Response
     from ...services.device_card import build_docx
-    items = _collect_card_items(db, group_code)
-    if not items:
-        raise HTTPException(status_code=404, detail="当前专业组暂无仪器档案")
-    qr_dir = os.path.join(os.getenv("CARD_QR_DIR", "/app/data/card_qr"), "qr")
     try:
+        items = _collect_card_items(db, group_code)
+        if not items:
+            raise HTTPException(status_code=404, detail="当前专业组暂无仪器档案")
+        qr_dir = os.path.join(os.getenv("CARD_QR_DIR", "/app/data/card_qr"), "qr")
         data = build_docx(items, _card_host(request), qr_dir)
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        raise HTTPException(status_code=500, detail=f"CARD_ERR: {type(e).__name__}: {e} | {traceback.format_exc()[-600:]}")
+        raise HTTPException(status_code=500, detail=f"CARD_ERR[{type(e).__name__}]: {e} || {traceback.format_exc()[-500:]}")
     fname = "设备卡片集.docx"
     return Response(
         content=data,
