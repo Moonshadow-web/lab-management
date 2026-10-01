@@ -925,6 +925,47 @@ def _collect_card_items(db: Session, group_code: str, only_id=None):
     return items
 
 
+@router.get("/cards/ping")
+def cards_ping(request: Request, db: Session = Depends(get_db),
+               user: User = Depends(get_current_user)):
+    """诊断探针：逐步验证各环节"""
+    out = {"step1_ok": True}
+    try:
+        g = get_current_group(request)
+        out["group_code"] = g
+    except Exception as e:
+        out["group_err"] = f"{type(e).__name__}: {e}"
+        return out
+    try:
+        items = _collect_card_items(db, out["group_code"])
+        out["items"] = len(items)
+    except Exception as e:
+        import traceback
+        out["collect_err"] = f"{type(e).__name__}: {e}"
+        out["tb"] = traceback.format_exc()[-500:]
+        return out
+    try:
+        from ...services.device_card import build_docx
+        out["import_ok"] = True
+    except Exception as e:
+        out["import_err"] = f"{type(e).__name__}: {e}"
+        return out
+    try:
+        import qrcode  # noqa
+        out["qrcode_ok"] = True
+    except Exception as e:
+        out["qrcode_ok"] = f"missing: {e}"
+    try:
+        import tempfile
+        d = build_docx(items[:1], _card_host(request), tempfile.mkdtemp())
+        out["docx_ok"] = len(d)
+    except Exception as e:
+        import traceback
+        out["docx_err"] = f"{type(e).__name__}: {e}"
+        out["tb"] = traceback.format_exc()[-500:]
+    return out
+
+
 @router.get("/cards/all")
 def download_all_cards(request: Request, db: Session = Depends(get_db),
                        user: User = Depends(get_current_user)):
