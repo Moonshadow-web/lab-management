@@ -993,6 +993,57 @@ def download_all_cards(request: Request, db: Session = Depends(get_db),
     )
 
 
+@router.get("/{instrument_id}/card-data")
+def get_card_data(instrument_id: int, request: Request, db: Session = Depends(get_db),
+                  user: User = Depends(get_current_user)):
+    """读取设备卡片的可编辑要素（供前端抽屉展示/编辑）"""
+    group_code = get_current_group(request)
+    items = _collect_card_items(db, group_code, only_id=instrument_id)
+    if not items:
+        raise HTTPException(status_code=404, detail="仪器不存在")
+    return items[0]
+
+
+@router.put("/{instrument_id}/card-data")
+async def update_card_data(instrument_id: int, request: Request, db: Session = Depends(get_db),
+                           user: User = Depends(get_current_user)):
+    """保存设备卡片编辑：负责人/状态/开始使用/维修联系方式 → 仪器档案；
+    本次、下次校准时间 → 最新一条校准记录（无则新建）"""
+    group_code = get_current_group(request)
+    inst = db.query(Instrument).filter(Instrument.id == instrument_id).first()
+    if not inst:
+        raise HTTPException(status_code=404, detail="仪器不存在")
+    body = await request.json()
+    if "owner" in body:
+        inst.owner = (body.get("owner") or "").strip()
+    if "status" in body:
+        inst.status = (body.get("status") or "").strip() or "在用"
+    if "start_date" in body:
+        inst.start_date = (body.get("start_date") or "").strip()
+    if "repair_contact" in body:
+        inst.repair_contact = (body.get("repair_contact") or "").strip() or "3000"
+    cal_date = (body.get("cal_date") or "").strip()
+    next_date = (body.get("next_cal_date") or "").strip()
+    if cal_date or next_date:
+        rec = (db.query(CalibrationRecord)
+                 .filter(CalibrationRecord.instrument_id == instrument_id)
+                 .order_by(CalibrationRecord.calibration_date.desc())
+                 .first())
+        if rec is None:
+            rec = CalibrationRecord(instrument_id=instrument_id, calibration_date=cal_date,
+                                    next_due_date=next_date, result="", agency="",
+                                    cycle_months="", operator="", report_file_path="",
+                                    report_filename="")
+            db.add(rec)
+        else:
+            rec.calibration_date = cal_date
+            rec.next_due_date = next_date
+    write_audit(db, user, "update", "instruments", instrument_id, "保存设备卡片编辑")
+    db.commit()
+    items = _collect_card_items(db, group_code, only_id=instrument_id)
+    return items[0] if items else {}
+
+
 @router.get("/{instrument_id}/card")
 def download_one_card(instrument_id: int, request: Request, db: Session = Depends(get_db),
                       user: User = Depends(get_current_user)):

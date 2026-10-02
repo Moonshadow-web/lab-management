@@ -87,6 +87,13 @@ export function downloadInstrumentCard(id) {
 export function downloadAllInstrumentCards() {
   return request.get('/api/v1/instruments/cards/all', { responseType: 'blob' })
 }
+// 设备卡片要素：读取 / 保存
+export function getInstrumentCardData(id) {
+  return request.get(`/api/v1/instruments/${id}/card-data`)
+}
+export function updateInstrumentCardData(id, data) {
+  return request.put(`/api/v1/instruments/${id}/card-data`, data)
+}
 export function getArchivesStatus() {
   return request.get('/api/v1/instruments/archives/status')
 }

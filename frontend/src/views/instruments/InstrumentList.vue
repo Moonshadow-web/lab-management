@@ -36,7 +36,7 @@
         </el-button>
         <el-button link type="primary" @click="openArchive(row)">档案</el-button>
         <el-button link type="warning" @click="openRepair(row)">维修记录</el-button>
-        <el-button link type="success" @click="downloadOneCard(row)">设备卡片</el-button>
+        <el-button link type="success" @click="openCard(row)">设备卡片</el-button>
       </template>
     </CrudTable>
 
@@ -161,6 +161,69 @@
         <el-button type="primary" @click="copyQrUrl">复制链接</el-button>
       </template>
     </el-dialog>
+
+    <!-- 设备卡片抽屉：预览 / 编辑 / 下载 -->
+    <el-drawer v-model="cardDrawer" :title="`设备卡片 - ${cardRow?.name || ''}`" size="640px">
+      <div class="devcard-wrap">
+        <div class="devcard">
+          <div class="dc-title">民航总医院检验科设备卡片</div>
+          <div class="dc-body">
+            <div class="dc-rows">
+              <div class="dc-row"><span class="dc-k">设备编号</span><span class="dc-v">{{ cardForm.dept_no || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">设备名称</span><span class="dc-v">{{ cardForm.name || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">厂家型号</span><span class="dc-v">{{ cardForm.model || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">设备状态</span><span class="dc-v">{{ cardForm.status || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">设备负责人</span><span class="dc-v">{{ cardForm.owner || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">开始使用日期</span><span class="dc-v">{{ cardForm.start_date || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">本次校准时间</span><span class="dc-v">{{ cardForm.cal_date || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">下次校准时间</span><span class="dc-v">{{ cardForm.next_cal_date || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">设备维修联系方式</span><span class="dc-v">{{ cardForm.repair_contact || '—' }}</span></div>
+            </div>
+            <div class="dc-qr">
+              <img v-if="cardQrImg" :src="cardQrImg" alt="二维码" />
+              <div v-else v-loading="true" class="dc-qr-ph" />
+              <div class="dc-qr-cap">型号：{{ cardForm.model || '—' }}</div>
+              <div class="dc-qr-cap">编号：{{ cardForm.dept_no || '—' }}</div>
+              <div class="dc-qr-cap">设备故障请扫码</div>
+              <div class="dc-qr-cap">填写维修记录</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <el-divider>编辑卡片内容（保存后同步到仪器档案）</el-divider>
+      <el-form label-width="130px" v-loading="cardLoading">
+        <el-form-item label="设备负责人">
+          <el-input v-model="cardForm.owner" placeholder="如：金子铮" />
+        </el-form-item>
+        <el-form-item label="设备状态">
+          <el-select v-model="cardForm.status" style="width: 100%">
+            <el-option v-for="s in ['在用', '备用', '维修', '停用']" :key="s" :label="s" :value="s" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="开始使用日期">
+          <el-date-picker v-model="cardForm.start_date" type="month" value-format="YYYY-MM"
+                          placeholder="选择年月" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="本次校准时间">
+          <el-date-picker v-model="cardForm.cal_date" type="month" value-format="YYYY-MM"
+                          placeholder="选择年月" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="下次校准时间">
+          <el-date-picker v-model="cardForm.next_cal_date" type="month" value-format="YYYY-MM"
+                          placeholder="选择年月" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="设备维修联系方式">
+          <el-input v-model="cardForm.repair_contact" placeholder="默认 3000" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="cardDrawer = false">关闭</el-button>
+        <el-button type="primary" :loading="cardSaving" @click="saveCard">保存</el-button>
+        <el-button type="success" @click="downloadOneCard(cardRow)">下载 Word</el-button>
+      </template>
+    </el-drawer>
 
     <!-- 汇总维修记录（跨仪器） -->
     <el-dialog v-model="summaryOpen" title="汇总维修记录" width="1100px" top="4vh">
@@ -358,6 +421,7 @@ import {
   uploadInstrumentArchive, getInstrumentArchiveInfo, downloadInstrumentArchive,
   deleteInstrumentArchive, getArchivesStatus, importArchivesFolder,
   downloadInstrumentCard, downloadAllInstrumentCards,
+  getInstrumentCardData, updateInstrumentCardData,
   getInstrumentTestItems, getInstrumentDocuments, getInstrumentSopDocuments,
   listRepairs, createRepair, updateRepair, deleteRepair, createRepairInvite, listAllRepairs,
 } from '../../api/instruments'
@@ -747,6 +811,79 @@ const repairDetailOpen = ref(false)
 const repairDetailRow = ref(null)
 // ---------------- 设备卡片（仪器标识卡 + 维修二维码） ----------------
 const cardsLoading = ref(false)
+const cardDrawer = ref(false)
+const cardRow = ref(null)
+const cardLoading = ref(false)
+const cardSaving = ref(false)
+const cardQrImg = ref('')
+const cardForm = ref({
+  dept_no: '', name: '', model: '', status: '在用', owner: '',
+  start_date: '', cal_date: '', next_cal_date: '', repair_contact: '3000',
+})
+
+/** 把 YYYY-MM / YYYY-MM-DD / YYYY年M月 统一成 YYYY-MM（供月份选择器） */
+function toMonth(v) {
+  if (!v) return ''
+  const m = String(v).match(/(\d{4})\D*(\d{1,2})?/)
+  if (!m) return ''
+  return m[2] ? `${m[1]}-${String(m[2]).padStart(2, '0')}` : m[1]
+}
+
+async function openCard(row) {
+  if (!row) return
+  cardRow.value = row
+  cardDrawer.value = true
+  cardLoading.value = true
+  cardQrImg.value = ''
+  try {
+    const d = await getInstrumentCardData(row.id)
+    cardForm.value = {
+      dept_no: d.dept_no || row.dept_no || '',
+      name: d.name || row.name || '',
+      model: d.model || row.model || '',
+      status: d.status || '在用',
+      owner: d.owner || '',
+      start_date: toMonth(d.start_date),
+      cal_date: toMonth(d.cal_date),
+      next_cal_date: toMonth(d.next_cal_date),
+      repair_contact: d.repair_contact || '3000',
+    }
+    // 二维码：用完整编号（系统要求 MHZYY- 前缀）
+    const code = cardForm.value.dept_no || ''
+    const full = code.startsWith('MHZYY-') ? code : 'MHZYY-' + code
+    const url = `${window.location.origin}/repair-fill?code=${encodeURIComponent(full)}`
+    cardQrImg.value = await QRCode.toDataURL(url, { width: 260, margin: 1 })
+  } catch (e) {
+    ElMessage.error('加载设备卡片失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    cardLoading.value = false
+  }
+}
+
+async function saveCard() {
+  if (!cardRow.value) return
+  cardSaving.value = true
+  try {
+    const payload = { ...cardForm.value }
+    // 日期转成 YYYY-MM-DD 存库更通用
+    const d = await updateInstrumentCardData(cardRow.value.id, payload)
+    cardForm.value = {
+      ...cardForm.value,
+      status: d.status || cardForm.value.status,
+      owner: d.owner || cardForm.value.owner,
+      start_date: toMonth(d.start_date),
+      cal_date: toMonth(d.cal_date),
+      next_cal_date: toMonth(d.next_cal_date),
+      repair_contact: d.repair_contact || cardForm.value.repair_contact,
+    }
+    ElMessage.success('已保存，卡片内容已同步到仪器档案')
+  } catch (e) {
+    ElMessage.error('保存失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    cardSaving.value = false
+  }
+}
+
 async function downloadOneCard(row) {
   if (!row) return
   try {
@@ -1299,4 +1436,31 @@ function formatTime(v) {
 .doc-preview :deep(img) {
   max-width: 100%;
 }
+
+/* ---------- 设备卡片预览 ---------- */
+.devcard-wrap { display: flex; justify-content: center; padding: 4px 0 8px; }
+.devcard {
+  width: 420px; border: 1.5px solid #444; background: #fff;
+  font-size: 12px; color: #222; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+.dc-title {
+  text-align: center; font-weight: 700; font-size: 14px; padding: 6px 0;
+  background: #c0c0c0; border-bottom: 1px solid #444; letter-spacing: 1px;
+}
+.dc-body { display: flex; }
+.dc-rows { flex: 1; border-right: 1px solid #444; }
+.dc-row { display: flex; border-bottom: 1px solid #ccc; }
+.dc-row:last-child { border-bottom: none; }
+.dc-k {
+  width: 108px; flex: none; padding: 4px 6px; border-right: 1px solid #ccc;
+  background: #fafafa; color: #333;
+}
+.dc-v { flex: 1; padding: 4px 6px; word-break: break-all; }
+.dc-qr {
+  width: 130px; flex: none; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 4px 2px; gap: 1px;
+}
+.dc-qr img { width: 96px; height: 96px; }
+.dc-qr-ph { width: 96px; height: 96px; background: #f5f5f5; }
+.dc-qr-cap { font-size: 9px; color: #333; line-height: 1.2; text-align: center; }
 </style>
