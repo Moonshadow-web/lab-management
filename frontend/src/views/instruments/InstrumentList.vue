@@ -1497,7 +1497,7 @@ function formatTime(v) {
   background: #5a6270; color: #fff; font-weight: 700; font-size: 16px;
   text-align: center; padding: 8px 0; letter-spacing: 3px;
 }
-.dc-top { display: flex; }
+.dc-top { display: flex; border-bottom: 1px solid #333; }
 .dc-left { flex: 1; min-width: 0; }
 .dc-row { display: flex; border-bottom: 1px solid #333; }
 .dc-row.last { border-bottom: none; }
