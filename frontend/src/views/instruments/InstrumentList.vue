@@ -167,7 +167,7 @@
       <div class="devcard-wrap">
         <div class="devcard">
           <div class="dc-title">民航总医院检验科设备卡片</div>
-          <div class="dc-body">
+          <div class="dc-top">
             <div class="dc-left">
               <div class="dc-row"><span class="dc-k">设备编号</span><span class="dc-v">{{ cardForm.dept_no || '—' }}</span></div>
               <div class="dc-row"><span class="dc-k">设备名称</span><span class="dc-v">{{ cardForm.name || '—' }}</span></div>
@@ -180,11 +180,7 @@
                   <span class="cb" :class="{ on: cardForm.status === '停用' }">停用</span>
                 </span>
               </div>
-              <div class="dc-row"><span class="dc-k">设备负责人</span><span class="dc-v strong big">{{ cardForm.owner || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">开始使用日期</span><span class="dc-v strong">{{ fmtYm(cardForm.start_date) || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">本次校准时间</span><span class="dc-v strong">{{ fmtYm(cardForm.cal_date) || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">下次校准时间</span><span class="dc-v strong">{{ fmtYm(cardForm.next_cal_date) || '—' }}</span></div>
-              <div class="dc-row last"><span class="dc-k">设备维修联系方式</span><span class="dc-v strong">{{ cardForm.repair_contact || '—' }}</span></div>
+              <div class="dc-row last"><span class="dc-k">设备负责人</span><span class="dc-v strong big">{{ cardForm.owner || '—' }}</span></div>
             </div>
             <div class="dc-qr">
               <img v-if="cardQrImg" :src="cardQrImg" alt="二维码" />
@@ -195,6 +191,10 @@
               <div class="dc-qr-cap">填写维修记录</div>
             </div>
           </div>
+          <div class="dc-row"><span class="dc-k">开始使用日期</span><span class="dc-v strong">{{ fmtYm(cardForm.start_date) || '—' }}</span></div>
+          <div class="dc-row"><span class="dc-k">本次校准时间</span><span class="dc-v strong">{{ fmtYm(cardForm.cal_date) || '—' }}</span></div>
+          <div class="dc-row"><span class="dc-k">下次校准时间</span><span class="dc-v strong">{{ fmtYm(cardForm.next_cal_date) || '—' }}</span></div>
+          <div class="dc-row last"><span class="dc-k">设备维修联系方式</span><span class="dc-v strong">{{ cardForm.repair_contact || '—' }}</span></div>
         </div>
       </div>
 
@@ -1465,7 +1465,7 @@ function formatTime(v) {
   background: #5a6270; color: #fff; font-weight: 700; font-size: 16px;
   text-align: center; padding: 8px 0; letter-spacing: 3px;
 }
-.dc-body { display: flex; }
+.dc-top { display: flex; }
 .dc-left { flex: 1; min-width: 0; }
 .dc-row { display: flex; border-bottom: 1px solid #333; }
 .dc-row.last { border-bottom: none; }
