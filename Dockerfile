@@ -9,6 +9,7 @@ WORKDIR /app
 # 系统依赖（gcc/python3-dev 用于编译 crcmod C 扩展）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2 libxslt1.1 gcc python3-dev \
+    fonts-wqy-zenhei \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 依赖
@@ -16,7 +17,9 @@ COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 清理编译工具（减小镜像体积）
-RUN apt-get remove -y gcc python3-dev && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+# 注意：标记 fonts-wqy-wenhei 为 manual，避免 autoremove 连带删掉中文字体
+RUN apt-mark manual fonts-wqy-zenhei \
+    && apt-get remove -y gcc python3-dev && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 # 后端代码
 COPY backend/ ./
