@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """设备卡片（仪器标识卡 + 维修二维码）生成服务
 
-输出：Word (.docx)
-版式：A4 竖版，每页 3 张卡片；每张卡片 = 1 个 3 列 × 10 行表格
-     卡片总宽 9.21cm（标签 3.50 / 值 3.30 / 二维码 2.41），可裁剪
+输出：PDF（ReportLab 精确绘制，版式与网页预览 1:1 对应）
+版式：A4 竖版，**每页 3 张卡片**（打印后沿卡片外框裁剪）
+     卡片宽 9.21cm，10 行；标签列 3.50cm，值列 3.30cm，二维码列 2.41cm
 
 要素来源（仪器档案）：
     设备编号 dept_no / 设备名称 name / 厂家型号 model / 设备状态 status
@@ -14,20 +14,63 @@ import io
 import os
 import re
 
-from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import OxmlElement, parse_xml
-from docx.oxml.ns import qn
-from docx.shared import Cm, Emu, Pt
-from docx.text.paragraph import Paragraph
+from reportlab.lib.colors import HexColor
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 
-WML = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
-# 列宽 twips（3.50 / 3.30 / 2.41 cm = 9.21cm 总宽）
-COL_W = [1985, 1871, 1364]
-CARD_W = sum(COL_W)
-QR_PX_CM = 1.60          # 二维码图片宽度(cm)
-PER_PAGE = 3             # 每页卡片数
-BLANK_LINES = 3          # 卡片之间的空行数
+# ---------- 颜色 / 尺寸 ----------
+C_TITLE_BG = HexColor("#5a6270")   # 深灰蓝标题栏
+C_LINE = HexColor("#333333")       # 表格线
+C_TEXT = HexColor("#111111")
+
+CARD_W = 9.21 * cm
+COL_LABEL = 3.50 * cm
+COL_VALUE = 3.30 * cm
+COL_QR = 2.41 * cm                 # 3.50 + 3.30 + 2.41 = 9.21cm
+ROW_H = 0.62 * cm
+TITLE_H = 0.72 * cm
+TOP_ROWS = 5                       # 二维码占前 5 行
+PER_PAGE = 3                       # 每页 3 张
+GAP = 0.45 * cm
+
+_FONT = None
+_FONT_BOLD = None
+
+
+def _ensure_font():
+    """注册中文字体（容器内可能没中文字体，多路径尝试）"""
+    global _FONT, _FONT_BOLD
+    if _FONT:
+        return
+    candidates = [
+        (r"C:\Windows\Fonts\simhei.ttf", r"C:\Windows\Fonts\simhei.ttf"),
+        (r"C:\Windows\Fonts\msyh.ttc", r"C:\Windows\Fonts\msyhbd.ttc"),
+        (r"C:\Windows\Fonts\msyh.ttc", r"C:\Windows\Fonts\msyh.ttc"),
+        ("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+         "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
+        ("/usr/share/fonts/truetype/arphic/uming.ttc",
+         "/usr/share/fonts/truetype/arphic/uming.ttc"),
+    ]
+    for reg, bold in candidates:
+        try:
+            if not os.path.exists(reg):
+                continue
+            pdfmetrics.registerFont(TTFont("CardCN", reg))
+            bold_src = bold if os.path.exists(bold) else reg
+            try:
+                pdfmetrics.registerFont(TTFont("CardCN-Bold", bold_src))
+            except Exception:
+                pdfmetrics.registerFont(TTFont("CardCN-Bold", reg))
+            _FONT = "CardCN"
+            _FONT_BOLD = "CardCN-Bold"
+            return
+        except Exception:
+            continue
+    _FONT = "Helvetica"
+    _FONT_BOLD = "Helvetica-Bold"
 
 
 def ym(v: str) -> str:
@@ -42,81 +85,68 @@ def ym(v: str) -> str:
     return f'{m.group(1)} 年' if m else s
 
 
-def _set_cell_text(cell, text, size=9, bold=False):
-    """覆盖单元格文本（保留首段格式）"""
-    paras = cell._tc.findall(qn('w:p'))
-    if not paras:
-        return
-    p = paras[0]
-    for ch in list(p):
-        if ch.tag != qn('w:pPr'):
-            p.remove(ch)
-    for ex in paras[1:]:
-        ex.getparent().remove(ex)
-    r = OxmlElement('w:r')
-    rPr = OxmlElement('w:rPr')
-    sz = OxmlElement('w:sz'); sz.set(qn('w:val'), str(int(size * 2))); rPr.append(sz)
-    if bold:
-        b = OxmlElement('w:b'); rPr.append(b)
-    r.append(rPr)
-    t = OxmlElement('w:t'); t.set(qn('xml:space'), 'preserve'); t.text = text
-    r.append(t)
-    p.append(r)
-
-
-def _tight_para(cell, txt, size=5.5):
-    """在单元格末尾追加一个紧凑居中段落"""
-    xml = (f'<w:p {WML}><w:pPr>'
-           f'<w:spacing w:before="0" w:after="0" w:line="200" w:lineRule="exact"/>'
-           f'<w:jc w:val="center"/>'
-           f'<w:rPr><w:sz w:val="{int(size*2)}"/><w:szCs w:val="{int(size*2)}"/></w:rPr>'
-           f'</w:pPr>'
-           f'<w:r><w:rPr><w:sz w:val="{int(size*2)}"/><w:szCs w:val="{int(size*2)}"/></w:rPr>'
-           f'<w:t xml:space="preserve">{txt}</w:t></w:r></w:p>')
-    cell._tc.append(parse_xml(xml))
-
-
 def _make_qr_png(url: str, path: str):
-    """生成二维码 PNG；无 qrcode 库时返回 None（卡片仍可生成，只是无图）"""
+    """生成二维码 PNG；失败返回 None（卡片仍可生成，只是无图）"""
+    if os.path.exists(path):
+        return path
     try:
         import qrcode
         from qrcode.constants import ERROR_CORRECT_M
     except Exception:
         return None
-    if os.path.exists(path):
+    try:
+        qr = qrcode.QRCode(error_correction=ERROR_CORRECT_M, box_size=24, border=1)
+        qr.add_data(url)
+        qr.make(fit=True)
+        qr.make_image(fill_color='black', back_color='white').convert('RGB').save(path)
         return path
-    qr = qrcode.QRCode(error_correction=ERROR_CORRECT_M, box_size=24, border=1)
-    qr.add_data(url)
-    qr.make(fit=True)
-    qr.make_image(fill_color='black', back_color='white').convert('RGB').save(path)
-    return path
+    except Exception:
+        return None
 
 
-def _shade(cell, fill='FFFFFF'):
-    tcPr = cell._tc.find(qn('w:tcPr'))
-    if tcPr is None:
-        tcPr = OxmlElement('w:tcPr'); cell._tc.insert(0, tcPr)
-    for tag in ('w:shd', 'w:tcShd'):
-        e = tcPr.find(qn(tag))
-        if e is not None:
-            tcPr.remove(e)
-    shd = OxmlElement('w:tcShd')
-    shd.set(qn('w:val'), 'clear'); shd.set(qn('w:color'), 'auto'); shd.set(qn('w:fill'), fill)
-    tcPr.append(shd)
+def _text(c, x, y, txt, size, font=None, color=C_TEXT):
+    if txt in (None, ""):
+        return
+    c.setFont(font or _FONT, size)
+    c.setFillColor(color)
+    c.drawCentredString(x, y, str(txt))
 
 
-def _valign(cell, val='center'):
-    tcPr = cell._tc.find(qn('w:tcPr'))
-    if tcPr is None:
-        tcPr = OxmlElement('w:tcPr'); cell._tc.insert(0, tcPr)
-    e = tcPr.find(qn('w:vAlign'))
-    if e is not None:
-        tcPr.remove(e)
-    va = OxmlElement('w:vAlign'); va.set(qn('w:val'), val); tcPr.append(va)
+def _status_text(status: str, size: float):
+    """状态行：(items, total_width, em)
+    宽度按实际字号估算：框 0.75em + 文字 2 字(1.2em) + 间隔 0.9em
+    """
+    opts = (('在用', '在用'), ('维修', '维修'), ('停用', '停用'))
+    parts = [(label, status == val) for label, val in opts]
+    em = size
+    box = 0.75 * em
+    text_w = 1.20 * em          # 2 个汉字
+    gap = 0.90 * em
+    item_w = box + 0.14 * em + text_w + gap
+    return parts, item_w * len(parts), em, box, gap
 
 
-def build_card_table(doc, item, qr_dir, host):
-    """在 doc 末尾追加一张设备卡片表格，返回表格对象"""
+def _draw_status(c, cx, cy, status, size):
+    """在 (cx, cy) 处居中绘制「□在用 □维修 □停用」状态行（矢量勾选框）"""
+    parts, total, em, box, gap = _status_text(status, size)
+    x = cx - total / 2
+    c.setStrokeColor(C_TEXT)
+    c.setFillColor(C_TEXT)
+    for label, on in parts:
+        c.setLineWidth(0.9)
+        c.rect(x, cy - box * 0.30, box, box, stroke=1, fill=0)
+        if on:
+            c.setLineWidth(1.3)
+            c.line(x + box * 0.22, cy + box * 0.24, x + box * 0.43, cy - box * 0.04)
+            c.line(x + box * 0.43, cy - box * 0.04, x + box * 0.78, cy + box * 0.44)
+        c.setFont(_FONT, size)
+        c.drawString(x + box + 0.14 * em, cy, label)
+        x += box + 0.14 * em + 1.20 * em + gap
+
+
+def _draw_card(c, x0, y_top, item, qr_dir, host):
+    """画一张卡片。x0,y_top = 卡片左上角"""
+    _ensure_font()
     code = (item.get('dept_no') or '').strip()
     name = (item.get('name') or '').strip()
     model = (item.get('model') or '').strip()
@@ -127,106 +157,112 @@ def build_card_table(doc, item, qr_dir, host):
     nextcal = ym(item.get('next_cal_date'))
     contact = (item.get('repair_contact') or '3000').strip()
 
-    tbl = doc.add_table(rows=10, cols=3)
-    tbl.style = 'Table Grid'
-    tbl.autofit = False
-    # 列宽（三处同步）
-    grid = tbl._tbl.find(qn('w:tblGrid'))
-    for i, gc in enumerate(grid.findall(qn('w:gridCol'))):
-        gc.set(qn('w:w'), str(COL_W[i]))
-    for tr in tbl._tbl.findall(qn('w:tr')):
-        for i, tc in enumerate(tr.findall(qn('w:tc'))):
-            tcPr = tc.find(qn('w:tcPr'))
-            if tcPr is None:
-                tcPr = OxmlElement('w:tcPr'); tc.insert(0, tcPr)
-            o = tcPr.find(qn('w:tcW'))
-            if o is not None:
-                tcPr.remove(o)
-            w = OxmlElement('w:tcW'); w.set(qn('w:w'), str(COL_W[i])); w.set(qn('w:type'), 'dxa')
-            tcPr.append(w)
-    tblW = tbl._tbl.find(qn('w:tblPr')).find(qn('w:tblW'))
-    if tblW is None:
-        tblW = OxmlElement('w:tblW'); tbl._tbl.find(qn('w:tblPr')).append(tblW)
-    tblW.set(qn('w:w'), str(CARD_W)); tblW.set(qn('w:type'), 'dxa')
+    # ---- 标题栏 ----
+    c.setFillColor(C_TITLE_BG)
+    c.rect(x0, y_top - TITLE_H, CARD_W, TITLE_H, stroke=0, fill=1)
+    _text(c, x0 + CARD_W / 2, y_top - TITLE_H / 2 - 4.0,
+          '民航总医院检验科设备卡片', 11.5, _FONT_BOLD, HexColor("#FFFFFF"))
 
-    # 标题行跨 3 列
-    tbl.rows[0].cells[0].merge(tbl.rows[0].cells[2])
-    # R7-R10 值列跨 2-3 列
-    for ri in range(6, 10):
-        tbl.rows[ri].cells[1].merge(tbl.rows[ri].cells[2])
-    # 二维码列 R2-R6 纵向合并
-    cq = tbl.rows[1].cells[2]
-    for i in range(2, 6):
-        cq = cq.merge(tbl.rows[i].cells[2])
+    body_top = y_top - TITLE_H
+    upper_h = ROW_H * TOP_ROWS
+    upper_bottom = body_top - upper_h
 
-    rows_data = [
-        ('设备编号', code),
-        ('设备名称', name),
-        ('厂家型号', model),
-        ('设备状态', status),
-        ('设备负责人', owner),
-        ('开始使用日期', start),
-        ('本次校准时间', cal),
-        ('下次校准时间', nextcal),
-        ('设备维修联系方式', contact),
+    c.setFillColor(HexColor("#FFFFFF"))
+    c.rect(x0, upper_bottom, CARD_W, upper_h, stroke=0, fill=1)
+
+    # 前 5 行的横线（左 2 列范围）
+    c.setStrokeColor(C_LINE)
+    c.setLineWidth(0.6)
+    for i in range(TOP_ROWS + 1):
+        yy = body_top - ROW_H * i
+        c.line(x0, yy, x0 + COL_LABEL + COL_VALUE, yy)
+    c.line(x0 + COL_LABEL, body_top, x0 + COL_LABEL, upper_bottom)
+    c.line(x0 + COL_LABEL + COL_VALUE, body_top, x0 + COL_LABEL + COL_VALUE, upper_bottom)
+
+    upper_rows = [
+        ('设备编号', code, _FONT, 9),
+        ('设备名称', name, _FONT, 9),
+        ('厂家型号', model, _FONT_BOLD, 9),
+        ('设备状态', None, _FONT, 7.5),
+        ('设备负责人', owner, _FONT_BOLD, 10),
     ]
-    _set_cell_text(tbl.rows[0].cells[0], '民航总医院检验科设备卡片', 11, True)
-    for i, (k, v) in enumerate(rows_data, start=1):
-        _set_cell_text(tbl.rows[i].cells[0], k, 9)
-        _set_cell_text(tbl.rows[i].cells[1], v, 9 if k != '设备状态' else 7.5)
+    for i, (label, value, vfont, vsize) in enumerate(upper_rows):
+        cy = body_top - ROW_H * i - ROW_H / 2 - 3.0
+        _text(c, x0 + COL_LABEL / 2, cy, label, 9, _FONT)
+        vx = x0 + COL_LABEL + COL_VALUE / 2
+        if label == '设备状态':
+            _draw_status(c, vx, cy, status, vsize)
+        else:
+            _text(c, vx, cy, value, vsize, vfont)
 
-    # 二维码单元格
-    cell = tbl.rows[1].cells[2]
-    _shade(cell, 'FFFFFF')
-    _valign(cell, 'center')
-    tc = cell._tc
-    ps = tc.findall(qn('w:p'))
-    for p in ps[1:]:
-        tc.remove(p)
-    p0 = ps[0]
-    for ch in list(p0):
-        if ch.tag != qn('w:pPr'):
-            p0.remove(ch)
-    pPr = p0.find(qn('w:pPr'))
-    if pPr is None:
-        pPr = OxmlElement('w:pPr'); p0.insert(0, pPr)
-    jc = OxmlElement('w:jc'); jc.set(qn('w:val'), 'center'); pPr.append(jc)
+    # 「设备负责人」行下方：左 2 列 + 二维码列 各补一段横线（拼成完整一条）
+    c.setStrokeColor(C_LINE)
+    c.setLineWidth(0.6)
+    c.line(x0, upper_bottom, x0 + COL_LABEL + COL_VALUE, upper_bottom)
+    c.line(x0 + COL_LABEL + COL_VALUE, upper_bottom, x0 + CARD_W, upper_bottom)
 
+    # ---- 二维码区域 ----
+    qx = x0 + COL_LABEL + COL_VALUE
+    qw = COL_QR
+    qr_size = 1.40 * cm
+    qr_top = body_top - 0.14 * cm
     if code:
         full = code if code.startswith('MHZYY-') else 'MHZYY-' + code
         png = _make_qr_png(f'{host}/repair-fill?code={full}',
                            os.path.join(qr_dir, full + '.png'))
         if png:
-            Paragraph(p0, doc).add_run().add_picture(png, width=Emu(int(QR_PX_CM * 360000)))
-    _tight_para(cell, f'型号：{model}', 5.5)
-    _tight_para(cell, f'编号：{code}', 5.5)
-    _tight_para(cell, '设备故障请扫码', 5.5)
-    _tight_para(cell, '填写维修记录', 5.5)
-    return tbl
+            try:
+                c.drawImage(png, qx + (qw - qr_size) / 2, qr_top - qr_size,
+                            width=qr_size, height=qr_size, mask=None)
+            except Exception:
+                pass
+    cap_y = (qr_top - qr_size) - 0.34 * cm
+    _text(c, qx + qw / 2, cap_y, '设备故障请扫码', 6.5, _FONT)
+    _text(c, qx + qw / 2, cap_y - 0.30 * cm, '填写维修记录', 6.5, _FONT)
+
+    # ---- 下方 4 行（通栏）----
+    lower_rows = [
+        ('开始使用日期', start),
+        ('本次校准时间', cal),
+        ('下次校准时间', nextcal),
+        ('设备维修联系方式', contact),
+    ]
+    y = upper_bottom
+    for label, value in lower_rows:
+        y -= ROW_H
+        c.setStrokeColor(C_LINE)
+        c.setLineWidth(0.6)
+        c.line(x0, y, x0 + CARD_W, y)
+        c.line(x0 + COL_LABEL, y, x0 + COL_LABEL, y + ROW_H)
+        _text(c, x0 + COL_LABEL / 2, y + ROW_H / 2 - 3.0, label, 9, _FONT)
+        _text(c, x0 + COL_LABEL + (CARD_W - COL_LABEL) / 2,
+              y + ROW_H / 2 - 3.0, value, 9.5, _FONT_BOLD)
+
+    # ---- 外框 ----
+    total_h = TITLE_H + ROW_H * (TOP_ROWS + len(lower_rows))
+    c.setStrokeColor(C_LINE)
+    c.setLineWidth(1.0)
+    c.rect(x0, y_top - total_h, CARD_W, total_h, stroke=1, fill=0)
 
 
-def build_docx(items, host: str, qr_dir: str) -> bytes:
-    """生成设备卡片 Word，返回 bytes"""
+def build_pdf(items, host: str, qr_dir: str) -> bytes:
+    """生成设备卡片 PDF（每页 3 张），返回 bytes"""
     os.makedirs(qr_dir, exist_ok=True)
-    doc = Document()
-    sec = doc.sections[0]
-    sec.page_width = Cm(21.0)
-    sec.page_height = Cm(29.7)
-    sec.left_margin = Cm(3.2)
-    sec.right_margin = Cm(3.2)
-    sec.top_margin = Cm(1.5)
-    sec.bottom_margin = Cm(1.5)
-
-    for idx, item in enumerate(items):
-        build_card_table(doc, item, qr_dir, host)
-        # 卡片之间留空（每 PER_PAGE 张内留空行，页尾分页）
-        if (idx + 1) % PER_PAGE == 0 and idx + 1 < len(items):
-            doc.add_page_break()
-        else:
-            for _ in range(BLANK_LINES):
-                doc.add_paragraph()
+    _ensure_font()
     buf = io.BytesIO()
-    doc.save(buf)
+    c = canvas.Canvas(buf, pagesize=A4)
+    page_w, page_h = A4
+    x0 = (page_w - CARD_W) / 2
+    card_h = TITLE_H + ROW_H * 9
+
+    y_cur = page_h - 1.2 * cm
+    for idx, item in enumerate(items):
+        if idx and idx % PER_PAGE == 0:
+            c.showPage()
+            y_cur = page_h - 1.2 * cm
+        _draw_card(c, x0, y_cur, item, qr_dir, host)
+        y_cur -= card_h + GAP
+    c.save()
     return buf.getvalue()
 
 
