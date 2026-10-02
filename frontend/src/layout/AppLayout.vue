@@ -95,6 +95,10 @@ const OTHER_GROUP_PATHS = new Set([
   '/reagent', '/reagent/items', '/reagent/stock', '/reagent/inventory',
   '/reagent/orders', '/reagent/consumption', '/reagent/associations',
   '/reagent/receivings',
+  // 2026-10-02 开放：性能验证（已按专业组隔离，各组用本组数据）、项目质量要求（全科标准库共享）、
+  // 仪器关联管理（供各组维护自己的总型号↔仪器映射）
+  '/verification', '/quality-requirements',
+  '/instrument-families', '/eqa-associations', '/post-instrument-map',
 ])
 
 const menus = computed(() => {
