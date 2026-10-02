@@ -73,6 +73,12 @@ def _ensure_font():
     _FONT_BOLD = "Helvetica-Bold"
 
 
+def font_ok() -> bool:
+    """是否成功加载了中文字体（False = 会渲染成方块，必须阻止出卡）"""
+    _ensure_font()
+    return _FONT not in ("Helvetica", "Helvetica-Bold")
+
+
 def ym(v: str) -> str:
     """把各种日期写法归一成「YYYY 年 M 月」（卡片只显示到年月，不显示具体日子）"""
     if not v:
@@ -249,6 +255,12 @@ def build_pdf(items, host: str, qr_dir: str) -> bytes:
     """生成设备卡片 PDF（每页 3 张），返回 bytes"""
     os.makedirs(qr_dir, exist_ok=True)
     _ensure_font()
+    if _FONT in ("Helvetica", "Helvetica-Bold"):
+        # 没有中文字体 → 会渲染成一堆黑方块，宁可报错也不要出废卡
+        raise RuntimeError(
+            "容器内缺少中文字体，无法生成设备卡片。"
+            "请在 Dockerfile 安装 fonts-wqy-zenhei 后重新部署。"
+        )
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     page_w, page_h = A4

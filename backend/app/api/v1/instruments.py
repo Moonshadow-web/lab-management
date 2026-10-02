@@ -947,11 +947,22 @@ def cards_ping(request: Request, db: Session = Depends(get_db),
         out["tb"] = traceback.format_exc()[-500:]
         return out
     try:
-        from ...services.device_card import build_docx
+        import glob
+        out["font_files"] = glob.glob("/usr/share/fonts/**/*.tt*", recursive=True)[:6]
+    except Exception as e:
+        out["font_files"] = f"err: {e}"
+    try:
+        from ...services.device_card import build_pdf, _ensure_font, _FONT, _FONT_BOLD
         out["import_ok"] = True
     except Exception as e:
         out["import_err"] = f"{type(e).__name__}: {e}"
         return out
+    try:
+        _ensure_font()
+        out["font_used"] = _FONT
+        out["font_is_cjk"] = _FONT not in ("Helvetica", "Helvetica-Bold")
+    except Exception as e:
+        out["font_err"] = f"{type(e).__name__}: {e}"
     try:
         import qrcode  # noqa
         out["qrcode_ok"] = True
@@ -959,11 +970,11 @@ def cards_ping(request: Request, db: Session = Depends(get_db),
         out["qrcode_ok"] = f"missing: {e}"
     try:
         import tempfile
-        d = build_docx(items[:1], _card_host(request), tempfile.mkdtemp())
-        out["docx_ok"] = len(d)
+        d = build_pdf(items[:1], _card_host(request), tempfile.mkdtemp())
+        out["pdf_ok"] = len(d)
     except Exception as e:
         import traceback
-        out["docx_err"] = f"{type(e).__name__}: {e}"
+        out["pdf_err"] = f"{type(e).__name__}: {e}"
         out["tb"] = traceback.format_exc()[-500:]
     return out
 
