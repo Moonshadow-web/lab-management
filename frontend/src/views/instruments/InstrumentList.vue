@@ -197,8 +197,6 @@
             <div class="dc-qr">
               <img v-if="cardQrImg" :src="cardQrImg" alt="二维码" />
               <div v-else v-loading="true" class="dc-qr-ph" />
-              <div class="dc-qr-cap">型号：{{ cardForm.model || '—' }}</div>
-              <div class="dc-qr-cap">编号：{{ cardForm.dept_no || '—' }}</div>
               <div class="dc-qr-cap">设备故障请扫码</div>
               <div class="dc-qr-cap">填写维修记录</div>
             </div>
@@ -240,7 +238,7 @@
       <template #footer>
         <el-button @click="cardDrawer = false">关闭</el-button>
         <el-button type="primary" :loading="cardSaving" @click="saveCard">保存</el-button>
-        <el-button type="success" @click="downloadOneCard(cardRow)">下载 Word</el-button>
+        <el-button type="success" @click="downloadOneCard(cardRow)">下载 PDF</el-button>
       </template>
     </el-drawer>
 
@@ -478,7 +476,8 @@ const GROUP_OPTIONS = [
   { code: 'xk', name: '血库' },
 ]
 const groupFilter = ref('')
-const canSeeAllGroups = computed(() => (auth.roles || '').split(',').map((r) => r.trim()).includes('all_group_view'))
+// 注意：auth store 没有 roles 属性，只有 myRoles getter（已合并 role + roles 两个来源）
+const canSeeAllGroups = computed(() => auth.myRoles.includes('all_group_view'))
 const instrumentExtraParams = computed(() => {
   const p = hideNonActive.value ? { status: '在用' } : {}
   if (groupFilter.value) p.group_code = groupFilter.value
@@ -939,7 +938,7 @@ async function downloadOneCard(row) {
   if (!row) return
   try {
     const blob = await downloadInstrumentCard(row.id)
-    triggerDownload(blob, `设备卡片_${row.name || row.dept_no || row.id}.docx`)
+    triggerDownload(blob, `设备卡片_${row.name || row.dept_no || row.id}.pdf`)
   } catch (e) {
     ElMessage.error('生成设备卡片失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
   }
@@ -949,7 +948,7 @@ async function downloadAllCards() {
   cardsLoading.value = true
   try {
     const blob = await downloadAllInstrumentCards()
-    triggerDownload(blob, '设备卡片集.docx')
+    triggerDownload(blob, '设备卡片集.pdf')
   } catch (e) {
     ElMessage.error('生成设备卡片集失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
   } finally {
