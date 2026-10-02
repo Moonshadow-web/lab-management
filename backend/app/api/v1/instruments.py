@@ -1029,6 +1029,20 @@ async def update_card_data(instrument_id: int, request: Request, db: Session = D
                  .filter(CalibrationRecord.instrument_id == instrument_id)
                  .order_by(CalibrationRecord.calibration_date.desc())
                  .first())
+        # 卡片上只选到「年-月」，但校准记录要保留具体日子：
+        # 若原值是完整日期而新值只有年月，则沿用原来的「日」。
+        def _keep_day(new_val: str, old_val: str) -> str:
+            if new_val and len(new_val) <= 7 and old_val:
+                m = re.match(r"^(\d{4}-\d{2})-(\d{2})", str(old_val).strip())
+                if m:
+                    return f"{new_val}-{m.group(2)}"
+            return new_val
+
+        old_cal = rec.calibration_date if rec is not None else ""
+        old_next = rec.next_due_date if rec is not None else ""
+        cal_date = _keep_day(cal_date, old_cal)
+        next_date = _keep_day(next_date, old_next)
+
         if rec is None:
             rec = CalibrationRecord(instrument_id=instrument_id, calibration_date=cal_date,
                                     next_due_date=next_date, result="", agency="",

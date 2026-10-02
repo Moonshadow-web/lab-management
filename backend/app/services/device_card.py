@@ -31,15 +31,15 @@ BLANK_LINES = 3          # 卡片之间的空行数
 
 
 def ym(v: str) -> str:
-    """把各种日期写法归一成「YYYY年M月」"""
+    """把各种日期写法归一成「YYYY 年 M 月」（卡片只显示到年月，不显示具体日子）"""
     if not v:
         return ''
     s = str(v).strip()
     m = re.search(r'(\d{4})\s*[-/年.]\s*(\d{1,2})', s)
     if m:
-        return f'{m.group(1)}年{int(m.group(2))}月'
+        return f'{m.group(1)} 年 {int(m.group(2))} 月'
     m = re.search(r'(\d{4})', s)
-    return f'{m.group(1)}年' if m else s
+    return f'{m.group(1)} 年' if m else s
 
 
 def _set_cell_text(cell, text, size=9, bold=False):

@@ -168,16 +168,16 @@
         <div class="devcard">
           <div class="dc-title">民航总医院检验科设备卡片</div>
           <div class="dc-body">
-            <div class="dc-rows">
+            <div class="dc-left">
               <div class="dc-row"><span class="dc-k">设备编号</span><span class="dc-v">{{ cardForm.dept_no || '—' }}</span></div>
               <div class="dc-row"><span class="dc-k">设备名称</span><span class="dc-v">{{ cardForm.name || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">厂家型号</span><span class="dc-v">{{ cardForm.model || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">设备状态</span><span class="dc-v">{{ cardForm.status || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">设备负责人</span><span class="dc-v">{{ cardForm.owner || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">开始使用日期</span><span class="dc-v">{{ cardForm.start_date || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">本次校准时间</span><span class="dc-v">{{ cardForm.cal_date || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">下次校准时间</span><span class="dc-v">{{ cardForm.next_cal_date || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">设备维修联系方式</span><span class="dc-v">{{ cardForm.repair_contact || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">厂家型号</span><span class="dc-v strong">{{ cardForm.model || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">设备状态</span><span class="dc-v sm">☑在用　□维修　□停用</span></div>
+              <div class="dc-row"><span class="dc-k">设备负责人</span><span class="dc-v strong big">{{ cardForm.owner || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">开始使用日期</span><span class="dc-v strong">{{ fmtYm(cardForm.start_date) || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">本次校准时间</span><span class="dc-v strong">{{ fmtYm(cardForm.cal_date) || '—' }}</span></div>
+              <div class="dc-row"><span class="dc-k">下次校准时间</span><span class="dc-v strong">{{ fmtYm(cardForm.next_cal_date) || '—' }}</span></div>
+              <div class="dc-row last"><span class="dc-k">设备维修联系方式</span><span class="dc-v strong">{{ cardForm.repair_contact || '—' }}</span></div>
             </div>
             <div class="dc-qr">
               <img v-if="cardQrImg" :src="cardQrImg" alt="二维码" />
@@ -188,6 +188,7 @@
               <div class="dc-qr-cap">填写维修记录</div>
             </div>
           </div>
+          <div class="dc-foot">民航总医院检验科　服务卡</div>
         </div>
       </div>
 
@@ -821,12 +822,20 @@ const cardForm = ref({
   start_date: '', cal_date: '', next_cal_date: '', repair_contact: '3000',
 })
 
-/** 把 YYYY-MM / YYYY-MM-DD / YYYY年M月 统一成 YYYY-MM（供月份选择器） */
+/** 把 YYYY-MM / YYYY-MM-DD / YYYY.M / YYYY年M月 统一成 YYYY-MM（供月份选择器） */
 function toMonth(v) {
   if (!v) return ''
   const m = String(v).match(/(\d{4})\D*(\d{1,2})?/)
   if (!m) return ''
   return m[2] ? `${m[1]}-${String(m[2]).padStart(2, '0')}` : m[1]
+}
+
+/** 卡片显示用：YYYY 年 M 月（不显示具体日子） */
+function fmtYm(v) {
+  if (!v) return ''
+  const m = String(v).match(/(\d{4})\D*(\d{1,2})?/)
+  if (!m) return String(v)
+  return m[2] ? `${m[1]} 年 ${parseInt(m[2], 10)} 月` : `${m[1]} 年`
 }
 
 async function openCard(row) {
@@ -1438,29 +1447,41 @@ function formatTime(v) {
 }
 
 /* ---------- 设备卡片预览 ---------- */
-.devcard-wrap { display: flex; justify-content: center; padding: 4px 0 8px; }
+.devcard-wrap { display: flex; justify-content: center; padding: 4px 0 10px; }
 .devcard {
-  width: 420px; border: 1.5px solid #444; background: #fff;
-  font-size: 12px; color: #222; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  width: 100%; max-width: 460px; border: 2px solid #333; background: #fff;
+  color: #111;
 }
 .dc-title {
-  text-align: center; font-weight: 700; font-size: 14px; padding: 6px 0;
-  background: #c0c0c0; border-bottom: 1px solid #444; letter-spacing: 1px;
+  background: #5a6270; color: #fff; font-weight: 700; font-size: 16px;
+  text-align: center; padding: 8px 0; letter-spacing: 3px;
 }
 .dc-body { display: flex; }
-.dc-rows { flex: 1; border-right: 1px solid #444; }
-.dc-row { display: flex; border-bottom: 1px solid #ccc; }
-.dc-row:last-child { border-bottom: none; }
+.dc-left { flex: 1; min-width: 0; }
+.dc-row { display: flex; border-bottom: 1px solid #333; }
+.dc-row.last { border-bottom: none; }
 .dc-k {
-  width: 108px; flex: none; padding: 4px 6px; border-right: 1px solid #ccc;
-  background: #fafafa; color: #333;
+  width: 118px; flex: none; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 6px 4px; border-right: 1px solid #333;
+  font-size: 13px; font-weight: 500; color: #111; background: #fff;
 }
-.dc-v { flex: 1; padding: 4px 6px; word-break: break-all; }
+.dc-v {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 6px 4px; font-size: 14px; color: #111;
+}
+.dc-v.strong { font-weight: 700; }
+.dc-v.big { font-size: 16px; }
+.dc-v.sm { font-size: 12px; font-weight: 400; }
 .dc-qr {
-  width: 130px; flex: none; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; padding: 4px 2px; gap: 1px;
+  width: 146px; flex: none; border-left: 1px solid #333; background: #fff;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 8px 4px; gap: 1px;
 }
-.dc-qr img { width: 96px; height: 96px; }
-.dc-qr-ph { width: 96px; height: 96px; background: #f5f5f5; }
-.dc-qr-cap { font-size: 9px; color: #333; line-height: 1.2; text-align: center; }
+.dc-qr img { width: 108px; height: 108px; }
+.dc-qr-ph { width: 108px; height: 108px; background: #f5f5f5; }
+.dc-qr-cap { font-size: 10px; color: #222; line-height: 1.35; text-align: center; }
+.dc-foot {
+  background: #c8c8c8; color: #000; text-align: center;
+  padding: 6px 0; font-size: 12px; font-weight: 700; letter-spacing: 1px;
+}
 </style>
