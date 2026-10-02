@@ -172,7 +172,14 @@
               <div class="dc-row"><span class="dc-k">设备编号</span><span class="dc-v">{{ cardForm.dept_no || '—' }}</span></div>
               <div class="dc-row"><span class="dc-k">设备名称</span><span class="dc-v">{{ cardForm.name || '—' }}</span></div>
               <div class="dc-row"><span class="dc-k">厂家型号</span><span class="dc-v strong">{{ cardForm.model || '—' }}</span></div>
-              <div class="dc-row"><span class="dc-k">设备状态</span><span class="dc-v sm">☑在用　□维修　□停用</span></div>
+              <div class="dc-row">
+                <span class="dc-k">设备状态</span>
+                <span class="dc-v sm">
+                  <span class="cb" :class="{ on: cardForm.status === '在用' }">在用</span>　
+                  <span class="cb" :class="{ on: cardForm.status === '维修' }">维修</span>　
+                  <span class="cb" :class="{ on: cardForm.status === '停用' }">停用</span>
+                </span>
+              </div>
               <div class="dc-row"><span class="dc-k">设备负责人</span><span class="dc-v strong big">{{ cardForm.owner || '—' }}</span></div>
               <div class="dc-row"><span class="dc-k">开始使用日期</span><span class="dc-v strong">{{ fmtYm(cardForm.start_date) || '—' }}</span></div>
               <div class="dc-row"><span class="dc-k">本次校准时间</span><span class="dc-v strong">{{ fmtYm(cardForm.cal_date) || '—' }}</span></div>
@@ -188,7 +195,6 @@
               <div class="dc-qr-cap">填写维修记录</div>
             </div>
           </div>
-          <div class="dc-foot">民航总医院检验科　服务卡</div>
         </div>
       </div>
 
@@ -788,7 +794,10 @@ async function openRepairQR() {
   qrUrl.value = ''
   try {
     // 稳定链接：按仪器编号，长期有效、免登录（不再使用 30 天有效期的 token）
-    const url = `${window.location.origin}/repair-fill?code=${encodeURIComponent(repairInstrument.value.dept_no || '')}`
+    // 用完整编号（系统按 dept_no 精确匹配，短编号查不到）
+    const raw = (repairInstrument.value.dept_no || '').trim()
+    const full = raw.startsWith('MHZYY-') ? raw : (raw ? 'MHZYY-' + raw : '')
+    const url = `${window.location.origin}/repair-fill?code=${encodeURIComponent(full)}`
     qrUrl.value = url
     qrImg.value = await QRCode.toDataURL(url, { width: 240, margin: 1 })
   } catch (e) {
@@ -1472,6 +1481,9 @@ function formatTime(v) {
 .dc-v.strong { font-weight: 700; }
 .dc-v.big { font-size: 16px; }
 .dc-v.sm { font-size: 12px; font-weight: 400; }
+.dc-v.sm .cb { display: inline-block; }
+.dc-v.sm .cb::before { content: '□'; margin-right: 2px; }
+.dc-v.sm .cb.on::before { content: '☑'; }
 .dc-qr {
   width: 140px; flex: none; border-left: 1px solid #333; background: #fff;
   display: flex; flex-direction: column; align-items: center;
@@ -1480,8 +1492,4 @@ function formatTime(v) {
 .dc-qr img { width: 108px; height: 108px; }
 .dc-qr-ph { width: 108px; height: 108px; background: #f5f5f5; }
 .dc-qr-cap { font-size: 10px; color: #222; line-height: 1.35; text-align: center; }
-.dc-foot {
-  background: #c8c8c8; color: #000; text-align: center;
-  padding: 6px 0; font-size: 12px; font-weight: 700; letter-spacing: 1px;
-}
 </style>
