@@ -53,6 +53,7 @@ def make_router(
     delete_roles: tuple[str, ...] | None = None,
     json_fields: list[str] | None = None,
     group_scoped: bool = False,
+    group_exempt_roles: tuple[str, ...] = (),
 ):
     """通用 CRUD 路由工厂：分页/搜索、get、create、update、delete，并统一写审计日志。
 
@@ -65,6 +66,10 @@ def make_router(
 
     json_fields：声明为 Text 但 API 层用 list/dict 表达的列名；create/update 时
     自动 json.dumps 序列化（ensure_ascii=False），读回时由 schema 反序列化。
+
+    group_exempt_roles：白名单角色（如 "all_group_view" 全科查看）。命中任一角色的用户
+    **完全跳过组过滤**，可读写全部专业组数据；其他人仍按 group_scoped 隔离。
+    用于"某个人需要跨组查看某模块"的个别授权，而非全局放开。
     """
     _json_fields = set(json_fields or [])
     # 专业组数据隔离：group_scoped=True 时才生效；当前组为生免组(sm)/空 → 不过滤（保持原行为）
@@ -77,8 +82,19 @@ def make_router(
         def _group_param() -> str | None:
             return None
 
-    def _need_filter(group: str | None) -> bool:
+    def _has_group_exempt(user: User | None) -> bool:
+        """用户是否命中跨组白名单角色（all_group_view 等）→ 跳过组过滤。"""
+        if not group_exempt_roles or user is None:
+            return False
+        raw = f"{getattr(user, 'role', '') or ''},{getattr(user, 'roles', '') or ''}"
+        got = {r.strip() for r in raw.split(",") if r.strip()}
+        return bool(got & set(group_exempt_roles))
+
+    def _need_filter(group: str | None, user: User | None = None) -> bool:
         # 所有专业组都按组过滤（含生免组）：生免组=本组 + 历史空值 + KS 共享
+        # 命中跨组白名单角色者不过滤
+        if _has_group_exempt(user):
+            return False
         return bool(group_scoped) and bool(group)
 
     def _shared_conds(Model_):
@@ -121,7 +137,7 @@ def make_router(
     ):
         params = dict(request.query_params)
         query = db.query(Model)
-        if _need_filter(group):
+        if _need_filter(group, user):
             col = getattr(Model, "group_code", None)
             if col is not None:
                 conds = [col == group]
@@ -227,7 +243,7 @@ def make_router(
         obj = db.get(Model, item_id)
         if not obj:
             raise HTTPException(status_code=404, detail="未找到记录")
-        if _need_filter(group) and not _visible(obj, group):
+        if _need_filter(group, user) and not _visible(obj, group):
             raise HTTPException(status_code=404, detail="未找到记录")
         return _to_read(obj)
 
@@ -240,7 +256,7 @@ def make_router(
         group: str | None = Depends(_group_param),
     ):
         data = item.model_dump()
-        if _need_filter(group) and hasattr(Model, "group_code"):
+        if _need_filter(group, user) and hasattr(Model, "group_code"):
             data["group_code"] = group
         for f in _json_fields:
             if f in data and data[f] is not None and not isinstance(data[f], str):
@@ -264,7 +280,7 @@ def make_router(
         group: str | None = Depends(_group_param),
     ):
         obj = db.get(Model, item_id)
-        if _need_filter(group) and obj is not None and not _visible(obj, group):
+        if _need_filter(group, user) and obj is not None and not _visible(obj, group):
             raise HTTPException(status_code=403, detail="无权修改其他专业组的数据")
         if not obj:
             raise HTTPException(status_code=404, detail="未找到记录")
@@ -293,7 +309,7 @@ def make_router(
         obj = db.get(Model, item_id)
         if not obj:
             raise HTTPException(status_code=404, detail="未找到记录")
-        if _need_filter(group) and not _visible(obj, group):
+        if _need_filter(group, user) and not _visible(obj, group):
             raise HTTPException(status_code=403, detail="无权删除其他专业组的数据")
         db.delete(obj)
         db.commit()

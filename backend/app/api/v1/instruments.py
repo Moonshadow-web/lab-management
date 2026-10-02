@@ -62,8 +62,9 @@ router = make_router(
     order_by=_instrument_order,
     prefix="/instruments",
     write_roles=("admin", "specialty_leader"),
-    # 注意：2026-10-02 起仪器档案**不再按专业组隔离**——各组均可见全科室仪器档案，
-    # 组长（specialty_leader）可跨组修改。仅创建时打上操作者所属组，便于追溯与筛选。
+    group_scoped=True,  # 默认按专业组隔离：各组只看到本组+KS共享仪器
+    # 个别授权：带 all_group_view（全科查看）角色的人不受组隔离限制，可查看/修改全部组仪器
+    group_exempt_roles=("all_group_view",),
 )
 
 

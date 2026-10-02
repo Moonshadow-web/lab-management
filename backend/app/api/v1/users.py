@@ -24,6 +24,7 @@ ROLE_OPTIONS = [
     {"code": "it_manager", "label": "信息管理员"},
     {"code": "staff", "label": "职工"},
     {"code": "technical_support", "label": "技术支持"},
+    {"code": "all_group_view", "label": "全科查看"},
 ]
 
 
