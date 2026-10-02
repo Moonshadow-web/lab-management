@@ -13,6 +13,18 @@
       @delete="onDelete"
     >
       <template #toolbar-extra>
+        <!-- 专业组筛选：仅对「全科查看」用户有意义（其可见全部组仪器）；隔离用户本就只见本组 -->
+        <el-select
+          v-if="canSeeAllGroups"
+          v-model="groupFilter"
+          size="small"
+          clearable
+          placeholder="全部专业组"
+          style="width: 140px; margin-right: 4px"
+          @change="onGroupFilterChange"
+        >
+          <el-option v-for="g in GROUP_OPTIONS" :key="g.code" :label="g.name" :value="g.code" />
+        </el-select>
         <el-button type="success" plain @click="downloadAllCards" :loading="cardsLoading">设备卡片集</el-button>
         <el-button type="warning" plain @click="openRepairSummary">汇总维修记录</el-button>
         <el-button v-if="auth.canWrite('instruments')" @click="importVisible = true">批量导入档案</el-button>
@@ -457,8 +469,25 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncMobileLayout))
 
 // 一键隐藏非在用：开启时仅显示「在用」状态的仪器（走后端 status 过滤），默认开启
 const hideNonActive = ref(true)
-const instrumentExtraParams = computed(() => (hideNonActive.value ? { status: '在用' } : {}))
+// 专业组筛选（仅「全科查看」用户：能看全部组仪器时才需要按组筛）
+const GROUP_OPTIONS = [
+  { code: 'sm', name: '生化免疫组' },
+  { code: 'lj', name: '临检组' },
+  { code: 'wsw', name: '微生物组' },
+  { code: 'fz', name: '分子组' },
+  { code: 'xk', name: '血库' },
+]
+const groupFilter = ref('')
+const canSeeAllGroups = computed(() => (auth.roles || '').split(',').map((r) => r.trim()).includes('all_group_view'))
+const instrumentExtraParams = computed(() => {
+  const p = hideNonActive.value ? { status: '在用' } : {}
+  if (groupFilter.value) p.group_code = groupFilter.value
+  return p
+})
 function onFilterChange() {
+  crud.value?.refresh()
+}
+function onGroupFilterChange() {
   crud.value?.refresh()
 }
 
@@ -511,7 +540,11 @@ const rules = {
   name: [{ required: true, message: '请填写仪器名称', trigger: 'blur' }],
 }
 
-const columns = [
+const columns = computed(() => (canSeeAllGroups.value ? [
+  { prop: 'group_name', label: '专业组', minWidth: 100, formatter: (r) => GROUP_OPTIONS.find((g) => g.code === r.group_code)?.name || r.group_code || '—' },
+] : []).concat(BASE_COLUMNS))
+
+const BASE_COLUMNS = [
   { prop: 'name', label: '名称', minWidth: 150, tooltip: false },
   { prop: 'dept_no', label: '科室编号', minWidth: 140, tooltip: false },
   { prop: 'model', label: '型号', minWidth: 100, tooltip: false },

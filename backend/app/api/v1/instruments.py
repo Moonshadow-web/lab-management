@@ -58,7 +58,7 @@ router = make_router(
     InstrumentCreate,
     InstrumentUpdate,
     search_fields=["name", "dept_no", "model", "manufacturer", "serial_no", "owner", "location"],
-    filter_fields=["status", "category"],
+    filter_fields=["status", "category", "group_code"],  # group_code 供「全科查看」用户按专业组筛选
     order_by=_instrument_order,
     prefix="/instruments",
     write_roles=("admin", "specialty_leader"),
