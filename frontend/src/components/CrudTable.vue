@@ -59,7 +59,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { Search, Plus, Edit, Delete } from '@element-plus/icons-vue'
 
 const props = defineProps({
@@ -84,6 +84,9 @@ const loading = ref(false)
 async function refresh() {
   loading.value = true
   try {
+    // extraParams 可能是 computed：调用方在 @change 里改值后立刻调 refresh，
+    // 此时 props 尚未完成更新（读到的仍是旧筛选条件）→ 必须等 nextTick 再取
+    await nextTick()
     const params = { page: page.value, page_size: pageSize.value, ...props.extraParams, q: q.value }
     const res = await props.fetch(params)
     rows.value = res.items || []
