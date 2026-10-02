@@ -125,29 +125,30 @@ def _status_text(status: str, size: float):
     opts = (('在用', '在用'), ('维修', '维修'), ('停用', '停用'))
     parts = [(label, status == val) for label, val in opts]
     em = size
-    box = 0.75 * em
-    text_w = 1.20 * em          # 2 个汉字
-    gap = 0.90 * em
-    item_w = box + 0.14 * em + text_w + gap
-    return parts, item_w * len(parts), em, box, gap
+    box = 0.80 * em
+    text_w = 1.35 * em          # 2 个汉字
+    gap = 1.15 * em             # 项间距，明显留空
+    pad = 0.18 * em             # 框与文字间距
+    item_w = box + pad + text_w + gap
+    return parts, item_w * len(parts), em, box, gap, pad
 
 
 def _draw_status(c, cx, cy, status, size):
     """在 (cx, cy) 处居中绘制「□在用 □维修 □停用」状态行（矢量勾选框）"""
-    parts, total, em, box, gap = _status_text(status, size)
+    parts, total, em, box, gap, pad = _status_text(status, size)
     x = cx - total / 2
     c.setStrokeColor(C_TEXT)
     c.setFillColor(C_TEXT)
     for label, on in parts:
         c.setLineWidth(0.9)
-        c.rect(x, cy - box * 0.30, box, box, stroke=1, fill=0)
+        c.rect(x, cy - box * 0.32, box, box, stroke=1, fill=0)
         if on:
             c.setLineWidth(1.3)
-            c.line(x + box * 0.22, cy + box * 0.24, x + box * 0.43, cy - box * 0.04)
-            c.line(x + box * 0.43, cy - box * 0.04, x + box * 0.78, cy + box * 0.44)
+            c.line(x + box * 0.24, cy + box * 0.22, x + box * 0.44, cy - box * 0.06)
+            c.line(x + box * 0.44, cy - box * 0.06, x + box * 0.78, cy + box * 0.42)
         c.setFont(_FONT, size)
-        c.drawString(x + box + 0.14 * em, cy, label)
-        x += box + 0.14 * em + 1.20 * em + gap
+        c.drawString(x + box + pad, cy, label)
+        x += box + pad + 1.35 * em + gap
 
 
 def _draw_card(c, x0, y_top, item, qr_dir, host):
@@ -189,7 +190,7 @@ def _draw_card(c, x0, y_top, item, qr_dir, host):
         ('设备编号', code, _FONT, 9),
         ('设备名称', name, _FONT, 9),
         ('厂家型号', model, _FONT_BOLD, 9),
-        ('设备状态', None, _FONT, 7.5),
+        ('设备状态', None, _FONT, 7),
         ('设备负责人', owner, _FONT_BOLD, 10),
     ]
     for i, (label, value, vfont, vsize) in enumerate(upper_rows):
