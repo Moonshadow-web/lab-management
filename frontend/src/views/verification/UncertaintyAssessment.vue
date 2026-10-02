@@ -2,7 +2,7 @@
   <div class="uncert-page">
     <div class="uncert-header">
       <h2>测量不确定度评定</h2>
-      <span>民航总医院检验科生化免疫组 | BG-SM-CZ-072 | 2026-08-18 重构版</span>
+      <span>{{ deptName }} | BG-SM-CZ-072 | 2026-08-18 重构版</span>
     </div>
 
     <el-row :gutter="16">
@@ -586,6 +586,8 @@ import { esc, todayStr, reportStyle, buildSingleReport, buildMultiReport, buildQ
 const COMMON_REAGENTS = ['贝克曼', '罗氏', '西门子', '雅培', '迈瑞', '积水', '柏定', '德赛', '九强', '安图', '奥森多', '强生', '迈克', '中生北控']
 
 const auth = useAuthStore()
+// 页头组名跟随当前登录专业组（各组报告抬头显示本组）
+const deptName = computed(() => `民航总医院检验科${auth.groupName}`)
 const projects = ref([])
 const current = ref(null)
 const saving = ref(false)

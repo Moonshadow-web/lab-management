@@ -43,6 +43,7 @@ router = make_router(
     json_fields=["l1_values", "l2_values", "multi_systems", "bias_levels"],
     prefix="/uncertainty",
     order_by=[UncertaintyAssessment.id.desc()],
+    group_scoped=True,  # 各专业组只看到本组不确定度评定
 )
 
 # ── 独立 APIRouter：避免被 make_router 的 {item_id} 路由抢匹配 ──

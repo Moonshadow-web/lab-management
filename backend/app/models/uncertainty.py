@@ -17,6 +17,7 @@ class UncertaintyAssessment(Base):
 
     __tablename__ = "uncertainty_assessments"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组
     id: Mapped[int] = mapped_column(primary_key=True)
     # ── 项目基本信息 ──
     project_name: Mapped[str] = mapped_column(String(200), index=True, default="")

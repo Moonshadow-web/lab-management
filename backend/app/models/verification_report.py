@@ -24,6 +24,7 @@ class VerificationReport(Base):
 
     __tablename__ = "verification_reports"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组
     id: Mapped[int] = mapped_column(primary_key=True)
     report_type: Mapped[str] = mapped_column(String(20), index=True, default="qualitative")
     project_name: Mapped[str] = mapped_column(String(200), index=True, default="")

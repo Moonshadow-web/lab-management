@@ -62,7 +62,8 @@ router = make_router(
     order_by=_instrument_order,
     prefix="/instruments",
     write_roles=("admin", "specialty_leader"),
-    group_scoped=True,  # S3：按专业组隔离（生免组看本组+历史空值+KS共享；其他组看本组+KS共享）
+    # 注意：2026-10-02 起仪器档案**不再按专业组隔离**——各组均可见全科室仪器档案，
+    # 组长（specialty_leader）可跨组修改。仅创建时打上操作者所属组，便于追溯与筛选。
 )
 
 

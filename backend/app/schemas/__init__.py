@@ -475,6 +475,7 @@ class TrainingRecordRead(TrainingRecordBase):
 # ---------------- VerificationRecord ----------------
 class VerificationRecordBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    group_code: str = "sm"
     test_item: str = ""
     verify_type: str = ""
     instrument: str = ""
@@ -617,6 +618,7 @@ class EqaSummaryRead(EqaSummaryBase):
 # ---------------- UncertaintyAssessment（测量不确定度评估，对应 BG-SM-CZ-072） ----------------
 class UncertaintyAssessmentBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    group_code: str = "sm"
     project_name: str = ""
     project_method: str = ""
     sample_type: str = "血清"
@@ -699,6 +701,7 @@ class UncertaintyAssessmentRead(UncertaintyAssessmentBase):
 # ---------------- VerificationReport（性能验证报告归档，模板驱动生成 xlsx） ----------------
 class VerificationReportBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    group_code: str = "sm"
     report_type: str = "qualitative"
     project_name: str = ""
     project_method: str = ""

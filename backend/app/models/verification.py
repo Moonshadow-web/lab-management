@@ -15,6 +15,7 @@ class VerificationRecord(Base):
 
     __tablename__ = "verification_records"
 
+    group_code: Mapped[str] = mapped_column(String(20), server_default="sm", default="sm", index=True)  # 专业组
     id: Mapped[int] = mapped_column(primary_key=True)
     test_item: Mapped[str] = mapped_column(String(200), index=True, default="")  # 验证项目
     verify_type: Mapped[str] = mapped_column(String(50), index=True, default="")  # 验证类型

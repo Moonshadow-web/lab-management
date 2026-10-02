@@ -11,4 +11,5 @@ router = make_router(
     filter_fields=["verify_type", "conclusion", "instrument"],
     prefix="/verification-records",
     write_roles=("admin", "specialty_leader"),
+    group_scoped=True,  # 各专业组只看到本组性能验证记录
 )

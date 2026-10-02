@@ -13,6 +13,24 @@ export function todayStr() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
+// ── 专业组显示名：按记录/列表的 group_code 动态取，生免组保持原样 ──
+export const GROUP_NAMES = { sm: '生化免疫组', lj: '临检组', wsw: '微生物组', fz: '分子组', xk: '血库' }
+
+export function groupLabel(groupCode, fallback = 'sm') {
+  return GROUP_NAMES[(groupCode || fallback || 'sm')] || GROUP_NAMES.sm
+}
+
+/** 单份记录 → 「民航总医院检验科XX组」 */
+export function deptLine(rec) {
+  return `民航总医院检验科${groupLabel(rec && rec.group_code)}`
+}
+
+/** 列表 → 取第一条记录的组名（汇总/汇编同一批数据必然同组） */
+export function deptLineOfList(list) {
+  const first = (list || []).find((x) => x && x.group_code)
+  return deptLine(first)
+}
+
 export function reportStyle() {
   return `body{font-family:"SimSun",serif;margin:20px;font-size:12pt;color:#000}
 h1{text-align:center;font-size:18pt;margin:4px 0}
@@ -53,7 +71,7 @@ export function buildSingleReport(p) {
     ? `实验室${method}测量人${sample}${analyte}的性能符合要求。`
     : '扩展不确定度超出质量目标，需改进精密度或校准溯源。'
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>测量不确定度评定报告 - ${esc(p.project_name)}</title><style>${reportStyle()}</style></head><body>
-<h1>民航总医院检验科生化免疫组</h1>
+<h1>${deptLine(p)}</h1>
 <h1>测量不确定度评定报告</h1>
 <h2 style="text-align:center">${esc(section1Title)}</h2>
 <table class="info-table">
@@ -120,7 +138,7 @@ export function buildMultiReport(p) {
     ? `实验室${method}测量人${sample}${analyte}（多测量系统合并评定）的性能符合要求。`
     : '扩展不确定度超出质量目标，需改进精密度或校准溯源。'
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>测量不确定度评定报告(多系统) - ${esc(p.project_name)}</title><style>${reportStyle()}</style></head><body>
-<h1>民航总医院检验科生化免疫组</h1>
+<h1>${deptLine(p)}</h1>
 <h1>测量不确定度评定报告</h1>
 <h2 style="text-align:center">${esc(sectionTitle)}</h2>
 <table class="info-table">
@@ -191,7 +209,7 @@ export function buildQualitativeReport(p) {
         ? `测值 ${r.toFixed(2)} S/CO 的似然比 LR = ${lr.toFixed(2)}，为<b>${esc(lrl)}</b>，该定性判读成立。`
         : '未录入待判读信号值。评定结果可用于建立本项目的灰区（LR&lt;10 区间）。')
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>定性项目测量不确定度评定报告 - ${esc(projName)}</title><style>${reportStyle()}</style></head><body>
-<h1>民航总医院检验科生化免疫组</h1>
+<h1>${deptLine(p)}</h1>
 <h1>${esc(projName)} 定性项目测量不确定度评定报告</h1>
 <table class="info-table">
 <tr><td><b>表格编号</b></td><td>BG-SM-CZ-072</td><td><b>版本号</b></td><td>01</td></tr>
@@ -258,7 +276,7 @@ export function buildSummaryReport(list) {
     <td>${esc(p.prepared_by || '')}</td>
   </tr>`}).join('')
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>测量不确定度评定汇总表</title><style>${reportStyle()}</style></head><body>
-<h1>民航总医院检验科生化免疫组</h1>
+<h1>${deptLineOfList(list)}</h1>
 <h1>测量不确定度评定汇总表</h1>
 <p>表格编号：BG-SM-GL-020 | 编制日期：${todayStr()}</p>
 <table><tr><th>序号</th><th>项目</th><th>测量方法</th><th>U</th><th>目标 / 灰区</th><th>目标来源</th><th>判定</th><th>评定日期</th><th>评定人</th></tr>${rows}</table>
@@ -284,7 +302,7 @@ export function buildAllReports(list) {
     .join('\n')
 
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>测量不确定度评定报告汇编</title><style>${reportStyle()}</style></head><body>
-<h1>民航总医院检验科生化免疫组</h1>
+<h1>${deptLineOfList(list)}</h1>
 <h1>测量不确定度评定报告汇编</h1>
 <p>共 ${parts.length} 份报告 | 编制日期：${todayStr()}</p>
 <div style="page-break-before:always"></div>
