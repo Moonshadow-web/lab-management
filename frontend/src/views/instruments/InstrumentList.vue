@@ -1461,9 +1461,9 @@ function formatTime(v) {
 .dc-row { display: flex; border-bottom: 1px solid #333; }
 .dc-row.last { border-bottom: none; }
 .dc-k {
-  width: 118px; flex: none; display: flex; align-items: center; justify-content: center;
-  text-align: center; padding: 6px 4px; border-right: 1px solid #333;
-  font-size: 13px; font-weight: 500; color: #111; background: #fff;
+  width: 134px; flex: none; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 6px 3px; border-right: 1px solid #333;
+  font-size: 12.5px; font-weight: 500; color: #111; background: #fff;
 }
 .dc-v {
   flex: 1; display: flex; align-items: center; justify-content: center;
@@ -1473,7 +1473,7 @@ function formatTime(v) {
 .dc-v.big { font-size: 16px; }
 .dc-v.sm { font-size: 12px; font-weight: 400; }
 .dc-qr {
-  width: 146px; flex: none; border-left: 1px solid #333; background: #fff;
+  width: 140px; flex: none; border-left: 1px solid #333; background: #fff;
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; padding: 8px 4px; gap: 1px;
 }
