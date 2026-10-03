@@ -71,6 +71,10 @@ const OTHER_GROUP_ALLOWED = new Set([
   '/reagent/orders', '/reagent/consumption', '/reagent/associations',
   '/reagent/lot-verification',
   '/reagent/receivings',
+  // 2026-10-02 开放：与 AppLayout.vue 的 OTHER_GROUP_PATHS 保持一致。
+  // 两份白名单必须同步——只改菜单会出现"菜单看得到、点进去被守卫弹回工作台"。
+  '/verification', '/quality-requirements',
+  '/instrument-families', '/eqa-associations', '/post-instrument-map',
 ])
 
 const router = createRouter({
