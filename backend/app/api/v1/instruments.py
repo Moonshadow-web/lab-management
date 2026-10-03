@@ -899,10 +899,22 @@ def _card_host(request: Request) -> str:
     return host
 
 
-def _collect_card_items(db: Session, group_code: str, only_id=None):
-    """按专业组收集卡片要素，并附带每台仪器的最新校准记录"""
+def _has_all_group_view(user: User | None) -> bool:
+    """是否命中「全科查看」角色 → 不受专业组隔离（与通用 CRUD 的 group_exempt_roles 保持一致）"""
+    if user is None:
+        return False
+    raw = f"{getattr(user, 'role', '') or ''},{getattr(user, 'roles', '') or ''}"
+    return "all_group_view" in {r.strip() for r in raw.split(",") if r.strip()}
+
+
+def _collect_card_items(db: Session, group_code: str, only_id=None, user: User | None = None):
+    """按专业组收集卡片要素，并附带每台仪器的最新校准记录
+
+    ⚠️ 「全科查看」角色（all_group_view）不受组隔离 —— 否则前端能看到别组仪器，
+    点设备卡片却报「仪器不存在」。
+    """
     q = db.query(Instrument)
-    if group_code:
+    if group_code and not _has_all_group_view(user):
         q = q.filter(or_(Instrument.group_code == group_code,
                          Instrument.group_code.is_(None),
                          Instrument.group_code == "",
@@ -949,7 +961,7 @@ def cards_ping(request: Request, db: Session = Depends(get_db),
         out["group_err"] = f"{type(e).__name__}: {e}"
         return out
     try:
-        items = _collect_card_items(db, out["group_code"])
+        items = _collect_card_items(db, out["group_code"], user=user)
         out["items"] = len(items)
     except Exception as e:
         import traceback
@@ -998,7 +1010,7 @@ def download_all_cards(request: Request, db: Session = Depends(get_db),
     from ...services.device_card import build_pdf
     try:
         group_code = get_current_group(request)
-        items = _collect_card_items(db, group_code)
+        items = _collect_card_items(db, group_code, user=user)
         if not items:
             raise HTTPException(status_code=404, detail="当前专业组暂无仪器档案")
         qr_dir = os.path.join(os.getenv("CARD_QR_DIR", "/app/data/card_qr"), "qr")
@@ -1021,7 +1033,7 @@ def get_card_data(instrument_id: int, request: Request, db: Session = Depends(ge
                   user: User = Depends(get_current_user)):
     """读取设备卡片的可编辑要素（供前端抽屉展示/编辑）"""
     group_code = get_current_group(request)
-    items = _collect_card_items(db, group_code, only_id=instrument_id)
+    items = _collect_card_items(db, group_code, only_id=instrument_id, user=user)
     if not items:
         raise HTTPException(status_code=404, detail="仪器不存在")
     return items[0]
@@ -1077,7 +1089,7 @@ async def update_card_data(instrument_id: int, request: Request, db: Session = D
             rec.next_due_date = next_date
     write_audit(db, user, "update", "instruments", instrument_id, "保存设备卡片编辑")
     db.commit()
-    items = _collect_card_items(db, group_code, only_id=instrument_id)
+    items = _collect_card_items(db, group_code, only_id=instrument_id, user=user)
     return items[0] if items else {}
 
 
@@ -1088,7 +1100,7 @@ def download_one_card(instrument_id: int, request: Request, db: Session = Depend
     from fastapi import Response
     from ...services.device_card import build_pdf, safe_filename
     group_code = get_current_group(request)
-    items = _collect_card_items(db, group_code, only_id=instrument_id)
+    items = _collect_card_items(db, group_code, only_id=instrument_id, user=user)
     if not items:
         raise HTTPException(status_code=404, detail="仪器不存在")
     item = items[0]
