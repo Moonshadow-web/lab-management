@@ -521,6 +521,8 @@ const STATUS_OPTIONS = ['在用', '备用', '维修', '停用'].map((v) => ({ la
 const fields = [
   { prop: 'name', label: '仪器名称' },
   { prop: 'dept_no', label: '科室编号' },
+  { prop: 'asset_no', label: '设备处编号' },
+  { prop: 'asset_value', label: '设备原值（元）' },
   { prop: 'model', label: '规格型号' },
   { prop: 'manufacturer', label: '生产厂家' },
   { prop: 'category', label: '类别' },
@@ -580,7 +582,7 @@ function formatYearMonth(v) {
 }
 
 const emptyForm = () => ({
-  name: '', dept_no: '', model: '', manufacturer: '', category: '',
+  name: '', dept_no: '', asset_no: '', asset_value: '', model: '', manufacturer: '', category: '',
   serial_no: '', status: '在用', location: '', owner: '', daily_manager: '',
   supplier: '', contact: '', purchase_date: '', start_date: '', qc_instrument: false,
 })

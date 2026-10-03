@@ -16,6 +16,8 @@ class Instrument(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200), index=True, default="")
     dept_no: Mapped[str] = mapped_column(String(50), default="")  # 科室编号
+    asset_no: Mapped[str] = mapped_column(String(100), default="", index=True)  # 设备处编号（资产编号，固定资产台账号）
+    asset_value: Mapped[str] = mapped_column(String(30), default="")  # 设备原值（元，字符串存避免精度问题）
     model: Mapped[str] = mapped_column(String(100), default="")  # 规格型号
     manufacturer: Mapped[str] = mapped_column(String(100), default="")  # 生产厂家
     category: Mapped[str] = mapped_column(String(50), default="")

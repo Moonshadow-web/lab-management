@@ -157,6 +157,10 @@ class InstrumentBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     name: str = ""
     dept_no: str = ""
+    # 设备处编号（资产编号，固定资产台账号）——与科室编号不同
+    asset_no: str = ""
+    # 设备原值（元）——用字符串存，避免浮点精度问题
+    asset_value: str = ""
     model: str = ""
     manufacturer: str = ""
     category: str = ""
