@@ -32,3 +32,12 @@ build_*.py
 compare_*.py
 _read_*.py
 backfill_*.py
+_append_note*.py
+_note*.py
+_append_*.py
+_diag*.py
+diag_*.py
+_*.py
+!backend/app/**/*.py
+!backend/main.py
+!scripts/**/*.py
