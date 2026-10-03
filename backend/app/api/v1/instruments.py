@@ -886,7 +886,17 @@ def debug_instruments_raw(db: Session = Depends(get_db), user: User = Depends(ge
 
 # ---------------- 设备卡片（仪器标识卡 + 维修二维码） ----------------
 def _card_host(request: Request) -> str:
-    return (os.getenv("LAB_PUBLIC_HOST") or str(request.base_url)).rstrip("/")
+    """二维码里用的站点根地址。
+
+    注意：不能用 str(request.base_url) —— CloudBase 前面是 http 代理，
+    base_url 会推导出 "http://"，而微信对 http 链接的处理更差（提示下载/不安全）。
+    这里强制 https，优先用环境变量 LAB_PUBLIC_HOST。
+    """
+    host = (os.getenv("LAB_PUBLIC_HOST") or
+            str(request.base_url)).rstrip("/")
+    if host.startswith("http://"):
+        host = "https://" + host[len("http://"):]
+    return host
 
 
 def _collect_card_items(db: Session, group_code: str, only_id=None):
