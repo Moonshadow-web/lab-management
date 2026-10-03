@@ -1123,12 +1123,18 @@ if _FRONTEND_DIST:
             raise HTTPException(status_code=404, detail="Not found")
         index = _FRONTEND_DIST / "index.html"
         if index.exists():
-            # 关键：FileResponse 默认会给响应加 `Content-Disposition: attachment`，
-            # 导致部分手机（尤其微信内置浏览器）把页面当成附件下载"要下载一个html"。
-            # 显式声明 inline + text/html，保证是直接打开网页。
-            return FileResponse(
-                str(index),
+            # 关键：微信内置浏览器遇到 `Content-Disposition: attachment` 会当成文件下载，
+            # 提示"要下载一个 html"。而 CloudBase 网关会**强制覆盖**这个响应头
+            # （即使 FileResponse 设了 content_disposition_type="inline" 也一样），
+            # 所以这里改用 Response 直接回 HTML 内容，**不设置 content-disposition**，
+            # 让浏览器按正常网页渲染。
+            from starlette.responses import Response as _RawResponse
+            return _RawResponse(
+                content=index.read_bytes(),
                 media_type="text/html; charset=utf-8",
-                content_disposition_type="inline",
+                headers={
+                    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                    "X-Robots-Tag": "noindex, nofollow, noarchive",
+                },
             )
         raise HTTPException(status_code=404, detail="Frontend not built")
