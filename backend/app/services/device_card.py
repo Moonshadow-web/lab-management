@@ -92,7 +92,11 @@ def ym(v: str) -> str:
 
 
 def _make_qr_png(url: str, path: str):
-    """生成二维码 PNG；失败返回 None（卡片仍可生成，只是无图）"""
+    """生成二维码 PNG；失败返回 None（卡片仍可生成，只是无图）
+
+    ⚠️ 缓存 key 必须用「完整 URL」，不能只用仪器编号 ——
+    否则 http 时代生成的旧 PNG 会被复用，导致改 https 后二维码还是旧的。
+    """
     if os.path.exists(path):
         return path
     try:
@@ -215,8 +219,11 @@ def _draw_card(c, x0, y_top, item, qr_dir, host):
     qr_top = body_top - 0.14 * cm
     if code:
         full = code if code.startswith('MHZYY-') else 'MHZYY-' + code
-        png = _make_qr_png(f'{host}/repair-fill?code={full}',
-                           os.path.join(qr_dir, full + '.png'))
+        url = f'{host}/repair-fill?code={full}'
+        # 文件名带 URL 指纹：协议或主机一变就用新文件，不会命中旧缓存
+        import hashlib
+        sig = hashlib.md5(url.encode('utf-8')).hexdigest()[:8]
+        png = _make_qr_png(url, os.path.join(qr_dir, f'{full}_{sig}.png'))
         if png:
             try:
                 c.drawImage(png, qx + (qw - qr_size) / 2, qr_top - qr_size,
