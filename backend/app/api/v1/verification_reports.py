@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from ...core.crud_base import make_router, write_audit
 from ...core.database import get_db
 from ...core.security import get_current_user
+from ...core._auth_helpers import get_current_group
 from ...core.storage import persist_get_path, persist_save, persist_delete
 from ...models.report_archive import ReportArchive
 from ...models.user import User
@@ -280,6 +281,25 @@ _TARGET_MODELS = {"AU5821B"}
 _TARGET_NOS = {"MHZYY-JYK-SM-2003"}
 
 
+def _apply_group_filter(query, model, group: str):
+    """按专业组过滤：各组只看本组数据（sm 组兼容历史空值）。
+
+    project_archive_router 是独立 APIRouter（不走 make_router 的 group_scoped），
+    必须显式加组过滤，否则会绕过隔离把别组数据全查出来。
+    """
+    if not group:
+        return query
+    gc = getattr(model, "group_code", None)
+    if gc is None:
+        return query
+    from sqlalchemy import or_
+    conds = [gc == group]
+    if group == "sm":          # 生免组兼容历史空值数据
+        conds.append(gc.is_(None))
+        conds.append(gc == "")
+    return query.filter(or_(*conds))
+
+
 def _is_target(model: str, no: str) -> bool:
     return ((model or "").strip() in _TARGET_MODELS) or ((no or "").strip() in _TARGET_NOS)
 
@@ -486,6 +506,7 @@ def list_by_project(
     keyword: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    group: str = Depends(get_current_group),
 ):
     """按项目名聚合：每个项目（同名）取最新一份验证报告 + 历史次数。
 
@@ -495,7 +516,7 @@ def list_by_project(
     """
     cnas_map = _load_cnas_map(db)      # 认可项目 {名: 标本类型}（来自认可能力范围表）
     cnas_names = set(cnas_map.keys())
-    q = db.query(VerificationReport)
+    q = _apply_group_filter(db.query(VerificationReport), VerificationReport, group)
     if keyword:
         kw = f"%{keyword}%"
         q = q.filter(VerificationReport.project_name.like(kw))
@@ -593,12 +614,13 @@ def conclusion_records(
     q: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    group: str = Depends(get_current_group),
 ):
     """按「记录」维度的验证列表（结构同 /verification-reports），但 result_summary 用最新引擎重算。
 
     用于「性能验证记录」页，保证老记录也按最新格式（前缀/单位/合并范围/稀释逻辑）展示。
     """
-    query = db.query(VerificationReport)
+    query = _apply_group_filter(db.query(VerificationReport), VerificationReport, group)
     if q:
         query = query.filter(VerificationReport.project_name.ilike(f"%{q}%"))
     query = query.order_by(VerificationReport.id.desc())

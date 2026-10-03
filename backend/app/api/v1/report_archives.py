@@ -27,6 +27,7 @@ router = make_router(
     prefix="/report-archives",
     order_by=[ReportArchive.id.desc()],
     write_roles=("admin", "specialty_leader"),
+    group_scoped=True,  # 各专业组只看到本组归档（性能验证/不确定度报告文件库）
 )
 
 

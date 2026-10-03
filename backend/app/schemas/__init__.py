@@ -751,6 +751,7 @@ class VerificationReportRead(VerificationReportBase):
 # ---------------- ReportArchive（性能验证报告归档） ----------------
 class ReportArchiveBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    group_code: str = "sm"
     project_name: str = ""
     report_type: str = ""
     source_type: str = "uploaded"
