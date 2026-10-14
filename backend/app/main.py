@@ -1140,6 +1140,21 @@ if _FRONTEND_DIST:
 
     _BV = _build_version()
 
+    # 白屏自愈脚本：注入到 index.html 的 </head> 前。
+    # 入口 SCRIPT/LINK 加载失败（部署换版后旧 chunk 已删 → 404）时，
+    # 自动清Cache Storage 并带时间戳强制重载一次，用户无需手动清缓存。
+    # sessionStorage 打标保证只重载一次，避免死循环。
+    _SELF_HEAL_JS = (
+        '<script>(function(){var K="__asset_reload__";'
+        'window.addEventListener("error",function(e){var t=e.target;'
+        'if(!t||(t.tagName!=="SCRIPT"&&t.tagName!=="LINK"))return;'
+        'if(sessionStorage.getItem(K))return;sessionStorage.setItem(K,"1");'
+        'try{if(window.caches&&caches.keys){caches.keys().then(function(ks){'
+        'ks.forEach(function(k){caches.delete(k)})})}}catch(x){}'
+        'var u=new URL(location.href);u.searchParams.set("_r",Date.now());'
+        'location.replace(u.toString())},true)})();</script>'
+    )
+
     # 静态资源（JS/CSS/图片等）
     # no-cache 而非 immutable：入口 JS/CSS 必须每次校验，
     # 否则浏览器/CDN 拿到旧入口 → 它引用的旧 chunk 已被删除 → 404 白屏。
@@ -1171,6 +1186,14 @@ if _FRONTEND_DIST:
                     rf'\g<1>\g<2>?v={_BV}\g<3>',
                     html,
                 )
+                # 白屏自愈脚本（后端注入，不依赖前端构建产物是否已打进镜像）：
+                # 部署换版后旧 chunk 被删除，浏览器缓存的旧入口 JS 请求到 404 →
+                # 整页白屏且普通刷新无效（坏 URL 由服务端每次生成）。
+                # 检测到入口资源加载失败即自动清缓存 + 带时间戳强制重载一次。
+                if "__asset_reload__" not in html:
+                    html = html.replace(
+                        "</head>",
+                        _SELF_HEAL_JS + "</head>", 1)
             except Exception:  # noqa: BLE001
                 html = index.read_text(encoding="utf-8", errors="ignore")
             from starlette.responses import Response as _RawResponse
