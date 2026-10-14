@@ -51,3 +51,22 @@ proj_unpacked/
 
 # Deploy scratch / large intermediate dirs (must NOT be uploaded as build context)
 _deploy_check/
+
+# ===== 大文件与临时产物（防 GitHub 100MB 限制导致 push 失败）=====
+# 短视频工程产物含 372MB/369MB mp4，绝不能入库
+output/
+pdf_pages/
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# 工具临时目录
+.playwright-cli/
+.slidep/
+.gitidx_tmp
+frontend/dist.old/
+frontend/dist_old_*/
+
+# 本地数据库（线上用 CloudBase MySQL，本地仅开发用）
+data/app.db
