@@ -7,6 +7,28 @@
     <meta name="googlebot" content="noindex, nofollow, noarchive" />
     <meta name="referrer" content="no-referrer" />
     <title>检验科实验室管理系统</title>
+    <script>
+      // 白屏自愈：部署换版后旧 chunk 被删除，浏览器缓存的旧入口 JS 会请求到 404，
+      // 导致整页白屏且普通刷新无效（错误 URL 由服务端每次生成）。
+      // 检测到入口资源加载失败时自动清缓存并强制重载一次，用户无需手动清缓存。
+      (function () {
+        var KEY = '__asset_reload__'
+        window.addEventListener('error', function (e) {
+          var t = e.target
+          if (!t || (t.tagName !== 'SCRIPT' && t.tagName !== 'LINK')) return
+          if (sessionStorage.getItem(KEY)) return          // 只重载一次，防死循环
+          sessionStorage.setItem(KEY, '1')
+          try {
+            if (window.caches && caches.keys) {
+              caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k) }) })
+            }
+          } catch (err) {}
+          var u = new URL(location.href)
+          u.searchParams.set('_r', Date.now())
+          location.replace(u.toString())
+        }, true)
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>
