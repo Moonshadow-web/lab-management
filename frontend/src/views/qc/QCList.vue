@@ -9,6 +9,44 @@
       >
       <!-- ============ 月结 ============ -->
       <template v-if="activeTab === 'summary'">
+        <!-- 月结上传进度：提醒未上传的仪器（选年月后自动加载） -->
+        <el-alert
+          v-if="uploadStatus"
+          :type="uploadStatus.not_uploaded > 0 ? 'warning' : 'success'"
+          :closable="false"
+          show-icon
+          class="upload-status-alert"
+        >
+          <template #title>
+            <span class="upload-status-title">
+              {{ uploadStatus.year }} 年 {{ uploadStatus.month }} 月质控数据上传进度：
+              已上传 <b class="ok">{{ uploadStatus.uploaded }}</b> /
+              {{ uploadStatus.total }} 台
+              <template v-if="uploadStatus.not_uploaded > 0">
+                ，<b class="warn">未上传 {{ uploadStatus.not_uploaded }}</b> 台
+              </template>
+              <el-button
+                link type="primary"
+                size="small"
+                :loading="loadingUploadStatus"
+                @click="loadUploadStatus"
+                style="margin-left: 8px"
+              >刷新</el-button>
+            </span>
+          </template>
+          <div v-if="uploadStatus.not_uploaded > 0" class="upload-status-missing">
+            未上传：
+            <el-tag
+              v-for="x in missingInstruments"
+              :key="x.instrument_id"
+              type="warning"
+              size="small"
+              effect="plain"
+              class="miss-tag"
+            >{{ x.dept_no }} {{ x.model || x.name }}</el-tag>
+          </div>
+        </el-alert>
+
         <div class="toolbar">
           <el-date-picker
             v-model="monthValue"
@@ -773,7 +811,7 @@ import {
   getQCReport, upsertQCReport, regenerateQCReport, exportQCReportDocx, getQCProjectDaily,
   clearQCMonth,
 } from '../../api/qc'
-import { getQCInstruments } from '../../api/qc'
+import { getQCInstruments, getQCUploadStatus } from '../../api/qc'
 import {
   listEqaPlans, createEqaPlan, updateEqaPlan, deleteEqaPlan, copyPrevYearEqa,
   getEqaAlerts, getEqaSummary, getEqaSummaryText, upsertEqaSummaryText, exportEqaPlans,
@@ -842,6 +880,26 @@ function instLabel(opt) {
 
 // ---------- 月结 ----------
 const monthValue = ref('')
+const uploadStatus = ref(null)
+const loadingUploadStatus = ref(false)
+const missingInstruments = computed(() =>
+  (uploadStatus.value?.instruments || []).filter((x) => !x.uploaded)
+)
+
+async function loadUploadStatus() {
+  if (!monthValue.value) { uploadStatus.value = null; return }
+  loadingUploadStatus.value = true
+  try {
+    const { year, month } = parseMonth()
+    const { data } = await getQCUploadStatus(year, month)
+    uploadStatus.value = data
+  } catch (e) {
+    // 进度卡片失败不影响月结主体功能
+    uploadStatus.value = null
+  } finally {
+    loadingUploadStatus.value = false
+  }
+}
 const summaryRows = ref([])
 const loadingSummary = ref(false)
 const uploadInstrumentId = ref(null)   // 月结筛选 + 上传 时选定的受控仪器
@@ -1327,6 +1385,8 @@ onUnmounted(() => {
 
 async function loadSummary() {
   const { year, month } = parseMonth()
+  // 进度卡片只需年月，不依赖仪器选择
+  loadUploadStatus()
   // 仅在「年月 + 仪器」都选齐后才允许加载（由工具栏「统计」按钮触发）
   if (!year || !month || !uploadInstrumentId.value) {
     summaryRows.value = []
@@ -2660,6 +2720,21 @@ watch(activeTab, (t) => {
 
 <style scoped>
 .page { height: 100%; }
+/* 月结上传进度卡片 */
+.upload-status-alert { margin-bottom: 10px; }
+.upload-status-alert :deep(.el-alert__title) { line-height: 1.6; }
+.upload-status-title b.ok { color: #67c23a; }
+.upload-status-title b.warn { color: #e6a23c; }
+.upload-status-missing {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.miss-tag { margin-right: 2px; }
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .toolbar .hint { color: #909399; font-size: 12px; flex: 1 1 100%; }
 .empty-tip { color: #909399; font-size: 13px; padding: 24px 0; text-align: center; }

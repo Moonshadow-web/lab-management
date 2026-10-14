@@ -18,6 +18,10 @@ export function deleteQC(id) {
 export function listQCSummaries(params) {
   return request.get('/api/v1/qc-summaries', { params })
 }
+// 月结上传进度：各质控受控仪器本月已传/未传
+export function getQCUploadStatus(year, month) {
+  return request.get('/api/v1/qc-summaries/upload-status', { params: { year, month } })
+}
 export function uploadQCSummary(file, instrumentId, onProgress) {
   const form = new FormData()
   form.append('file', file)

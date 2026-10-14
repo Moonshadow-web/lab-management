@@ -449,6 +449,90 @@ def _ensure_report_draft(db: Session, instrument_id, instrument: str, year: int,
     db.commit()
 
 
+@router.get("/upload-status")
+def qc_upload_status(
+    year: int,
+    month: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """月结上传进度：按 (年, 月) 统计每台质控受控仪器是否已上传质控数据。
+
+    便于提醒员工干活 —— 返回每台仪器的已上传项目数 / 测值数，
+    uploaded=true 表示该仪器本月已有月结记录（不论项目多少）。
+    """
+    instruments = (
+        db.query(Instrument)
+        .filter(Instrument.qc_instrument == True)  # noqa: E712
+        .order_by(Instrument.dept_no)
+        .all()
+    )
+    # 兜底：未打质控受控标记时回退全部仪器，与 /instruments 口径一致
+    if not instruments:
+        instruments = db.query(Instrument).order_by(Instrument.dept_no).all()
+
+    inst_ids = [i.id for i in instruments]
+    rows = []
+    if inst_ids:
+        rows = (
+            db.query(
+                QCMonthlySummary.instrument_id,
+                func.count(QCMonthlySummary.id),
+                func.count(func.distinct(QCMonthlySummary.test_item)),
+            )
+            .filter(
+                QCMonthlySummary.instrument_id.in_(inst_ids),
+                QCMonthlySummary.year == year,
+                QCMonthlySummary.month == month,
+            )
+            .group_by(QCMonthlySummary.instrument_id)
+            .all()
+        )
+    # instrument_id -> (月结行数, 项目数)
+    stat = {r[0]: (r[1] or 0, r[2] or 0) for r in rows}
+
+    # 每日测值数（用于显示工作量）—— QCDailyValue 无 instrument_id，需经 summary_id 关联
+    daily_stat = {}
+    if inst_ids:
+        drows = (
+            db.query(
+                QCMonthlySummary.instrument_id,
+                func.count(QCDailyValue.id),
+            )
+            .join(QCDailyValue, QCDailyValue.summary_id == QCMonthlySummary.id)
+            .filter(
+                QCMonthlySummary.instrument_id.in_(inst_ids),
+                QCMonthlySummary.year == year,
+                QCMonthlySummary.month == month,
+            )
+            .group_by(QCMonthlySummary.instrument_id)
+            .all()
+        )
+        daily_stat = {r[0]: (r[1] or 0) for r in drows}
+
+    result = []
+    for i in instruments:
+        summary_rows, item_cnt = stat.get(i.id, (0, 0))
+        result.append({
+            "instrument_id": i.id,
+            "dept_no": i.dept_no or "",
+            "name": i.name or "",
+            "model": i.model or "",
+            "uploaded": summary_rows > 0,
+            "summary_count": summary_rows,
+            "item_count": item_cnt,
+            "daily_count": daily_stat.get(i.id, 0),
+        })
+    return {
+        "year": year,
+        "month": month,
+        "total": len(result),
+        "uploaded": sum(1 for x in result if x["uploaded"]),
+        "not_uploaded": sum(1 for x in result if not x["uploaded"]),
+        "instruments": result,
+    }
+
+
 @router.post("/upload", status_code=201)
 def upload_qc_summary(
     file: UploadFile = File(...),
