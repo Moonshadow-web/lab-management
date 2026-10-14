@@ -1020,10 +1020,19 @@ class AssetCacheMiddleware(BaseHTTPMiddleware):
         if request.url.path.startswith("/assets/"):
             # ⚠️ 不要用 immutable 长缓存！
             # vite 构建时 chunk 文件名带内容 hash（Login-xxx.js），但**部署会删除旧 chunk**。
-            # 若浏览器/CDN 长期缓存了旧入口 JS，它引用的旧 chunk 已不存在 → 404 → 整页白屏。
+            # 若浏览器/CDN长期缓存了旧入口 JS，它引用的旧 chunk 已不存在 → 404 → 整页白屏。
             # 入口 JS/CSS 体积只有几百 KB，校验一次几十毫秒，换取"绝不白屏"值得。
             # （真正的性能优化靠 index.html 加 ?v= 版本号，见 _build_version()）
             response.headers["Cache-Control"] = "no-cache"
+            # ⚠️ 必须补 CORS 头。
+            # index.html 里资源 URL 带 ?v=xxx 查询串 → 浏览器对 module script
+            # 会发带 Origin 的请求；而vary 里没有 Origin，回包里也没有
+            # Access-Control-Allow-Origin → Edge/Chrome 直接拒绝执行脚本 → 白屏。
+            # （Playwright 的干净会话不带 Origin，所以测不出来，只有真实浏览器会暴露）
+            if "access-control-allow-origin" not in response.headers:
+                response.headers["access-control-allow-origin"] = request.headers.get(
+                    "origin", "*") or "*"
+                response.headers["vary"] = "Accept-Encoding, Origin"
         elif "text/html" in (response.headers.get("content-type") or ""):
             # index.html / SPA fallback：禁止任何缓存，每次都向服务端取，
             # 避免浏览器长期缓存旧版入口页（旧主 JS 被新构建删掉 → 404 白屏）
