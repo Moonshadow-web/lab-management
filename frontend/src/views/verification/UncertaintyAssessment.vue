@@ -36,6 +36,7 @@
                 <el-radio-group v-model="form.sample_type">
                   <el-radio value="血清">血清</el-radio>
                   <el-radio value="血浆">血浆</el-radio>
+                  <el-radio value="全血">全血</el-radio>
                   <el-radio value="尿液">尿液</el-radio>
                   <el-radio value="其他">其他</el-radio>
                 </el-radio-group>
@@ -523,7 +524,7 @@
             </template>
             <div class="btn-row" style="margin-top:10px">
               <el-button size="small" type="primary" @click="previewOne(current)">📄 预览报告</el-button>
-              <el-button size="small" type="success" @click="downloadOne(current)">⬇️ 下载 PDF / 打印</el-button>
+              <el-button size="small" type="success" @click="downloadOne(current)">🖨️ 打印报告</el-button>
             </div>
           </div>
           <el-empty v-else description="暂无计算结果，请在左侧录入并保存" :image-size="70" />

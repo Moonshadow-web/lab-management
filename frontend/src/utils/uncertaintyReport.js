@@ -319,10 +319,12 @@ export function downloadHtml(html, name) {
 }
 
 export function printOrSavePdf(html, name) {
-  // 浏览器原生：打开新窗口 → 写 HTML → 调 window.print()
-  // 用户在弹窗选"另存为 PDF"或打印机 → A4 排版（依赖 CSS @page）
+  // 浏览器原生：打开新窗口 → 写 HTML → 直接调 window.print()
+  // 打印弹窗里用户可选打印机或「另存为 PDF」。
+  // 说明：前端无法静默生成 PDF 文件下载（浏览器安全限制），
+  //      因此本系统统一走「打印」，需要 PDF 时在打印对话框选「另存为 PDF」。
   const w = window.open('', '_blank')
-  if (!w) { ElMessage.warning('请允许浏览器弹窗以打印/下载 PDF'); return }
+  if (!w) { ElMessage.warning('请允许浏览器弹窗以打印'); return }
   w.document.open()
   w.document.write(html)
   w.document.close()

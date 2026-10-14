@@ -23,8 +23,8 @@
             @input="onSearch"
           />
           <el-button :disabled="!filtered.length" @click="previewSummary">📑 预览汇总表</el-button>
-          <el-button type="primary" :disabled="!filtered.length" @click="downloadSummary">⬇️ 下载汇总表 PDF</el-button>
-          <el-button type="success" :disabled="!filtered.length" @click="downloadAllReports">📚 全部报告合并 PDF</el-button>
+          <el-button type="primary" :disabled="!filtered.length" @click="downloadSummary">🖨️ 打印汇总表</el-button>
+          <el-button type="success" :disabled="!filtered.length" @click="downloadAllReports">🖨️ 打印全部报告</el-button>
         </div>
       </div>
     </el-card>
@@ -204,7 +204,7 @@ function downloadAllReports() {
     ElMessage.warning('没有可导出的报告')
     return
   }
-  ElMessage.info(`正在生成 ${list.length} 份报告的合并 PDF，请在弹窗中选择「另存为 PDF」或打印`)
+  ElMessage.info(`正在打开 ${list.length} 份报告合并的打印预览`)
   printOrSavePdf(buildAllReports(list), `测量不确定度评定报告汇编_${list.length}份_${todayStr()}`)
 }
 
