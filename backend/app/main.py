@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import logging
 import os
+import re
 import shutil
 import sqlite3
 from datetime import datetime, timedelta
@@ -1017,12 +1018,17 @@ class AssetCacheMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         if request.url.path.startswith("/assets/"):
-            # 带内容 hash 的静态资源：文件名随内容变化，可永久缓存
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        elif "text/html" in (response.headers.get("content-type") or ""):
-            # index.html / SPA fallback：禁止强缓存，每次都向服务端校验，
-            # 避免浏览器长期缓存旧版入口页（旧主 JS 被新构建删掉 → 404 白屏）
+            # ⚠️ 不要用 immutable 长缓存！
+            # vite 构建时 chunk 文件名带内容 hash（Login-xxx.js），但**部署会删除旧 chunk**。
+            # 若浏览器/CDN 长期缓存了旧入口 JS，它引用的旧 chunk 已不存在 → 404 → 整页白屏。
+            # 入口 JS/CSS 体积只有几百 KB，校验一次几十毫秒，换取"绝不白屏"值得。
+            # （真正的性能优化靠 index.html 加 ?v= 版本号，见 _build_version()）
             response.headers["Cache-Control"] = "no-cache"
+        elif "text/html" in (response.headers.get("content-type") or ""):
+            # index.html / SPA fallback：禁止任何缓存，每次都向服务端取，
+            # 避免浏览器长期缓存旧版入口页（旧主 JS 被新构建删掉 → 404 白屏）
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
         return response
 
 
@@ -1112,8 +1118,33 @@ for _candidate in [
 if _FRONTEND_DIST:
     from fastapi.responses import FileResponse
 
+    # ====== 构建版本号：用于给静态资源 URL 加版本，防 CDN 串版本导致白屏 ======
+    def _build_version() -> str:
+        """取入口 JS 文件名里的内容 hash（vite 每次构建内容变则 hash 变）。
+
+        白屏根因：/assets/ 是 immutable 长缓存，而部署时旧 chunk 会被删除。
+        CDN/浏览器若缓存了旧入口 JS，它引用的旧 chunk 已 404 → 白屏。
+        给 assets 路径加 ?v=<hash> 后，换版本 URL 必变，CDN 不会拿错文件。
+        """
+        try:
+            idx = _FRONTEND_DIST / "index.html"
+            if idx.exists():
+                import re as _re
+                m = _re.search(r"/assets/index-[A-Za-z0-9_\-]+\.js",
+                               idx.read_text(encoding="utf-8", errors="ignore"))
+                if m:
+                    return m.group(0).rsplit("-", 1)[-1].split(".")[0]
+        except Exception:  # noqa: BLE001
+            pass
+        return "dev"
+
+    _BV = _build_version()
+
     # 静态资源（JS/CSS/图片等）
-    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
+    # no-cache 而非 immutable：入口 JS/CSS 必须每次校验，
+    # 否则浏览器/CDN 拿到旧入口 → 它引用的旧 chunk 已被删除 → 404 白屏。
+    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")),
+              name="assets")
 
     # SPA fallback：所有非 /api、/uploads、/health 的请求都返回 index.html
     @app.get("/{full_path:path}")
@@ -1123,17 +1154,25 @@ if _FRONTEND_DIST:
             raise HTTPException(status_code=404, detail="Not found")
         index = _FRONTEND_DIST / "index.html"
         if index.exists():
-            # 关键：微信内置浏览器遇到 `Content-Disposition: attachment` 会当成文件下载，
-            # 提示"要下载一个 html"。而 CloudBase 网关会**强制覆盖**这个响应头
-            # （即使 FileResponse 设了 content_disposition_type="inline" 也一样），
-            # 所以这里改用 Response 直接回 HTML 内容，**不设置 content-disposition**，
-            # 让浏览器按正常网页渲染。
+            # 关键 1：微信内置浏览器遇到 `Content-Disposition: attachment` 会当成文件下载，
+            #   所以直接回 HTML 内容，不设置该响应头。
+            # 关键 2：给所有 /assets/ 引用追加 ?v=<构建hash>。
+            #   原因：/assets 是 immutable 长缓存，部署会删掉旧 chunk 文件。
+            #   若浏览器/CDN 命中旧版 index.html（或旧入口 JS），会请求已删除的
+            #   旧 chunk → 404 → 整页白屏。加版本号后换版本 URL 必变，强制取新资源。
+            # 关键 3：index.html 本身 no-store，彻底避免入口页被缓存。
+            try:
+                html = index.read_text(encoding="utf-8", errors="ignore")
+                html = re.sub(r'(["\'])/assets/', rf'\g<1>/assets/?v={_BV}&', html)
+            except Exception:  # noqa: BLE001
+                html = index.read_text(encoding="utf-8", errors="ignore")
             from starlette.responses import Response as _RawResponse
             return _RawResponse(
-                content=index.read_bytes(),
+                content=html.encode("utf-8"),
                 media_type="text/html; charset=utf-8",
                 headers={
                     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                    "Pragma": "no-cache",
                     "X-Robots-Tag": "noindex, nofollow, noarchive",
                 },
             )
