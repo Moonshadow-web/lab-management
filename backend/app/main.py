@@ -1163,7 +1163,14 @@ if _FRONTEND_DIST:
             # 关键 3：index.html 本身 no-store，彻底避免入口页被缓存。
             try:
                 html = index.read_text(encoding="utf-8", errors="ignore")
-                html = re.sub(r'(["\'])/assets/', rf'\g<1>/assets/?v={_BV}&', html)
+                # ⚠️ 版本号必须放在**文件名之后**（?v=xxx），
+                #    不能写成 /assets/?v=xxx&file.js —— 那样 StaticFiles
+                #    会把 file.js 当成目录名的一部分 → 404 白屏。
+                html = re.sub(
+                    r'(["\'])(/assets/[A-Za-z0-9_\-]+\.(?:js|css|png|jpg|svg|woff2?))(["\'])',
+                    rf'\g<1>\g<2>?v={_BV}\g<3>',
+                    html,
+                )
             except Exception:  # noqa: BLE001
                 html = index.read_text(encoding="utf-8", errors="ignore")
             from starlette.responses import Response as _RawResponse
