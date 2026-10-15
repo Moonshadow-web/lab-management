@@ -66,6 +66,9 @@ const routes = [
 
 // 非生免组允许访问的路径（与侧边菜单白名单一致）；其余一律回工作台
 const OTHER_GROUP_ALLOWED = new Set([
+  '/login',   // ⚠️ 必须放行：退出登录时 token 已清空且 groupCode 仍是别组，
+              // 若/login 不在白名单会被专业组守卫 next('/dashboard') 弹回，
+              //与未登录守卫形成死循环 → 临检组「退出登录」按钮点了没反应。
   '/dashboard', '/test-items', '/documents', '/instruments',
   '/reagent', '/reagent/items', '/reagent/stock', '/reagent/inventory',
   '/reagent/orders', '/reagent/consumption', '/reagent/associations',
