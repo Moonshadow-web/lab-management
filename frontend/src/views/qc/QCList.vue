@@ -58,7 +58,7 @@
                     :closable="false" show-icon style="margin-bottom: 8px">
             <template #title>
               <template v-if="todoMissing.length">
-                <b>{{ monthLabel }}</b> 还有 <b style="color:#e6a23c">{{ todoMissing.length }}</b> 台仪器没交活，需催办
+                <b>{{ monthLabel }}</b> 还有 <b style="color:#e6a23c">{{ todoMissing.length }}</b> 台仪器的「数据上传」和「文字小结」都未提交，需催办
               </template>
               <template v-else>
                 <b>{{ monthLabel }}</b> 全部 {{ todoRows.length }} 台仪器都已完成 ✅
@@ -89,13 +89,13 @@
             <el-table-column label="已传项目" width="88" align="center">
               <template #default="{ row }">{{ row.data_ok ? row.item_count : '—' }}</template>
             </el-table-column>
-            <el-table-column label="待办" min-width="140">
+            <el-table-column label="处理" min-width="140">
               <template #default="{ row }">
-                <span v-if="!row.data_ok && !row.report_ok" class="todo">缺数据 + 缺小结</span>
-                <span v-else-if="!row.data_ok" class="todo">缺数据</span>
-                <span v-else-if="!row.report_ok" class="todo">缺小结</span>
-                <el-button v-else link type="primary" size="small"
+                <!-- 有其一即算完成；只有都没有才需催办 -->
+                <span v-if="!row.data_ok && !row.report_ok" class="todo">数据、小结都未交</span>
+                <el-button v-else-if="row.report_ok" link type="primary" size="small"
                            @click="previewReport(row)">查看小结</el-button>
+                <span v-else class="dim">—</span>
               </template>
             </el-table-column>
           </el-table>
@@ -1030,7 +1030,9 @@ const todoRows = computed(() => {
   })
   return out
 })
-const todoMissing = computed(() => todoRows.value.filter((x) => !x.data_ok || !x.report_ok))
+// ⚠️ 判定口径：数据上传 与 文字小结 **有其一即算已完成**（用户 2026-10-15 明确要求），
+// 只有两者都没有才列入催办。
+const todoMissing = computed(() => todoRows.value.filter((x) => !x.data_ok && !x.report_ok))
 const showTodoMissingOnly = ref(false)
 const visibleTodoRows = computed(() =>
   showTodoMissingOnly.value ? todoMissing.value : todoRows.value
@@ -1038,21 +1040,19 @@ const visibleTodoRows = computed(() =>
 const monthLabel = computed(() =>
   uploadStatus.value ? `${uploadStatus.value.year} 年 ${uploadStatus.value.month} 月` : '本月')
 function todoRowClass({ row }) {
-  return (!row.data_ok || !row.report_ok) ? 'row-missing' : ''
+  // 只有数据和小结都缺，才标黄需催办
+  return (!row.data_ok && !row.report_ok) ? 'row-missing' : ''
 }
 async function loadTodoData() {
   await Promise.all([loadUploadStatus(), loadReportStatus()])
 }
 // 复制催办名单：直接粘到微信群/钉钉催人
 async function copyTodoList() {
-  const list = todoMissing.value
-  if (!list.length) { ElMessage.info('全部已完成，无需催办'); return }
-  const lines = [`${monthLabel.value} 质控月结待办（共 ${list.length} 台）：`]
+  const list = todoMissing.value   // 只含"数据、小结都未提交"的仪器
+  if (!list.length) { ElMessage.info('全部已完成（数据或小结有其一即算完成），无需催办'); return }
+  const lines = [`${monthLabel.value} 质控月结待办（以下 ${list.length} 台仪器的数据上传和文字小结均未提交）：`]
   list.forEach((x, i) => {
-    const miss = []
-    if (!x.data_ok) miss.push('数据未上传')
-    if (!x.report_ok) miss.push('小结未写')
-    lines.push(`${i + 1}. ${x.dept_no} ${x.model || x.name} —— ${miss.join('、')}`)
+    lines.push(`${i + 1}. ${x.dept_no} ${x.model || x.name}`)
   })
   const text = lines.join('\n')
   try {
