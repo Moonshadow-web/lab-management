@@ -76,6 +76,79 @@
           </el-table>
         </el-card>
 
+        <!-- 质控文字小结完成情况：数据传了还要写小结才算完成 -->
+        <el-card v-if="reportStatus" shadow="never" class="upload-status-card report-status-card">
+          <template #header>
+            <div class="upload-status-head">
+              <span>
+                <b>{{ reportStatus.year }} 年 {{ reportStatus.month }} 月</b>
+                质控小结完成情况
+              </span>
+              <span class="upload-status-count">
+                <el-tag type="success" size="small" effect="dark">
+                  已写 {{ reportStatus.written }}
+                </el-tag>
+                <el-tag v-if="reportStatus.not_written > 0" type="danger" size="small" effect="dark">
+                  未写 {{ reportStatus.not_written }}
+                </el-tag>
+                <el-tag type="info" size="small" effect="plain">共 {{ reportStatus.total }} 台</el-tag>
+              </span>
+              <span class="upload-status-actions">
+                <el-button size="small" @click="showReportMissingOnly = !showReportMissingOnly">
+                  {{ showReportMissingOnly ? '显示全部' : '只看待办' }}
+                </el-button>
+                <el-button size="small" type="primary" plain :loading="loadingReportStatus"
+                           @click="loadReportStatus">刷新</el-button>
+              </span>
+            </div>
+          </template>
+          <el-table :data="visibleReportRows" size="small" border max-height="260"
+                    :row-class-name="reportRowClass">
+            <el-table-column label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.written ? 'success' : 'danger'" size="small">
+                  {{ row.written ? '已写' : '未写' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="dept_no" label="科室编号" width="180" />
+            <el-table-column label="仪器" min-width="180">
+              <template #default="{ row }">
+                {{ row.model || row.name }}
+                <span v-if="row.model && row.name && row.model !== row.name" class="dim">
+                  （{{ row.name }}）
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="最后更新" width="150">
+              <template #default="{ row }">
+                <span class="dim">{{ fmtDateTime(row.updated_at) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150" align="center">
+              <template #default="{ row }">
+                <el-button v-if="row.written" link type="primary" size="small"
+                           @click="previewReport(row)">查看</el-button>
+                <span v-else class="todo">需催办</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+
+        <!-- 小结预览弹窗 -->
+        <el-dialog v-model="reportPreview.visible" :title="reportPreview.title" width="760px">
+          <div v-if="reportPreview.rows.length" class="report-preview">
+            <div v-for="(r, i) in reportPreview.rows" :key="i" class="rp-block">
+              <div class="rp-label">{{ r.label }}</div>
+              <div class="rp-text">{{ r.text || '（空）' }}</div>
+            </div>
+          </div>
+          <template #footer>
+            <el-button @click="reportPreview.visible = false">关闭</el-button>
+            <el-button type="primary" @click="printReport">打印</el-button>
+          </template>
+        </el-dialog>
+
         <div class="toolbar">
           <el-date-picker
             v-model="monthValue"
@@ -840,7 +913,7 @@ import {
   getQCReport, upsertQCReport, regenerateQCReport, exportQCReportDocx, getQCProjectDaily,
   clearQCMonth,
 } from '../../api/qc'
-import { getQCInstruments, getQCUploadStatus } from '../../api/qc'
+import { getQCInstruments, getQCUploadStatus, getQCReportStatus } from '../../api/qc'
 import {
   listEqaPlans, createEqaPlan, updateEqaPlan, deleteEqaPlan, copyPrevYearEqa,
   getEqaAlerts, getEqaSummary, getEqaSummaryText, upsertEqaSummaryText, exportEqaPlans,
@@ -936,9 +1009,71 @@ async function loadUploadStatus() {
 }
 
 // 选了年月即自动加载，无需点「统计」
-watch(monthValue, () => { loadUploadStatus() })
+watch(monthValue, () => { loadUploadStatus(); loadReportStatus() })
 // 切到月结页时也加载一次（年月已有值的情况）
-watch(activeTab, (t) => { if (t === 'summary' && monthValue.value) loadUploadStatus() })
+watch(activeTab, (t) => { if (t === 'summary' && monthValue.value) { loadUploadStatus(); loadReportStatus() } })
+
+// ---------- 质控文字小结完成情况 ----------
+const reportStatus = ref(null)
+const loadingReportStatus = ref(false)
+const showReportMissingOnly = ref(false)
+const visibleReportRows = computed(() => {
+  const list = reportStatus.value?.instruments || []
+  return showReportMissingOnly.value ? list.filter((x) => !x.written) : list
+})
+const reportPreview = reactive({ visible: false, title: '', rows: [] })
+const REPORT_FIELDS = [
+  ['operation_status', '一、仪器运行情况'],
+  ['drift_trend', '二、各项目是否出现漂移或趋势性改变'],
+  ['cv_setting_ok', '三、各项目CV%设置是否达标'],
+  ['cv_calc_ok', '四、各项目计算CV%是否达标'],
+  ['freq_ok', '五、各项目质控频次是否达标'],
+]
+
+function reportRowClass({ row }) {
+  return row.written ? '' : 'row-missing'
+}
+function fmtDateTime(v) {
+  if (!v) return '—'
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return String(v).slice(0, 16).replace('T', ' ')
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+function previewReport(row) {
+  const s = row.summary || {}
+  reportPreview.title = `${row.dept_no} ${row.model || row.name} — ${reportStatus.value?.year}年${reportStatus.value?.month}月质控小结`
+  reportPreview.rows = REPORT_FIELDS.map(([k, label]) => ({ label, text: s[k] || '' }))
+  reportPreview.visible = true
+}
+function printReport() {
+  const esc = (t) => String(t || '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+  const body = reportPreview.rows
+    .map((r) => `<h3>${esc(r.label)}</h3><p>${esc(r.text || '（空）')}</p>`).join('')
+  const html = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
+<title>${esc(reportPreview.title)}</title>
+<style>body{font-family:"Microsoft YaHei",serif;padding:24px;line-height:1.7}
+h1{font-size:17px;text-align:center}h3{font-size:14px;margin:14px 0 4px}p{margin:0;font-size:13px;white-space:pre-wrap}</style>
+</head><body><h1>${esc(reportPreview.title)}</h1>${body}</body></html>`
+  const w = window.open('', '_blank')
+  if (!w) { ElMessage.warning('请允许浏览器弹窗以打印'); return }
+  w.document.open(); w.document.write(html); w.document.close(); w.focus()
+  setTimeout(() => { try { w.print() } catch (e) { console.error(e) } }, 400)
+}
+
+async function loadReportStatus() {
+  if (!monthValue.value) { reportStatus.value = null; return }
+  loadingReportStatus.value = true
+  try {
+    const { year, month } = parseMonth()
+    const { data } = await getQCReportStatus(year, month)
+    reportStatus.value = data
+  } catch (e) {
+    reportStatus.value = null
+  } finally {
+    loadingReportStatus.value = false
+  }
+}
 const summaryRows = ref([])
 const loadingSummary = ref(false)
 const uploadInstrumentId = ref(null)   // 月结筛选 + 上传 时选定的受控仪器
@@ -2767,6 +2902,14 @@ watch(activeTab, (t) => {
 .upload-status-actions { margin-left: auto; display: flex; gap: 6px; }
 /* 未上传行浅黄底，整行一眼可辨 */
 .upload-status-card :deep(.row-missing) { background: #fff8e6; }
+/* 小结预览弹窗 */
+.report-preview { max-height: 56vh; overflow-y: auto; }
+.rp-block { margin-bottom: 14px; }
+.rp-label { font-weight: 600; font-size: 13px; color: #303133; margin-bottom: 4px; }
+.rp-text {
+  font-size: 13px; line-height: 1.7; color: #606266;
+  white-space: pre-wrap; background: #fafafa; padding: 8px 10px; border-radius: 4px;
+}
 .dim { color: #909399; font-size: 12px; }
 .todo { color: #e6a23c; font-weight: 600; font-size: 12px; }
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }

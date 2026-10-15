@@ -22,6 +22,10 @@ export function listQCSummaries(params) {
 export function getQCUploadStatus(year, month) {
   return request.get('/api/v1/qc-summaries/upload-status', { params: { year, month } })
 }
+// 月结文字小结完成情况：各仪器本月小结是否已写（含内容，供预览/打印）
+export function getQCReportStatus(year, month) {
+  return request.get('/api/v1/qc-summaries/report-status', { params: { year, month } })
+}
 export function uploadQCSummary(file, instrumentId, onProgress) {
   const form = new FormData()
   form.append('file', file)

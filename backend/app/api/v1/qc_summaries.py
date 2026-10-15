@@ -533,6 +533,60 @@ def qc_upload_status(
     }
 
 
+@router.get("/report-status")
+def qc_report_status(
+    year: int,
+    month: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """月结「文字小结」完成情况：按 (年, 月) 统计每台质控受控仪器是否已写小结。
+
+    与 /upload-status（质控数据是否上传）互补 —— 数据传了还要写小结才算完成。
+    返回每台仪器的 written 状态 + 五段小结内容（供预览/打印存档）。
+    """
+    instruments = (
+        db.query(Instrument)
+        .filter(Instrument.qc_instrument == True)  # noqa: E712
+        .order_by(Instrument.dept_no)
+        .all()
+    )
+    if not instruments:
+        instruments = db.query(Instrument).order_by(Instrument.dept_no).all()
+
+    rows = (
+        db.query(QCMonthlyReport)
+        .filter(QCMonthlyReport.year == year, QCMonthlyReport.month == month)
+        .all()
+    )
+    by_inst = {r.instrument_id: r for r in rows if r.instrument_id}
+
+    FIELDS = ("operation_status", "drift_trend", "cv_setting_ok", "cv_calc_ok", "freq_ok")
+    result = []
+    for i in instruments:
+        r = by_inst.get(i.id)
+        summary = {f: (getattr(r, f) or "") if r else "" for f in FIELDS}
+        written = any((summary.get(f) or "").strip() for f in FIELDS)
+        result.append({
+            "instrument_id": i.id,
+            "dept_no": i.dept_no or "",
+            "name": i.name or "",
+            "model": i.model or "",
+            "report_id": getattr(r, "id", None),
+            "written": written,
+            "updated_at": r.updated_at.isoformat() if (r and r.updated_at) else None,
+            "summary": summary if written else {},
+        })
+    return {
+        "year": year,
+        "month": month,
+        "total": len(result),
+        "written": sum(1 for x in result if x["written"]),
+        "not_written": sum(1 for x in result if not x["written"]),
+        "instruments": result,
+    }
+
+
 @router.post("/upload", status_code=201)
 def upload_qc_summary(
     file: UploadFile = File(...),
