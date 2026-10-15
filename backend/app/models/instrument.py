@@ -26,6 +26,9 @@ class Instrument(Base):
     serial_no: Mapped[str] = mapped_column(String(100), default="")  # 出厂编号
     purchase_date: Mapped[str] = mapped_column(String(30), default="")  # 购入日期
     start_date: Mapped[str] = mapped_column(String(30), default="")  # 启用日期
+    # 停用/退役日期（YYYY-MM 或 YYYY-MM-DD）。质控月结按月份判断仪器是否需要交：
+    # 停用当月起不再要求（end_date <= 该月 即排除）
+    end_date: Mapped[str] = mapped_column(String(30), default="")
     owner: Mapped[str] = mapped_column(String(100), default="")  # 设备负责人
     daily_manager: Mapped[str] = mapped_column(String(100), default="")  # 日常管理人
     supplier: Mapped[str] = mapped_column(String(200), default="")  # 供货商名称

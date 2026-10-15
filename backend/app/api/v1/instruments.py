@@ -1051,6 +1051,9 @@ async def update_card_data(instrument_id: int, request: Request, db: Session = D
         inst.status = (body.get("status") or "").strip() or "在用"
     if "start_date" in body:
         inst.start_date = (body.get("start_date") or "").strip()
+    if "end_date" in body:
+        # 停用/退役日期：质控月结据此判断该月起不再要求交数据
+        inst.end_date = (body.get("end_date") or "").strip()
     if "repair_contact" in body:
         inst.repair_contact = (body.get("repair_contact") or "").strip() or "3000"
     cal_date = (body.get("cal_date") or "").strip()

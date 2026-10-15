@@ -202,6 +202,7 @@
             </div>
           </div>
           <div class="dc-row"><span class="dc-k">开始使用日期</span><span class="dc-v strong">{{ fmtYm(cardForm.start_date) || '—' }}</span></div>
+          <div class="dc-row"><span class="dc-k">停用日期</span><span class="dc-v strong">{{ fmtYm(cardForm.end_date) || '—' }}</span></div>
           <div class="dc-row"><span class="dc-k">本次校准时间</span><span class="dc-v strong">{{ fmtYm(cardForm.cal_date) || '—' }}</span></div>
           <div class="dc-row"><span class="dc-k">下次校准时间</span><span class="dc-v strong">{{ fmtYm(cardForm.next_cal_date) || '—' }}</span></div>
           <div class="dc-row last"><span class="dc-k">设备维修联系方式</span><span class="dc-v strong">{{ cardForm.repair_contact || '—' }}</span></div>
@@ -221,6 +222,11 @@
         <el-form-item label="开始使用日期">
           <el-date-picker v-model="cardForm.start_date" type="month" value-format="YYYY-MM"
                           placeholder="选择年月" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="停用日期">
+          <el-date-picker v-model="cardForm.end_date" type="month" value-format="YYYY-MM"
+                          placeholder="停用/退役的年月（填了之后，质控月结从该月起不再要求这台仪器）"
+                          style="width: 100%" />
         </el-form-item>
         <el-form-item label="本次校准时间">
           <el-date-picker v-model="cardForm.cal_date" type="month" value-format="YYYY-MM"
@@ -896,6 +902,7 @@ async function openCard(row) {
       status: d.status || '在用',
       owner: d.owner || '',
       start_date: toMonth(d.start_date),
+      end_date: toMonth(d.end_date),   // 停用日期（质控月结据此判断该月起不再要求）
       cal_date: toMonth(d.cal_date),
       next_cal_date: toMonth(d.next_cal_date),
       repair_contact: d.repair_contact || '3000',
@@ -924,6 +931,7 @@ async function saveCard() {
       status: d.status || cardForm.value.status,
       owner: d.owner || cardForm.value.owner,
       start_date: toMonth(d.start_date),
+      end_date: toMonth(d.end_date),
       cal_date: toMonth(d.cal_date),
       next_cal_date: toMonth(d.next_cal_date),
       repair_contact: d.repair_contact || cardForm.value.repair_contact,

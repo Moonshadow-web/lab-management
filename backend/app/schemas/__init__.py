@@ -169,6 +169,7 @@ class InstrumentBase(BaseModel):
     serial_no: str = ""
     purchase_date: str = ""
     start_date: str = ""
+    end_date: str = ""   # 停用/退役日期（YYYY-MM）。质控月结据此判断该月是否还需交
     owner: str = ""
     daily_manager: str = ""
     supplier: str = ""

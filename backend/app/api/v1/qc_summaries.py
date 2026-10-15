@@ -28,6 +28,33 @@ from ...schemas import (
 from ...services.qc_service import aggregate_project, lookup_quality_goal, draft_report, find_test_item_by_name, _parse_rule_cell, _canon_item_name, QC_GOAL_EXACT_OVERRIDES
 
 
+def _ym_prefix(s) -> str:
+    """把日期字符串规范到 YYYY-MM（兼容 YYYY-MM 与 YYYY-MM-DD）。"""
+    s = (s or "").strip()
+    return s[:7] if len(s) >= 7 else s
+
+
+def _instrument_in_service(inst, year: int, month: int) -> bool:
+    """该仪器在指定月份是否「在役」—— 判断这个月要不要它交质控月结。
+
+    规则（2026-10-15 用户确认）：
+      - **启用当月就要求**：start_date 晚于该月 → 排除
+      - **停用当月就不要求**：end_date 不晚于该月 → 排除
+    日期缺失时视为一直在役（不排除），保证历史兼容。
+
+    例：日立 HT7600 填 end_date=2026-09 → 2026-09 起不再出现；
+        迈瑞 CL6000i/BS2000 填 start_date=2026-09 → 2026-09 起开始出现。
+    """
+    ym = f"{year:04d}-{month:02d}"
+    st = _ym_prefix(getattr(inst, "start_date", ""))
+    ed = _ym_prefix(getattr(inst, "end_date", ""))
+    if st and st > ym:
+        return False   # 该月还没启用
+    if ed and ed <= ym:
+        return False   # 该月已停用（停用当月即不要求）
+    return True
+
+
 def _ph_relative_goal(target_mean: float) -> str:
     """pH(血气) 质量目标 = 0.02 / 靶值（相对允许误差），按该水平靶值逐行计算。
 
@@ -471,6 +498,9 @@ def qc_upload_status(
     if not instruments:
         instruments = db.query(Instrument).order_by(Instrument.dept_no).all()
 
+    # ⭐ 按月份过滤：只统计该月在役的仪器（停用当月不要求、启用当月即要求）
+    instruments = [i for i in instruments if _instrument_in_service(i, year, month)]
+
     inst_ids = [i.id for i in instruments]
     rows = []
     if inst_ids:
@@ -553,6 +583,8 @@ def qc_report_status(
     )
     if not instruments:
         instruments = db.query(Instrument).order_by(Instrument.dept_no).all()
+    # ⭐ 按月份过滤：只统计该月在役的仪器（停用当月不要求、启用当月即要求）
+    instruments = [i for i in instruments if _instrument_in_service(i, year, month)]
 
     rows = (
         db.query(QCMonthlyReport)
