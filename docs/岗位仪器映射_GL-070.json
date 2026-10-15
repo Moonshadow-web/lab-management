@@ -1,0 +1,73 @@
+{
+  "_source": "data/uploads/docs/BG-KS-GL-070-仪器使用授权书_1.docx（documents.id=496）",
+  "_提取日期": "2026-09-01",
+  "_说明": "岗位→仪器 以 dept_no 编号为准（编号是唯一稳定键）。GL-070 里的『型号名』与 instruments 表有出入，见 _待核对。",
+  "_待核对": [
+    "贝克曼DXI800 编号：GL-070 写 1/2/4=2004/2006/2007、3=2005；instruments 表为 2004=1/2005=2/2006=3/2007=4。以哪个为准？",
+    "安图A6200：GL-070 写 SM-1024；instruments 表 SM-1024=安图A2000PLUS A（停用），SM-2010=安图A6200（在用）。疑似换机后未改编号。",
+    "罗氏Cobas e601A：GL-070 写 SM-1017；instruments 表 SM-1017=罗氏e602（型号名不一致，编号一致）。"
+  ],
+  "岗位仪器映射": {
+    "生化流水线岗": [
+      "MHZYY-JYK-SM-2001",
+      "MHZYY-JYK-SM-2002",
+      "MHZYY-JYK-SM-2003",
+      "MHZYY-JYK-SM-2004",
+      "MHZYY-JYK-SM-2006",
+      "MHZYY-JYK-SM-2007",
+      "MHZYY-JYK-SM-2005"
+    ],
+    "急诊岗": [
+      "MHZYY-JYK-SM-1005",
+      "MHZYY-JYK-SM-2008",
+      "MHZYY-JYK-SM-1012",
+      "MHZYY-JYK-SM-1018",
+      "MHZYY-JYK-SM-1015",
+      "MHZYY-JYK-SM-1023",
+      "MHZYY-JYK-SM-1022"
+    ],
+    "病房岗": [
+      "MHZYY-JYK-SM-1013"
+    ],
+    "糖化电泳岗": [
+      "MHZYY-JYK-SM-1021",
+      "MHZYY-JYK-SM-1026",
+      "MHZYY-JYK-SM-1027"
+    ],
+    "凝血流水线岗": [
+      "MHZYY-JYK-SM-1009",
+      "MHZYY-JYK-SM-1010",
+      "MHZYY-JYK-SM-1011",
+      "MHZYY-JYK-SM-1028"
+    ],
+    "免疫岗": [
+      "MHZYY-JYK-SM-1016",
+      "MHZYY-JYK-SM-1017",
+      "MHZYY-JYK-SM-2009",
+      "MHZYY-JYK-SM-1024",
+      "MHZYY-JYK-SM-1025"
+    ],
+    "质谱岗": [
+      "MHZYY-JYK-SM-1032"
+    ]
+  },
+  "岗位子项": {
+    "免疫岗": ["免疫上机岗", "免疫报告岗（原仪器和杂项）"]
+  },
+  "产前血清学筛查岗": {
+    "_说明": "GL-070 未单列此岗（SM-2009 唐筛机归在免疫岗下）。按用户 2026-09-01 要求单列为第 8 个岗位。",
+    "固定仪器": ["MHZYY-JYK-SM-2009"],
+    "固定项目": [
+      { "code": "AFP", "name": "甲胎蛋白", "test_item_id": 52 },
+      { "code": "uE3", "name": "非结合型雌三醇", "test_item_id": 66 },
+      { "code": "β-HCG", "name": "β人绒毛膜促性腺激素", "test_item_id": 64 }
+    ]
+  },
+  "仪器号段范围": {
+    "段1": "1009-1032",
+    "段2": "2001-2012",
+    "_库内命中": 35,
+    "_停用": ["MHZYY-JYK-SM-1019", "MHZYY-JYK-SM-1020", "MHZYY-JYK-SM-1024"],
+    "_备用": ["MHZYY-JYK-SM-2011", "MHZYY-JYK-SM-2012"]
+  }
+}

@@ -1,4 +1,4 @@
-检验科生化免疫组试剂与物料管理软件 V1.0   第1页 / 共60页（总源码3950行，取自原第1页）
+检验科生化免疫组试剂与物料管理软件 V1.0   第1页 / 共60页（总源码4817行，取自原第1页）
 ----------------------------------------------------
 
 ======================================================================
@@ -60,7 +60,7 @@ from ...schemas.reagent_management import (
     ReagentConsumptionRead, ImportResult,
 
 
-检验科生化免疫组试剂与物料管理软件 V1.0   第2页 / 共60页（总源码3950行，取自原第2页）
+检验科生化免疫组试剂与物料管理软件 V1.0   第2页 / 共60页（总源码4817行，取自原第2页）
 ----------------------------------------------------
     TestItemReagentCreate, TestItemReagentUpdate, TestItemReagentRead,
     InstrumentReagentCreate, InstrumentReagentUpdate, InstrumentReagentRead,
@@ -114,7 +114,7 @@ def list_reagent_items(
     rows = base.order_by(
 
 
-检验科生化免疫组试剂与物料管理软件 V1.0   第3页 / 共60页（总源码3950行，取自原第3页）
+检验科生化免疫组试剂与物料管理软件 V1.0   第3页 / 共60页（总源码4817行，取自原第3页）
 ----------------------------------------------------
         ReagentItem.annual_usage.is_(None),
         ReagentItem.annual_usage.desc(),
@@ -122,6 +122,32 @@ def list_reagent_items(
     ).offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size,
             "items": [ReagentItemRead.model_validate(r) for r in rows]}
+
+
+@router.get("/items/counts", response_model=dict)
+def get_reagent_item_counts(
+    library: Optional[str] = Query(None, description="责任库筛选（生化凝血/免疫）"),
+    active_only: bool = Query(True, description="仅统计启用项"),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """按类型统计试剂目录数量。用于试剂目录页/工作台展示：试剂/校准品/耗材/质控品。"""
+    base = db.query(ReagentItem)
+    if library:
+        base = base.filter(ReagentItem.library == library)
+    if active_only:
+        base = base.filter(ReagentItem.is_active == True)
+    rows = base.with_entities(ReagentItem.type, func.count()).group_by(ReagentItem.type).all()
+    counts = {"试剂": 0, "校准品": 0, "耗材": 0, "质控品": 0}
+    for t, n in rows:
+        if t in counts:
+            counts[t] = n
+    return {
+        "library": library,
+        "active_only": active_only,
+        "total": sum(counts.values()),
+        "counts": counts,
+    }
 
 
 @router.get("/items/{item_id}", response_model=ReagentItemRead)
@@ -135,11 +161,15 @@ def get_reagent_item(item_id: int, db: Session = Depends(get_db), _=Depends(get_
 @router.post("/items", response_model=ReagentItemRead)
 def create_reagent_item(
     data: ReagentItemCreate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
 ):
     item = ReagentItem(**data.model_dump())
     db.add(item)
     db.commit()
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第4页 / 共60页（总源码4817行，取自原第4页）
+----------------------------------------------------
     db.refresh(item)
     return item
 
@@ -147,7 +177,7 @@ def create_reagent_item(
 @router.put("/items/{item_id}", response_model=ReagentItemRead)
 def update_reagent_item(
     item_id: int, data: ReagentItemUpdate, db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "lab_technician")),
+    user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
 ):
     item = db.query(ReagentItem).get(item_id)
     if not item:
@@ -166,10 +196,6 @@ def delete_reagent_item(
 ):
     item = db.query(ReagentItem).get(item_id)
     if not item:
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第4页 / 共60页（总源码3950行，取自原第4页）
-----------------------------------------------------
         raise HTTPException(404, "试剂未找到")
     db.delete(item)
     db.commit()
@@ -194,6 +220,10 @@ def batch_update_usage(
     n = 0
     for u in payload.updates:
         it = db.query(ReagentItem).get(u.item_id)
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第5页 / 共60页（总源码4817行，取自原第5页）
+----------------------------------------------------
         if it:
             it.annual_usage = int(u.annual_usage)
             n += 1
@@ -220,10 +250,6 @@ def list_stock(
     if q.strip():
         kw = f"%{q.strip()}%"
         item_ids = [r[0] for r in db.query(ReagentItem.id).filter(
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第5页 / 共60页（总源码3950行，取自原第5页）
-----------------------------------------------------
             or_(ReagentItem.name.like(kw), ReagentItem.brand.like(kw))
         ).all()]
         base = base.filter(ReagentStock.item_id.in_(item_ids))
@@ -248,6 +274,10 @@ def list_stock(
 # =============================================================================
 # 3. 盘库
 # =============================================================================
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第6页 / 共60页（总源码4817行，取自原第6页）
+----------------------------------------------------
 
 @router.get("/inventory-checks", response_model=dict)
 def list_inventory_checks(
@@ -276,10 +306,6 @@ def get_inventory_check(check_id: int, db: Session = Depends(get_db), _=Depends(
     return check
 
 
-检验科生化免疫组试剂与物料管理软件 V1.0   第6页 / 共60页（总源码3950行，取自原第6页）
-----------------------------------------------------
-
-
 @router.delete("/inventory-checks/{check_id}", response_model=dict)
 def delete_inventory_check(
     check_id: int, db: Session = Depends(get_db),
@@ -300,7 +326,12 @@ def _item_dto(ri: ReagentItem, stock_map: dict,
     return {
         "item_id": ri.id, "name": ri.name, "spec": ri.spec, "type": ri.type,
         "unit": ri.unit, "material_code": ri.material_code or "",
+        "brand": ri.brand or "",
         "current_stock": int(stock_map.get(ri.id, 0)), "library": ri.library,
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第7页 / 共60页（总源码4817行，取自原第7页）
+----------------------------------------------------
         "min_stock": int(ri.min_stock or 0),
         "annual_usage": int(ri.annual_usage or 0),
         "project_name": project_name,
@@ -328,10 +359,6 @@ _NO_CONSUMABLE_INSTRUMENT_KEYWORDS = ("流水线",)
 
 
 def build_reagent_template(db: Session, library: str) -> dict:
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第7页 / 共60页（总源码3950行，取自原第7页）
-----------------------------------------------------
     """构建盘库/订购录入模板，按「项目 / 仪器家族 / 质控品」分组。
 
     规则：
@@ -355,6 +382,10 @@ def build_reagent_template(db: Session, library: str) -> dict:
         .join(TestItem, TestItem.id == TestItemReagent.test_item_id)
         .join(ReagentItem, ReagentItem.id == TestItemReagent.reagent_item_id)
         .filter(
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第8页 / 共60页（总源码4817行，取自原第8页）
+----------------------------------------------------
             TestItemReagent.role.in_(["试剂", "校准品"]),
             ReagentItem.library == library,
             ReagentItem.is_active == True,
@@ -382,10 +413,6 @@ def build_reagent_template(db: Session, library: str) -> dict:
     orphan_items = [r for r in orphans if r.id not in linked_reagent_ids]
     if orphan_items:
         proj_map["__orphan__"] = {
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第8页 / 共60页（总源码3950行，取自原第8页）
-----------------------------------------------------
             "test_item_id": None, "test_item_name": "未关联项目的试剂 / 校准品",
             "test_item_aliases": "", "items": [_item_dto(r, stock_map) for r in orphan_items],
         }
@@ -409,6 +436,10 @@ def build_reagent_template(db: Session, library: str) -> dict:
     )
     # 过滤掉流水线类仪器
     ir_rows = [
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第9页 / 共60页（总源码4817行，取自原第9页）
+----------------------------------------------------
         (ir, ins, ri) for ir, ins, ri in ir_rows
         if not any(kw in (ins.name or "") for kw in _NO_CONSUMABLE_INSTRUMENT_KEYWORDS)
     ]
@@ -436,10 +467,6 @@ def build_reagent_template(db: Session, library: str) -> dict:
         if not any(it["item_id"] == ri.id for it in fam_map[gkey_s]["items"]):
             fam_map[gkey_s]["items"].append(_item_dto(ri, stock_map))
     # 未关联仪器的耗材（仅在用）
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第9页 / 共60页（总源码3950行，取自原第9页）
-----------------------------------------------------
     cons_orphans = (
         db.query(ReagentItem)
         .filter(ReagentItem.type == "耗材", ReagentItem.library == library,
@@ -463,6 +490,10 @@ def build_reagent_template(db: Session, library: str) -> dict:
         db.query(ReagentItem).filter(
             ReagentItem.type == "质控品", ReagentItem.library == library,
             ReagentItem.is_active == True,
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第10页 / 共60页（总源码4817行，取自原第10页）
+------------------------------------------------------
         ).order_by(ReagentItem.name).all()
     ]
     controls = _sort_items_by_usage(controls)
@@ -490,10 +521,6 @@ def create_inventory_check(
     user: User = Depends(require_roles("admin", "reagent_manager", "lab_technician")),
 ):
     check = InventoryCheck(
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第10页 / 共60页（总源码3950行，取自原第10页）
-------------------------------------------------------
         library=data.library or "",
         check_date=data.check_date,
         check_type=data.check_type,
@@ -517,6 +544,10 @@ def create_inventory_check(
                 ReagentStock.batch_no == it.batch_no,
             ).first()
             if stock:
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第11页 / 共60页（总源码4817行，取自原第11页）
+------------------------------------------------------
                 stock.quantity = it.recorded_quantity
                 stock.last_updated = datetime.utcnow()
             else:
@@ -544,10 +575,6 @@ def _gen_order_no(db: Session) -> str:
     """生成订购单号：日期(YYYYMMDD) + 当日顺序号(2位)，如 2026072701。"""
     today = date.today()
     prefix = today.strftime("%Y%m%d")
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第11页 / 共60页（总源码3950行，取自原第11页）
-------------------------------------------------------
     cnt = db.query(ReagentOrder).filter(ReagentOrder.order_no.like(f"{prefix}%")).count()
     seq = cnt + 1
     candidate = f"{prefix}{seq:02d}"
@@ -571,6 +598,10 @@ def list_orders(
         base = base.filter(ReagentOrder.library == library)
     # 试剂配送：仅看自己建的
     roles = set((user.roles or "").split(",")) | {user.role}
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第12页 / 共60页（总源码4817行，取自原第12页）
+------------------------------------------------------
     if "reagent_delivery" in roles and "admin" not in roles and "reagent_manager" not in roles:
         base = base.filter(ReagentOrder.created_by == user.username)
     total = base.count()
@@ -598,10 +629,6 @@ def get_order(order_id: int, db: Session = Depends(get_db), _=Depends(get_curren
 @router.post("/orders", response_model=ReagentOrderRead)
 def create_order(
     data: ReagentOrderCreate, db: Session = Depends(get_db),
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第12页 / 共60页（总源码3950行，取自原第12页）
-------------------------------------------------------
     user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     order_no = data.order_no or _gen_order_no(db)
@@ -625,6 +652,10 @@ def create_order(
 
 @router.put("/orders/{order_id}", response_model=ReagentOrderRead)
 def update_order(
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第13页 / 共60页（总源码4817行，取自原第13页）
+------------------------------------------------------
     order_id: int, data: ReagentOrderCreate, db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
@@ -654,10 +685,6 @@ def update_order(
     return order
 
 
-检验科生化免疫组试剂与物料管理软件 V1.0   第13页 / 共60页（总源码3950行，取自原第13页）
-------------------------------------------------------
-
-
 @router.post("/orders/{order_id}/confirm", response_model=ReagentOrderRead)
 def confirm_order(
     order_id: int, db: Session = Depends(get_db),
@@ -679,6 +706,10 @@ def confirm_order(
 
 
 @router.get("/orders/{order_id}/export-form")
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第14页 / 共60页（总源码4817行，取自原第14页）
+------------------------------------------------------
 def export_order_form(
     order_id: int, db: Session = Depends(get_db),
     _=Depends(get_current_user),
@@ -706,10 +737,6 @@ def export_order_form(
         cell = ws.cell(row=1, column=c)
         cell.font = head_font
         cell.fill = head_fill
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第14页 / 共60页（总源码3950行，取自原第14页）
-------------------------------------------------------
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = border
     for it in order.items:
@@ -733,6 +760,10 @@ def export_order_form(
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第15页 / 共60页（总源码4817行，取自原第15页）
+------------------------------------------------------
     filename = f"设备科订购表_{order.order_no}.xlsx"
     return StreamingResponse(
         buf,
@@ -760,10 +791,6 @@ def list_receivings(
         recv_ids = [r[0] for r in db.query(ReceivingItem.receiving_id).filter(
             ReceivingItem.item_id.in_(lib_item_ids)).distinct().all()]
         base = base.filter(Receiving.id.in_(recv_ids))
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第15页 / 共60页（总源码3950行，取自原第15页）
-------------------------------------------------------
     if confirmed is not None:
         base = base.filter(Receiving.is_confirmed == confirmed)
     # 试剂配送角色：仅能看自己创建的记录
@@ -787,6 +814,10 @@ def get_receiving(receiving_id: int, db: Session = Depends(get_db), _=Depends(ge
     return r
 
 
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第16页 / 共60页（总源码4817行，取自原第16页）
+------------------------------------------------------
 @router.post("/receivings", response_model=ReceivingRead)
 def create_receiving(
     data: ReceivingCreate, db: Session = Depends(get_db),
@@ -795,7 +826,7 @@ def create_receiving(
     rec = Receiving(
         receipt_no=data.receipt_no, receipt_date=data.receipt_date,
         order_id=data.order_id, delivery_person=data.delivery_person,
-        receiver=data.receiver or user.full_name or user.username,
+        receiver=data.receiver or "",  # 新建/编辑时保存用户实际填入值（可空，由确认时填入确认人）
         remark=data.remark, created_by=user.username, is_confirmed=False,
     )
     db.add(rec)
@@ -814,11 +845,7 @@ def create_receiving(
 @router.post("/receivings/{receiving_id}/confirm", response_model=ReceivingRead)
 def confirm_receiving(
     receiving_id: int, db: Session = Depends(get_db),
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第16页 / 共60页（总源码3950行，取自原第16页）
-------------------------------------------------------
-    user: User = Depends(require_roles("admin", "reagent_manager", "reagent_delivery")),
+    user: User = Depends(require_roles("admin", "reagent_manager")),
 ):
     """确认接收：写入实时库存，并记录确认人/确认时间。重复确认不会重复加库存。"""
     r = db.query(Receiving).get(receiving_id)
@@ -826,8 +853,8 @@ def confirm_receiving(
         raise HTTPException(404, "收货记录未找到")
     if r.is_confirmed:
         raise HTTPException(400, "该收货单已确认接收，无需重复确认")
-    # 接收人默认取当前登录人员（若创建时未指定）
-    r.receiver = r.receiver or (user.full_name or user.username)
+    # 接收人在「确认接收」时强制填入当前登录人（即便保存时已有人工填值）
+    r.receiver = user.full_name or user.username
     for it in r.items:
         stock = db.query(ReagentStock).filter(
             ReagentStock.item_id == it.item_id,
@@ -841,6 +868,10 @@ def confirm_receiving(
                 item_id=it.item_id, batch_no=it.batch_no,
                 expiry_date=it.expiry_date, quantity=it.quantity,
             ))
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第17页 / 共60页（总源码4817行，取自原第17页）
+------------------------------------------------------
     r.is_confirmed = True
     r.confirmed_at = datetime.utcnow()
     r.confirmed_by = user.username
@@ -868,10 +899,6 @@ def delete_receiving(
             if stock:
                 stock.quantity -= it.quantity
                 if stock.quantity <= 0:
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第17页 / 共60页（总源码3950行，取自原第17页）
-------------------------------------------------------
                     db.delete(stock)
                 else:
                     stock.last_updated = datetime.utcnow()
@@ -895,6 +922,10 @@ def update_receiving(
     """
     r = db.query(Receiving).get(receiving_id)
     if not r:
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第18页 / 共60页（总源码4817行，取自原第18页）
+------------------------------------------------------
         raise HTTPException(404, "收货记录未找到")
     owned = set(user_roles_list(user))
     is_restricted = ("reagent_delivery" in owned) and ("admin" not in owned) and ("reagent_manager" not in owned)
@@ -922,10 +953,6 @@ def update_receiving(
 
 
 # =============================================================================
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第18页 / 共60页（总源码3950行，取自原第18页）
-------------------------------------------------------
 # 6. 月消耗
 # =============================================================================
 
@@ -949,6 +976,10 @@ def list_consumption(
         if q.strip():
             kw = f"%{q.strip()}%"
             ri_base = ri_base.filter(or_(ReagentItem.name.like(kw), ReagentItem.brand.like(kw)))
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第19页 / 共60页（总源码4817行，取自原第19页）
+------------------------------------------------------
         item_ids = [r[0] for r in ri_base.all()]
         base = base.filter(ReagentConsumption.item_id.in_(item_ids))
     total = base.count()
@@ -976,10 +1007,6 @@ def calculate_consumption(
         raise HTTPException(400, "year_month 格式应为 YYYY-MM")
     try:
         y, m = int(year_month[:4]), int(year_month[5:7])
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第19页 / 共60页（总源码3950行，取自原第19页）
-------------------------------------------------------
     except ValueError:
         raise HTTPException(400, "year_month 格式应为 YYYY-MM")
     month_start = date(y, m, 1)
@@ -1003,6 +1030,10 @@ def calculate_consumption(
             Receiving.receipt_date >= month_start,
             Receiving.receipt_date < month_end,
         ).scalar() or 0
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第20页 / 共60页（总源码4817行，取自原第20页）
+------------------------------------------------------
         # 期初库存：上月消耗记录的期末库存
         prev = db.query(ReagentConsumption).filter(
             ReagentConsumption.item_id == it.id,
@@ -1030,10 +1061,6 @@ def calculate_consumption(
                 opening_balance=opening, total_received=received_qty,
                 closing_balance=closing_qty, consumption=consumption,
             ))
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第20页 / 共60页（总源码3950行，取自原第20页）
-------------------------------------------------------
             added += 1
     db.commit()
     return {"added": added, "updated": updated, "year_month": year_month}
@@ -1057,6 +1084,10 @@ def import_reagent_from_excel(
         raise HTTPException(400, "服务端未安装 openpyxl，无法处理 Excel")
     wb = openpyxl.load_workbook(file.file)
     ws = wb.active
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第21页 / 共60页（总源码4817行，取自原第21页）
+------------------------------------------------------
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
         raise HTTPException(400, "Excel 为空")
@@ -1084,10 +1115,6 @@ def import_reagent_from_excel(
     for col in ["brand", "品牌", "生产厂家", "厂家"]:
         if col in headers:
             col_map["brand"] = headers.index(col)
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第21页 / 共60页（总源码3950行，取自原第21页）
-------------------------------------------------------
             break
     for col in ["spec", "规格", "规格型号", "包装规格"]:
         if col in headers:
@@ -1111,6 +1138,10 @@ def import_reagent_from_excel(
             break
     for col in ["unit_price", "单价", "价格", "参考单价"]:
         if col in headers:
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第22页 / 共60页（总源码4817行，取自原第22页）
+------------------------------------------------------
             col_map["unit_price"] = headers.index(col)
             break
     for col in ["remark", "备注", "说明"]:
@@ -1138,10 +1169,6 @@ def import_reagent_from_excel(
                 for key in ("material_code", "spec", "brand", "unit", "category", "library",
                             "type", "unit_price", "manufacturer", "supplier", "remark"):
                     if key not in col_map:
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第22页 / 共60页（总源码3950行，取自原第22页）
-------------------------------------------------------
                         continue
                     v = row[col_map[key]]
                     if v is None or str(v).strip() == "":
@@ -1165,6 +1192,10 @@ def import_reagent_from_excel(
                 skipped += 1
                 continue
             item = ReagentItem(name=name)
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第23页 / 共60页（总源码4817行，取自原第23页）
+------------------------------------------------------
             if "type" in col_map:
                 item.type = str(row[col_map["type"]] or "试剂").strip()
             else:
@@ -1192,10 +1223,6 @@ def import_reagent_from_excel(
             if "unit_price" in col_map:
                 v = row[col_map["unit_price"]]
                 if v is not None and str(v).strip() != "":
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第23页 / 共60页（总源码3950行，取自原第23页）
-------------------------------------------------------
                     try:
                         item.unit_price = Decimal(str(v))
                     except Exception:
@@ -1219,6 +1246,10 @@ def import_reagent_from_excel(
 import re as _re
 
 
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第24页 / 共60页（总源码4817行，取自原第24页）
+------------------------------------------------------
 def _norm_match(s: str) -> str:
     """归一化用于模糊匹配：仅去空白/标点与 R1/R2 标记，保留字母数字与中文
     （刻意保留型号代码 DxI800 / ACL / cobas 等，以便耗材能按仪器型号匹配）。"""
@@ -1246,10 +1277,6 @@ def _alnum_tokens(s: str) -> list:
     - 品牌中文前缀（贝克曼/罗氏…）天然被排除；即便型号被全角括号包裹
       （如「反应杯（DxI800）」）也能正确析出 `dxi800`。
     """
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第24页 / 共60页（总源码3950行，取自原第24页）
-------------------------------------------------------
     return [t.lower() for t in _re.findall(r"[A-Za-z0-9]+", str(s or ""))
             if len(t) >= 2 and any(c.isalpha() for c in t)]
 
@@ -1273,6 +1300,10 @@ def _reagent_core(s: str) -> str:
     例：「D-二聚体测定试剂盒（免疫比浊法）」→ d二聚体，可命中项目「血浆D-二聚体」；
     「铁测定试剂盒」→ 铁，可命中项目「铁」。解决项目名带前缀/后缀导致漏匹配的问题。"""
     s = _re.sub(r"\([^)]*\)", "", str(s or ""))
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第25页 / 共60页（总源码4817行，取自原第25页）
+------------------------------------------------------
     s = _re.sub(r"（[^）]*）", "", s)
     changed = True
     while changed:
@@ -1300,10 +1331,6 @@ def _best_test_item_match(rn: str, rc: str, test_norms):
             elif rn in cand or (rc and rc in cand):
                 score = len(rc) if (rc and rc in cand) else len(rn)
             if rc and cand == rc:
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第25页 / 共60页（总源码3950行，取自原第25页）
-------------------------------------------------------
                 score = max(score, 2)
             if score > best_score:
                 best_score, best = score, tid
@@ -1327,6 +1354,10 @@ def auto_match_associations(
         db.query(InstrumentReagent).delete()
 
     tests = db.query(TestItem).all()
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第26页 / 共60页（总源码4817行，取自原第26页）
+------------------------------------------------------
     test_norms = [
         (t.id, _norm_match(t.name), _core_name(t.name),
          [_norm_match(a) for a in str(t.aliases or "").split(",") if a.strip()])
@@ -1354,10 +1385,6 @@ def auto_match_associations(
 
     insts = db.query(Instrument).all()
     # 预计算每个仪器的：全名归一化 / ASCII 型号代码列表 / 中文名归一化
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第26页 / 共60页（总源码3950行，取自原第26页）
-------------------------------------------------------
     inst_idx = []
     for ins in insts:
         full = _norm_match((ins.name or "") + " " + (getattr(ins, "model", None) or ""))
@@ -1381,6 +1408,10 @@ def auto_match_associations(
             # 2) 耗材型号代码出现在仪器全名中（耗材带的型号代码命中仪器）
             for t in r_alnum:
                 if len(t) >= 2 and t in full:
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第27页 / 共60页（总源码4817行，取自原第27页）
+------------------------------------------------------
                     score = max(score, len(t))
             # 3) 仪器中文名称出现在耗材名中（如「糖化血红蛋白分析仪」）
             if len(cn_name) >= 4 and cn_name in rn:
@@ -1408,10 +1439,6 @@ def _enrich_test_item_reagents(rows):
     out = []
     for r in rows:
         ti = r.test_item
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第27页 / 共60页（总源码3950行，取自原第27页）
-------------------------------------------------------
         ri = r.reagent_item
         out.append({
             "id": r.id, "test_item_id": r.test_item_id, "reagent_item_id": r.reagent_item_id,
@@ -1435,6 +1462,10 @@ INSTRUMENT_FAMILY_MAP = {
     "免疫分析仪": "罗氏Cobas6000",  # 默认归 Cobas6000（e601/e602），e411/A6200 在下面按 model 覆盖
     "DXA5000": None,               # 无耗材，不显示
 }
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第28页 / 共60页（总源码4817行，取自原第28页）
+------------------------------------------------------
 
 # 免疫分析仪的 model → 总型号覆盖（name 都是"免疫分析仪"，靠 model 区分）
 _IMMUNO_MODEL_MAP = {
@@ -1462,10 +1493,6 @@ def _extract_instrument_base_model(name: str, model: str = "") -> str:
             return _IMMUNO_MODEL_MAP[raw_model]
         return mapped
 
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第28页 / 共60页（总源码3950行，取自原第28页）
-------------------------------------------------------
     # ② 正则提取总型号（遇空格/中文即停，去尾部实例编号）
     m = re.match(r'^([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)', raw_name)
     if m:
@@ -1489,6 +1516,10 @@ def _enrich_instrument_reagents(rows):
         out.append({
             "id": r.id, "instrument_id": r.instrument_id, "reagent_item_id": r.reagent_item_id,
             "role": r.role, "auto_matched": r.auto_matched, "remark": r.remark,
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第29页 / 共60页（总源码4817行，取自原第29页）
+------------------------------------------------------
             "instrument_name": ins.name if ins else "",
             "instrument_model": ins.model if ins else "",
             "reagent_name": ri.name if ri else "", "reagent_type": ri.type if ri else "",
@@ -1516,10 +1547,6 @@ def association_suggestions(
     linked_inst_ids = {r.reagent_item_id for r in db.query(InstrumentReagent.reagent_item_id).all()}
 
     tests = db.query(TestItem).all()
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第29页 / 共60页（总源码3950行，取自原第29页）
-------------------------------------------------------
     test_norms = [
         (t.id, _norm_match(t.name), _core_name(t.name),
          [_norm_match(a) for a in str(t.aliases or "").split(",") if a.strip()])
@@ -1543,6 +1570,10 @@ def association_suggestions(
         if library and r.library != library:
             continue
         if r.type == "耗材":
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第30页 / 共60页（总源码4817行，取自原第30页）
+------------------------------------------------------
             if r.id in linked_inst_ids:
                 continue
             rn = _norm_match(r.name)
@@ -1570,10 +1601,6 @@ def association_suggestions(
                     ],
                 })
             else:
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第30页 / 共60页（总源码3950行，取自原第30页）
-------------------------------------------------------
                 instrument_orphans.append({
                     "reagent_id": r.id, "reagent_name": r.name, "reagent_type": r.type, "library": r.library,
                 })
@@ -1597,581 +1624,15 @@ def association_suggestions(
                 })
 
     # 按得分降序，便于优先处理高置信度项
-    test_item_suggestions.sort(key=lambda x: -x["score"])
-    return {
-        "test_item_suggestions": test_item_suggestions,
-        "test_item_orphans": test_item_orphans,
-        "instrument_suggestions": instrument_suggestions,
-        "instrument_orphans": instrument_orphans,
-    }
 
 
-@router.get("/associations/test-items", response_model=dict)
-def list_test_item_reagents(
-    test_item_id: Optional[int] = Query(None),
-    reagent_id: Optional[int] = Query(None),
-    auto_only: Optional[bool] = Query(None),
-    q: str = Query("", description="搜索项目名/试剂名"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
-):
-    base = db.query(TestItemReagent)
-    if test_item_id:
-        base = base.filter(TestItemReagent.test_item_id == test_item_id)
-    if reagent_id:
-        base = base.filter(TestItemReagent.reagent_item_id == reagent_id)
-    if auto_only is not None:
-        base = base.filter(TestItemReagent.auto_matched == auto_only)
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第31页 / 共60页（总源码3950行，取自原第50页）
+检验科生化免疫组试剂与物料管理软件 V1.0   第31页 / 共60页（总源码4817行，取自原第68页）
 ------------------------------------------------------
-              <el-button size="small" link type="danger" @click="onDeleteProj(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <el-pagination class="pager" v-model:current-page="projPage" v-model:page-size="projPageSize"
-          :total="projTotal" :page-sizes="[20, 50, 100]" layout="total, sizes, prev, pager, next"
-          @current-change="loadProj" @size-change="projPage=1; loadProj()" />
-      </el-tab-pane>
-
-      <!-- 仪器 ↔ 耗材 -->
-      <el-tab-pane label="仪器 ↔ 耗材" name="instrument">
-        <div class="toolbar">
-          <el-input v-model="instQ" placeholder="搜索仪器名/耗材名" clearable style="width:260px" @keyup.enter="loadInst" @clear="loadInst">
-            <template #prefix><el-icon><Search /></el-icon></template>
-          </el-input>
-          <el-button type="success" :icon="Plus" @click="openInstAdd" v-if="canWrite">新增关联</el-button>
-        </div>
-        <el-table v-loading="instLoading" :data="instItems" border stripe height="calc(100vh - 340px)" empty-text="暂无关联">
-          <el-table-column type="index" width="50" label="#" />
-          <el-table-column label="仪器（总型号）" min-width="220" show-overflow-tooltip>
-            <template #default="{ row }">
-              <strong>{{ row.instrument_name }}</strong>
-              <el-tag v-if="row.source_count > 1" size="small" type="info" style="margin-left:6px">{{ row.source_count }}台</el-tag>
-              <el-tooltip v-if="row.merged_instruments?.length > 1" :content="row.merged_instruments.join('、')" placement="top">
-                <span style="color:var(--el-text-color-secondary);font-size:12px;margin-left:4px;cursor:help">({{ row.merged_instruments.join('、') }})</span>
-              </el-tooltip>
-            </template>
-          </el-table-column>
-          <el-table-column prop="reagent_name" label="耗材" min-width="220" show-overflow-tooltip />
-          <el-table-column prop="reagent_type" label="类型" width="100" />
-          <el-table-column prop="role" label="关联角色" width="110" />
-          <el-table-column label="来源" width="100">
-            <template #default="{ row }">
-              <el-tag :type="row.auto_matched ? 'warning' : 'success'" size="small">{{ row.auto_matched ? '自动' : '人工' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
-            <template #default="{ row }">
-              <el-button size="small" link @click="openInstEdit(row)">编辑</el-button>
-              <el-button size="small" link type="danger" @click="onDeleteInst(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <el-pagination class="pager" v-model:current-page="instPage" v-model:page-size="instPageSize"
-          :total="instTotal" :page-sizes="[20, 50, 100]" layout="total, sizes, prev, pager, next"
-          @current-change="loadInst" @size-change="instPage=1; loadInst()" />
-      </el-tab-pane>
-
-      <!-- 待关联建议 -->
-      <el-tab-pane label="待关联建议" name="suggest">
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第32页 / 共60页（总源码3950行，取自原第51页）
-------------------------------------------------------
-        <div class="toolbar">
-          <el-select v-model="sugLib" placeholder="全部责任库" clearable style="width:140px" @change="loadSuggestions">
-            <el-option label="生化凝血" value="生化凝血" />
-            <el-option label="免疫" value="免疫" />
-          </el-select>
-          <el-button :icon="Refresh" @click="loadSuggestions" :loading="sugLoading">刷新建议</el-button>
-          <el-button type="success" :icon="Check" :loading="adoptingAll" @click="adoptAll" v-if="canWrite">批量采纳全部建议</el-button>
-          <el-tag type="success">可匹配：项目 {{ testSug.length }} / 仪器 {{ instSug.length }}</el-tag>
-          <el-tag type="warning">需人工：项目 {{ testOrph.length }} / 仪器 {{ instOrph.length }}</el-tag>
-        </div>
-        <el-alert type="info" :closable="false" show-icon style="margin-bottom:10px"
-          title="系统按名称匹配出「本可关联却未关联」的试剂。绿色为已给出候选建议（可直接采纳或改选），黄色为无自动候选需人工判断。" />
-
-        <h4 class="grp-title">项目 ↔ 试剂（系统建议匹配）</h4>
-        <el-table v-loading="sugLoading" :data="testSug" border stripe size="small" empty-text="无">
-          <el-table-column prop="reagent_name" label="试剂 / 校准品 / 质控品" min-width="240" show-overflow-tooltip />
-          <el-table-column prop="reagent_type" label="类型" width="100" />
-          <el-table-column prop="library" label="责任库" width="90" />
-          <el-table-column label="建议关联项目" min-width="240">
-            <template #default="{ row }">
-              <el-select v-model="row._sel" filterable placeholder="选择项目" style="width:100%">
-                <el-option v-for="o in testItemOptions" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-              <span class="muted" style="font-size:11px">匹配度 {{ row.score }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
-            <template #default="{ row }">
-              <el-button size="small" type="primary" :loading="row._loading" @click="adoptTest(row)">采纳</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <h4 class="grp-title">项目 ↔ 试剂（无自动候选，需人工）</h4>
-        <el-table :data="testOrph" border stripe size="small" empty-text="无">
-          <el-table-column prop="reagent_name" label="试剂 / 校准品 / 质控品" min-width="240" show-overflow-tooltip />
-          <el-table-column prop="reagent_type" label="类型" width="100" />
-          <el-table-column prop="library" label="责任库" width="90" />
-          <el-table-column label="选择项目" min-width="240">
-            <template #default="{ row }">
-              <el-select v-model="row._sel" filterable placeholder="选择项目" style="width:100%">
-                <el-option v-for="o in testItemOptions" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
-            <template #default="{ row }">
-              <el-button size="small" type="primary" :loading="row._loading" @click="adoptTest(row)">关联</el-button>
-            </template>
-          </el-table-column>
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第33页 / 共60页（总源码3950行，取自原第52页）
-------------------------------------------------------
-        </el-table>
-
-        <h4 class="grp-title">仪器 ↔ 耗材（系统建议匹配）</h4>
-        <el-table v-loading="sugLoading" :data="instSug" border stripe size="small" empty-text="无">
-          <el-table-column prop="reagent_name" label="耗材" min-width="240" show-overflow-tooltip />
-          <el-table-column prop="reagent_type" label="类型" width="100" />
-          <el-table-column prop="library" label="责任库" width="90" />
-          <el-table-column label="建议关联仪器" min-width="260">
-            <template #default="{ row }">
-              <el-select v-model="row._sel" filterable placeholder="选择仪器" style="width:100%">
-                <el-option v-for="o in instrumentOptions" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-              <span class="muted" style="font-size:11px">
-                候选：{{ row.candidates.slice(0,3).map(c => c.instrument_name + (c.instrument_model ? '('+c.instrument_model+')' : '')).join('、') }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
-            <template #default="{ row }">
-              <el-button size="small" type="primary" :loading="row._loading" @click="adoptInst(row)">采纳</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <h4 class="grp-title">仪器 ↔ 耗材（无自动候选，需人工）</h4>
-        <el-table :data="instOrph" border stripe size="small" empty-text="无">
-          <el-table-column prop="reagent_name" label="耗材" min-width="240" show-overflow-tooltip />
-          <el-table-column prop="reagent_type" label="类型" width="100" />
-          <el-table-column prop="library" label="责任库" width="90" />
-          <el-table-column label="选择仪器" min-width="260">
-            <template #default="{ row }">
-              <el-select v-model="row._sel" filterable placeholder="选择仪器" style="width:100%">
-                <el-option v-for="o in instrumentOptions" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right" v-if="canWrite">
-            <template #default="{ row }">
-              <el-button size="small" type="primary" :loading="row._loading" @click="adoptInst(row)">关联</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-    </el-tabs>
-
-    <!-- 新增/编辑 项目-试剂 关联 -->
-    <el-dialog v-model="projAddVisible" :title="projEditingId ? '编辑 项目-试剂 关联' : '新增 项目-试剂 关联'" width="560px">
-      <el-form label-width="90px" size="small">
-        <el-form-item label="检验项目" required>
-          <el-select v-model="projForm.test_item_id" filterable placeholder="选择项目" style="width:100%">
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第34页 / 共60页（总源码3950行，取自原第53页）
-------------------------------------------------------
-            <el-option v-for="o in testItemOptions" :key="o.value" :label="o.label" :value="o.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="试剂" required>
-          <el-select v-model="projForm.reagent_item_id" filterable placeholder="选择试剂（试剂/校准品/质控品）" style="width:100%">
-            <el-option v-for="o in reagentOptionsNonCons" :key="o.value" :label="o.label" :value="o.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="关联角色">
-          <el-select v-model="projForm.role" style="width:100%">
-            <el-option label="试剂" value="试剂" />
-            <el-option label="校准品" value="校准品" />
-            <el-option label="质控品" value="质控品" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="projAddVisible=false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="onProjSubmit">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 新增/编辑 仪器-耗材 关联 -->
-    <el-dialog v-model="instAddVisible" :title="instEditingId ? '编辑 仪器-耗材 关联' : '新增 仪器-耗材 关联'" width="560px">
-      <el-form label-width="90px" size="small">
-        <el-form-item label="仪器" required>
-          <el-select v-model="instForm.instrument_id" filterable placeholder="选择仪器" style="width:100%">
-            <el-option v-for="o in instrumentOptions" :key="o.value" :label="o.label" :value="o.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="耗材" required>
-          <el-select v-model="instForm.reagent_item_id" filterable placeholder="选择耗材" style="width:100%">
-            <el-option v-for="o in reagentOptionsCons" :key="o.value" :label="o.label" :value="o.value" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="instAddVisible=false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="onInstSubmit">保存</el-button>
-      </template>
-    </el-dialog>
-  </div>
-</template>
-
-<script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import {
-  listTestItemReagents, createTestItemReagent, updateTestItemReagent, deleteTestItemReagent,
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第35页 / 共60页（总源码3950行，取自原第54页）
-------------------------------------------------------
-  listInstrumentReagents, createInstrumentReagent, updateInstrumentReagent, deleteInstrumentReagent,
-  autoMatchAssociations, getAssociationSuggestions,
-} from '../../api/reagent'
-import { listTestItems } from '../../api/testItems'
-import { listReagentItems } from '../../api/reagent'
-import { listInstruments } from '../../api/instruments'
-import { useAuthStore } from '../../store/auth'
-
-const auth = useAuthStore()
-const canWrite = computed(() => auth.canWrite('reagents'))
-
-const activeTab = ref('project')
-
-// 下拉数据
-const testItemOptions = ref([])
-const instrumentOptions = ref([])
-const reagentOptionsAll = ref([])
-const reagentOptionsNonCons = computed(() => reagentOptionsAll.value.filter(o => o.type !== '耗材'))
-const reagentOptionsCons = computed(() => reagentOptionsAll.value.filter(o => o.type === '耗材'))
-
-// 项目-试剂
-const projItems = ref([]), projTotal = ref(0), projPage = ref(1), projPageSize = ref(50)
-const projLoading = ref(false), projQ = ref(''), projLibFilter = ref(''), projAutoFilter = ref(null)
-const projFiltered = computed(() => {
-  let arr = projItems.value
-  if (projLibFilter.value) arr = arr.filter(r => r.reagent_library === projLibFilter.value)
-  return arr
-})
-
-// 仪器-耗材
-const instItems = ref([]), instTotal = ref(0), instPage = ref(1), instPageSize = ref(50)
-const instLoading = ref(false), instQ = ref('')
-
-// 待关联建议
-const sugLib = ref('')
-const sugLoading = ref(false), adoptingAll = ref(false)
-const testSug = ref([]), testOrph = ref([]), instSug = ref([]), instOrph = ref([])
-
-const matching = ref(false)
-const submitting = ref(false)
-const projAddVisible = ref(false), instAddVisible = ref(false)
-const projEditingId = ref(null), instEditingId = ref(null)
-const projForm = reactive({ test_item_id: null, reagent_item_id: null, role: '试剂' })
-const instForm = reactive({ instrument_id: null, reagent_item_id: null, role: '耗材' })
-
-async function loadOptions() {
-  try {
-    const [ti, ins] = await Promise.all([
-      listTestItems({ page: 1, page_size: 300 }),
-      listInstruments({ page: 1, page_size: 100 }),
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第36页 / 共60页（总源码3950行，取自原第55页）
-------------------------------------------------------
-    ])
-    testItemOptions.value = (ti.items || []).map(t => ({ value: t.id, label: t.name }))
-    instrumentOptions.value = (ins.items || []).map(i => ({
-      value: i.id,
-      label: i.model ? `${i.name}（${i.model}）` : i.name,
-    }))
-    // 试剂可能超过单页上限(200)，分页拉全
-    const all = []
-    let page = 1
-    while (page <= 20) {
-      const r = await listReagentItems({ page, page_size: 200 })
-      all.push(...(r.items || []))
-      if (!r.items || r.items.length < 200) break
-      page++
-    }
-    reagentOptionsAll.value = all.map(r => ({ value: r.id, label: `${r.name}（${r.type}）`, type: r.type }))
-  } catch (e) {
-    ElMessage.error('加载下拉数据失败：' + errText(e))
-  }
-}
-
-function errText(e) {
-  const d = e?.response?.data?.detail
-  if (d == null) return e?.message || '未知错误'
-  if (typeof d === 'string') return d
-  try { return JSON.stringify(d) } catch { return String(d) }
-}
-
-async function loadProj() {
-  projLoading.value = true
-  try {
-    const params = { page: projPage.value, page_size: projPageSize.value }
-    if (projQ.value.trim()) params.q = projQ.value.trim()
-    if (projAutoFilter.value !== null) params.auto_only = projAutoFilter.value
-    const r = await listTestItemReagents(params)
-    projItems.value = r.items; projTotal.value = r.total
-  } catch (e) {
-    ElMessage.error('加载失败：' + errText(e))
-  } finally { projLoading.value = false }
-}
-
-async function loadInst() {
-  instLoading.value = true
-  try {
-    const params = { page: instPage.value, page_size: instPageSize.value }
-    if (instQ.value.trim()) params.q = instQ.value.trim()
-    const r = await listInstrumentReagents(params)
-    instItems.value = r.items; instTotal.value = r.total
-  } catch (e) {
-    ElMessage.error('加载失败：' + errText(e))
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第37页 / 共60页（总源码3950行，取自原第56页）
-------------------------------------------------------
-  } finally { instLoading.value = false }
-}
-
-function refreshCurrent() {
-  if (activeTab.value === 'project') loadProj(); else loadInst()
-}
-
-async function onAutoMatch() {
-  try {
-    await ElMessageBox.confirm('将按名称自动匹配生成关联（已存在的关联不会重复生成）。是否继续？', '自动匹配', { type: 'info' })
-  } catch { return }
-  matching.value = true
-  try {
-    const r = await autoMatchAssociations(false)
-    const msg = `新增 项目-试剂 ${r.test_item_reagents_added} 条、仪器-耗材 ${r.instrument_reagents_added} 条；`
-      + `未能自动匹配：项目侧 ${r.test_item_unmatched.length} 个、仪器侧 ${r.instrument_unmatched.length} 个（可人工补录）。`
-    ElMessage.success(msg)
-    loadProj(); loadInst()
-  } catch (e) {
-    ElMessage.error('自动匹配失败：' + errText(e))
-  } finally { matching.value = false }
-}
-
-function openProjAdd() {
-  projEditingId.value = null
-  Object.assign(projForm, { test_item_id: null, reagent_item_id: null, role: '试剂' })
-  projAddVisible.value = true
-}
-function openProjEdit(row) {
-  projEditingId.value = row.id
-  Object.assign(projForm, { test_item_id: row.test_item_id, reagent_item_id: row.reagent_item_id, role: row.role })
-  projAddVisible.value = true
-}
-function openInstAdd() {
-  instEditingId.value = null
-  Object.assign(instForm, { instrument_id: null, reagent_item_id: null, role: '耗材' })
-  instAddVisible.value = true
-}
-function openInstEdit(row) {
-  instEditingId.value = row.id
-  Object.assign(instForm, { instrument_id: row.instrument_id, reagent_item_id: row.reagent_item_id, role: row.role })
-  instAddVisible.value = true
-}
-async function onProjSubmit() {
-  if (!projForm.test_item_id || !projForm.reagent_item_id) { ElMessage.warning('请选择项目与试剂'); return }
-  submitting.value = true
-  try {
-    if (projEditingId.value) {
-      await updateTestItemReagent(projEditingId.value, { ...projForm })
-    } else {
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第38页 / 共60页（总源码3950行，取自原第57页）
-------------------------------------------------------
-      await createTestItemReagent({ ...projForm, auto_matched: false })
-    }
-    ElMessage.success('已保存'); projAddVisible.value = false; loadProj()
-  } catch (e) {
-    ElMessage.error('保存失败：' + errText(e))
-  } finally { submitting.value = false }
-}
-async function onInstSubmit() {
-  if (!instForm.instrument_id || !instForm.reagent_item_id) { ElMessage.warning('请选择仪器与耗材'); return }
-  submitting.value = true
-  try {
-    if (instEditingId.value) {
-      await updateInstrumentReagent(instEditingId.value, { ...instForm })
-    } else {
-      await createInstrumentReagent({ ...instForm, auto_matched: false })
-    }
-    ElMessage.success('已保存'); instAddVisible.value = false; loadInst()
-  } catch (e) {
-    ElMessage.error('保存失败：' + errText(e))
-  } finally { submitting.value = false }
-}
-async function onDeleteProj(row) {
-  await ElMessageBox.confirm(`确认删除「${row.test_item_name} ↔ ${row.reagent_name}」？`, '提示', { type: 'warning' })
-  await deleteTestItemReagent(row.id); ElMessage.success('已删除'); loadProj()
-}
-async function onDeleteInst(row) {
-  const ins = row.instrument_model ? `${row.instrument_name}（${row.instrument_model}）` : row.instrument_name
-  await ElMessageBox.confirm(`确认删除「${ins} ↔ ${row.reagent_name}」？`, '提示', { type: 'warning' })
-  await deleteInstrumentReagent(row.id); ElMessage.success('已删除'); loadInst()
-}
-
-function onTabChange(name) {
-  if (name === 'suggest') loadSuggestions()
-}
-
-async function loadSuggestions() {
-  if (!testItemOptions.value.length) await loadOptions()
-  sugLoading.value = true
-  try {
-    const params = {}
-    if (sugLib.value) params.library = sugLib.value
-    const r = await getAssociationSuggestions(params)
-    testSug.value = (r.test_item_suggestions || []).map(x => ({ ...x, _sel: x.candidate_test_item_id, _loading: false }))
-    testOrph.value = (r.test_item_orphans || []).map(x => ({ ...x, _sel: null, _loading: false }))
-    instSug.value = (r.instrument_suggestions || []).map(x => ({ ...x, _sel: x.candidates?.[0]?.instrument_id || null, _loading: false }))
-    instOrph.value = (r.instrument_orphans || []).map(x => ({ ...x, _sel: null, _loading: false }))
-  } catch (e) {
-    ElMessage.error('加载建议失败：' + errText(e))
-  } finally { sugLoading.value = false }
-}
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第39页 / 共60页（总源码3950行，取自原第58页）
-------------------------------------------------------
-
-async function adoptTest(row) {
-  if (!row._sel) { ElMessage.warning('请选择要关联的项目'); return }
-  row._loading = true
-  try {
-    await createTestItemReagent({
-      test_item_id: row._sel, reagent_item_id: row.reagent_id,
-      role: (row.reagent_type === '校准品' || row.reagent_type === '质控品') ? row.reagent_type : '试剂',
-      auto_matched: false,
-    })
-    ElMessage.success('已关联')
-    testSug.value = testSug.value.filter(r => r.reagent_id !== row.reagent_id)
-    testOrph.value = testOrph.value.filter(r => r.reagent_id !== row.reagent_id)
-    loadProj()
-  } catch (e) {
-    ElMessage.error('关联失败：' + errText(e))
-  } finally { row._loading = false }
-}
-
-async function adoptInst(row) {
-  if (!row._sel) { ElMessage.warning('请选择要关联的仪器'); return }
-  row._loading = true
-  try {
-    await createInstrumentReagent({ instrument_id: row._sel, reagent_item_id: row.reagent_id, role: '耗材', auto_matched: false })
-    ElMessage.success('已关联')
-    instSug.value = instSug.value.filter(r => r.reagent_id !== row.reagent_id)
-    instOrph.value = instOrph.value.filter(r => r.reagent_id !== row.reagent_id)
-    loadInst()
-  } catch (e) {
-    ElMessage.error('关联失败：' + errText(e))
-  } finally { row._loading = false }
-}
-
-async function adoptAll() {
-  const rows = [...testSug.value, ...instSug.value]
-  if (!rows.length) { ElMessage.info('没有可采纳的建议'); return }
-  adoptingAll.value = true
-  let ok = 0, fail = 0
-  try {
-    for (const row of rows) {
-      try {
-        if (row.candidates) await createInstrumentReagent({ instrument_id: row._sel, reagent_item_id: row.reagent_id, role: '耗材', auto_matched: false })
-        else await createTestItemReagent({ test_item_id: row._sel, reagent_item_id: row.reagent_id, role: (row.reagent_type === '校准品' || row.reagent_type === '质控品') ? row.reagent_type : '试剂', auto_matched: false })
-        ok++
-      } catch { fail++ }
-    }
-    ElMessage.success(`批量采纳完成：成功 ${ok} 条${fail ? `，失败 ${fail} 条` : ''}`)
-    await loadSuggestions(); loadProj(); loadInst()
-  } finally { adoptingAll.value = false }
-}
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第40页 / 共60页（总源码3950行，取自原第59页）
-------------------------------------------------------
-
-onMounted(() => { loadOptions(); loadProj(); loadInst() })
-</script>
-
-<style scoped>
-.page { padding: 16px 20px 0; display: flex; flex-direction: column; height: 100%; }
-.page-header { margin-bottom: 8px; }
-.title { margin: 0; font-size: 20px; }
-.sub { margin: 4px 0 0; color: #64748b; font-size: 13px; }
-.toolbar { display: flex; gap: 10px; align-items: center; margin: 8px 0 12px; flex-wrap: wrap; }
-.tabs { flex: 1; display: flex; flex-direction: column; }
-.pager { margin: 10px 0 16px; display: flex; justify-content: flex-end; }
-</style>
-
-======================================================================
-# 文件: views/reagent/InventoryCheck.vue  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\views\reagent\InventoryCheck.vue)
-======================================================================
-
-<template>
-  <div class="page">
-    <div class="page-header">
-      <h2 class="title">盘库管理</h2>
-      <p class="sub">按项目显示试剂与校准品、按仪器显示耗材（同型号多台共用一次录入）、质控品单独列示。录入余量后自动更新实时库存。</p>
-    </div>
-    <LibraryTabs @change="refresh" />
-
-    <div class="toolbar">
-      <el-button type="primary" :icon="Plus" @click="onNewCheck" v-if="canWrite">新建盘库</el-button>
-      <el-button :icon="Refresh" @click="refresh">刷新</el-button>
-    </div>
-    <el-table v-loading="loading" :data="checks" border stripe height="calc(100vh - 360px)">
-      <el-table-column type="index" width="50" />
-      <el-table-column prop="library" label="责任库" width="100">
-        <template #default="{ row }">
-          <el-tag v-if="row.library" size="small" :type="row.library === '免疫' ? 'warning' : 'success'">{{ row.library }}</el-tag>
-          <span v-else class="muted">—</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="check_date" label="盘库日期" width="120" />
-      <el-table-column prop="check_type" label="类型" width="100" />
-      <el-table-column prop="operator" label="操作人" width="120" />
-      <el-table-column prop="remark" label="备注" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="created_at" label="创建时间" width="170">
-        <template #default="{ row }">{{ row.created_at ? new Date(row.created_at).toLocaleString('zh-CN') : '-' }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" link type="primary" @click="onView(row)">详情</el-button>
-          <el-button size="small" link type="primary" @click="onPrintCheck(row)">打印</el-button>
           <el-button size="small" link type="danger" @click="onDeleteCheck(row)" v-if="canWrite">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
     <el-pagination class="pager" v-model:current-page="page" v-model:page-size="pageSize"
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第41页 / 共60页（总源码3950行，取自原第60页）
-------------------------------------------------------
       :total="total" :page-sizes="[20,50]" layout="total, sizes, prev, pager, next"
       @current-change="refresh" @size-change="page=1; refresh()" />
 
@@ -2188,11 +1649,17 @@ onMounted(() => { loadOptions(); loadProj(); loadInst() })
       </el-form>
       <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <el-select v-model="categoryFilter" placeholder="全部分类" clearable style="width:130px" size="default">
+          <el-option label="按品牌" value="brand" />
           <el-option label="试剂 / 校准品" value="reagent" />
           <el-option label="耗材" value="consumable" />
           <el-option label="质控品" value="control" />
         </el-select>
-        <el-input v-model="dialogSearch" placeholder="模糊检索试剂/规格/编码/项目名(含英文别名如ALT)..." clearable style="width:340px" />
+        <el-select v-if="categoryFilter === 'brand'" v-model="brandTypeFilter" placeholder="类型" clearable style="width:110px" size="default">
+          <el-option label="试剂" value="reagent" />
+          <el-option label="耗材" value="consumable" />
+          <el-option label="质控品" value="control" />
+        </el-select>
+        <el-input v-model="dialogSearch" placeholder="模糊检索试剂/规格/编码/品牌/项目名(含英文别名如ALT)..." clearable style="width:340px" />
         <el-button @click="onPrintBlank" :icon="Printer" size="small">打印空白录入页</el-button>
         <span class="muted" style="font-size:12px">共 {{ totalEntries }} 项</span>
       </div>
@@ -2202,8 +1669,8 @@ onMounted(() => { loadOptions(); loadProj(); loadInst() })
         <template v-for="grp in filteredProjects" :key="'p'+grp.test_item_id">
           <h4 class="grp-title">项目：{{ grp.test_item_name }}</h4>
           <el-table :data="grp.items" border size="small">
-            <el-table-column label="试剂 / 校准品" min-width="180">
-              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
+            <el-table-column label="试剂 / 校准品" min-width="190">
+              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
             </el-table-column>
             <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
@@ -2211,21 +1678,21 @@ onMounted(() => { loadOptions(); loadProj(); loadInst() })
               </template>
             </el-table-column>
           </el-table>
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第32页 / 共60页（总源码4817行，取自原第69页）
+------------------------------------------------------
         </template>
         <!-- 按仪器 -->
         <template v-for="grp in filteredInstruments" :key="'i'+grp.group">
           <h4 class="grp-title">仪器：{{ grp.group }} <span class="muted" v-if="grp.instruments.length">（{{ grp.instruments.join('、') }}）</span></h4>
           <el-table :data="grp.items" border size="small">
-            <el-table-column label="耗材" min-width="180">
-              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
+            <el-table-column label="耗材" min-width="190">
+              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
             </el-table-column>
             <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
                 <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:110px" controls-position="right" />
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第42页 / 共60页（总源码3950行，取自原第61页）
-------------------------------------------------------
               </template>
             </el-table-column>
           </el-table>
@@ -2234,8 +1701,8 @@ onMounted(() => { loadOptions(); loadProj(); loadInst() })
         <template v-if="filteredControls.length">
           <h4 class="grp-title">质控品（单独）</h4>
           <el-table :data="filteredControls" border size="small">
-            <el-table-column label="质控品" min-width="180">
-              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }}</span></template>
+            <el-table-column label="质控品" min-width="190">
+              <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
             </el-table-column>
             <el-table-column label="盘点余量" width="120" fixed="right">
               <template #default="{ row }">
@@ -2244,11 +1711,31 @@ onMounted(() => { loadOptions(); loadProj(); loadInst() })
             </el-table-column>
           </el-table>
         </template>
+        <!-- 按品牌 -->
+        <template v-if="filteredByBrand.length">
+          <template v-for="grp in filteredByBrand" :key="'b'+grp.brand">
+            <h4 class="grp-title">品牌：{{ grp.brand }}</h4>
+            <el-table :data="grp.items" border size="small">
+              <el-table-column label="名称 / 规格 / 品牌" min-width="200">
+                <template #default="{ row }">{{ row.name }} <span class="muted">{{ row.spec }} · {{ row.brand }}</span></template>
+              </el-table-column>
+              <el-table-column label="盘点余量" width="120" fixed="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="quantities[row.item_id]" :min="0" size="small" style="width:110px" controls-position="right" />
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
+        </template>
         <el-empty v-if="totalEntries === 0" description="该分类/检索条件下无数据" />
       </div>
 
       <template #footer>
         <el-button @click="onPrintBlank" :icon="Printer">打印空白页</el-button>
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第33页 / 共60页（总源码4817行，取自原第70页）
+------------------------------------------------------
         <el-button @click="dialogVisible=false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="onSubmit">提交盘库</el-button>
       </template>
@@ -2273,13 +1760,9 @@ onMounted(() => { loadOptions(); loadProj(); loadInst() })
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Printer } from '@element-plus/icons-vue'
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第43页 / 共60页（总源码3950行，取自原第62页）
-------------------------------------------------------
 import { listInventoryChecks, getInventoryCheck, createInventoryCheck, deleteInventoryCheck, getReagentTemplate, listAllReagentItems } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
 import { useReagentStore } from '../../store/reagent'
@@ -2293,12 +1776,20 @@ const canWrite = computed(() => auth.canWrite('reagents'))
 const checks = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
 const dialogVisible = ref(false), submitting = ref(false)
 const dialogSearch = ref('')
-const categoryFilter = ref('')  // '' | 'reagent' | 'consumable' | 'control'
+const categoryFilter = ref('')  // '' | 'reagent' | 'consumable' | 'control' | 'brand'
+const brandTypeFilter = ref('')  // '' | 'reagent' | 'consumable' | 'control'（仅 brand 模式生效）
+
+// 切走「按品牌」分类时清除类型子筛选，避免残留影响其他分类
+watch(categoryFilter, (v) => { if (v !== 'brand') brandTypeFilter.value = '' })
 const checkForm = ref({ check_date: '', check_type: '月末盘库', remark: '' })
 const tpl = ref(null)
 const quantities = reactive({})
 const nameMap = ref({})
 
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第34页 / 共60页（总源码4817行，取自原第71页）
+------------------------------------------------------
 const viewVisible = ref(false), viewItems = ref([]), viewLibrary = ref('')
 
 async function refresh() {
@@ -2319,6 +1810,7 @@ function allItems() {
 }
 const totalEntries = computed(() => {
   if (!tpl.value) return 0
+  if (categoryFilter.value === 'brand') return allItems().filter(it => matchItem(it) && matchType(it)).length
   let n = 0
   if (categoryFilter.value === '' || categoryFilter.value === 'reagent')
     for (const g of tpl.value.by_project) n += g.items.filter(matchItem).length
@@ -2329,11 +1821,7 @@ const totalEntries = computed(() => {
   return n
 })
 
-/** 模糊匹配：试剂名/规格/编码 + 项目中文名/英文别名 */
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第44页 / 共60页（总源码3950行，取自原第63页）
-------------------------------------------------------
+/** 模糊匹配：试剂名/规格/编码/品牌 + 项目中文名/英文别名 */
 function matchItem(it) {
   const kw = dialogSearch.value.trim().toLowerCase()
   if (!kw) return true
@@ -2341,6 +1829,8 @@ function matchItem(it) {
   if ((it.name || '').toLowerCase().includes(kw)) return true
   if ((it.spec || '').toLowerCase().includes(kw)) return true
   if ((it.material_code || '').toLowerCase().includes(kw)) return true
+  // 品牌（按品牌检索）
+  if ((it.brand || '').toLowerCase().includes(kw)) return true
   // 项目名称 + 英文别名（逗号分隔，支持 ALT / ATIII 等）
   if (it.project_name && it.project_name.toLowerCase().includes(kw)) return true
   if (it.project_aliases) {
@@ -2350,10 +1840,42 @@ function matchItem(it) {
   return false
 }
 
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第35页 / 共60页（总源码4817行，取自原第72页）
+------------------------------------------------------
+/** 按品牌视图下的类型子筛选：试剂(含校准品)/耗材/质控品 */
+function matchType(it) {
+  const t = brandTypeFilter.value
+  if (!t) return true
+  if (t === 'reagent') return it.type === '试剂' || it.type === '校准品'
+  if (t === 'consumable') return it.type === '耗材'
+  if (t === 'control') return it.type === '质控品'
+  return true
+}
+
+// 甲状腺功能项目统一归到「甲状腺」分组下展示
+const THYROID_NAMES = ["甲状腺素", "三碘甲状腺原氨酸", "游离甲状腺素", "游离三碘甲状腺原氨酸", "促甲状腺激素", "抗甲状腺过氧化物酶抗体", "甲状腺球蛋白", "促甲状腺激素受体抗体", "抗甲状腺球蛋白抗体"]
+function isThyroid(name) {
+  if (!name) return false
+  if (THYROID_NAMES.includes(name)) return true
+  return name.includes('甲状腺')
+}
+function groupProjects(projects) {
+  const thyroid = []
+  const others = []
+  for (const g of projects) {
+    if (isThyroid(g.test_item_name)) thyroid.push(...g.items)
+    else others.push(g)
+  }
+  if (thyroid.length) others.unshift({ test_item_id: null, test_item_name: '甲状腺', test_item_aliases: '', items: thyroid })
+  return others
+}
 const filteredProjects = computed(() => {
   if (!tpl.value) return []
   if (categoryFilter.value && categoryFilter.value !== 'reagent') return []
-  return tpl.value.by_project.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length)
+  const filtered = tpl.value.by_project.map(g => ({ ...g, items: g.items.filter(matchItem) })).filter(g => g.items.length)
+  return groupProjects(filtered)
 })
 const filteredInstruments = computed(() => {
   if (!tpl.value) return []
@@ -2365,10 +1887,35 @@ const filteredControls = computed(() => {
   if (categoryFilter.value && categoryFilter.value !== 'control') return []
   return tpl.value.controls.filter(matchItem)
 })
+const filteredByBrand = computed(() => {
+  if (!tpl.value || categoryFilter.value !== 'brand') return []
+  const seen = new Set()  // 按 item_id 去重：同品牌多仪器共用的耗材（如反应杯）只显示一次
+  const map = {}
+  for (const it of allItems()) {
+    if (seen.has(it.item_id)) continue
+    if (!matchItem(it) || !matchType(it)) continue
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第36页 / 共60页（总源码4817行，取自原第73页）
+------------------------------------------------------
+    seen.add(it.item_id)
+    const b = it.brand || '未标注品牌'
+    if (!map[b]) map[b] = []
+    map[b].push(it)
+  }
+  return Object.keys(map)
+    .sort((a, b) => {
+      if (a === '未标注品牌') return 1
+      if (b === '未标注品牌') return -1
+      return a.localeCompare(b, 'zh-CN')
+    })
+    .map(brand => ({ brand, items: map[brand] }))
+})
 
 async function onNewCheck() {
   dialogSearch.value = ''
   categoryFilter.value = ''
+  brandTypeFilter.value = ''
   checkForm.value = { check_date: new Date().toISOString().slice(0,10), check_type: '月末盘库', remark: '' }
   dialogVisible.value = true
   submitting.value = true
@@ -2383,13 +1930,10 @@ async function onNewCheck() {
 
 function buildSections(useRecorded) {
   const secs = []
-  for (const g of tpl.value.by_project) {
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第45页 / 共60页（总源码3950行，取自原第64页）
-------------------------------------------------------
+  for (const g of groupProjects(tpl.value.by_project)) {
     secs.push({ heading: '项目：' + g.test_item_name, items: g.items.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
+      brand: it.brand,
       current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
@@ -2398,13 +1942,19 @@ function buildSections(useRecorded) {
     const extra = g.instruments.length ? `（${g.instruments.join('、')}）` : ''
     secs.push({ heading: '仪器：' + g.group + extra, items: g.items.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
+      brand: it.brand,
       current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
   }
   if (tpl.value.controls.length) {
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第37页 / 共60页（总源码4817行，取自原第74页）
+------------------------------------------------------
     secs.push({ heading: '质控品（单独）', items: tpl.value.controls.map(it => ({
       name: it.name, spec: it.spec, unit: it.unit, material_code: it.material_code,
+      brand: it.brand,
       current: it.current_stock,
       qty: useRecorded ? (quantities[it.item_id] || 0) : '',
     })) })
@@ -2416,9 +1966,9 @@ function sectionHtml(secs) {
   let h = ''
   for (const s of secs) {
     h += `<h3>${s.heading}</h3>`
-    h += '<table><thead><tr><th>名称</th><th>规格</th><th>材料编码</th><th>单位</th><th class="num">当前库存</th><th class="num">盘点余量</th></tr></thead><tbody>'
+    h += '<table><thead><tr><th>名称</th><th>规格</th><th>品牌</th><th>材料编码</th><th>单位</th><th class="num">当前库存</th><th class="num">盘点余量</th></tr></thead><tbody>'
     for (const it of s.items) {
-      h += `<tr><td>${it.name || ''}</td><td>${it.spec || ''}</td><td>${it.material_code || ''}</td><td>${it.unit || ''}</td><td class="num">${it.current}</td><td class="num">${it.qty}</td></tr>`
+      h += `<tr><td>${it.name || ''}</td><td>${it.spec || ''}</td><td>${it.brand || ''}</td><td>${it.material_code || ''}</td><td>${it.unit || ''}</td><td class="num">${it.current}</td><td class="num">${it.qty}</td></tr>`
     }
     h += '</tbody></table>'
   }
@@ -2438,10 +1988,6 @@ async function onSubmit() {
   try {
     const items = allItems().map(it => ({
       item_id: it.item_id, batch_no: '', expiry_date: null,
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第46页 / 共60页（总源码3950行，取自原第65页）
-------------------------------------------------------
       recorded_quantity: Number(quantities[it.item_id] || 0),
     }))
     await createInventoryCheck({ library: reagentStore.library, ...checkForm.value, items })
@@ -2456,6 +2002,10 @@ async function onView(row) {
     if (Object.keys(nameMap.value).length === 0) {
       // 加载全库名称映射（含停用项），避免因责任库不同导致跨库盘库解析不到名称而回退成 (id=…)
       const all = await listAllReagentItems()
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第38页 / 共60页（总源码4817行，取自原第75页）
+------------------------------------------------------
       for (const it of all) nameMap.value[it.id] = it
     }
     // 只展示实际盘点过且有余量的条目；数量为 0 / 空 视为“未盘”，详情与打印均不显示
@@ -2492,10 +2042,6 @@ async function onDeleteCheck(row) {
   await deleteInventoryCheck(row.id); ElMessage.success('已删除'); refresh()
 }
 
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第47页 / 共60页（总源码3950行，取自原第66页）
-------------------------------------------------------
 onMounted(refresh)
 </script>
 <style scoped>
@@ -2510,6 +2056,10 @@ onMounted(refresh)
 .grp-title { margin: 14px 0 6px; font-size: 14px; color: #0f172a; border-left: 4px solid #2563eb; padding-left: 8px; }
 .grp-title:first-child { margin-top: 4px; }
 </style>
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第39页 / 共60页（总源码4817行，取自原第76页）
+------------------------------------------------------
 
 ======================================================================
 # 文件: views/reagent/ReagentOrders.vue  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\views\reagent\ReagentOrders.vue)
@@ -2550,10 +2100,6 @@ onMounted(refresh)
       <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
       <el-table-column prop="created_by" label="创建人" width="100" />
       <el-table-column label="操作" width="230" fixed="right" v-if="canWrite">
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第48页 / 共60页（总源码3950行，取自原第67页）
-------------------------------------------------------
         <template #default="{ row }">
           <el-button size="small" link type="primary" @click="onExport(row)">导出</el-button>
           <el-button size="small" link type="primary" @click="onPrint(row)">打印</el-button>
@@ -2568,6 +2114,10 @@ onMounted(refresh)
 
     <!-- 新建/编辑订购弹窗 -->
     <el-dialog v-model="dialogVisible" :title="(editingId ? '编辑订购' : '新建订购') + `（${reagentStore.library}）`" width="min(960px, 96vw)" top="3vh">
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第40页 / 共60页（总源码4817行，取自原第77页）
+------------------------------------------------------
       <el-form :model="orderForm" label-width="80px" size="small">
         <el-row :gutter="12">
           <el-col :span="8"><el-form-item label="订单号"><el-input v-model="orderForm.order_no" placeholder="ORD-202607-001" /></el-form-item></el-col>
@@ -2604,10 +2154,6 @@ onMounted(refresh)
             </div>
           </div>
         </template>
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第49页 / 共60页（总源码3950行，取自原第68页）
-------------------------------------------------------
         <template v-for="grp in filteredInstruments" :key="'i'+grp.group">
           <h4 class="grp-title">仪器：{{ grp.group }} <span class="muted" v-if="grp.instruments.length">（{{ grp.instruments.join('、') }}）</span></h4>
           <div class="entry-card-list">
@@ -2622,6 +2168,10 @@ onMounted(refresh)
               </div>
             </div>
           </div>
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第41页 / 共60页（总源码4817行，取自原第78页）
+------------------------------------------------------
         </template>
         <template v-if="filteredControls.length">
           <h4 class="grp-title">质控品（单独）</h4>
@@ -2658,10 +2208,6 @@ import {
   exportOrderForm, getReagentTemplate, listAllReagentItems,
   getNextOrderNo, confirmReagentOrder,
 } from '../../api/reagent'
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第50页 / 共60页（总源码3950行，取自原第69页）
-------------------------------------------------------
 import { useAuthStore } from '../../store/auth'
 import { useReagentStore } from '../../store/reagent'
 import { errText } from '../../utils/errText'
@@ -2676,6 +2222,10 @@ function canEditRow(row) {
   if (auth.isAdmin) return true
   return !!(row.created_by && row.created_by === auth.user?.username)
 }
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第42页 / 共60页（总源码4817行，取自原第79页）
+------------------------------------------------------
 const orders = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
 const dialogVisible = ref(false), editingId = ref(null), submitting = ref(false)
 const dialogSearch = ref('')
@@ -2712,10 +2262,6 @@ const totalEntries = computed(() => {
   return n
 })
 
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第51页 / 共60页（总源码3950行，取自原第70页）
-------------------------------------------------------
 /** 模糊匹配：试剂名/规格/编码 + 项目中文名/英文别名 */
 function matchItem(it) {
   const kw = dialogSearch.value.trim().toLowerCase()
@@ -2730,6 +2276,10 @@ function matchItem(it) {
   }
   return false
 }
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第43页 / 共60页（总源码4817行，取自原第80页）
+------------------------------------------------------
 const filteredProjects = computed(() => {
   if (!tpl.value) return []
   if (categoryFilter.value && categoryFilter.value !== 'reagent') return []
@@ -2766,10 +2316,6 @@ async function onNewOrder() {
 
 function onEdit(row) {
   dialogSearch.value = ''
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第52页 / 共60页（总源码3950行，取自原第71页）
-------------------------------------------------------
   categoryFilter.value = ''
   editingId.value = row.id
   orderForm.value = { order_no: row.order_no, order_date: row.order_date, order_type: row.order_type, remark: row.remark || '' }
@@ -2784,6 +2330,10 @@ async function onSubmit() {
   if (!orderForm.value.order_no) { ElMessage.warning('请填写订单号'); return }
   submitting.value = true
   try {
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第44页 / 共60页（总源码4817行，取自原第81页）
+------------------------------------------------------
     const items = allItems()
       .filter(it => Number(quantities[it.item_id] || 0) > 0)
       .map(it => ({ item_id: it.item_id, ordered_quantity: Number(quantities[it.item_id] || 0) }))
@@ -2820,10 +2370,6 @@ async function onPrint(row) {
   try {
     const r = await listAllReagentItems({ library: row.library || reagentStore.library })
     const nm = {}
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第53页 / 共60页（总源码3950行，取自原第72页）
-------------------------------------------------------
     for (const it of r) nm[it.id] = it
     let h = '<table><thead><tr><th>材料编码</th><th>名称</th><th>规格</th><th>单位</th><th class="num">订购数量</th></tr></thead><tbody>'
     for (const it of (row.items || [])) {
@@ -2838,6 +2384,10 @@ async function onPrint(row) {
 
 onMounted(refresh)
 </script>
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第45页 / 共60页（总源码4817行，取自原第82页）
+------------------------------------------------------
 <style scoped>
 .page { padding: 16px 20px 0; display: flex; flex-direction: column; height: 100%; }
 .page-header { margin-bottom: 8px; }
@@ -2878,10 +2428,6 @@ onMounted(refresh)
         <el-radio-button label="全部" value="" />
         <el-radio-button label="待确认" value="false" />
         <el-radio-button label="已确认" value="true" />
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第54页 / 共60页（总源码3950行，取自原第73页）
-------------------------------------------------------
       </el-radio-group>
       <el-button :icon="Refresh" @click="refresh">刷新</el-button>
     </div>
@@ -2896,6 +2442,10 @@ onMounted(refresh)
       <el-table-column prop="receiver" label="接收人" width="100" />
       <el-table-column prop="created_by" label="创建人" width="100" />
       <el-table-column label="状态" width="160">
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第46页 / 共60页（总源码4817行，取自原第83页）
+------------------------------------------------------
         <template #default="{ row }">
           <el-tag :type="row.is_confirmed ? 'success' : 'warning'" size="small">
             {{ row.is_confirmed ? '已确认' : '待确认' }}
@@ -2910,9 +2460,11 @@ onMounted(refresh)
         <template #default="{ row }">
           <el-button size="small" link type="primary" @click="onView(row)">详情</el-button>
           <el-button size="small" link type="success" @click="onConfirm(row)"
-            v-if="canConfirm(row)">确认接收</el-button>
+            v-if="!row.is_confirmed" :disabled="!canConfirm(row)">确认接收</el-button>
           <el-button size="small" link type="warning" @click="onEdit(row)"
             v-if="canEdit(row)">编辑</el-button>
+          <el-button size="small" link type="danger" @click="onDelete(row)"
+            v-if="auth.isAdmin">删除</el-button>
           <el-button size="small" link type="info" @click="onPrint(row)">打印</el-button>
         </template>
       </el-table-column>
@@ -2930,12 +2482,8 @@ onMounted(refresh)
           <el-col :span="8"><el-form-item label="送货人"><el-input v-model="form.delivery_person" /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="8"><el-form-item label="接收人"><el-input v-model="form.receiver" placeholder="默认当前登录人" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="接收人"><el-input v-model="form.receiver" placeholder="确认接收时自动填入当前登录人" /></el-form-item></el-col>
         </el-row>
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第55页 / 共60页（总源码3950行，取自原第74页）
-------------------------------------------------------
         <el-form-item label="备注"><el-input v-model="form.remark" /></el-form-item>
       </el-form>
       <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
@@ -2948,6 +2496,10 @@ onMounted(refresh)
         <span class="hint">（模糊搜索后点选即可加入下方明细）</span>
       </div>
       <el-table :data="items" border size="small" max-height="360">
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第47页 / 共60页（总源码4817行，取自原第84页）
+------------------------------------------------------
         <el-table-column label="试剂" min-width="200">
           <template #default="{ row }">
             <el-select v-model="row.item_id" filterable placeholder="选试剂" style="width:100%">
@@ -2986,10 +2538,6 @@ onMounted(refresh)
           <tr v-if="printData.is_confirmed">
             <td colspan="2">确认：{{ printData.confirmed_by }} · {{ fmt(printData.confirmed_at) }}</td>
           </tr>
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第56页 / 共60页（总源码3950行，取自原第75页）
-------------------------------------------------------
           <tr>
             <td colspan="2">备注：{{ printData.remark || '—' }}</td>
           </tr>
@@ -3002,6 +2550,10 @@ onMounted(refresh)
             <tr v-for="(it, i) in printData.items || []" :key="it.id">
               <td>{{ i + 1 }}</td>
               <td>{{ itemName(it.item_id) }}</td>
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第48页 / 共60页（总源码4817行，取自原第85页）
+------------------------------------------------------
               <td>{{ it.batch_no || '—' }}</td>
               <td>{{ it.expiry_date || '—' }}</td>
               <td>{{ it.quantity }}</td>
@@ -3027,7 +2579,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Delete, Printer } from '@element-plus/icons-vue'
 import {
   listReagentReceivings, createReagentReceiving, getReagentReceiving,
-  updateReagentReceiving, confirmReagentReceiving, listAllReagentItems, listReagentItems,
+  updateReagentReceiving, confirmReagentReceiving, deleteReagentReceiving,
+  listAllReagentItems, listReagentItems, getReagentItem,
 } from '../../api/reagent'
 import { useAuthStore } from '../../store/auth'
 import { useReagentStore } from '../../store/reagent'
@@ -3040,13 +2593,10 @@ const canWrite = computed(() => auth.canWrite('reagent-receivings'))
 const currentUser = computed(() => auth.user?.username || '')
 
 const receivings = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第57页 / 共60页（总源码3950行，取自原第76页）
-------------------------------------------------------
 const confirmedFilter = ref('')
 const dialogVisible = ref(false), submitting = ref(false), editingId = ref(null)
 const allItems = ref([]), searchSel = ref(''), searchResults = ref([]), searching = ref(false)
+const loadedLib = ref('')
 const form = ref({ receipt_no: '', receipt_date: '', delivery_person: '', receiver: '', remark: '' })
 const items = ref([])
 const printVisible = ref(false), printData = ref({})
@@ -3054,6 +2604,10 @@ const printVisible = ref(false), printData = ref({})
 function fmt(v) {
   if (!v) return ''
   return String(v).slice(0, 16).replace('T', ' ')
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第49页 / 共60页（总源码4817行，取自原第86页）
+------------------------------------------------------
 }
 function itemName(id) {
   const it = allItems.value.find(x => x.id === id) || searchResults.value.find(x => x.id === id)
@@ -3061,6 +2615,9 @@ function itemName(id) {
 }
 
 async function refresh() {
+  // 切库/筛选/翻页时清空试剂名映射缓存，避免下次 loadItems 早退导致切库后显示 ID
+  allItems.value = []
+  loadedLib.value = ''
   loading.value = true
   try {
     const params = { library: reagentStore.library, page: page.value, page_size: pageSize.value }
@@ -3070,9 +2627,11 @@ async function refresh() {
   } catch (e) { ElMessage.error('加载失败：' + errText(e)) } finally { loading.value = false }
 }
 async function loadItems() {
-  if (allItems.value.length) return
+  // 已按当前库加载过则跳过；切库后 loadedLib 已被 refresh 清空，会重新拉取
+  if (allItems.value.length && loadedLib.value === reagentStore.library) return
   const all = await listAllReagentItems({ library: reagentStore.library })
   allItems.value = all
+  loadedLib.value = reagentStore.library
 }
 function onNewReceiving() {
   loadItems()
@@ -3080,7 +2639,7 @@ function onNewReceiving() {
   form.value = {
     receipt_no: 'RCV-' + new Date().toISOString().slice(0, 7) + '-' + String(Date.now()).slice(-3),
     receipt_date: new Date().toISOString().slice(0, 10),
-    delivery_person: '', receiver: (auth.user?.full_name || auth.user?.username || ''), remark: '',
+    delivery_person: '',     receiver: '', remark: '',
   }
   items.value = []; searchResults.value = []; searchSel.value = ''
   dialogVisible.value = true
@@ -3094,13 +2653,23 @@ async function onEdit(row) {
       delivery_person: r.delivery_person, receiver: r.receiver, remark: r.remark,
     }
     items.value = (r.items || []).map(it => ({
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第58页 / 共60页（总源码3950行，取自原第77页）
-------------------------------------------------------
       item_id: it.item_id, batch_no: it.batch_no, expiry_date: it.expiry_date, quantity: it.quantity,
     }))
     await loadItems()
+    // 补充当前库下拉中缺失的试剂（跨库混单或切库后，原明细试剂可能不在当前库）
+    const missingIds = [...new Set(items.value
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第50页 / 共60页（总源码4817行，取自原第87页）
+------------------------------------------------------
+      .map(it => it.item_id)
+      .filter(id => id && !allItems.value.some(x => x.id === id)))]
+    if (missingIds.length) {
+      const filled = await Promise.all(missingIds.map(id => getReagentItem(id).catch(() => null)))
+      for (const it of filled) {
+        if (it) allItems.value.push(it)
+      }
+    }
     dialogVisible.value = true
   } catch (e) { ElMessage.error('加载失败：' + errText(e)) }
 }
@@ -3143,15 +2712,15 @@ async function onSubmit() {
   } catch (e) { ElMessage.error('提交失败：' + errText(e)) } finally { submitting.value = false }
 }
 async function onConfirm(row) {
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第51页 / 共60页（总源码4817行，取自原第88页）
+------------------------------------------------------
   try {
     await ElMessageBox.confirm(`确认接收「${row.receipt_no}」？确认后试剂将进入实时库存。`, '确认接收', { type: 'warning' })
   } catch (_) { return }
   try {
     await confirmReagentReceiving(row.id)
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第59页 / 共60页（总源码3950行，取自原第78页）
-------------------------------------------------------
     ElMessage.success('已确认接收，库存已更新')
     refresh()
   } catch (e) { ElMessage.error('确认失败：' + errText(e)) }
@@ -3173,6 +2742,22 @@ async function onPrint(row) {
 }
 function doPrint() { window.print() }
 
+// 管理员删除收货单（已确认的会回退库存）
+async function onDelete(row) {
+  if (!auth.isAdmin) return
+  try {
+    await ElMessageBox.confirm(
+      `确认删除收货单「${row.receipt_no}」？${row.is_confirmed ? '该单已确认，删除后将回退对应库存。' : ''}此操作不可恢复。`,
+      '删除收货单', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+    )
+  } catch (_) { return }
+  try {
+    await deleteReagentReceiving(row.id)
+    ElMessage.success(`收货单 ${row.receipt_no} 已删除`)
+    refresh()
+  } catch (e) { ElMessage.error('删除失败：' + errText(e)) }
+}
+
 // 权限判定：试剂配送仅能改自己建的、且未确认的；管理员/试剂管理员可改任意未确认
 function canEdit(row) {
   if (!canWrite.value) return false
@@ -3181,10 +2766,15 @@ function canEdit(row) {
   const roles = auth.myRoles
   if (roles.includes('reagent_manager')) return true
   // 试剂配送：仅本人
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第52页 / 共60页（总源码4817行，取自原第89页）
+------------------------------------------------------
   return row.created_by === currentUser.value
 }
-function canConfirm(row) {
-  return canWrite.value && !row.is_confirmed
+function canConfirm() {
+  if (auth.isAdmin) return true
+  return auth.myRoles.includes('reagent_manager')
 }
 onMounted(refresh)
 </script>
@@ -3202,10 +2792,6 @@ onMounted(refresh)
 .receipt-title { text-align: center; font-size: 18px; margin: 0 0 12px; }
 .receipt-head { width: 100%; border-collapse: collapse; font-size: 13px; }
 .receipt-head td { padding: 6px 4px; }
-
-
-检验科生化免疫组试剂与物料管理软件 V1.0   第60页 / 共60页（总源码3950行，取自原第79页）
-------------------------------------------------------
 .receipt-items { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
 .receipt-items th, .receipt-items td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
 .receipt-items th { background: #f1f5f9; }
@@ -3220,6 +2806,391 @@ onMounted(refresh)
   .no-print-dialog .el-dialog__footer { display: none !important; }
 }
 </style>
+
+======================================================================
+# 文件: views/reagents/ReagentList.vue  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\views\reagents\ReagentList.vue)
+======================================================================
+
+<template>
+  <div class="page">
+    <CrudTable
+      ref="crud"
+      :columns="columns"
+      :fetch="fetch"
+      search-placeholder="搜索名称 / 批号 / 厂家 / 供应商..."
+      :show-add="auth.canWrite('reagents')"
+      :can-write="auth.canWrite('reagents')"
+      @add="onAdd"
+      @edit="onEdit"
+      @delete="onDelete"
+    />
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第53页 / 共60页（总源码4817行，取自原第90页）
+------------------------------------------------------
+    <EditDialog
+      v-model="dialogVisible"
+      :title="editingId ? '编辑试剂' : '新增试剂'"
+      :form="form"
+      :fields="fields"
+      :rules="rules"
+      :submitting="submitting"
+      @submit="onSubmit"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import CrudTable from '../../components/CrudTable.vue'
+import EditDialog from '../../components/EditDialog.vue'
+import { listReagents, createReagent, updateReagent, deleteReagent } from '../../api/reagents'
+import { useAuthStore } from '../../store/auth'
+
+const crud = ref(null)
+const auth = useAuthStore()
+const dialogVisible = ref(false)
+const editingId = ref(null)
+const submitting = ref(false)
+
+const STATUS_OPTIONS = ['在库', '预警', '过期', '停用'].map((v) => ({ label: v, value: v }))
+
+const fields = [
+  { prop: 'name', label: '试剂名称' },
+  { prop: 'brand', label: '品牌/厂家' },
+  { prop: 'spec', label: '规格' },
+  { prop: 'lot_no', label: '批号' },
+  { prop: 'quantity', label: '库存数量' },
+  { prop: 'unit', label: '单位', placeholder: '盒 / 支 / 瓶' },
+  { prop: 'production_date', label: '生产日期', type: 'date' },
+  { prop: 'expiry_date', label: '有效期至', type: 'date' },
+  { prop: 'in_date', label: '入库日期', type: 'date' },
+  { prop: 'supplier', label: '供应商' },
+  { prop: 'storage_condition', label: '储存条件', placeholder: '如 2-8℃' },
+  { prop: 'status', label: '状态', type: 'select', options: STATUS_OPTIONS },
+  { prop: 'operator', label: '经手人' },
+  { prop: 'remark', label: '备注', type: 'textarea' },
+]
+
+const rules = {
+  name: [{ required: true, message: '请填写试剂名称', trigger: 'blur' }],
+}
+
+const columns = [
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第54页 / 共60页（总源码4817行，取自原第91页）
+------------------------------------------------------
+  { prop: 'name', label: '名称', width: 160 },
+  { prop: 'brand', label: '厂家', width: 120 },
+  { prop: 'spec', label: '规格', width: 110 },
+  { prop: 'lot_no', label: '批号', width: 120 },
+  { prop: 'quantity', label: '库存', width: 80 },
+  { prop: 'unit', label: '单位', width: 70 },
+  { prop: 'expiry_date', label: '有效期至', width: 110 },
+  { prop: 'supplier', label: '供应商', width: 140 },
+  {
+    prop: 'status', label: '状态', width: 90,
+    formatter: (row) => {
+      const map = { 在库: 'success', 预警: 'warning', 过期: 'danger', 停用: 'info' }
+      const t = map[row.status] || 'info'
+      return `<el-tag type="${t}" size="small">${row.status || '-'}</el-tag>`
+    },
+  },
+]
+
+const emptyForm = () => ({
+  name: '', brand: '', spec: '', lot_no: '', quantity: '', unit: '',
+  production_date: '', expiry_date: '', in_date: '', supplier: '',
+  storage_condition: '', status: '在库', operator: '', remark: '',
+})
+
+const form = reactive(emptyForm())
+
+function fetch(params) {
+  return listReagents(params)
+}
+function onAdd() {
+  Object.assign(form, emptyForm())
+  editingId.value = null
+  dialogVisible.value = true
+}
+function onEdit(row) {
+  Object.assign(form, emptyForm(), row)
+  editingId.value = row.id
+  dialogVisible.value = true
+}
+async function onSubmit() {
+  submitting.value = true
+  try {
+    if (editingId.value) {
+      await updateReagent(editingId.value, { ...form })
+    } else {
+      await createReagent({ ...form })
+    }
+    ElMessage.success('已保存')
+    dialogVisible.value = false
+    crud.value?.refresh()
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第55页 / 共60页（总源码4817行，取自原第92页）
+------------------------------------------------------
+  } catch (e) {
+    ElMessage.error('保存失败')
+  } finally {
+    submitting.value = false
+  }
+}
+async function onDelete(row) {
+  await ElMessageBox.confirm(`确认删除「${row.name}」？`, '提示', { type: 'warning' })
+  await deleteReagent(row.id)
+  ElMessage.success('已删除')
+  crud.value?.refresh()
+}
+</script>
+
+<style scoped>
+.page {
+  height: 100%;
+}
+</style>
+
+======================================================================
+# 文件: components/reagent/LibraryTabs.vue  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\components\reagent\LibraryTabs.vue)
+======================================================================
+
+<template>
+  <div class="library-tabs">
+    <span class="label">责任库：</span>
+    <el-radio-group v-model="selected" size="small" @change="onRadioChange">
+      <el-radio-button v-for="lib in libs" :key="lib" :value="lib">{{ lib }}</el-radio-button>
+    </el-radio-group>
+    <span class="hint">（生化凝血 / 免疫 分开管理，两人各管一类）</span>
+  </div>
+</template>
+
+<script setup>
+import { ref, watch, onMounted } from 'vue'
+import { useReagentStore, LIBRARIES } from '../../store/reagent'
+
+const reagentStore = useReagentStore()
+const libs = LIBRARIES
+const selected = ref(reagentStore.library)
+
+// 外部切换（如其他页面修改了 store）时同步回来
+watch(() => reagentStore.library, (val) => {
+  if (val !== selected.value) selected.value = val
+})
+
+function onRadioChange(val) {
+  reagentStore.setLibrary(val)
+  emit('change', val)
+}
+const emit = defineEmits(['change'])
+</script>
+
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第56页 / 共60页（总源码4817行，取自原第93页）
+------------------------------------------------------
+<style scoped>
+.library-tabs { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
+.library-tabs .label { font-size: 13px; color: #475569; font-weight: 600; }
+.library-tabs .hint { font-size: 12px; color: #94a3b8; }
+</style>
+
+======================================================================
+# 文件: api/reagent.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\reagent.js)
+======================================================================
+
+/**
+ * 试剂管理模块 API 调用
+ */
+
+import request from '../utils/request'
+
+// ── 试剂目录 ──
+export function listReagentItems(params) {
+  return request.get('/api/v1/reagent/items', { params })
+}
+
+export function getReagentItemCounts(params = {}) {
+  return request.get('/api/v1/reagent/items/counts', { params })
+}
+
+// 分页拉全试剂目录（后端 page_size 上限 200，超 200 触发 422）。
+// 用于在库存/月消耗等页面一次性拿到全部试剂映射，避免 [object Object] 报错。
+// 默认包含停用项（show_inactive=true），保证盘库详情/打印的名称映射完整。
+export async function listAllReagentItems(extra = {}) {
+  let page = 1
+  const all = []
+  while (true) {
+    const r = await listReagentItems({ page, page_size: 200, show_inactive: true, ...extra })
+    all.push(...(r.items || []))
+    if (all.length >= (r.total || 0) || (r.items || []).length === 0) break
+    page += 1
+    if (page > 100) break
+  }
+  return all
+}
+
+// 盘库/订购录入模板：按项目、仪器家族、质控品分组（含实时库存）
+export function getReagentTemplate(params) {
+  return request.get('/api/v1/reagent/template', { params })
+}
+
+export function getReagentItem(id) {
+  return request.get(`/api/v1/reagent/items/${id}`)
+}
+
+export function createReagentItem(data) {
+  return request.post('/api/v1/reagent/items', data)
+}
+
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第57页 / 共60页（总源码4817行，取自原第94页）
+------------------------------------------------------
+export function updateReagentItem(id, data) {
+  return request.put(`/api/v1/reagent/items/${id}`, data)
+}
+
+export function deleteReagentItem(id) {
+  return request.delete(`/api/v1/reagent/items/${id}`)
+}
+
+export function importReagentFromExcel(formData) {
+  return request.post('/api/v1/reagent/items/_import-excel', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+// ── 实时库存 ──
+export function listReagentStock(params) {
+  return request.get('/api/v1/reagent/stock', { params })
+}
+
+// ── 盘库 ──
+export function listInventoryChecks(params) {
+  return request.get('/api/v1/reagent/inventory-checks', { params })
+}
+
+export function getInventoryCheck(id) {
+  return request.get(`/api/v1/reagent/inventory-checks/${id}`)
+}
+
+export function createInventoryCheck(data) {
+  return request.post('/api/v1/reagent/inventory-checks', data)
+}
+
+export function deleteInventoryCheck(id) {
+  return request.delete(`/api/v1/reagent/inventory-checks/${id}`)
+}
+
+// ── 订购 ──
+export function listReagentOrders(params) {
+  return request.get('/api/v1/reagent/orders', { params })
+}
+
+export function getReagentOrder(id) {
+  return request.get(`/api/v1/reagent/orders/${id}`)
+}
+
+export function getNextOrderNo() {
+  return request.get('/api/v1/reagent/orders/_next-no')
+}
+
+export function createReagentOrder(data) {
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第58页 / 共60页（总源码4817行，取自原第95页）
+------------------------------------------------------
+  return request.post('/api/v1/reagent/orders', data)
+}
+
+export function updateReagentOrder(id, data) {
+  return request.put(`/api/v1/reagent/orders/${id}`, data)
+}
+
+export function confirmReagentOrder(id) {
+  return request.post(`/api/v1/reagent/orders/${id}/confirm`)
+}
+
+export function exportOrderForm(id) {
+  return request.get(`/api/v1/reagent/orders/${id}/export-form`, { responseType: 'blob' })
+}
+
+// ── 到货接收 ──
+export function listReagentReceivings(params) {
+  return request.get('/api/v1/reagent/receivings', { params })
+}
+
+export function getReagentReceiving(id) {
+  return request.get(`/api/v1/reagent/receivings/${id}`)
+}
+
+export function createReagentReceiving(data) {
+  return request.post('/api/v1/reagent/receivings', data)
+}
+
+export function updateReagentReceiving(id, data) {
+  return request.put(`/api/v1/reagent/receivings/${id}`, data)
+}
+
+export function confirmReagentReceiving(id) {
+  return request.post(`/api/v1/reagent/receivings/${id}/confirm`)
+}
+export function deleteReagentReceiving(id) {
+  return request.delete(`/api/v1/reagent/receivings/${id}`)
+}
+
+// ── 月消耗 ──
+export function listReagentConsumption(params) {
+  return request.get('/api/v1/reagent/consumption', { params })
+}
+
+export function calculateConsumption(yearMonth) {
+  return request.post(`/api/v1/reagent/consumption/_calculate?year_month=${yearMonth}`)
+}
+
+// ── 项目↔试剂 / 仪器↔耗材 关联 ──
+export function listTestItemReagents(params) {
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第59页 / 共60页（总源码4817行，取自原第96页）
+------------------------------------------------------
+  return request.get('/api/v1/reagent/associations/test-items', { params })
+}
+export function createTestItemReagent(data) {
+  return request.post('/api/v1/reagent/associations/test-items', data)
+}
+export function updateTestItemReagent(id, data) {
+  return request.put(`/api/v1/reagent/associations/test-items/${id}`, data)
+}
+export function deleteTestItemReagent(id) {
+  return request.delete(`/api/v1/reagent/associations/test-items/${id}`)
+}
+export function listInstrumentReagents(params) {
+  return request.get('/api/v1/reagent/associations/instruments', { params })
+}
+export function createInstrumentReagent(data) {
+  return request.post('/api/v1/reagent/associations/instruments', data)
+}
+export function updateInstrumentReagent(id, data) {
+  return request.put(`/api/v1/reagent/associations/instruments/${id}`, data)
+}
+export function deleteInstrumentReagent(id) {
+  return request.delete(`/api/v1/reagent/associations/instruments/${id}`)
+}
+export function autoMatchAssociations(reset = false) {
+  return request.post(`/api/v1/reagent/associations/_auto-match?reset=${reset}`)
+}
+
+// 待关联建议：返回未关联但可匹配 / 真正无候选的试剂，供人工审核采纳
+export function getAssociationSuggestions(params = {}) {
+  return request.get('/api/v1/reagent/associations/suggestions', { params })
+}
 
 ======================================================================
 # 文件: api/reagents.js  (D:\workbuddyprojects\网页版-生免速查工具\frontend\src\api\reagents.js)
@@ -3247,6 +3218,10 @@ export function deleteReagent(id) {
 import { defineStore } from 'pinia'
 
 // 试剂管理「责任库」全局状态：生化凝血 / 免疫 两类分管。
+
+
+检验科生化免疫组试剂与物料管理软件 V1.0   第60页 / 共60页（总源码4817行，取自原第97页）
+------------------------------------------------------
 // 各试剂页面共享当前选中的责任库，刷新后仍记住选择。
 const STORAGE_KEY = 'reagent_library'
 
