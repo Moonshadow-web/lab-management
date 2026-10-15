@@ -50,6 +50,10 @@
               </div>
             </div>
           </template>
+          <el-alert v-if="loadError" type="error" :closable="false" show-icon
+                    style="margin-bottom: 8px">
+            <template #title>{{ loadError }}</template>
+          </el-alert>
           <el-alert v-if="todoRows.length" :type="todoMissing.length ? 'warning' : 'success'"
                     :closable="false" show-icon style="margin-bottom: 8px">
             <template #title>
@@ -954,6 +958,7 @@ function instLabel(opt) {
 // 记住上次选的年月：刷新页面后保持不变（否则手选月份一刷新就回到默认月，看不到数据）
 const monthValue = ref(localStorage.getItem('qc_month') || '')
 const uploadStatus = ref(null)
+const loadError = ref('')   // 加载失败原因（非空时在表格上方显示红色提示）
 const loadingUploadStatus = ref(false)
 const showMissingOnly = ref(false)
 const visibleUploadRows = computed(() => {
@@ -969,11 +974,18 @@ async function loadUploadStatus() {
   loadingUploadStatus.value = true
   try {
     const { year, month } = parseMonth()
-    const { data } = await getQCUploadStatus(year, month)
-    uploadStatus.value = data
+    // ⚠️ 拦截器已把 axios 的 response.data 剥出来了（见 utils/request.js），
+    // 这里不能再解构 .data —— 否则得到 undefined，表格显示「暂无数据」
+    uploadStatus.value = await getQCUploadStatus(year, month)
+    loadError.value = ''
   } catch (e) {
-    // 进度表失败不影响月结主体功能
+    // ⚠️ 不静默吞掉：之前 catch 里只置 null，页面显示"暂无数据"，看不出是失败还是真的没数据
+    console.error('[QC] 数据上传状态加载失败:', e)
     uploadStatus.value = null
+    const st = e?.response?.status
+    const detail = e?.response?.data?.detail
+    loadError.value = `数据上传状态加载失败${st ? `（HTTP ${st}）` : ''}：${
+      typeof detail === 'string' ? detail : (e?.message || '网络错误，请刷新重试')}`
   } finally {
     loadingUploadStatus.value = false
   }
@@ -1104,10 +1116,14 @@ async function loadReportStatus() {
   loadingReportStatus.value = true
   try {
     const { year, month } = parseMonth()
-    const { data } = await getQCReportStatus(year, month)
-    reportStatus.value = data
+    reportStatus.value = await getQCReportStatus(year, month)   // 拦截器已剥 .data
   } catch (e) {
+    console.error('[QC] 小结完成情况加载失败:', e)
     reportStatus.value = null
+    const st = e?.response?.status
+    const detail = e?.response?.data?.detail
+    loadError.value = `小结完成情况加载失败${st ? `（HTTP ${st}）` : ''}：${
+      typeof detail === 'string' ? detail : (e?.message || '网络错误，请刷新重试')}`
   } finally {
     loadingReportStatus.value = false
   }
@@ -1703,7 +1719,7 @@ async function initDefaultMonth() {
   try {
     // 先探测当月有没有数据（不设 monthValue，避免触发两次加载）
     const [u, r] = await Promise.all([getQCUploadStatus(y, m), getQCReportStatus(y, m)])
-    const noData = !(u.data?.uploaded) && !(r.data?.written)
+    const noData = !(u?.uploaded) && !(r?.written)   // 拦截器已剥 .data
     if (noData) {
       const prev = new Date(y, m - 2, 1)  // m-2 因为 getMonth() 从 0 计
       monthValue.value = fmtYM(prev)
