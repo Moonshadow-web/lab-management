@@ -72,6 +72,11 @@
             <el-table-column label="仪器" min-width="160">
               <template #default="{ row }">{{ row.model || row.name }}</template>
             </el-table-column>
+            <el-table-column label="日常管理人" width="100" align="center">
+              <template #default="{ row }">
+                <span :class="{ dim: !row.daily_manager }">{{ row.daily_manager || '—' }}</span>
+              </template>
+            </el-table-column>
             <el-table-column label="数据上传" width="110" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.data_ok ? 'success' : 'danger'" size="small" effect="dark">
@@ -1016,6 +1021,7 @@ const todoRows = computed(() => {
       dept_no: d.dept_no || r.dept_no || '',
       model: d.model || r.model || '',
       name: d.name || r.name || '',
+      daily_manager: d.daily_manager || r.daily_manager || '',   // 日常管理人（催办时找谁）
       data_ok: !!d.uploaded,
       report_ok: !!r.written,
       item_count: d.item_count || 0,
@@ -1052,7 +1058,8 @@ async function copyTodoList() {
   if (!list.length) { ElMessage.info('全部已完成（数据或小结有其一即算完成），无需催办'); return }
   const lines = [`${monthLabel.value} 质控月结待办（以下 ${list.length} 台仪器的数据上传和文字小结均未提交）：`]
   list.forEach((x, i) => {
-    lines.push(`${i + 1}. ${x.dept_no} ${x.model || x.name}`)
+    const who = x.daily_manager ? `（${x.daily_manager}）` : ''
+    lines.push(`${i + 1}. ${x.dept_no} ${x.model || x.name}${who}`)
   })
   const text = lines.join('\n')
   try {

@@ -548,6 +548,7 @@ def qc_upload_status(
             "dept_no": i.dept_no or "",
             "name": i.name or "",
             "model": i.model or "",
+            "daily_manager": i.daily_manager or "",   # 日常管理人（催办时找谁）
             "uploaded": summary_rows > 0,
             "summary_count": summary_rows,
             "item_count": item_cnt,
@@ -604,6 +605,7 @@ def qc_report_status(
             "dept_no": i.dept_no or "",
             "name": i.name or "",
             "model": i.model or "",
+            "daily_manager": i.daily_manager or "",   # 日常管理人（催办时找谁）
             "report_id": getattr(r, "id", None),
             "written": written,
             "updated_at": r.updated_at.isoformat() if (r and r.updated_at) else None,
