@@ -8,214 +8,95 @@
         :name="tab.name"
       >
       <!-- ============ 上传催办（管理者视角：谁没交活） ============ -->
-      <template v-if="activeTab === 'todo'">
-        <div class="todo-head">
-          <el-date-picker
-            v-model="monthValue"
-            type="month"
-            placeholder="选择年月"
-            format="YYYY-MM"
-            value-format="YYYY-MM"
-            style="width: 150px"
-          />
-          <el-button :loading="loadingUploadStatus || loadingReportStatus"
-                     @click="loadTodoData">刷新</el-button>
-          <div class="todo-stats" v-if="todoRows.length">
-            <span class="stat-item">
-              数据上传
-              <b :class="uploadStatus && uploadStatus.not_uploaded ? 'warn' : 'ok'">
-                {{ uploadStatus ? `${uploadStatus.uploaded}/${uploadStatus.total}` : '—' }}
-              </b>
-            </span>
-            <span class="stat-item">
-              文字小结
-              <b :class="reportStatus && reportStatus.not_written ? 'warn' : 'ok'">
-                {{ reportStatus ? `${reportStatus.written}/${reportStatus.total}` : '—' }}
-              </b>
-            </span>
-          </div>
-          <div style="margin-left: auto; display: flex; gap: 8px">
-            <el-button type="primary" plain :disabled="!todoMissing.length"
-                       @click="copyTodoList">📋 复制催办名单</el-button>
-          </div>
-        </div>
-
-        <el-alert v-if="todoRows.length" :type="todoMissing.length ? 'warning' : 'success'"
-                  :closable="false" show-icon style="margin-bottom: 10px">
-          <template #title>
-            <template v-if="todoMissing.length">
-              <b>{{ monthLabel }}</b> 还有 <b style="color:#e6a23c">{{ todoMissing.length }}</b> 台仪器没交活，需催办
-            </template>
-            <template v-else>
-              <b>{{ monthLabel }}</b> 全部 {{ todoRows.length }} 台仪器都已完成 ✅
-            </template>
-          </template>
-        </el-alert>
-
-        <el-table :data="todoRows" size="small" border stripe max-height="64vh"
-                  v-loading="loadingUploadStatus || loadingReportStatus"
-                  :row-class-name="todoRowClass" empty-text="暂无数据">
-          <el-table-column label="科室编号" width="180" prop="dept_no" fixed />
-          <el-table-column label="仪器" min-width="170">
-            <template #default="{ row }">
-              {{ row.model || row.name }}
-            </template>
-          </el-table-column>
-          <el-table-column label="数据上传" width="120" align="center">
-            <template #default="{ row }">
-              <el-tag :type="row.data_ok ? 'success' : 'danger'" size="small" effect="dark">
-                {{ row.data_ok ? '已上传' : '未上传' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="文字小结" width="120" align="center">
-            <template #default="{ row }">
-              <el-tag :type="row.report_ok ? 'success' : 'danger'" size="small" effect="dark">
-                {{ row.report_ok ? '已写' : '未写' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="已传项目" width="90" align="center">
-            <template #default="{ row }">{{ row.data_ok ? row.item_count : '—' }}</template>
-          </el-table-column>
-          <el-table-column label="待办" min-width="150">
-            <template #default="{ row }">
-              <span v-if="!row.data_ok && !row.report_ok" class="todo">缺数据 + 缺小结</span>
-              <span v-else-if="!row.data_ok" class="todo">缺数据</span>
-              <span v-else-if="!row.report_ok" class="todo">缺小结</span>
-              <span v-else class="dim">—</span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </template>
 
       <!-- ============ 月结 ============ -->
       <template v-if="activeTab === 'summary'">
-        <!-- 月结上传进度：选年月即自动加载，无需点「统计」 -->
-        <el-card v-if="uploadStatus" shadow="never" class="upload-status-card">
+        <!-- 月结完成情况：数据上传 + 文字小结（选年月即自动加载，无需点「统计」） -->
+        <el-card shadow="never" class="upload-status-card">
           <template #header>
-            <div class="upload-status-head">
-              <span>
-                <b>{{ uploadStatus.year }} 年 {{ uploadStatus.month }} 月</b>
-                质控数据上传进度
-              </span>
-              <span class="upload-status-count">
-                <el-tag type="success" size="small" effect="dark">
-                  已上传 {{ uploadStatus.uploaded }}
-                </el-tag>
-                <el-tag v-if="uploadStatus.not_uploaded > 0" type="warning" size="small" effect="dark">
-                  未上传 {{ uploadStatus.not_uploaded }}
-                </el-tag>
-                <el-tag type="info" size="small" effect="plain">共 {{ uploadStatus.total }} 台</el-tag>
-              </span>
-              <span class="upload-status-actions">
-                <el-button
-                  size="small"
-                  @click="showMissingOnly = !showMissingOnly"
-                >{{ showMissingOnly ? '显示全部' : '只看待办' }}</el-button>
-                <el-button
-                  size="small"
-                  type="primary"
-                  plain
-                  :loading="loadingUploadStatus"
-                  @click="loadUploadStatus"
-                >刷新</el-button>
-              </span>
+            <div class="todo-head" style="margin-bottom:0">
+              <b>质控月结完成情况</b>
+              <el-date-picker
+                v-model="monthValue"
+                type="month"
+                placeholder="选择年月"
+                format="YYYY-MM"
+                value-format="YYYY-MM"
+                style="width: 145px"
+              />
+              <div class="todo-stats" v-if="todoRows.length">
+                <span class="stat-item">
+                  数据上传
+                  <b :class="uploadStatus && uploadStatus.not_uploaded ? 'warn' : 'ok'">
+                    {{ uploadStatus ? `${uploadStatus.uploaded}/${uploadStatus.total}` : '—' }}
+                  </b>
+                </span>
+                <span class="stat-item">
+                  文字小结
+                  <b :class="reportStatus && reportStatus.not_written ? 'warn' : 'ok'">
+                    {{ reportStatus ? `${reportStatus.written}/${reportStatus.total}` : '—' }}
+                  </b>
+                </span>
+              </div>
+              <div style="margin-left: auto; display: flex; gap: 8px">
+                <el-button size="small" @click="showTodoMissingOnly = !showTodoMissingOnly">
+                  {{ showTodoMissingOnly ? '显示全部' : '只看待办' }}
+                </el-button>
+                <el-button size="small" type="primary" plain
+                           :loading="loadingUploadStatus || loadingReportStatus"
+                           @click="loadTodoData">刷新</el-button>
+                <el-button size="small" type="primary" plain :disabled="!todoMissing.length"
+                           @click="copyTodoList">📋 复制催办名单</el-button>
+              </div>
             </div>
           </template>
-          <el-table
-            :data="visibleUploadRows"
-            size="small"
-            border
-            max-height="260"
-            :row-class-name="uploadRowClass"
-          >
-            <el-table-column label="状态" width="86">
+          <el-alert v-if="todoRows.length" :type="todoMissing.length ? 'warning' : 'success'"
+                    :closable="false" show-icon style="margin-bottom: 8px">
+            <template #title>
+              <template v-if="todoMissing.length">
+                <b>{{ monthLabel }}</b> 还有 <b style="color:#e6a23c">{{ todoMissing.length }}</b> 台仪器没交活，需催办
+              </template>
+              <template v-else>
+                <b>{{ monthLabel }}</b> 全部 {{ todoRows.length }} 台仪器都已完成 ✅
+              </template>
+            </template>
+          </el-alert>
+          <el-table :data="visibleTodoRows" size="small" border stripe max-height="300"
+                    v-loading="loadingUploadStatus || loadingReportStatus"
+                    :row-class-name="todoRowClass" empty-text="暂无数据">
+            <el-table-column label="科室编号" width="180" prop="dept_no" />
+            <el-table-column label="仪器" min-width="160">
+              <template #default="{ row }">{{ row.model || row.name }}</template>
+            </el-table-column>
+            <el-table-column label="数据上传" width="110" align="center">
               <template #default="{ row }">
-                <el-tag :type="row.uploaded ? 'success' : 'warning'" size="small">
-                  {{ row.uploaded ? '已上传' : '未上传' }}
+                <el-tag :type="row.data_ok ? 'success' : 'danger'" size="small" effect="dark">
+                  {{ row.data_ok ? '已上传' : '未上传' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="dept_no" label="科室编号" width="180" />
-            <el-table-column label="仪器" min-width="180">
+            <el-table-column label="文字小结" width="110" align="center">
               <template #default="{ row }">
-                {{ row.model || row.name }}
-                <span v-if="row.model && row.name && row.model !== row.name" class="dim">
-                  （{{ row.name }}）
-                </span>
+                <el-tag :type="row.report_ok ? 'success' : 'danger'" size="small" effect="dark">
+                  {{ row.report_ok ? '已写' : '未写' }}
+                </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="item_count" label="已传项目" width="94" align="center" />
-            <el-table-column prop="daily_count" label="已传测值" width="94" align="center" />
-            <el-table-column label="备注" min-width="120">
+            <el-table-column label="已传项目" width="88" align="center">
+              <template #default="{ row }">{{ row.data_ok ? row.item_count : '—' }}</template>
+            </el-table-column>
+            <el-table-column label="待办" min-width="140">
               <template #default="{ row }">
-                <span :class="row.uploaded ? 'dim' : 'todo'">
-                  {{ row.uploaded ? '' : '需催办上传' }}
-                </span>
+                <span v-if="!row.data_ok && !row.report_ok" class="todo">缺数据 + 缺小结</span>
+                <span v-else-if="!row.data_ok" class="todo">缺数据</span>
+                <span v-else-if="!row.report_ok" class="todo">缺小结</span>
+                <el-button v-else link type="primary" size="small"
+                           @click="previewReport(row)">查看小结</el-button>
               </template>
             </el-table-column>
           </el-table>
         </el-card>
 
-        <!-- 质控文字小结完成情况：数据传了还要写小结才算完成 -->
-        <el-card v-if="reportStatus" shadow="never" class="upload-status-card report-status-card">
-          <template #header>
-            <div class="upload-status-head">
-              <span>
-                <b>{{ reportStatus.year }} 年 {{ reportStatus.month }} 月</b>
-                质控小结完成情况
-              </span>
-              <span class="upload-status-count">
-                <el-tag type="success" size="small" effect="dark">
-                  已写 {{ reportStatus.written }}
-                </el-tag>
-                <el-tag v-if="reportStatus.not_written > 0" type="danger" size="small" effect="dark">
-                  未写 {{ reportStatus.not_written }}
-                </el-tag>
-                <el-tag type="info" size="small" effect="plain">共 {{ reportStatus.total }} 台</el-tag>
-              </span>
-              <span class="upload-status-actions">
-                <el-button size="small" @click="showReportMissingOnly = !showReportMissingOnly">
-                  {{ showReportMissingOnly ? '显示全部' : '只看待办' }}
-                </el-button>
-                <el-button size="small" type="primary" plain :loading="loadingReportStatus"
-                           @click="loadReportStatus">刷新</el-button>
-              </span>
-            </div>
-          </template>
-          <el-table :data="visibleReportRows" size="small" border max-height="260"
-                    :row-class-name="reportRowClass">
-            <el-table-column label="状态" width="80">
-              <template #default="{ row }">
-                <el-tag :type="row.written ? 'success' : 'danger'" size="small">
-                  {{ row.written ? '已写' : '未写' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="dept_no" label="科室编号" width="180" />
-            <el-table-column label="仪器" min-width="180">
-              <template #default="{ row }">
-                {{ row.model || row.name }}
-                <span v-if="row.model && row.name && row.model !== row.name" class="dim">
-                  （{{ row.name }}）
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column label="最后更新" width="150">
-              <template #default="{ row }">
-                <span class="dim">{{ fmtDateTime(row.updated_at) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="150" align="center">
-              <template #default="{ row }">
-                <el-button v-if="row.written" link type="primary" size="small"
-                           @click="previewReport(row)">查看</el-button>
-                <span v-else class="todo">需催办</span>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
 
         <!-- 小结预览弹窗 -->
         <el-dialog v-model="reportPreview.visible" :title="reportPreview.title" width="760px">
@@ -1010,7 +891,7 @@ const InterlabComparison = defineAsyncComponent(() => import('../interlab/Interl
 const TargetValueBoard = defineAsyncComponent(() => import('./TargetValueBoard.vue'))
 
 // 默认落在「上传催办」——管理者打开就能看到谁没交活
-const activeTab = ref('todo')
+const activeTab = ref('summary')
 const auth = useAuthStore()
 
 // LJ 质控图状态
@@ -1026,7 +907,6 @@ let chartResizeObserver = null
 // 按权限收口可见页签：technical_support 仅见其被授权的页签
 const visibleTabs = computed(() => {
   const tabs = [
-    { name: 'todo', label: '📋 上传催办', key: 'qc-monthly' },
     { name: 'summary', label: '室内质控月结', key: 'qc-monthly' },
     { name: 'chart', label: 'LJ 质控图', key: 'qc-monthly' },
     { name: 'eqa', label: '室间质评', key: 'eqa' },
@@ -1129,6 +1009,10 @@ const todoRows = computed(() => {
   return out
 })
 const todoMissing = computed(() => todoRows.value.filter((x) => !x.data_ok || !x.report_ok))
+const showTodoMissingOnly = ref(false)
+const visibleTodoRows = computed(() =>
+  showTodoMissingOnly.value ? todoMissing.value : todoRows.value
+)
 const monthLabel = computed(() =>
   uploadStatus.value ? `${uploadStatus.value.year} 年 ${uploadStatus.value.month} 月` : '本月')
 function todoRowClass({ row }) {
