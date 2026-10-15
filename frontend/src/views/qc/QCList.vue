@@ -9,43 +9,72 @@
       >
       <!-- ============ 月结 ============ -->
       <template v-if="activeTab === 'summary'">
-        <!-- 月结上传进度：提醒未上传的仪器（选年月后自动加载） -->
-        <el-alert
-          v-if="uploadStatus"
-          :type="uploadStatus.not_uploaded > 0 ? 'warning' : 'success'"
-          :closable="false"
-          show-icon
-          class="upload-status-alert"
-        >
-          <template #title>
-            <span class="upload-status-title">
-              {{ uploadStatus.year }} 年 {{ uploadStatus.month }} 月质控数据上传进度：
-              已上传 <b class="ok">{{ uploadStatus.uploaded }}</b> /
-              {{ uploadStatus.total }} 台
-              <template v-if="uploadStatus.not_uploaded > 0">
-                ，<b class="warn">未上传 {{ uploadStatus.not_uploaded }}</b> 台
-              </template>
-              <el-button
-                link type="primary"
-                size="small"
-                :loading="loadingUploadStatus"
-                @click="loadUploadStatus"
-                style="margin-left: 8px"
-              >刷新</el-button>
-            </span>
+        <!-- 月结上传进度：选年月即自动加载，无需点「统计」 -->
+        <el-card v-if="uploadStatus" shadow="never" class="upload-status-card">
+          <template #header>
+            <div class="upload-status-head">
+              <span>
+                <b>{{ uploadStatus.year }} 年 {{ uploadStatus.month }} 月</b>
+                质控数据上传进度
+              </span>
+              <span class="upload-status-count">
+                <el-tag type="success" size="small" effect="dark">
+                  已上传 {{ uploadStatus.uploaded }}
+                </el-tag>
+                <el-tag v-if="uploadStatus.not_uploaded > 0" type="warning" size="small" effect="dark">
+                  未上传 {{ uploadStatus.not_uploaded }}
+                </el-tag>
+                <el-tag type="info" size="small" effect="plain">共 {{ uploadStatus.total }} 台</el-tag>
+              </span>
+              <span class="upload-status-actions">
+                <el-button
+                  size="small"
+                  @click="showMissingOnly = !showMissingOnly"
+                >{{ showMissingOnly ? '显示全部' : '只看待办' }}</el-button>
+                <el-button
+                  size="small"
+                  type="primary"
+                  plain
+                  :loading="loadingUploadStatus"
+                  @click="loadUploadStatus"
+                >刷新</el-button>
+              </span>
+            </div>
           </template>
-          <div v-if="uploadStatus.not_uploaded > 0" class="upload-status-missing">
-            未上传：
-            <el-tag
-              v-for="x in missingInstruments"
-              :key="x.instrument_id"
-              type="warning"
-              size="small"
-              effect="plain"
-              class="miss-tag"
-            >{{ x.dept_no }} {{ x.model || x.name }}</el-tag>
-          </div>
-        </el-alert>
+          <el-table
+            :data="visibleUploadRows"
+            size="small"
+            border
+            max-height="260"
+            :row-class-name="uploadRowClass"
+          >
+            <el-table-column label="状态" width="86">
+              <template #default="{ row }">
+                <el-tag :type="row.uploaded ? 'success' : 'warning'" size="small">
+                  {{ row.uploaded ? '已上传' : '未上传' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="dept_no" label="科室编号" width="180" />
+            <el-table-column label="仪器" min-width="180">
+              <template #default="{ row }">
+                {{ row.model || row.name }}
+                <span v-if="row.model && row.name && row.model !== row.name" class="dim">
+                  （{{ row.name }}）
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="item_count" label="已传项目" width="94" align="center" />
+            <el-table-column prop="daily_count" label="已传测值" width="94" align="center" />
+            <el-table-column label="备注" min-width="120">
+              <template #default="{ row }">
+                <span :class="row.uploaded ? 'dim' : 'todo'">
+                  {{ row.uploaded ? '' : '需催办上传' }}
+                </span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
 
         <div class="toolbar">
           <el-date-picker
@@ -882,9 +911,14 @@ function instLabel(opt) {
 const monthValue = ref('')
 const uploadStatus = ref(null)
 const loadingUploadStatus = ref(false)
-const missingInstruments = computed(() =>
-  (uploadStatus.value?.instruments || []).filter((x) => !x.uploaded)
-)
+const showMissingOnly = ref(false)
+const visibleUploadRows = computed(() => {
+  const list = uploadStatus.value?.instruments || []
+  return showMissingOnly.value ? list.filter((x) => !x.uploaded) : list
+})
+function uploadRowClass({ row }) {
+  return row.uploaded ? '' : 'row-missing'
+}
 
 async function loadUploadStatus() {
   if (!monthValue.value) { uploadStatus.value = null; return }
@@ -894,12 +928,17 @@ async function loadUploadStatus() {
     const { data } = await getQCUploadStatus(year, month)
     uploadStatus.value = data
   } catch (e) {
-    // 进度卡片失败不影响月结主体功能
+    // 进度表失败不影响月结主体功能
     uploadStatus.value = null
   } finally {
     loadingUploadStatus.value = false
   }
 }
+
+// 选了年月即自动加载，无需点「统计」
+watch(monthValue, () => { loadUploadStatus() })
+// 切到月结页时也加载一次（年月已有值的情况）
+watch(activeTab, (t) => { if (t === 'summary' && monthValue.value) loadUploadStatus() })
 const summaryRows = ref([])
 const loadingSummary = ref(false)
 const uploadInstrumentId = ref(null)   // 月结筛选 + 上传 时选定的受控仪器
@@ -1385,8 +1424,6 @@ onUnmounted(() => {
 
 async function loadSummary() {
   const { year, month } = parseMonth()
-  // 进度卡片只需年月，不依赖仪器选择
-  loadUploadStatus()
   // 仅在「年月 + 仪器」都选齐后才允许加载（由工具栏「统计」按钮触发）
   if (!year || !month || !uploadInstrumentId.value) {
     summaryRows.value = []
@@ -2721,20 +2758,17 @@ watch(activeTab, (t) => {
 <style scoped>
 .page { height: 100%; }
 /* 月结上传进度卡片 */
-.upload-status-alert { margin-bottom: 10px; }
-.upload-status-alert :deep(.el-alert__title) { line-height: 1.6; }
-.upload-status-title b.ok { color: #67c23a; }
-.upload-status-title b.warn { color: #e6a23c; }
-.upload-status-missing {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #909399;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
+.upload-status-card { margin-bottom: 10px; }
+.upload-status-card :deep(.el-card__header) { padding: 10px 14px; }
+.upload-status-head {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px;
 }
-.miss-tag { margin-right: 2px; }
+.upload-status-count { display: flex; gap: 6px; align-items: center; }
+.upload-status-actions { margin-left: auto; display: flex; gap: 6px; }
+/* 未上传行浅黄底，整行一眼可辨 */
+.upload-status-card :deep(.row-missing) { background: #fff8e6; }
+.dim { color: #909399; font-size: 12px; }
+.todo { color: #e6a23c; font-weight: 600; font-size: 12px; }
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .toolbar .hint { color: #909399; font-size: 12px; flex: 1 1 100%; }
 .empty-tip { color: #909399; font-size: 13px; padding: 24px 0; text-align: center; }
