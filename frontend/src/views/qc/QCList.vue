@@ -7,6 +7,88 @@
         :label="tab.label"
         :name="tab.name"
       >
+      <!-- ============ 上传催办（管理者视角：谁没交活） ============ -->
+      <template v-if="activeTab === 'todo'">
+        <div class="todo-head">
+          <el-date-picker
+            v-model="monthValue"
+            type="month"
+            placeholder="选择年月"
+            format="YYYY-MM"
+            value-format="YYYY-MM"
+            style="width: 150px"
+          />
+          <el-button :loading="loadingUploadStatus || loadingReportStatus"
+                     @click="loadTodoData">刷新</el-button>
+          <div class="todo-stats" v-if="todoRows.length">
+            <span class="stat-item">
+              数据上传
+              <b :class="uploadStatus && uploadStatus.not_uploaded ? 'warn' : 'ok'">
+                {{ uploadStatus ? `${uploadStatus.uploaded}/${uploadStatus.total}` : '—' }}
+              </b>
+            </span>
+            <span class="stat-item">
+              文字小结
+              <b :class="reportStatus && reportStatus.not_written ? 'warn' : 'ok'">
+                {{ reportStatus ? `${reportStatus.written}/${reportStatus.total}` : '—' }}
+              </b>
+            </span>
+          </div>
+          <div style="margin-left: auto; display: flex; gap: 8px">
+            <el-button type="primary" plain :disabled="!todoMissing.length"
+                       @click="copyTodoList">📋 复制催办名单</el-button>
+          </div>
+        </div>
+
+        <el-alert v-if="todoRows.length" :type="todoMissing.length ? 'warning' : 'success'"
+                  :closable="false" show-icon style="margin-bottom: 10px">
+          <template #title>
+            <template v-if="todoMissing.length">
+              <b>{{ monthLabel }}</b> 还有 <b style="color:#e6a23c">{{ todoMissing.length }}</b> 台仪器没交活，需催办
+            </template>
+            <template v-else>
+              <b>{{ monthLabel }}</b> 全部 {{ todoRows.length }} 台仪器都已完成 ✅
+            </template>
+          </template>
+        </el-alert>
+
+        <el-table :data="todoRows" size="small" border stripe max-height="64vh"
+                  v-loading="loadingUploadStatus || loadingReportStatus"
+                  :row-class-name="todoRowClass" empty-text="暂无数据">
+          <el-table-column label="科室编号" width="180" prop="dept_no" fixed />
+          <el-table-column label="仪器" min-width="170">
+            <template #default="{ row }">
+              {{ row.model || row.name }}
+            </template>
+          </el-table-column>
+          <el-table-column label="数据上传" width="120" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.data_ok ? 'success' : 'danger'" size="small" effect="dark">
+                {{ row.data_ok ? '已上传' : '未上传' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="文字小结" width="120" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.report_ok ? 'success' : 'danger'" size="small" effect="dark">
+                {{ row.report_ok ? '已写' : '未写' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="已传项目" width="90" align="center">
+            <template #default="{ row }">{{ row.data_ok ? row.item_count : '—' }}</template>
+          </el-table-column>
+          <el-table-column label="待办" min-width="150">
+            <template #default="{ row }">
+              <span v-if="!row.data_ok && !row.report_ok" class="todo">缺数据 + 缺小结</span>
+              <span v-else-if="!row.data_ok" class="todo">缺数据</span>
+              <span v-else-if="!row.report_ok" class="todo">缺小结</span>
+              <span v-else class="dim">—</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+
       <!-- ============ 月结 ============ -->
       <template v-if="activeTab === 'summary'">
         <!-- 月结上传进度：选年月即自动加载，无需点「统计」 -->
@@ -927,7 +1009,8 @@ const Comparison = defineAsyncComponent(() => import('../comparison/Comparison.v
 const InterlabComparison = defineAsyncComponent(() => import('../interlab/InterlabComparison.vue'))
 const TargetValueBoard = defineAsyncComponent(() => import('./TargetValueBoard.vue'))
 
-const activeTab = ref('summary')
+// 默认落在「上传催办」——管理者打开就能看到谁没交活
+const activeTab = ref('todo')
 const auth = useAuthStore()
 
 // LJ 质控图状态
@@ -943,6 +1026,7 @@ let chartResizeObserver = null
 // 按权限收口可见页签：technical_support 仅见其被授权的页签
 const visibleTabs = computed(() => {
   const tabs = [
+    { name: 'todo', label: '📋 上传催办', key: 'qc-monthly' },
     { name: 'summary', label: '室内质控月结', key: 'qc-monthly' },
     { name: 'chart', label: 'LJ 质控图', key: 'qc-monthly' },
     { name: 'eqa', label: '室间质评', key: 'eqa' },
@@ -1010,10 +1094,70 @@ async function loadUploadStatus() {
 
 // 选了年月即自动加载，无需点「统计」
 watch(monthValue, () => { loadUploadStatus(); loadReportStatus() })
-// 切到月结页时也加载一次（年月已有值的情况）
-watch(activeTab, (t) => { if (t === 'summary' && monthValue.value) { loadUploadStatus(); loadReportStatus() } })
+// 切到月结 / 催办页时也加载一次（年月已有值的情况）
+watch(activeTab, (t) => {
+  if ((t === 'summary' || t === 'todo') && monthValue.value) { loadUploadStatus(); loadReportStatus() }
+})
 
-// ---------- 质控文字小结完成情况 ----------
+// ---------- 上传催办（管理者视角） ----------
+// 把「数据上传状态」和「小结完成状态」按仪器合并成一张表，一眼看出谁没交活
+const todoRows = computed(() => {
+  const dataMap = new Map((uploadStatus.value?.instruments || []).map((x) => [x.instrument_id, x]))
+  const repMap = new Map((reportStatus.value?.instruments || []).map((x) => [x.instrument_id, x]))
+  const ids = new Set([...dataMap.keys(), ...repMap.keys()])
+  const out = []
+  for (const id of ids) {
+    const d = dataMap.get(id) || {}
+    const r = repMap.get(id) || {}
+    out.push({
+      instrument_id: id,
+      dept_no: d.dept_no || r.dept_no || '',
+      model: d.model || r.model || '',
+      name: d.name || r.name || '',
+      data_ok: !!d.uploaded,
+      report_ok: !!r.written,
+      item_count: d.item_count || 0,
+    })
+  }
+  // 未完成的排前面，其余按编号
+  out.sort((a, b) => {
+    const ka = (a.data_ok ? 1 : 0) + (a.report_ok ? 1 : 0)
+    const kb = (b.data_ok ? 1 : 0) + (b.report_ok ? 1 : 0)
+    if (ka !== kb) return ka - kb
+    return String(a.dept_no).localeCompare(String(b.dept_no))
+  })
+  return out
+})
+const todoMissing = computed(() => todoRows.value.filter((x) => !x.data_ok || !x.report_ok))
+const monthLabel = computed(() =>
+  uploadStatus.value ? `${uploadStatus.value.year} 年 ${uploadStatus.value.month} 月` : '本月')
+function todoRowClass({ row }) {
+  return (!row.data_ok || !row.report_ok) ? 'row-missing' : ''
+}
+async function loadTodoData() {
+  await Promise.all([loadUploadStatus(), loadReportStatus()])
+}
+// 复制催办名单：直接粘到微信群/钉钉催人
+async function copyTodoList() {
+  const list = todoMissing.value
+  if (!list.length) { ElMessage.info('全部已完成，无需催办'); return }
+  const lines = [`${monthLabel.value} 质控月结待办（共 ${list.length} 台）：`]
+  list.forEach((x, i) => {
+    const miss = []
+    if (!x.data_ok) miss.push('数据未上传')
+    if (!x.report_ok) miss.push('小结未写')
+    lines.push(`${i + 1}. ${x.dept_no} ${x.model || x.name} —— ${miss.join('、')}`)
+  })
+  const text = lines.join('\n')
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success(`已复制 ${list.length} 台待办名单，可直接粘贴到群里`)
+  } catch (e) {
+    // 剪贴板不可用时退化为弹窗展示
+    ElMessageBox.alert(`<pre style="white-space:pre-wrap;font-size:13px">${text.replace(/</g, '&lt;')}</pre>`,
+      '催办名单（请手动复制）', { dangerouslyUseHTMLString: true })
+  }
+}
 const reportStatus = ref(null)
 const loadingReportStatus = ref(false)
 const showReportMissingOnly = ref(false)
@@ -1643,7 +1787,15 @@ function onSummaryExpand(row, expandedRows) {
 }
 // 切回月结 tab 时保留已加载数据，不自动重新拉取（仅「统计」按钮触发加载）
 watch(activeTab, () => {})
-onMounted(loadInstruments)
+onMounted(() => {
+  loadInstruments()
+  // 默认选中当月 —— 一进页面就显示「数据上传进度」和「小结完成情况」，
+  // 不用先手动选年月（否则两张表都是空的，看不到任何信息）。
+  if (!monthValue.value) {
+    const d = new Date()
+    monthValue.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+})
 
 function triggerCsv() {
   if (!uploadInstrumentId.value) {
@@ -2892,6 +3044,18 @@ watch(activeTab, (t) => {
 
 <style scoped>
 .page { height: 100%; }
+/* 上传催办面板 */
+.todo-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.todo-stats { display: flex; gap: 18px; margin-left: 6px; font-size: 14px; }
+.todo-stats .stat-item { color: #606266; }
+.todo-stats b { font-size: 16px; margin-left: 4px; }
+.todo-stats b.ok { color: #67c23a; }
+.todo-stats b.warn { color: #e6a23c; }
+/* 未完成行浅黄底（催办表 + 月结卡片通用） */
+.page :deep(.row-missing) { background: #fff8e6; }
 /* 月结上传进度卡片 */
 .upload-status-card { margin-bottom: 10px; }
 .upload-status-card :deep(.el-card__header) { padding: 10px 14px; }
