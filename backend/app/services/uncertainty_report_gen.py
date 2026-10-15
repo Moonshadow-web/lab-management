@@ -1,15 +1,35 @@
 """测量不确定度评估报告生成（Python 版，供后端批量 API 调用）。
 
-按 BG-SM-CZ-072 模板，支持 single/multi 两种模式，公式与图1/图2示例一致。
+按各专业组的表格编号生成（生免 BG-SM-CZ-072 / 临检 BG-LJ-CZ-30），
+支持 single/multi 两种模式，公式与图1/图2示例一致。
 """
 import io
 import json
 import math
 from datetime import datetime
 
-REPORT_CODE = "BG-SM-CZ-072"
+DEFAULT_REPORT_CODE = "BG-SM-CZ-072"
+# 各专业组的表格编号（2026-10-15 用户指定临检组为 BG-LJ-CZ-30）
+REPORT_CODE_BY_GROUP = {
+    "sm": "BG-SM-CZ-072",
+    "lj": "BG-LJ-CZ-30",
+}
 REPORT_VERSION = "01"
 REPORT_DATE = "2025.01.01"
+
+
+def report_code_for(group_code: str) -> str:
+    """按专业组返回表格编号。
+
+    已登记的直接命中；生免组回退默认值；其余组按 BG-<组>-CZ-30 规则生成，
+    避免非生免组报告误用 BG-SM- 前缀。
+    """
+    g = (group_code or "sm").strip().lower()
+    if g in REPORT_CODE_BY_GROUP:
+        return REPORT_CODE_BY_GROUP[g]
+    if g == "sm":
+        return DEFAULT_REPORT_CODE
+    return f"BG-{g.upper()}-CZ-30"
 
 
 def _esc(s):
@@ -54,6 +74,7 @@ p{line-height:1.7}
 
 def _report_single_html(v):
     """单个测量系统报告（图1范式）。"""
+    rc = report_code_for(v.get("group_code"))  # 按专业组取表格编号
     l1_mean = float(v.get("l1_mean") or 0)
     l1_sd = float(v.get("l1_sd") or 0)
     l1_n = int(v.get("l1_n") or 0)
@@ -112,7 +133,7 @@ def _report_single_html(v):
 <h1>测量不确定度评定报告</h1>
 <h1 class="s">单个测量系统{_esc(v.get('project_method') or '该检测方法')}测量人{_esc(v.get('sample_type') or '血清')}{_esc(v.get('analyte') or v.get('project_name') or '')}测量结果不确定度的评定</h1>
 <table class="info">
-<tr><td><b>表格编号</b></td><td>{REPORT_CODE}</td><td><b>版本号</b></td><td>{REPORT_VERSION}</td></tr>
+<tr><td><b>表格编号</b></td><td>{rc}</td><td><b>版本号</b></td><td>{REPORT_VERSION}</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">{_esc(v.get('project_name'))}</td></tr>
 <tr><td><b>检测系统</b></td><td colspan="3">{_esc(v.get('instrument'))}</td></tr>
 <tr><td><b>试剂</b></td><td>{_esc(v.get('reagent'))}</td><td><b>校准品</b></td><td>{_esc(v.get('calibrator') or '-')}</td></tr>
@@ -161,6 +182,7 @@ def _report_single_html(v):
 
 def _report_multi_html(v):
     """多个测量系统报告（图2范式）。"""
+    rc = report_code_for(v.get("group_code"))  # 按专业组取表格编号
     systems = _parse_multi_systems(v.get("multi_systems"))
     if not systems:
         return _report_single_html(v)  # 兜底按单系统
@@ -241,7 +263,7 @@ def _report_multi_html(v):
 <h1>测量不确定度评定报告</h1>
 <h1 class="s">{_esc(multi_title)}</h1>
 <table class="info">
-<tr><td><b>表格编号</b></td><td>{REPORT_CODE}</td><td><b>版本号</b></td><td>{REPORT_VERSION}</td></tr>
+<tr><td><b>表格编号</b></td><td>{rc}</td><td><b>版本号</b></td><td>{REPORT_VERSION}</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">{_esc(v.get('project_name'))}</td></tr>
 <tr><td><b>检测系统数</b></td><td>{len(systems)}</td><td><b>系统列表</b></td><td>{_esc('、'.join(s.get('name') or '—' for s in systems))}</td></tr>
 <tr><td><b>评定日期</b></td><td>{_esc(v.get('eval_date'))}</td><td><b>评定周期</b></td><td>{int(v.get('cycle_months') or 12)} 个月</td></tr>

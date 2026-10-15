@@ -2,7 +2,7 @@
   <div class="uncert-page">
     <div class="uncert-header">
       <h2>测量不确定度评定</h2>
-      <span>{{ deptName }} | BG-SM-CZ-072 | 2026-08-18 重构版</span>
+      <span>{{ deptName }} | {{ reportCode(auth.groupCode) }} | 2026-08-18 重构版</span>
     </div>
 
     <el-row :gutter="16">
@@ -581,7 +581,7 @@ import request from '../../utils/request'
 import { downloadReportArchive } from '../../api/reportArchives'
 import { useAuthStore } from '../../store/auth'
 // 报告 HTML 构建 / 打印 / 下载已抽到共享工具（不确定度汇总页复用同一份）
-import { esc, todayStr, reportStyle, buildSingleReport, buildMultiReport, buildQualitativeReport, buildSummaryReport, printOrSavePdf, downloadHtml } from '../../utils/uncertaintyReport'
+import { esc, todayStr, reportStyle, reportCode, buildSingleReport, buildMultiReport, buildQualitativeReport, buildSummaryReport, printOrSavePdf, downloadHtml } from '../../utils/uncertaintyReport'
 
 // 常用试剂品牌兜底（项目库 reagent 字段普遍为空，保证下拉有候选可选）
 const COMMON_REAGENTS = ['贝克曼', '罗氏', '西门子', '雅培', '迈瑞', '积水', '柏定', '德赛', '九强', '安图', '奥森多', '强生', '迈克', '中生北控']

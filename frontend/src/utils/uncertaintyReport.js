@@ -20,6 +20,24 @@ export function groupLabel(groupCode, fallback = 'sm') {
   return GROUP_NAMES[(groupCode || fallback || 'sm')] || GROUP_NAMES.sm
 }
 
+/** 各专业组的不确定度评定报告表格编号（2026-10-15 用户指定临检组为 BG-LJ-CZ-30） */
+const REPORT_CODES = {
+  sm: 'BG-SM-CZ-072',
+  lj: 'BG-LJ-CZ-30',
+}
+/** 按专业组取表格编号；未登记的组按 BG-<组大写>-CZ-30 生成，避免误用 BG-SM- 前缀 */
+export function reportCode(groupCode, fallback = 'sm') {
+  const g = String(groupCode || fallback || 'sm').toLowerCase()
+  if (REPORT_CODES[g]) return REPORT_CODES[g]
+  if (g === 'sm') return REPORT_CODES.sm
+  return `BG-${g.toUpperCase()}-CZ-30`
+}
+/** 列表 → 取第一条记录的组对应的编号（同一批数据必然同组） */
+export function reportCodeOfList(list) {
+  const first = (list || []).find((x) => x && x.group_code)
+  return reportCode(first && first.group_code)
+}
+
 /** 单份记录 → 「民航总医院检验科XX组」 */
 export function deptLine(rec) {
   return `民航总医院检验科${groupLabel(rec && rec.group_code)}`
@@ -75,7 +93,7 @@ export function buildSingleReport(p) {
 <h1>测量不确定度评定报告</h1>
 <h2 style="text-align:center">${esc(section1Title)}</h2>
 <table class="info-table">
-<tr><td><b>表格编号</b></td><td>BG-SM-CZ-072</td><td><b>版本号</b></td><td>01</td></tr>
+<tr><td><b>表格编号</b></td><td>${reportCode(p.group_code)}</td><td><b>版本号</b></td><td>01</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">${esc(p.project_name)}</td></tr>
 <tr><td><b>试剂</b></td><td>${esc(p.reagent || '-')}</td><td><b>校准品</b></td><td>${esc(p.calibrator || '-')}</td></tr>
 <tr><td><b>评定日期</b></td><td>${esc(p.eval_date || '-')}</td><td><b>评定周期</b></td><td>${p.cycle_months || 12} 个月</td></tr>
@@ -142,7 +160,7 @@ export function buildMultiReport(p) {
 <h1>测量不确定度评定报告</h1>
 <h2 style="text-align:center">${esc(sectionTitle)}</h2>
 <table class="info-table">
-<tr><td><b>表格编号</b></td><td>BG-SM-CZ-072</td><td><b>版本号</b></td><td>01</td></tr>
+<tr><td><b>表格编号</b></td><td>${reportCode(p.group_code)}</td><td><b>版本号</b></td><td>01</td></tr>
 <tr><td><b>项目名称</b></td><td colspan="3">${esc(p.project_name)}</td></tr>
 <tr><td><b>系统数</b></td><td>${sys.length}</td><td><b>系统列表</b></td><td>${esc(sys.map(s => s.name).join('、'))}</td></tr>
 <tr><td><b>评定日期</b></td><td>${esc(p.eval_date || '-')}</td><td><b>评定周期</b></td><td>${p.cycle_months || 12} 个月</td></tr>
@@ -212,7 +230,7 @@ export function buildQualitativeReport(p) {
 <h1>${deptLine(p)}</h1>
 <h1>${esc(projName)} 定性项目测量不确定度评定报告</h1>
 <table class="info-table">
-<tr><td><b>表格编号</b></td><td>BG-SM-CZ-072</td><td><b>版本号</b></td><td>01</td></tr>
+<tr><td><b>表格编号</b></td><td>${reportCode(p.group_code)}</td><td><b>版本号</b></td><td>01</td></tr>
 <tr><td><b>项目名称</b></td><td>${esc(projName)}</td><td><b>测量方法</b></td><td>${esc(method)}</td></tr>
 <tr><td><b>标本类型</b></td><td>${esc(sample)}</td><td><b>测量单位</b></td><td>S/CO（信号值/阈值比）</td></tr>
 <tr><td><b>试剂</b></td><td>${esc(p.reagent || '-')}</td><td><b>校准品</b></td><td>${esc(p.calibrator || '-')}</td></tr>
