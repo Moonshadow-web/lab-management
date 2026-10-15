@@ -35,8 +35,23 @@ export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem('token') || '',
     groupCode: localStorage.getItem('group_code') || 'sm',
-    canSwitchGroup: false,
-    switchableGroups: [],
+    // ⚠️ 必须持久化：只存在内存里的话，刷新页面后 canSwitchGroup 变回 false，
+    // 顶栏的「切换专业组」下拉框会消失，管理员以为没有这个功能。
+    canSwitchGroup: (() => {
+      if (localStorage.getItem('can_switch_group') === '1') return true
+      if (localStorage.getItem('can_switch_group') === '0') return false
+      // 兜底：老数据没有该键时，管理员默认可切换（与后端 is_admin 判定一致）
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || 'null')
+        return !!u && `${u.roles || ''},${u.role || ''}`.includes('admin')
+      } catch (_) { return false }
+    })(),
+    switchableGroups: (() => {
+      try {
+        const arr = JSON.parse(localStorage.getItem('switchable_groups') || '[]')
+        return Array.isArray(arr) && arr.length ? arr : ['sm', 'lj', 'wsw', 'fz', 'xk']
+      } catch (_) { return ['sm', 'lj', 'wsw', 'fz', 'xk'] }
+    })(),
     refreshToken: localStorage.getItem('refresh_token') || '',
     user: JSON.parse(localStorage.getItem('user') || 'null'),
   }),
@@ -79,6 +94,9 @@ export const useAuthStore = defineStore('auth', {
       localStorage.setItem('group_code', this.groupCode)
       this.canSwitchGroup = !!data.can_switch_group
       this.switchableGroups = data.switchable_groups || [this.groupCode]
+      // 持久化：刷新后仍能显示「切换专业组」下拉框
+      localStorage.setItem('can_switch_group', this.canSwitchGroup ? '1' : '0')
+      localStorage.setItem('switchable_groups', JSON.stringify(this.switchableGroups))
       this.token = data.access_token
       localStorage.setItem('token', this.token)
       if (data.refresh_token) {
@@ -122,6 +140,8 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('token')
       localStorage.removeItem('refresh_token')
       localStorage.removeItem('user')
+      localStorage.removeItem('can_switch_group')
+      localStorage.removeItem('switchable_groups')
     },
     // 判断当前用户对某模块是否有写权限
     canWrite(module) {

@@ -9,8 +9,8 @@
       >
       <!-- ============ 上传催办（管理者视角：谁没交活） ============ -->
 
-      <!-- ============ 月结 ============ -->
-      <template v-if="activeTab === 'summary'">
+      <!-- ============ 月结完成情况（独立 tab，放月结右边） ============ -->
+      <template v-if="activeTab === 'todo'">
         <!-- 月结完成情况：数据上传 + 文字小结（选年月即自动加载，无需点「统计」） -->
         <el-card shadow="never" class="upload-status-card">
           <template #header>
@@ -96,21 +96,12 @@
             </el-table-column>
           </el-table>
         </el-card>
+      </template>
+
+      <!-- ============ 月结 ============ -->
+      <template v-if="activeTab === 'summary'">
 
 
-        <!-- 小结预览弹窗 -->
-        <el-dialog v-model="reportPreview.visible" :title="reportPreview.title" width="760px">
-          <div v-if="reportPreview.rows.length" class="report-preview">
-            <div v-for="(r, i) in reportPreview.rows" :key="i" class="rp-block">
-              <div class="rp-label">{{ r.label }}</div>
-              <div class="rp-text">{{ r.text || '（空）' }}</div>
-            </div>
-          </div>
-          <template #footer>
-            <el-button @click="reportPreview.visible = false">关闭</el-button>
-            <el-button type="primary" @click="printReport">打印</el-button>
-          </template>
-        </el-dialog>
 
         <div class="toolbar">
           <el-date-picker
@@ -865,6 +856,20 @@
       </template>
     </el-tab-pane>
     </el-tabs>
+
+        <!-- 小结预览弹窗 -->
+        <el-dialog v-model="reportPreview.visible" :title="reportPreview.title" width="760px">
+          <div v-if="reportPreview.rows.length" class="report-preview">
+            <div v-for="(r, i) in reportPreview.rows" :key="i" class="rp-block">
+              <div class="rp-label">{{ r.label }}</div>
+              <div class="rp-text">{{ r.text || '（空）' }}</div>
+            </div>
+          </div>
+          <template #footer>
+            <el-button @click="reportPreview.visible = false">关闭</el-button>
+            <el-button type="primary" @click="printReport">打印</el-button>
+          </template>
+        </el-dialog>
   </div>
 </template>
 
@@ -908,6 +913,7 @@ let chartResizeObserver = null
 const visibleTabs = computed(() => {
   const tabs = [
     { name: 'summary', label: '室内质控月结', key: 'qc-monthly' },
+    { name: 'todo', label: '质控月结完成情况', key: 'qc-monthly' },
     { name: 'chart', label: 'LJ 质控图', key: 'qc-monthly' },
     { name: 'eqa', label: '室间质评', key: 'eqa' },
     { name: 'cmp', label: '仪器间比对', key: 'comparison' },
@@ -945,7 +951,8 @@ function instLabel(opt) {
 }
 
 // ---------- 月结 ----------
-const monthValue = ref('')
+// 记住上次选的年月：刷新页面后保持不变（否则手选月份一刷新就回到默认月，看不到数据）
+const monthValue = ref(localStorage.getItem('qc_month') || '')
 const uploadStatus = ref(null)
 const loadingUploadStatus = ref(false)
 const showMissingOnly = ref(false)
@@ -973,8 +980,11 @@ async function loadUploadStatus() {
 }
 
 // 选了年月即自动加载，无需点「统计」
-watch(monthValue, () => { loadUploadStatus(); loadReportStatus() })
-// 切到月结 / 催办页时也加载一次（年月已有值的情况）
+watch(monthValue, (v) => {
+  if (v) localStorage.setItem('qc_month', v)  // 持久化，刷新后保持
+  loadUploadStatus(); loadReportStatus()
+})
+// 切到月结 / 完成情况页时也加载一次（年月已有值的情况）
 watch(activeTab, (t) => {
   if ((t === 'summary' || t === 'todo') && monthValue.value) { loadUploadStatus(); loadReportStatus() }
 })
@@ -1673,13 +1683,38 @@ function onSummaryExpand(row, expandedRows) {
 watch(activeTab, () => {})
 onMounted(() => {
   loadInstruments()
-  // 默认选中当月 —— 一进页面就显示「数据上传进度」和「小结完成情况」，
-  // 不用先手动选年月（否则两张表都是空的，看不到任何信息）。
-  if (!monthValue.value) {
-    const d = new Date()
-    monthValue.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  }
+  initDefaultMonth()
 })
+
+// 默认月份：优先当月；若当月完全无数据（月中还没开始做月结），自动回退到上月。
+// 否则用户打开页面看到一片空白，以为功能没数据。
+function fmtYM(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+async function initDefaultMonth() {
+  if (monthValue.value) {
+    // 已有月份（用户上次选的，已持久化）—— 直接加载，刷新后不会变空
+    loadUploadStatus()
+    loadReportStatus()
+    return
+  }
+  const now = new Date()
+  const y = now.getFullYear(), m = now.getMonth() + 1
+  try {
+    // 先探测当月有没有数据（不设 monthValue，避免触发两次加载）
+    const [u, r] = await Promise.all([getQCUploadStatus(y, m), getQCReportStatus(y, m)])
+    const noData = !(u.data?.uploaded) && !(r.data?.written)
+    if (noData) {
+      const prev = new Date(y, m - 2, 1)  // m-2 因为 getMonth() 从 0 计
+      monthValue.value = fmtYM(prev)
+      ElMessage.info('本月尚无质控数据，已自动切换到上月')
+    } else {
+      monthValue.value = fmtYM(now)
+    }
+  } catch (e) {
+    monthValue.value = fmtYM(now)  // 探测失败就走当月，不影响主流程
+  }
+}
 
 function triggerCsv() {
   if (!uploadInstrumentId.value) {
