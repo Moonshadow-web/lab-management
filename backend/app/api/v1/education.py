@@ -589,6 +589,80 @@ def _ans_str(a) -> str:
     return str(a if a is not None else "").strip()
 
 
+PASS_LINE = 60  # 培训考核合格线（民航总医院检验科：60 分合格）
+
+
+def _sync_session_stats(db: Session, session_id: int | None) -> dict | None:
+    """把「岗前培训考核授权」的扫码答题结果，回写到关联的「组内培训记录」。
+
+    - 考核人数 = 已至少提交过一次答卷的人数（按姓名去重）
+    - 合格率   = 其中「历史最好成绩 ≥ 60 分」的人数占比（允许重考取最好成绩）
+    - 满意率   = 填了培训满意度（1~5 分）的人里，≥4 分的人数占比
+
+    让「授权考核 → 扫码答题」与「组内培训 → 考题记录 / 培训效果记录」自动联动，
+    不必再手工上传问卷星导出文件来解析统计。
+    """
+    if not session_id:
+        return None
+    sess = db.get(TrainingSession, session_id)
+    if not sess:
+        return None
+    auths = db.query(PreJobAuth).filter(PreJobAuth.training_session_id == session_id).all()
+    if not auths:
+        return None
+
+    by_name: dict[str, list] = {}
+    for a in auths:
+        n = (a.name or "").strip()
+        if n:
+            by_name.setdefault(n, []).append(a)
+
+    counts = passed = 0
+    sat_values: list[float] = []
+
+    def _satisfaction_of(row) -> float | None:
+        try:
+            ej = json.loads(row.exam_json or "{}") if isinstance(row.exam_json, str) else (row.exam_json or {})
+            v = ej.get("_satisfaction")
+            return float(v) if v else None
+        except Exception:
+            return None
+
+    for rows in by_name.values():
+        auth_ids = [r.id for r in rows]
+        recs = (db.query(PreJobTheoryRecord)
+                  .filter(PreJobTheoryRecord.pre_job_auth_id.in_(auth_ids))
+                  .all())
+        if not recs:
+            continue
+        counts += 1
+        if max((r.score_pct or 0) for r in recs) >= PASS_LINE:
+            passed += 1
+        # 满意度：取该人最后一次填写的值
+        for r in sorted(rows, key=lambda x: x.id or 0,reverse=True):
+            v = _satisfaction_of(r)
+            if v is not None:
+                sat_values.append(v)
+                break
+
+    if counts:
+        sess.exam_person_count = counts
+        sess.exam_pass_rate = round(passed * 100.0 / counts, 1)
+    if sat_values:
+        sess.eval_satisfy_rate = round(sum(1 for v in sat_values if v >= 4) * 100.0 / len(sat_values), 1)
+    try:
+        db.commit()
+    except Exception as e:  # noqa: BLE001
+        db.rollback()
+        logger.warning("培训统计回写失败(忽略): %s", e)
+        return None
+    return {
+        "exam_person_count": sess.exam_person_count,
+        "exam_pass_rate": sess.exam_pass_rate,
+        "eval_satisfy_rate": sess.eval_satisfy_rate,
+    }
+
+
 @router.post("/public/exam-submit/{pid}")
 def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
     """提交理论答卷：校验姓名 → 服务端判分 → 回写 exam_json（免登录）。"""
@@ -638,6 +712,15 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
             d["qaResult"] = "合格"
         d["theoryAnswers"] = a
         exam[post] = d
+    # 培训满意度（1~5，可选）：供组内培训记录统计「满意率」
+    try:
+        sat = payload.get("satisfaction")
+        if sat is not None and str(sat).strip() != "":
+            sv = int(float(sat))
+            if 1 <= sv <= 5:
+                exam["_satisfaction"] = sv
+    except Exception:
+        pass
     p.exam_json = json.dumps(exam, ensure_ascii=False)
     db.commit()
     # 平均分只统计有理论考核的岗位（无理论考核的岗位不计入）
@@ -673,6 +756,12 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
             logger.warning("理论答题归档写入失败(忽略): %s", e)
         except Exception:  # noqa: BLE001
             pass
+
+    # 联动：回写关联组内培训记录的考核人数/合格率/满意率
+    try:
+        _sync_session_stats(db, p.training_session_id)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("培训统计联动失败(忽略): %s", e)
 
     return {"ok": True, "score": total, "full": full, "pct": avg_pct, "detail": detail}
 

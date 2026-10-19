@@ -625,6 +625,7 @@ class PreJobAuthBase(BaseModel):
     conclusion: str = "待审核"
     auth_date: str = ""
     batch_id: str = ""
+    training_session_id: int | None = None  # 关联组内培训记录（答题后自动回写考核统计）
     status: str = "进行中"
     remark: str = ""
 

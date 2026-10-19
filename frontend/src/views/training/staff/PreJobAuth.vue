@@ -23,6 +23,13 @@
           <el-col :span="12"><el-form-item label="申请人"><el-input v-model="form.name" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="申请日期"><el-date-picker v-model="form.apply_date" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
         </el-row>
+        <el-form-item label="关联组内培训">
+          <el-select v-model="form.training_session_id" clearable filterable style="width:100%"
+            placeholder="选填：扫码答题后自动回写该培训记录的考核人数 / 合格率 / 满意率">
+            <el-option v-for="s in trainingSessions" :key="s.id"
+              :label="`${s.name}（${s.train_time || '未填时间'}）`" :value="s.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="考核岗位（多选）">
           <el-select v-model="positions" multiple style="width:100%" placeholder="按 GL-070 选择岗位，仪器自动带出">
             <el-option v-for="p in POSITIONS" :key="p.name" :label="p.name" :value="p.name" />
@@ -155,7 +162,7 @@ import CrudTable from '../../../components/CrudTable.vue'
 import { printHtml } from '../../../utils/printHtml'
 import QRCode from 'qrcode'
 import { GL070_POSITIONS as META, AUTH_SCOPES } from './gl070Meta'
-import { listPreJobAuth, createPreJobAuth, updatePreJobAuth, deletePreJobAuth, generatePreJobAuths, listAuthSheet, listExamBank, listPostInstrumentMap } from '../../../api/education'
+import { listPreJobAuth, createPreJobAuth, updatePreJobAuth, deletePreJobAuth, generatePreJobAuths, listAuthSheet, listExamBank, listPostInstrumentMap, listTrainingSession } from '../../../api/education'
 import { listInstruments, getInstrumentTestItems } from '../../../api/instruments'
 import { useAuthStore } from '../../../store/auth'
 
@@ -182,7 +189,7 @@ META.forEach((p) => { ensureExam(p.name) })
 const form = ref(blank())
 function blank() {
   return {
-    id: null, name: '', apply_date: '', positions_json: [], instruments_json: [], permissions_json: [], items_json: [], exam_json: {},
+    id: null, name: '', apply_date: '', training_session_id: null, positions_json: [], instruments_json: [], permissions_json: [], items_json: [], exam_json: {},
     theory_eval: '', operation_eval: '', group_leader_opinion: '', director_opinion: '', conclusion: '', auth_date: '', status: '进行中', remark: '',
   }
 }
@@ -193,6 +200,16 @@ async function loadPostMap() {
   try { const r = await listPostInstrumentMap({ page: 1, page_size: 300 }); postMap.value = (r.items || []) } catch (e) { postMap.value = [] }
 }
 loadPostMap()
+
+// 组内培训记录（供「关联组内培训」下拉；答题后统计自动回写该记录）
+const trainingSessions = ref([])
+async function loadTrainingSessions() {
+  try {
+    const r = await listTrainingSession({ page: 1, page_size: 200, tag: '组内培训' })
+    trainingSessions.value = (r.items || r || []).filter((x) => (x.tag || '组内培训') === '组内培训')
+  } catch (e) { trainingSessions.value = [] }
+}
+loadTrainingSessions()
 const POSITIONS = computed(() => {
   if (!postMap.value.length) return META
   const map = new Map()

@@ -58,6 +58,10 @@
           </div>
         </div>
       </div>
+      <div style="margin:16px 0 10px;padding:12px;background:#f7f9fc;border-radius:8px;">
+        <div style="font-size:14px;color:#333;margin-bottom:8px;">培训效果评价（必填）：本次培训对您掌握该岗位/仪器操作的帮助程度</div>
+        <el-rate v-model="satisfaction" :texts="['很差','较差','一般','满意','非常满意']" show-text />
+      </div>
       <el-button type="primary" size="large" style="width:100%;" @click="submit" :loading="saving">提交答卷</el-button>
     </div>
 
@@ -88,6 +92,7 @@ const answers = ref({})
 const loading = ref(false)
 const saving = ref(false)
 const result = ref({ score: 0, full: 0 })
+const satisfaction = ref(0)  // 培训满意度 1~5（培训效果评价，会统计到组内培训的「满意率」）
 
 async function findMine() {
   if (!name.value.trim()) { ElMessage.error('请输入姓名'); return }
@@ -115,12 +120,13 @@ async function loadPaper() {
 }
 
 async function submit() {
+  if (!satisfaction.value) { ElMessage.warning('请先完成培训效果评价（点选星级）'); return }
   saving.value = true
   try {
     const r = await fetch(`${BASE}/public/exam-submit/${picked.value}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.value.trim(), answers: answers.value }),
+      body: JSON.stringify({ name: name.value.trim(), answers: answers.value, satisfaction: satisfaction.value }),
     })
     const j = await r.json()
     if (!r.ok) { ElMessage.error(j.detail || '提交失败'); return }

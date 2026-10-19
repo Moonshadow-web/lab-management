@@ -460,6 +460,9 @@ class PreJobAuth(Base):
     conclusion: Mapped[str] = mapped_column(String(20), default="待审核")  # 通过/不通过/待审核
     auth_date: Mapped[str] = mapped_column(String(20), default="")  # 授权日期
     batch_id: Mapped[str] = mapped_column(String(50), default="")  # 批量生成授权分组（P3）
+    # 关联「组内培训记录」：扫码理论答题提交后，自动把考核人数/合格率回写到该培训记录，
+    # 使授权考核与组内培训统计联动（2026-10-19）
+    training_session_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True, default=None)
     exam_json: Mapped[str] = mapped_column(Text, default="{}")  # 考核记录快照（按岗位×方式的作答/打分）
     status: Mapped[str] = mapped_column(String(20), default="进行中")
     remark: Mapped[str] = mapped_column(String(500), default="")
