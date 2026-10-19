@@ -10,7 +10,7 @@ pymysql==1.1.1
 cryptography>=42.0.0
 python-docx>=1.1.0
 openpyxl>=3.1.0
-PyMuPDF>=1.24.0
+PyMuPDF>=1.24.0,<2.0   # 锁 1.x：2.0 移除 fitz 顶层模块（eqa.py 依赖），且会拖入 onnxruntime 使镜像 +330MB
 pypdf>=4.0.0
 Pillow>=10.0.0
 qrcode>=7.4.2
