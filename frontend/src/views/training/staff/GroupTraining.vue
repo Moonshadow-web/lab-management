@@ -93,10 +93,28 @@
             <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="notice" label="通知" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" :can-write="canWrite" />
           </el-tab-pane>
           <el-tab-pane label="培训考题" name="exam">
-            <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="exam" label="考题" accept=".doc,.docx,.pdf" :can-write="canWrite" @uploaded="refreshSessionMeta" />
+            <div v-if="canWrite" style="margin-bottom:8px;">
+              <el-button type="primary" plain size="small" :loading="genExamLoading"
+                :disabled="!sessionForm.id" @click="genExamSummary">
+                自动生成考题及成绩汇总
+              </el-button>
+              <span style="margin-left:8px;color:#909399;font-size:12px;">
+                按关联的授权考核单 + 岗位题库 + 扫码成绩生成 Word，自动归入下方附件
+              </span>
+            </div>
+            <EducationAttachmentList :key="'exam-' + examListKey" owner-type="training_session" :owner-id="sessionForm.id" kind="exam" label="考题" accept=".doc,.docx,.pdf" :can-write="canWrite" @uploaded="refreshSessionMeta" />
           </el-tab-pane>
           <el-tab-pane label="效果评价" name="effect_eval">
-            <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="effect_eval" label="效果评价" accept=".doc,.docx,.pdf" :can-write="canWrite" @uploaded="refreshSessionMeta" />
+            <div v-if="canWrite" style="margin-bottom:8px;">
+              <el-button type="primary" plain size="small" :loading="genEvalLoading"
+                :disabled="!sessionForm.id" @click="genEvalSummary">
+                自动生成效果评价汇总
+              </el-button>
+              <span style="margin-left:8px;color:#909399;font-size:12px;">
+                按扫码答题时填写的满意度评分生成 Word，自动归入下方附件
+              </span>
+            </div>
+            <EducationAttachmentList :key="'eval-' + evalListKey" owner-type="training_session" :owner-id="sessionForm.id" kind="effect_eval" label="效果评价" accept=".doc,.docx,.pdf" :can-write="canWrite" @uploaded="refreshSessionMeta" />
           </el-tab-pane>
           <el-tab-pane label="签到扫描件" name="sign_in">
             <EducationAttachmentList owner-type="training_session" :owner-id="sessionForm.id" kind="sign_in" label="签到扫描件" accept=".pdf,.jpg,.jpeg,.png" hint="上传打印并签名后的扫描件/照片" :can-write="canWrite" />
@@ -122,6 +140,7 @@ import { Plus, Delete } from '@element-plus/icons-vue'
 import CrudTable from '../../../components/CrudTable.vue'
 import SignInSheet from '../SignInSheet.vue'
 import EducationAttachmentList from '../EducationAttachmentList.vue'
+import { generateExamSummary, generateEvalSummary } from '../../../api/education'
 import TrainingPlanBoard from './TrainingPlanBoard.vue'
 import {
   listTrainingPlan, createTrainingPlan, updateTrainingPlan, deleteTrainingPlan,
@@ -193,6 +212,38 @@ const sessionStats = computed(() => ({
   exam_pass_rate: sessionForm.value.exam_pass_rate ?? '—',
   eval_satisfy_rate: sessionForm.value.eval_satisfy_rate ?? '—',
 }))
+// ── 一键生成汇总文档（考题及成绩 / 效果评价）──
+const genExamLoading = ref(false)
+const genEvalLoading = ref(false)
+const examListKey = ref(0)
+const evalListKey = ref(0)
+
+async function genExamSummary() {
+  if (!sessionForm.value.id) { ElMessage.warning('请先保存培训记录'); return }
+  genExamLoading.value = true
+  try {
+    const r = await generateExamSummary(sessionForm.value.id)
+    examListKey.value += 1
+    await refreshSessionMeta()
+    ElMessage.success('已生成：' + (r?.attachment?.original_name || '培训考题及成绩汇总.docx'))
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '生成失败')
+  } finally { genExamLoading.value = false }
+}
+
+async function genEvalSummary() {
+  if (!sessionForm.value.id) { ElMessage.warning('请先保存培训记录'); return }
+  genEvalLoading.value = true
+  try {
+    const r = await generateEvalSummary(sessionForm.value.id)
+    evalListKey.value += 1
+    await refreshSessionMeta()
+    ElMessage.success('已生成：' + (r?.attachment?.original_name || '培训效果评价汇总.docx'))
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '生成失败')
+  } finally { genEvalLoading.value = false }
+}
+
 async function refreshSessionMeta() {
   if (!sessionForm.value.id) return
   try {

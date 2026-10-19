@@ -112,3 +112,11 @@ export function deletePostInstrumentMap(id) { return request.delete(`${P}/post-i
 export function listPreJobTheoryRecords(params) { return request.get(`${P}/prejob-theory-records`, { params }) }
 export function getPreJobTheoryRecord(id) { return request.get(`${P}/prejob-theory-records/${id}`) }
 export function deletePreJobTheoryRecord(id) { return request.delete(`${P}/prejob-theory-records/${id}`) }
+
+// 组内培训：一键生成汇总文档（归入附件列表）
+export function generateExamSummary(sessionId) {
+  return request.post(`${P}/training-sessions/${sessionId}/generate-exam-summary`)
+}
+export function generateEvalSummary(sessionId) {
+  return request.post(`${P}/training-sessions/${sessionId}/generate-eval-summary`)
+}

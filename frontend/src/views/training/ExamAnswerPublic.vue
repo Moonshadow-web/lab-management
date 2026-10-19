@@ -15,8 +15,15 @@
         未找到「{{ name }}」的考核单，请与组长确认姓名是否与系统一致
       </div>
       <el-radio-group v-else v-model="picked" style="width:100%;">
-        <el-radio v-for="r in mine" :key="r.id" :value="r.id" style="display:block;margin:8px 0;">
-          #{{ r.id }}　{{ r.name }}　{{ r.apply_date }}　{{ (r.positions_json || []).join('、') }}
+        <el-radio v-for="r in mine" :key="r.id" :value="r.id" style="display:block;margin:8px 0;height:auto;align-items:flex-start;">
+          <div style="line-height:1.6;">
+            <b>{{ (r.positions_json || []).join('、') }}</b>
+            <span style="color:#909399;font-size:12px;margin-left:8px;">{{ r.apply_date }}</span>
+            <div v-if="(r.instruments || []).length" style="color:#606266;font-size:12px;">
+              考核仪器：{{ (r.instruments || []).map(i => i.name + '（' + i.code + '）').join('；') }}
+            </div>
+            <div v-else style="color:#c0c4cc;font-size:12px;">考核单号 #{{ r.id }}</div>
+          </div>
         </el-radio>
       </el-radio-group>
       <div style="display:flex;gap:8px;margin-top:12px;">

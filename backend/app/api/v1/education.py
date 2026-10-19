@@ -531,6 +531,24 @@ postmap_router = make_router(
 # =========================================================================
 # K. 免登录公开答题（扫码即答：填姓名 → 找到自己的岗前考核单 → 提交自动判分回写）
 # =========================================================================
+CLOSED_CONCLUSIONS = ("同意", "通过", "已授权")
+
+
+def _auth_closed(p) -> bool:
+    """考核单是否已完成授权 → 扫码答题通道应关闭。
+
+    判定：结论含「同意/通过」且不含「不通过/待审核」，或状态已置为已完成/已授权。
+    既往考核单一律不再出现在扫码列表里，避免与本次考核串单。
+    """
+    c = (getattr(p, "conclusion", "") or "").strip()
+    st = (getattr(p, "status", "") or "").strip()
+    if "不通过" in c or "待审核" in c or "待考" in c:
+        return False
+    if any(k in c for k in CLOSED_CONCLUSIONS):
+        return True
+    return st in ("已完成", "已授权", "已关闭")
+
+
 @router.get("/public/pre-job-auths")
 def public_prejob_by_name(name: str = "", db: Session = Depends(get_db)):
     """按姓名查找待考的岗前培训考核单（免登录）。"""
@@ -544,6 +562,7 @@ def public_prejob_by_name(name: str = "", db: Session = Depends(get_db)):
         .limit(20)
         .all()
     )
+    # 已完成授权的既往考核单不再开放答题通道
     return {
         "items": [
             {
@@ -552,8 +571,10 @@ def public_prejob_by_name(name: str = "", db: Session = Depends(get_db)):
                 "apply_date": r.apply_date,
                 "positions_json": json.loads(r.positions_json or "[]"),
                 "conclusion": r.conclusion,
+                "instruments": json.loads(r.instruments_json or "[]"),
             }
             for r in rows
+            if not _auth_closed(r)
         ]
     }
 
@@ -564,6 +585,8 @@ def public_exam_paper(pid: int, db: Session = Depends(get_db)):
     p = db.get(PreJobAuth, pid)
     if not p:
         raise HTTPException(404, "考核单不存在")
+    if _auth_closed(p):
+        raise HTTPException(403, "该考核单已完成授权，答题通道已关闭")
     positions = json.loads(p.positions_json or "[]")
 
     def strip(lst):
@@ -669,6 +692,8 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
     p = db.get(PreJobAuth, pid)
     if not p:
         raise HTTPException(404, "考核单不存在")
+    if _auth_closed(p):
+        raise HTTPException(403, "该考核单已完成授权，答题通道已关闭")
     name = (payload.get("name") or "").strip()
     if not name or name != (p.name or "").strip():
         raise HTTPException(400, "姓名与考核单不一致，请确认")
@@ -764,6 +789,91 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
         logger.warning("培训统计联动失败(忽略): %s", e)
 
     return {"ok": True, "score": total, "full": full, "pct": avg_pct, "detail": detail}
+
+# =========================================================================
+# 组内培训：一键生成「考题及成绩汇总」「效果评价汇总」Word 并归档为附件
+# =========================================================================
+def _save_generated_docx(db: Session, sess: TrainingSession, kind: str,
+                         filename: str, content: bytes, user: User):
+    """保存生成的 docx 为培训附件（同名同类型先删后建，避免重复堆积）。"""
+    old = (db.query(EducationAttachment)
+             .filter_by(owner_type="training_session", owner_id=sess.id, kind=kind,
+                        original_name=filename)
+             .all())
+    for a in old:
+        if a.cloud_key:
+            try:
+                cos_storage.delete(a.cloud_key)
+            except Exception:
+                pass
+        db.delete(a)
+    db.flush()
+
+    cloud_key = None
+    if cos_storage.ready:
+        try:
+            cloud_key = cos_storage.save("education_attachments", filename, content)
+        except Exception:
+            cloud_key = None
+    att = EducationAttachment(
+        owner_type="training_session", owner_id=sess.id, kind=kind,
+        file_type="doc", original_name=filename, stored_name=filename, rel_path="",
+        cloud_key=cloud_key, data=None if cloud_key else content,
+        size_bytes=len(content), uploaded_by=(user.username if user else "system"),
+    )
+    db.add(att)
+    db.commit()
+    db.refresh(att)
+    return att
+
+
+@router.post("/training-sessions/{sid}/generate-exam-summary")
+def generate_exam_summary(sid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    """按关联的授权考核单 + 题库 + 答题成绩，生成「培训考题及成绩汇总」docx。"""
+    sess = db.get(TrainingSession, sid)
+    if not sess:
+        raise HTTPException(404, "培训记录不存在")
+    from ...services.training_docx import build_exam_summary
+
+    _sync_session_stats(db, sid)
+    content = build_exam_summary(db, sess, PreJobAuth, PreJobTheoryRecord)
+    name = f"{(sess.name or '培训').strip()}-培训考题及成绩汇总.docx"
+    att = _save_generated_docx(db, sess, "exam", name, content, user)
+    db.refresh(sess)
+    return {
+        "ok": True,
+        "attachment": _ser_attachment(att),
+        "stats": {
+            "exam_person_count": sess.exam_person_count,
+            "exam_pass_rate": sess.exam_pass_rate,
+            "eval_satisfy_rate": sess.eval_satisfy_rate,
+        },
+    }
+
+
+@router.post("/training-sessions/{sid}/generate-eval-summary")
+def generate_eval_summary(sid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    """按答题时填写的培训满意度，生成「培训效果评价汇总」docx。"""
+    sess = db.get(TrainingSession, sid)
+    if not sess:
+        raise HTTPException(404, "培训记录不存在")
+    from ...services.training_docx import build_eval_summary
+
+    _sync_session_stats(db, sid)
+    content = build_eval_summary(db, sess, PreJobAuth, PreJobTheoryRecord)
+    name = f"{(sess.name or '培训').strip()}-培训效果评价汇总.docx"
+    att = _save_generated_docx(db, sess, "effect_eval", name, content, user)
+    db.refresh(sess)
+    return {
+        "ok": True,
+        "attachment": _ser_attachment(att),
+        "stats": {
+            "exam_person_count": sess.exam_person_count,
+            "exam_pass_rate": sess.exam_pass_rate,
+            "eval_satisfy_rate": sess.eval_satisfy_rate,
+        },
+    }
+
 
 router.include_router(postmap_router)
 router.include_router(theoryrec_router)
