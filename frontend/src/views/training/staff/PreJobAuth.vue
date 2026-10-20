@@ -243,12 +243,19 @@ async function loadBanks() {
 }
 loadBanks()
 
-// 仪器库（dept_no → id，用于带出关联项目）
+// 仪器库（dept_no → 仪器数组，用于带出关联项目）
+// ⚠️ 同一 dept_no 可能对应多台仪器（如 MHZYY-JYK-SM-2012 = 糖化G11 + 生化免疫流水线），
+// 必须保留数组，否则后写入的会覆盖前面的，取到「没关联项目」的那台。
 const instByCode = ref({})
 onMounted(async () => {
   try {
     const r = await listInstruments({ page: 1, page_size: 1000 })
-    instByCode.value = Object.fromEntries((r.items || []).map((x) => [x.dept_no, x]))
+    const map = {}
+    ;(r.items || []).forEach((x) => {
+      if (!x.dept_no) return
+      ;(map[x.dept_no] = map[x.dept_no] || []).push(x)
+    })
+    instByCode.value = map
   } catch (e) {}
 })
 
@@ -292,22 +299,37 @@ watch(instrumentCodes, () => {
 const projCache = new Map()
 const projLoading = ref(false)
 const instrumentProjects = ref([])
+async function fetchProjects(instId) {
+  try {
+    const items = await getInstrumentTestItems(instId)
+    return (items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim()).join('、')
+  } catch (e) { return '' }
+}
+
 watch(instrumentCodes, async () => {
   projLoading.value = true
   const rows = []
   for (const c of instrumentCodes.value) {
     const inst = GL070_META_ALL.value.find((i) => i.code === c) || {}
-    let projects = projCache.get(c)
+    const cacheKey = `${c}|${inst.name || ''}`
+    let projects = projCache.get(cacheKey)
     if (projects === undefined) {
       projects = ''
-      const dbInst = instByCode.value[c]
-      if (dbInst) {
-        try {
-          const items = await getInstrumentTestItems(dbInst.id)
-          projects = (items || []).map((t) => `${t.code || ''} ${t.name || ''}`.trim()).join('、')
-        } catch (e) { projects = '' }
+      const candidates = instByCode.value[c] || []
+      // ① 名称与岗位映射完全一致的那台优先（解决同编号多台仪器）
+      const exact = inst.name
+        ? candidates.find((x) => (x.name || '').trim() === String(inst.name).trim())
+        : null
+      if (exact) projects = await fetchProjects(exact.id)
+      // ② 还没取到 → 依次尝试该编号下的其它仪器，取第一个「有项目」的
+      if (!projects) {
+        for (const cand of candidates) {
+          if (exact && cand.id === exact.id) continue
+          const p2 = await fetchProjects(cand.id)
+          if (p2) { projects = p2; break }
+        }
       }
-      projCache.set(c, projects)
+      projCache.set(cacheKey, projects)
     }
     rows.push({ code: c, name: inst.name || '', projects })
   }
