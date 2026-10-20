@@ -707,21 +707,38 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
     total = 0
     full = 0
     detail = {}
+    review = {}   # 逐题批改：供答题人提交后查看题目与对错
     for post in positions:
         b = db.query(ExamBank).filter(ExamBank.post == post).first()
         T = json.loads((b.theory_json if b else None) or "{}")
         a = answers.get(post) or {}
         s = 0
+        rv = []
         for i, t in enumerate(T.get("single") or []):
-            if a.get("s%d" % i) == _ans_str(t.get("answer"))[:1]:
+            picked = a.get("s%d" % i) or ""
+            correct = _ans_str(t.get("answer"))[:1]
+            ok = picked == correct
+            if ok:
                 s += 2
+            rv.append({"type": "single", "q": t.get("q", ""), "options": t.get("options") or [],
+                       "picked": picked, "answer": correct, "ok": ok})
         for i, t in enumerate(T.get("multi") or []):
             got = "".join(sorted(a.get("m%d" % i) or []))
-            if got and got == "".join(sorted(_ans_str(t.get("answer")))):
+            correct = "".join(sorted(_ans_str(t.get("answer"))))
+            ok = bool(got) and got == correct
+            if ok:
                 s += 4
+            rv.append({"type": "multi", "q": t.get("q", ""), "options": t.get("options") or [],
+                       "picked": got, "answer": correct, "ok": ok})
         for i, t in enumerate(T.get("judge") or []):
-            if a.get("j%d" % i) == _ans_str(t.get("answer")):
+            picked = a.get("j%d" % i) or ""
+            correct = _ans_str(t.get("answer"))
+            ok = picked == correct
+            if ok:
                 s += 2
+            rv.append({"type": "judge", "q": t.get("q", ""), "options": [],
+                       "picked": picked, "answer": correct, "ok": ok})
+        review[post] = rv
         f = len(T.get("single") or []) * 2 + len(T.get("multi") or []) * 4 + len(T.get("judge") or []) * 2
         pct = int(round(s * 100.0 / f)) if f else 0
         # 该岗位若无理论考核（full=0），不计入百分制平均分
@@ -788,7 +805,8 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
     except Exception as e:  # noqa: BLE001
         logger.warning("培训统计联动失败(忽略): %s", e)
 
-    return {"ok": True, "score": total, "full": full, "pct": avg_pct, "detail": detail}
+    return {"ok": True, "score": total, "full": full, "pct": avg_pct,
+            "detail": detail, "review": review}
 
 # =========================================================================
 # 组内培训：一键生成「考题及成绩汇总」「效果评价汇总」Word 并归档为附件

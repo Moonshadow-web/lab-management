@@ -73,13 +73,44 @@
     </div>
 
     <!-- 完成 -->
-    <div v-else style="text-align:center;padding:24px 0;">
-      <h3 style="color:#16a34a;">提交成功</h3>
-      <p style="font-size:18px;">理论得分（总分）：<b>{{ result.pct }}</b> / 100 分</p>
-      <div v-for="(v, k) in result.detail || {}" :key="k" style="font-size:14px;color:#444;">
-        {{ k }}：<template v-if="v.full"><b>{{ v.pct }}</b> / 100 分（原始 {{ v.score }}/{{ v.full }}）　合格线 60</template><template v-else>该岗位无理论考核（不计入）</template>
+    <div v-else>
+      <div style="text-align:center;padding:16px 0 8px;">
+        <h3 style="color:#16a34a;margin:0 0 6px;">提交成功</h3>
+        <p style="font-size:18px;margin:4px 0;">理论得分（总分）：<b>{{ result.pct }}</b> / 100 分</p>
+        <div v-for="(v, k) in result.detail || {}" :key="k" style="font-size:14px;color:#444;">
+          {{ k }}：<template v-if="v.full"><b>{{ v.pct }}</b> / 100 分（原始 {{ v.score }}/{{ v.full }}）　合格线 60</template><template v-else>该岗位无理论考核（不计入）</template>
+        </div>
+        <p style="color:#888;margin-top:8px;">成绩已回写到您的岗前培训考核记录</p>
       </div>
-      <p style="color:#888;margin-top:8px;">成绩已回写到您的岗前培训考核记录</p>
+
+      <!-- 逐题对错 -->
+      <div v-for="(list, post) in result.review || {}" :key="'rv-' + post" style="margin-top:16px;">
+        <h4 style="border-left:4px solid #2563eb;padding-left:8px;font-size:15px;margin:12px 0 8px;">{{ post }} · 答题详情</h4>
+        <div v-for="(it, idx) in list" :key="idx"
+             :style="{ padding: '10px', marginBottom: '8px', borderRadius: '6px',
+                       background: it.ok ? '#f0fdf4' : '#fef2f2',
+                       border: '1px solid ' + (it.ok ? '#bbf7d0' : '#fecaca') }">
+          <div style="font-size:14px;line-height:1.6;">
+            <span :style="{ color: it.ok ? '#16a34a' : '#dc2626', fontWeight: 700, marginRight: '6px' }">
+              {{ it.ok ? '✓' : '✗' }}
+            </span>
+            <b>{{ idx + 1 }}.</b> {{ it.q }}
+          </div>
+          <div v-if="(it.options || []).length" style="font-size:12.5px;color:#606266;margin:6px 0 0 22px;">
+            <div v-for="(o, oi) in it.options" :key="oi">{{ o }}</div>
+          </div>
+          <div style="font-size:13px;margin:6px 0 0 22px;">
+            <span style="color:#606266;">你的答案：</span>
+            <b :style="{ color: it.ok ? '#16a34a' : '#dc2626' }">{{ it.picked || '未作答' }}</b>
+            <span style="color:#606266;margin-left:14px;">正确答案：</span>
+            <b style="color:#16a34a;">{{ it.answer || '—' }}</b>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:18px;">
+        <el-button @click="restart">重新作答 / 返回</el-button>
+      </div>
     </div>
   </div>
 </template>
@@ -124,6 +155,14 @@ async function loadPaper() {
     answers.value = a
     step.value = 3
   } catch (e) { ElMessage.error('加载试卷失败') } finally { loading.value = false }
+}
+
+function restart() {
+  step.value = 1
+  picked.value = null
+  answers.value = {}
+  satisfaction.value = 0
+  result.value = { score: 0, full: 0 }
 }
 
 async function submit() {
