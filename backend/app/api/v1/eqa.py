@@ -1175,11 +1175,88 @@ def _conversion_for(plan: EqaPlan | None, name: str):
 #   - 例外（抑制/竞争法抗体，COI 越低越阳）：HBeAb、HBcAb → COI < 1 → 阳性(P)，否则 阴性(N)
 # result_data 中保留 COI 原值（存于 cells），并新增 qual_pn = {样本:{项目:'P'/'N'}}。
 # ---------------------------------------------------------------------------
-EQA_QUALITATIVE_PROGRAM_KEYWORDS = ["肝炎", "感染"]  # program 含这些字 → 定性试验（COI）
+EQA_QUALITATIVE_PROGRAM_KEYWORDS = ["肝炎", "感染", "优生"]  # program 含这些字 → 定性试验（按参考范围判阴阳）
 EQA_QUALITATIVE_REVERSE_ITEMS = [
     "hbeab", "抗-hbe", "抗hbe", "hbe抗体", "e抗体", "乙肝e抗体",
     "hbcab", "抗-hbc", "抗hbc", "hbc抗体", "核心抗体", "乙肝核心抗体",
 ]
+
+
+# ═══ 定性项目判读规则（2026-10-21 用户确认）═══
+# EQA 项目名 → 系统检验项目名（用于从 test_items.reference 取参考范围）
+_EQA_QUAL_ALIASES = {
+    "hbsab": ("乙型肝炎病毒表面抗体", "乙肝表面抗体"),
+    "hbeab": ("乙型肝炎病毒e抗体", "乙肝e抗体"),
+    "hbcab": ("乙型肝炎病毒核心抗体", "乙肝核心抗体"),
+    "hbsag": ("乙型肝炎病毒表面抗原", "乙肝表面抗原"),
+    "hbeag": ("乙型肝炎病毒e抗原", "乙肝e抗原"),
+    "hcvab": ("丙型肝炎病毒抗体", "丙肝抗体"),
+    "hiv": ("人类免疫缺陷病毒抗体", "HIV抗体", "快速抗HIV抗体"),
+    "tp": ("梅毒特异性抗体", "快速抗梅毒螺旋体抗体", "梅毒螺旋体抗体"),
+    "tpab": ("梅毒特异性抗体", "快速抗梅毒螺旋体抗体"),
+}
+
+# 兜底规则（取不到参考范围时用）：用户明确 HBsAb<10 阴、HBeAb/HBcAb>1 阴
+_EQA_QUAL_FALLBACK_RULES = {
+    "hbsab": {"neg_below": 10.0},
+    "hbeab": {"neg_above": 1.0},
+    "hbcab": {"neg_above": 1.0},
+}
+_DEFAULT_QUAL_RULE = {"neg_below": 1.0}   # COI 类项目默认「<1 阴性」（与旧逻辑 v>1 判阳等价）
+
+
+def _parse_ref_rule(ref: str) -> dict | None:
+    """从参考范围文本解析定性判读规则。
+
+    支持形态：
+      "<10" / "< 10"                → {"neg_below": 10}
+      ">1"                          → {"neg_above": 1}
+      "无反应 < 0.51 COI；不确定..."  → {"neg_below": 0.51}（取第一段=阴性段）
+      "<6 阴性；6≤浓度值<10 可疑；≥10 阳性" → {"neg_below": 6}
+      "阴性" / "阴性（-）"           → {"direct": True}（纯定性，直接填阴阳）
+    """
+    t = (ref or "").replace("＜", "<").replace("＞", ">").replace("≤", "<=").strip()
+    if not t:
+        return None
+    # 纯定性（无任何数值阈值）
+    if not re.search(r"[<>]\s*=?\s*[0-9]", t):
+        if "阴性" in t or "阳性" in t or t in ("-", "/"):
+            return {"direct": True}
+        return None
+    first = re.split(r"[；;]", t)[0]          # 取第一段（阴性段）
+    m = re.search(r"(<=|<|>=|>)\s*=?\s*([0-9]+(?:\.[0-9]+)?)", first)
+    if not m:
+        return None
+    op, num = m.group(1), float(m.group(2))
+    if op.startswith("<"):
+        return {"neg_below": num}
+    return {"neg_above": num}
+
+
+def _qual_rule_for(item: str, db=None) -> dict:
+    """取某定性项目的判读规则：优先系统参考范围，取不到用兜底规则。"""
+    key = _norm_item(item)
+    # 去掉可能的「（胶体金）」等后缀参与匹配
+    base = re.sub(r"[（(][^）)]*[）)]", "", key)
+    rule = _EQA_QUAL_FALLBACK_RULES.get(base) or _EQA_QUAL_FALLBACK_RULES.get(key)
+    if rule:
+        rule = dict(rule)
+    if db is not None:
+        names = _EQA_QUAL_ALIASES.get(base) or _EQA_QUAL_ALIASES.get(key)
+        if names:
+            for nm in names:
+                row = db.query(TestItem).filter(TestItem.name == nm).first()
+                if row and (row.reference or "").strip():
+                    parsed = _parse_ref_rule(row.reference)
+                    if parsed:
+                        return parsed
+    return rule or dict(_DEFAULT_QUAL_RULE)
+
+
+def _is_direct_pn_program(program: str) -> bool:
+    """「感染性疾病抗原抗体快速检测」类：胶体金法，结果直接填阴阳性，不填数值。"""
+    p = program or ""
+    return "快速检测" in p or "胶体金" in p
 
 
 def _is_qualitative_program(program: str) -> bool:
@@ -1200,45 +1277,61 @@ def _is_reverse_item(item: str) -> bool:
     return False
 
 
-def _qualitative_pn(value, reverse: bool) -> str:
-    """返回 'P'(阳性) / 'N'(阴性) / ''（无值/非法）。
+def _qualitative_pn(value, rule: dict) -> str:
+    """按判读规则返回 'P'(阳性) / 'N'(阴性) / ''（无值/非法）。
 
-    value 兼容多种历史写法：可带 '<'/'≤'（低于 cutoff）、可带末尾 '/P' '/N'
-    （旧数据把 数值/阴阳 写在一起，如 '908.2/P'、'<2/N'、'0.016/P'），
-    解析时自动忽略后缀、识别低于 cutoff。
+    rule 形态（由 _qual_rule_for 提供）：
+      {"direct": True}     → 直接填阴阳性（胶体金快速检测）
+      {"neg_below": 10.0}  → 值 < 10 判阴性（如 HBsAb 参考范围 <10）
+      {"neg_above": 1.0}   → 值 > 1 判阴性（如 HBeAb/HBcAb 参考范围 >1）
+
+    兼容历史写法：可带 '<'/'≤' 前缀、可带末尾 '/P' '/N'（如 '908.2/P'、'<2/N'）。
     """
     if value is None:
         return ""
     s = str(value).strip()
-    # 兼容旧数据：去掉末尾 /P /N
-    s = re.sub(r"/[PN]$", "", s, flags=re.IGNORECASE).strip()
     if not s:
         return ""
-    below = bool(re.match(r"^(<|≤|<=|小于)", s))
-    s2 = re.sub(r"^(<|≤|<=|小于)", "", s).strip()
+    # 值本身就是阴阳性结果（胶体金快速检测 / 手工录入）
+    u = s.upper().replace(" ", "")
+    if u in ("P", "阳性", "阳", "+", "POS", "POSITIVE"):
+        return "P"
+    if u in ("N", "阴性", "阴", "-", "NEG", "NEGATIVE"):
+        return "N"
+    if rule.get("direct"):
+        return ""
+    # 数值判读
+    s = re.sub(r"/[PN]$", "", s, flags=re.IGNORECASE).strip()
+    s = re.sub(r"^(<|≤|<=|小于|>|≥|>=|大于)", "", s).strip()
     try:
-        v = float(s2)
+        v = float(s)
     except (TypeError, ValueError):
         return ""
-    if below:
-        # 低于 cutoff：常规项目为阴(N)，反向项目(HBeAb/HBcAb)为阳(P)
-        return "N" if not reverse else "P"
-    if reverse:
-        return "P" if v < 1 else "N"
-    return "P" if v > 1 else "N"
+    if "neg_below" in rule:
+        return "N" if v < rule["neg_below"] else "P"
+    if "neg_above" in rule:
+        return "N" if v > rule["neg_above"] else "P"
+    return ""
 
 
-def _compute_qual_pn(payload: dict) -> dict:
-    """对定性试验计划，按 cells（COI 原值）计算 qual_pn 阴阳性表。"""
+def _compute_qual_pn(payload: dict, plan=None, db=None) -> dict:
+    """对定性试验计划，按「项目参考范围」计算 qual_pn 阴阳性表。
+
+    - 胶体金快速检测类（program 含「快速检测」）：direct=True，值本身就是阴阳性
+    - 其余：按 test_items.reference 解析的阈值判读（HBsAb<10 阴、HBeAb/HBcAb>1 阴…）
+    """
     items = payload.get("items") or []
     cells = payload.get("cells") or {}
+    direct = _is_direct_pn_program(getattr(plan, "program", "") or "")
+    rules = {it: ({"direct": True} if direct else _qual_rule_for(it, db)) for it in items}
     pn = {}
     for s, row in cells.items():
         pn[s] = {}
         for it in items:
             val = (row or {}).get(it, "")
-            pn[s][it] = _qualitative_pn(val, _is_reverse_item(it))
+            pn[s][it] = _qualitative_pn(val, rules[it])
     return pn
+
 
 
 def _split_items(raw: str) -> list:
@@ -1427,6 +1520,14 @@ def get_eqa_result(
                     orig = _lookup_units([it], db).get(it)
                     if orig:
                         rd["units"][it] = orig
+    # 定性计划：把每个项目的判读规则一并返回，前端据此显示「直接填阴阳」或「数值自动判读」
+    if isinstance(rd, dict) and _is_qualitative_program(plan.program):
+        _direct = _is_direct_pn_program(plan.program)
+        rd["qual_direct"] = _direct
+        rd["qual_rules"] = {
+            it: ({"direct": True} if _direct else _qual_rule_for(it, db))
+            for it in (rd.get("items") or [])
+        }
     return {
         "result_data": rd,
         "plan": {
@@ -1461,7 +1562,7 @@ def put_eqa_result(
     # 定性试验：保留 COI 原值（cells）并自动生成阴阳性表 qual_pn
     if _is_qualitative_program(plan.program):
         payload["qualitative"] = True
-        payload["qual_pn"] = _compute_qual_pn(payload)
+        payload["qual_pn"] = _compute_qual_pn(payload, plan, db)
     else:
         payload.pop("qualitative", None)
         payload.pop("qual_pn", None)

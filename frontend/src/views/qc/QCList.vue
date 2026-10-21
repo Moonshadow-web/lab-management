@@ -716,8 +716,16 @@
                     </div>
                   </template>
                   <template v-else-if="it.qualitative">
-                    <div class="qual-cell">
-                      <el-input v-model="row.values[it.key]" size="small" placeholder="COI值"
+                    <!-- 胶体金快速检测：结果直接选阴阳性，不填数值 -->
+                    <div v-if="it.qualRule && it.qualRule.direct" class="qual-cell">
+                      <el-radio-group v-model="row.values[it.key]" size="small">
+                        <el-radio-button label="阴性" />
+                        <el-radio-button label="阳性" />
+                      </el-radio-group>
+                    </div>
+                    <!-- 其余定性项目：填数值，按项目参考范围自动判读 -->
+                    <div v-else class="qual-cell">
+                      <el-input v-model="row.values[it.key]" size="small" placeholder="COI/浓度值"
                         @input="onQualInput(row, it)" />
                       <span class="pn-badge" :class="pnClass(qualPN(row, it))">{{ qualPN(row, it) || '—' }}</span>
                     </div>
@@ -2308,7 +2316,7 @@ function _roundNum(x, d = 4) {
 
 // EQA 定性试验（COI）阴阳性判定（与后端 eqa.py 保持一致）
 // program 含「肝炎/感染」→ 定性试验；HBeAb/HBcAb 反向（COI<1 判阳）。
-const QUAL_PROGRAM_KEYWORDS = ['肝炎', '感染']
+const QUAL_PROGRAM_KEYWORDS = ['肝炎', '感染', '优生']   // 「优生优育」也按参考范围判阴阳
 const QUAL_REVERSE_ITEMS = [
   'hbeab', '抗-hbe', '抗hbe', 'e抗体', '乙肝e抗体',
   'hbcab', '抗-hbc', '抗hbc', '核心抗体', '乙肝核心抗体',
@@ -2328,16 +2336,23 @@ function isReverseItem(item) {
     return kk === nn || kk.includes(nn) || nn.includes(kk)
   })
 }
-function computePN(value, reverse) {
+// 按项目参考范围判读阴阳性（与后端 _qualitative_pn 保持一致）
+// rule: {direct:true} 直接填阴阳 | {neg_below:10} 值<10 判阴 | {neg_above:1} 值>1 判阴
+function computePN(value, rule) {
   let s = String(value == null ? '' : value).trim()
-  s = s.replace(/\/[PN]$/i, '').trim() // 去掉末尾 /P /N（兼容旧数据）
   if (!s) return ''
-  const below = /^(<|≤|<=|小于)/.test(s)
-  s = s.replace(/^(<|≤|<=|小于)/, '').trim()
+  const u = s.toUpperCase().replace(/\s/g, '')
+  if (['P', '阳性', '阳', '+', 'POS', 'POSITIVE'].includes(u)) return 'P'
+  if (['N', '阴性', '阴', '-', 'NEG', 'NEGATIVE'].includes(u)) return 'N'
+  const r = rule || { neg_below: 1 }   // 无规则时按 COI <1 阴性
+  if (r.direct) return ''
+  s = s.replace(/\/[PN]$/i, '').trim()
+  s = s.replace(/^(<|≤|<=|小于|>|≥|>=|大于)/, '').trim()
   const v = parseFloat(s)
   if (isNaN(v)) return ''
-  if (below) return reverse ? 'P' : 'N' // 低于 cutoff：常规判阴、反向(HBeAb/HBcAb)判阳
-  return reverse ? (v < 1 ? 'P' : 'N') : (v > 1 ? 'P' : 'N')
+  if (r.neg_below != null) return v < r.neg_below ? 'N' : 'P'
+  if (r.neg_above != null) return v > r.neg_above ? 'N' : 'P'
+  return ''
 }
 
 async function openResultDialog(row) {
@@ -2358,6 +2373,7 @@ async function openResultDialog(row) {
     gridItems.value = items.map((n) => ({
       key: n, name: n, unit: units[n] || '', conv: conv[n] || null,
       qualitative: isQualitativeProgram(resultPlan.value?.program),
+      qualRule: (rd.qual_rules || {})[n] || null,
       reverse: isReverseItem(n),
     }))
     // 正确度类计划：后端给了 rows（样本×天×次），按它展开多行；否则按样本一行
@@ -2484,10 +2500,17 @@ function applyGrid() {
   // 保留已有值（按样本名 + 项目名匹配）
   const old = {}
   for (const r of gridRows.value) old[r.sample] = { values: r.values || {}, report: r.report || {} }
+  // 保留各项目的定性判读规则（由后端 qual_rules 下发，刷新表格时不能丢）
+  const oldRules = Object.fromEntries(gridItems.value.map((x) => [x.key, x.qualRule]))
   gridItems.value = items.map((n, i) => {
     const c = matchConv(n, resultPlan.value)
     const unit = c ? c.to : (unitLines[i] || '')
-    return { key: n, name: n, unit, conv: c, qualitative: isQualitativeProgram(resultPlan.value?.program), reverse: isReverseItem(n) }
+    return {
+      key: n, name: n, unit, conv: c,
+      qualitative: isQualitativeProgram(resultPlan.value?.program),
+      qualRule: oldRules[n] || null,
+      reverse: isReverseItem(n),
+    }
   })
   // 正确度类：保持「样本 × 天 × 次」多行结构（用户改了样本编号时按新样本重排）
   if (resultDesign.value) {
@@ -2546,7 +2569,7 @@ function onQualInput(row, it) {
 }
 function qualPN(row, it) {
   const v = row.values ? row.values[it.key] : ''
-  return computePN(v, it.reverse)
+  return computePN(v, it.qualRule)
 }
 function pnClass(pn) {
   return pn === 'P' ? 'pn-pos' : (pn === 'N' ? 'pn-neg' : 'pn-none')
