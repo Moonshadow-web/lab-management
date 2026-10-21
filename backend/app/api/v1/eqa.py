@@ -1283,6 +1283,32 @@ def _split_specimen(token: str, spec_plan: str):
     return spec, an
 
 
+# 正确度验证类计划的重复测量设计（用户 2026-10-21 确认）
+# (program 关键词, 样本数, 天数, 每天次数)
+_CORRECTNESS_DESIGNS = (
+    ("类固醇", 2, 3, 3),   # 类固醇激素正确度验证：2 样本 × 3 天 × 3 次
+    ("甲功", 2, 3, 3),     # 甲功相关项目检测及正确度验证：2 样本 × 3 天 × 3 次
+    ("C肽", 3, 2, 2),      # C肽和胰岛素检测及正确度验证：3 样本 × 2 天 × 2 次
+    ("胰岛素", 3, 2, 2),
+    ("肾素", 3, 1, 2),     # 肾素/醛固酮：3 样本 × 1 天 × 2 次
+    ("醛固酮", 3, 1, 2),
+)
+
+
+def _correctness_design(plan) -> dict | None:
+    """按 program 返回正确度类计划的重复测量设计；非正确度计划返回 None。
+
+    返回 {"samples": 样本数, "days": 天数, "times": 每天次数}。
+    """
+    prog = plan.program or ""
+    if "正确度" not in prog:
+        return None
+    for kw, n, d, t in _CORRECTNESS_DESIGNS:
+        if kw in prog:
+            return {"samples": n, "days": d, "times": t}
+    return None
+
+
 def _build_skeleton(plan: EqaPlan, db: Session = None) -> dict:
     """无已存数据时，按计划信息生成可填骨架。
 
@@ -1304,9 +1330,29 @@ def _build_skeleton(plan: EqaPlan, db: Session = None) -> dict:
                 units[it] = u0  # 卫健委骨代谢组 PTH/VD：固定原单位（pg/mL、ng/mL）
     year = plan.year or datetime.now().year
     rnd = _parse_round(plan.round_no)
-    samples = [f"{year}{rnd}{i}" for i in range(1, 6)]  # 默认 5 个样本
+    design = _correctness_design(plan)
+    if design:
+        # 正确度类：按「样本 × 天 × 次」展开成多行（用户确认的形态）
+        samples = [f"{year}{rnd}{i}" for i in range(1, design["samples"] + 1)]
+        rows = [
+            {
+                "key": f"{smp}-D{d}T{t}",
+                "sample": smp,
+                "day": d,
+                "time": t,
+                "label": f"{smp} 第{d}天 第{t}次",
+            }
+            for smp in samples
+            for d in range(1, design["days"] + 1)
+            for t in range(1, design["times"] + 1)
+        ]
+    else:
+        samples = [f"{year}{rnd}{i}" for i in range(1, 6)]  # 默认 5 个样本
+        rows = []
     return {
         "samples": samples,
+        "design": design,
+        "rows": rows,
         "items": items,
         "units": units,
         "conv": conv,
@@ -1344,6 +1390,19 @@ def get_eqa_result(
     # 避免「录入结果」打开后项目为空（历史空数据自愈 + 对未来类似情况免疫）。
     if isinstance(rd, dict) and (not rd.get("items")) and plan.item and plan.item.strip():
         rd = _build_skeleton(plan, db)
+    # 自愈：正确度类计划若已存数据没有「重复测量设计」（历史数据），按当前设计重建行结构。
+    # 旧的 cells 以样本编号为 key，与新行 key（样本-D天T次）不通用 —— 仅当旧 cells 为空时才迁移。
+    _design = _correctness_design(plan)
+    if _design and isinstance(rd, dict) and not rd.get("design"):
+        _skel = _build_skeleton(plan, db)
+        _old_cells = rd.get("cells") or {}
+        _rowkeys = {r["key"] for r in (_skel.get("rows") or [])}
+        if not _old_cells or not (set(_old_cells) & _rowkeys):
+            # 旧值无法映射到新行 → 丢弃（原本就是空数据）
+            _skel["cells"] = {}
+            _skel["cells_report"] = {}
+        _skel["meta"] = rd.get("meta") or _skel.get("meta")
+        rd = _skel
     # 已存数据若缺 units，则按当前项目查询库补算，保证单位能显示
     if isinstance(rd, dict) and not rd.get("units") and rd.get("items"):
         rd["units"] = _lookup_units(rd["items"], db)

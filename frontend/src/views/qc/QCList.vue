@@ -672,6 +672,9 @@
             <el-alert type="info" :closable="false" show-icon
               title="按样本×项目填写实测结果；项目与单位自动取自计划与项目查询库（可改）。需换算上报的项目（如雌二醇、孕酮等）会自动显示「原值→上报值」两栏，原值输入即自动换算。定性试验（肝炎/感染血清学）按 COI 自动判阴阳性（P=阳性/N=阴性）：常规项目 COI>1 判阳；HBeAb、HBcAb 例外（COI<1 判阳）；COI 值照填，阴阳性实时算出并随结果保存。"
               style="margin-bottom:10px" />
+            <el-alert v-if="resultDesign" type="success" :closable="false" show-icon
+              :title="`正确度重复测量设计：${resultDesign.samples} 个样本 × ${resultDesign.days} 天 × 每天 ${resultDesign.times} 次（共 ${resultDesign.samples * resultDesign.days * resultDesign.times} 行，已按样本/天/次展开）`"
+              style="margin-bottom:10px" />
             <!-- 样本 / 项目 定义 -->
             <div class="re-def">
               <div class="re-def-col">
@@ -694,9 +697,10 @@
             </div>
             <!-- 矩阵表 -->
             <el-table :data="gridRows" border class="re-grid" size="small">
-              <el-table-column label="样本编号" width="140">
+              <el-table-column label="样本 / 测量" width="190">
                 <template #default="{ row }">
-                  <el-input v-model="row.sample" placeholder="样本编号" />
+                  <el-input v-if="row.editable" v-model="row.sample" placeholder="样本编号" />
+                  <span v-else class="dim">{{ row.label }}</span>
                 </template>
               </el-table-column>
               <el-table-column v-for="it in gridItems" :key="it.key" :label="it.name + (it.unit ? ' (' + it.unit + ')' : '') + (it.qualitative ? ' ·COI' : '')" min-width="150">
@@ -707,7 +711,8 @@
                         :placeholder="'原值(' + it.conv.from + ')'" @input="onConvInput(row, it)" />
                       <span class="conv-arrow">×{{ it.conv.factor }}→</span>
                       <el-input v-model="row.report[it.key]" size="small"
-                        :placeholder="'上报(' + it.conv.to + ')'" />
+                        :placeholder="'上报(' + it.conv.to + ')'"
+                        @input="onReportInput(row, it)" />
                     </div>
                   </template>
                   <template v-else-if="it.qualitative">
@@ -1886,6 +1891,7 @@ const previewLoading = ref(false)
 const resultDialog = ref(false)
 const resultPlan = ref(null)
 const resultTargetId = ref(null)
+const resultDesign = ref(null)   // 正确度类计划的重复设计 {samples, days, times}
 const resultSaving = ref(false)
 // 收样登记
 const receiveDialog = ref(false)
@@ -2354,16 +2360,21 @@ async function openResultDialog(row) {
       qualitative: isQualitativeProgram(resultPlan.value?.program),
       reverse: isReverseItem(n),
     }))
-    gridRows.value = samples.map((s) => {
-      const prev = oldCells[s] || {}
-      const prevR = oldReport[s] || {}
+    // 正确度类计划：后端给了 rows（样本×天×次），按它展开多行；否则按样本一行
+    resultDesign.value = rd.design || null
+    const rowDefs = (rd.rows && rd.rows.length)
+      ? rd.rows.map((r) => ({ key: r.key, label: r.label, sampleNo: r.sample, editable: false }))
+      : samples.map((s) => ({ key: s, label: s, sampleNo: s, editable: true }))
+    gridRows.value = rowDefs.map((d) => {
+      const prev = oldCells[d.key] || {}
+      const prevR = oldReport[d.key] || {}
       const values = {}
       const report = {}
       for (const it of items) {
         values[it] = prev[it] || ''
         report[it] = prevR[it] || ''
       }
-      return { sample: s, values, report }
+      return { sample: d.key, label: d.label, sampleNo: d.sampleNo, editable: d.editable, values, report }
     })
     const sysNote = (row && row.note) || ''
     const savedNote = (rd.meta && rd.meta.note) || ''
@@ -2478,6 +2489,29 @@ function applyGrid() {
     const unit = c ? c.to : (unitLines[i] || '')
     return { key: n, name: n, unit, conv: c, qualitative: isQualitativeProgram(resultPlan.value?.program), reverse: isReverseItem(n) }
   })
+  // 正确度类：保持「样本 × 天 × 次」多行结构（用户改了样本编号时按新样本重排）
+  if (resultDesign.value) {
+    const d = resultDesign.value
+    const rowDefs = []
+    for (const smp of samples) {
+      for (let day = 1; day <= d.days; day++) {
+        for (let t = 1; t <= d.times; t++) {
+          rowDefs.push({ key: `${smp}-D${day}T${t}`, label: `${smp} 第${day}天 第${t}次`, sampleNo: smp })
+        }
+      }
+    }
+    gridRows.value = rowDefs.map((rd) => {
+      const prev = old[rd.key] || { values: {}, report: {} }
+      const values = {}
+      const report = {}
+      for (const it of items) {
+        values[it] = prev.values[it] || ''
+        report[it] = prev.report[it] || ''
+      }
+      return { sample: rd.key, label: rd.label, sampleNo: rd.sampleNo, editable: false, values, report }
+    })
+    return
+  }
   gridRows.value = samples.map((s) => {
     const prev = old[s] || { values: {}, report: {} }
     const values = {}
@@ -2486,7 +2520,7 @@ function applyGrid() {
       values[it] = prev.values[it] || ''
       report[it] = prev.report[it] || ''
     }
-    return { sample: s, values, report }
+    return { sample: s, label: s, sampleNo: s, editable: true, values, report }
   })
 }
 function onConvInput(row, it) {
@@ -2496,6 +2530,15 @@ function onConvInput(row, it) {
     row.report[it.key] = String(_roundNum(num * it.conv.factor))
   } else {
     row.report[it.key] = ''
+  }
+}
+
+// 反向换算：直接在「上报值」里填，反算原值（用户 2026-10-21 要求，其他项目同样适用）
+function onReportInput(row, it) {
+  if (!it.conv || !it.conv.factor) return
+  const num = parseFloat(row.report[it.key])
+  if (!isNaN(num)) {
+    row.values[it.key] = String(_roundNum(num / it.conv.factor))
   }
 }
 function onQualInput(row, it) {
@@ -2531,8 +2574,15 @@ function onResultClose() {
 async function saveResult() {
   if (!resultTargetId.value) return
   applyGrid()
+  // ⚠️ samples 必须是「真实样本编号」；cells 的 key 才是行 key（正确度类是 样本-天-次）
+  const realSamples = sampleText.value.split('\n').map((x) => x.trim()).filter(Boolean)
   const payload = {
-    samples: gridRows.value.map((r) => r.sample),
+    samples: realSamples.length ? realSamples : gridRows.value.map((r) => r.sampleNo || r.sample),
+    // 正确度类：保存重复设计 + 行定义，重新打开时按同样结构还原
+    design: resultDesign.value || null,
+    rows: resultDesign.value
+      ? gridRows.value.map((r) => ({ key: r.sample, label: r.label, sample: r.sampleNo }))
+      : [],
     items: gridItems.value.map((it) => it.name),
     units: Object.fromEntries(gridItems.value.map((it) => [it.name, it.conv ? it.conv.to : (it.unit || '')])),
     conv: Object.fromEntries(gridItems.value.filter((it) => it.conv).map((it) => [it.name, it.conv])),
@@ -2580,7 +2630,7 @@ function buildPrintHtml() {
         }
         return `<td>${escapeHtml(main)}${sub ? `<div class="orig">${sub}</div>` : ''}</td>`
       }).join('')
-      return `<tr><td>${escapeHtml(r.sample)}</td>${tds}</tr>`
+      return `<tr><td>${escapeHtml(r.label || r.sample)}</td>${tds}</tr>`
     }).join('')
 
   let tableHtml
@@ -2735,7 +2785,7 @@ async function exportExcel() {
       ws.getRow(headerRow).height = 28
       r = headerRow + 1
       rows.forEach((row) => {
-        ws.getCell(r, 1).value = row.sample
+        ws.getCell(r, 1).value = row.label || row.sample
         gItems.forEach((it, i) => {
           let main, sub = ''
           if (it.conv) {
