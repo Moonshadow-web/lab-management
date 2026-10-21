@@ -1194,6 +1194,21 @@ _EQA_QUAL_ALIASES = {
     "hiv": ("人类免疫缺陷病毒抗体", "HIV抗体", "快速抗HIV抗体"),
     "tp": ("梅毒特异性抗体", "快速抗梅毒螺旋体抗体", "梅毒螺旋体抗体"),
     "tpab": ("梅毒特异性抗体", "快速抗梅毒螺旋体抗体"),
+    # ═══ 优生优育（TORCH）═══
+    "hsv-1m": ("I型单纯疱疹病毒IgM抗体", "单纯疱疹病毒I型IgM抗体"),
+    "hsv-1g": ("I型单纯疱疹病毒IgG抗体", "单纯疱疹病毒I型IgG抗体"),
+    "hsv-2m": ("II型单纯疱疹病毒IgM抗体", "单纯疱疹病毒II型IgM抗体"),
+    "hsv-2g": ("II型单纯疱疹病毒IgG抗体", "单纯疱疹病毒II型IgG抗体"),
+    "hsv1m": ("I型单纯疱疹病毒IgM抗体",),
+    "hsv1g": ("I型单纯疱疹病毒IgG抗体",),
+    "hsv2m": ("II型单纯疱疹病毒IgM抗体",),
+    "hsv2g": ("II型单纯疱疹病毒IgG抗体",),
+    "toxm": ("弓形虫IgM抗体", "TOX-IgM", "弓形虫IgM"),
+    "toxg": ("弓形虫IgG抗体", "TOX-IgG", "弓形虫IgG"),
+    "cmvm": ("巨细胞病毒IgM抗体", "CMV-IgM"),
+    "cmvg": ("巨细胞病毒IgG抗体", "CMV-IgG"),
+    "rvm": ("风疹病毒IgM抗体", "RV-IgM", "风疹病毒IgM"),
+    "rvg": ("风疹病毒IgG抗体", "RV-IgG", "风疹病毒IgG"),
 }
 
 # 兜底规则（取不到参考范围时用）：用户明确 HBsAb<10 阴、HBeAb/HBcAb>1 阴
@@ -1223,14 +1238,16 @@ def _parse_ref_rule(ref: str) -> dict | None:
         if "阴性" in t or "阳性" in t or t in ("-", "/"):
             return {"direct": True}
         return None
-    first = re.split(r"[；;]", t)[0]          # 取第一段（阴性段）
+    first = re.split(r"[；;]", t)[0]          # 取第一段
     m = re.search(r"(<=|<|>=|>)\s*=?\s*([0-9]+(?:\.[0-9]+)?)", first)
     if not m:
         return None
     op, num = m.group(1), float(m.group(2))
+    # 「有反应 < 10」= 低于阈值判阳性（如风疹IgG：有抗体才有免疫力）→ 反向
+    reactive = ("有反应" in first) and ("无反应" not in first.replace("有反应", ""))
     if op.startswith("<"):
-        return {"neg_below": num}
-    return {"neg_above": num}
+        return {"neg_above": num} if reactive else {"neg_below": num}
+    return {"neg_below": num} if reactive else {"neg_above": num}
 
 
 def _qual_rule_for(item: str, db=None) -> dict:
