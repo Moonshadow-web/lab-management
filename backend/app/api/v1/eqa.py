@@ -1009,6 +1009,10 @@ def copy_prev_year_eqa(
 # ---------------------------------------------------------------------------
 class EqaResultData(BaseModel):
     samples: list[str] = []
+    # ⚠️ 正确度类计划的重复测量结构必须保留，否则 Pydantic 会丢掉它们，
+    # 导致「自愈」逻辑误判为旧数据而重建骨架、把已填的 cells 清空。
+    design: dict | None = None
+    rows: list[dict] = []
     items: list[str] = []
     units: dict[str, str] = {}  # 项目名 -> 单位（上报单位，换算项目为 to）
     conv: dict[str, dict] = {}  # 项目名 -> {factor, from, to}，需单位换算后上报的项目
@@ -1458,7 +1462,8 @@ def _correctness_design(plan) -> dict | None:
     返回 {"samples": 样本数, "days": 天数, "times": 每天次数}。
     """
     prog = plan.program or ""
-    if "正确度" not in prog:
+    # 「正确度验证」类 + 「醛固酮和肾素」（用户明确 3 样本 × 1 天 × 2 次）都按重复测量展开
+    if "正确度" not in prog and not any(k in prog for k in ("肾素", "醛固酮")):
         return None
     for kw, n, d, t in _CORRECTNESS_DESIGNS:
         if kw in prog:
