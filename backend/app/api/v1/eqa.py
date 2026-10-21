@@ -1221,16 +1221,22 @@ _DEFAULT_QUAL_RULE = {"neg_below": 1.0}   # COI 类项目默认「<1 阴性」�
 
 
 def _parse_ref_rule(ref: str) -> dict | None:
-    """从参考范围文本解析定性判读规则。
+    """从参考范围文本解析定性判读规则（支持三段式：阴性 / 可疑 / 阳性）。
 
-    支持形态：
-      "<10" / "< 10"                → {"neg_below": 10}
-      ">1"                          → {"neg_above": 1}
-      "无反应 < 0.51 COI；不确定..."  → {"neg_below": 0.51}（取第一段=阴性段）
-      "<6 阴性；6≤浓度值<10 可疑；≥10 阳性" → {"neg_below": 6}
-      "阴性" / "阴性（-）"           → {"direct": True}（纯定性，直接填阴阳）
+    典型形态（系统实际数据）：
+      "< 10"                                    → {"neg_below": 10}
+      ">1"                                      → {"neg_above": 1}
+      "无反应 < 1 IU/mL；不确定 ≥1-<30 IU/mL；有反应 ≥ 30 IU/mL"
+          → {"neg_below": 1, "gray_max": 30}     ← 弓形虫IgG（1~30 为灰区）
+      "无反应 < 0.8 COI；不确定 0.8-1.0 COI；有反应 ≥ 1.0 COI"
+          → {"neg_below": 0.8, "gray_max": 1.0}  ← 弓形虫IgM
+      "<6 阴性；6≤浓度值<10 可疑；≥10 阳性"
+          → {"neg_below": 6, "gray_max": 10}
+      "有反应 < 10 IU/mL；无反应 ≥ 10 IU/mL"
+          → {"neg_above": 10}                    ← 风疹IgG（反向：有抗体即阳）
+      "阴性"                                    → {"direct": True}
     """
-    t = (ref or "").replace("＜", "<").replace("＞", ">").replace("≤", "<=").strip()
+    t = (ref or "").replace("＜", "<").replace("＞", ">").replace("≤", "<=").replace("≥", ">=").strip()
     if not t:
         return None
     # 纯定性（无任何数值阈值）
@@ -1238,16 +1244,52 @@ def _parse_ref_rule(ref: str) -> dict | None:
         if "阴性" in t or "阳性" in t or t in ("-", "/"):
             return {"direct": True}
         return None
-    first = re.split(r"[；;]", t)[0]          # 取第一段
-    m = re.search(r"(<=|<|>=|>)\s*=?\s*([0-9]+(?:\.[0-9]+)?)", first)
-    if not m:
-        return None
-    op, num = m.group(1), float(m.group(2))
-    # 「有反应 < 10」= 低于阈值判阳性（如风疹IgG：有抗体才有免疫力）→ 反向
-    reactive = ("有反应" in first) and ("无反应" not in first.replace("有反应", ""))
-    if op.startswith("<"):
-        return {"neg_above": num} if reactive else {"neg_below": num}
-    return {"neg_below": num} if reactive else {"neg_above": num}
+
+    segs = [x.strip() for x in re.split(r"[；;。]", t) if x.strip()]
+    neg_thr = None          # 阴性阈值
+    neg_dir = None          # "below" 值低于阈值判阴；"above" 值高于阈值判阴
+    gray_lo = gray_hi = None
+
+    for seg in segs:
+        nums = [float(x) for x in re.findall(r"[0-9]+(?:\.[0-9]+)?", seg)]
+        if not nums:
+            continue
+        is_gray = any(k in seg for k in ("不确定", "灰区", "可疑"))
+        is_neg = any(k in seg for k in ("阴性", "无反应"))
+        is_pos = any(k in seg for k in ("阳性", "有反应"))
+        if is_gray:
+            lo, hi = min(nums), max(nums)
+            gray_lo, gray_hi = lo, hi
+        elif is_neg:
+            m = re.search(r"(<=|<|>=|>)\s*=?\s*([0-9]+(?:\.[0-9]+)?)", seg)
+            if m:
+                neg_thr = float(m.group(2))
+                neg_dir = "below" if m.group(1).startswith("<") else "above"
+        elif is_pos and neg_thr is None:
+            # 阳性段先出现（如风疹IgG 的「有反应 <10」写在前面）
+            m = re.search(r"(<=|<|>=|>)\s*=?\s*([0-9]+(?:\.[0-9]+)?)", seg)
+            if m:
+                neg_thr = float(m.group(2))
+                # 阳性在低值侧 → 阴性在高值侧
+                neg_dir = "above" if m.group(1).startswith("<") else "below"
+
+    if neg_thr is None:
+        # 兜底：取第一个阈值，按默认「< 阴性」
+        m = re.search(r"(<=|<|>=|>)\s*=?\s*([0-9]+(?:\.[0-9]+)?)", t)
+        if not m:
+            return None
+        neg_thr = float(m.group(2))
+        neg_dir = "below" if m.group(1).startswith("<") else "above"
+
+    rule: dict = {}
+    if neg_dir == "below":
+        rule["neg_below"] = neg_thr
+        if gray_hi is not None and gray_hi > neg_thr:
+            rule["gray_max"] = gray_hi
+    else:
+        rule["neg_above"] = neg_thr
+    return rule
+
 
 
 def _qual_rule_for(item: str, db=None) -> dict:
@@ -1325,7 +1367,12 @@ def _qualitative_pn(value, rule: dict) -> str:
     except (TypeError, ValueError):
         return ""
     if "neg_below" in rule:
-        return "N" if v < rule["neg_below"] else "P"
+        if v < rule["neg_below"]:
+            return "N"
+        # 灰区（如弓形虫IgG 1~30、IgM 0.8~1.0）判「可疑」
+        if rule.get("gray_max") is not None and v < rule["gray_max"]:
+            return "?"
+        return "P"
     if "neg_above" in rule:
         return "N" if v > rule["neg_above"] else "P"
     return ""

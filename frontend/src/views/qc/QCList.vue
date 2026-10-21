@@ -727,7 +727,7 @@
                     <div v-else class="qual-cell">
                       <el-input v-model="row.values[it.key]" size="small" placeholder="COI/浓度值"
                         @input="onQualInput(row, it)" />
-                      <span class="pn-badge" :class="pnClass(qualPN(row, it))">{{ qualPN(row, it) || '—' }}</span>
+                      <span class="pn-badge" :class="pnClass(qualPN(row, it))">{{ qualPN(row, it) === '?' ? '可疑' : (qualPN(row, it) || '—') }}</span>
                     </div>
                   </template>
                   <el-input v-else v-model="row.values[it.key]" placeholder="结果" />
@@ -2350,7 +2350,12 @@ function computePN(value, rule) {
   s = s.replace(/^(<|≤|<=|小于|>|≥|>=|大于)/, '').trim()
   const v = parseFloat(s)
   if (isNaN(v)) return ''
-  if (r.neg_below != null) return v < r.neg_below ? 'N' : 'P'
+  if (r.neg_below != null) {
+    if (v < r.neg_below) return 'N'
+    // 灰区（弓形虫IgG 1~30、IgM 0.8~1.0 等）→ 可疑
+    if (r.gray_max != null && v < r.gray_max) return '?'
+    return 'P'
+  }
   if (r.neg_above != null) return v > r.neg_above ? 'N' : 'P'
   return ''
 }
@@ -2572,7 +2577,7 @@ function qualPN(row, it) {
   return computePN(v, it.qualRule)
 }
 function pnClass(pn) {
-  return pn === 'P' ? 'pn-pos' : (pn === 'N' ? 'pn-neg' : 'pn-none')
+  return pn === 'P' ? 'pn-pos' : (pn === 'N' ? 'pn-neg' : (pn === '?' ? 'pn-gray' : 'pn-none'))
 }
 function addRow() {
   gridRows.value.push({
@@ -3191,6 +3196,7 @@ watch(activeTab, (t) => {
 .pn-pos { background: #fef0f0; color: #f56c6c; border: 1px solid #fbc4c4; }
 .pn-neg { background: #f0f9eb; color: #67c23a; border: 1px solid #c2e7b0; }
 .pn-none { background: #f4f4f5; color: #909399; border: 1px solid #e9e9eb; }
+.pn-gray { background: #fdf6ec; color: #e6a23c; border: 1px solid #f5dab1; }
 .re-grid :deep(.el-input__wrapper) { box-shadow: none; }
 .re-grid :deep(.el-table__cell) { padding: 2px 0; }
 .re-meta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 6px; }
