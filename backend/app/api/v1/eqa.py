@@ -1220,7 +1220,13 @@ _EQA_QUAL_FALLBACK_RULES = {
     "hbsab": {"neg_below": 10.0},
     "hbeab": {"neg_above": 1.0},
     "hbcab": {"neg_above": 1.0},
+    # 风疹IgG：EQA 计划用 COI 单位，而系统参考范围是 IU/mL（有反应<10；无反应≥10），
+    # 单位不匹配不能直接用 —— COI 体系下按 <1 阴性（用户 2026-10-21 指出 0.170 被判成 P 是错的）
+    "rvg": {"neg_below": 1.0},
 }
+
+# 单位与系统参考范围不一致的项目：强制用兜底规则，跳过 test_items.reference
+_EQA_QUAL_FORCE_FALLBACK = {"rvg"}
 _DEFAULT_QUAL_RULE = {"neg_below": 1.0}   # COI 类项目默认「<1 阴性」（与旧逻辑 v>1 判阳等价）
 
 
@@ -1304,6 +1310,9 @@ def _qual_rule_for(item: str, db=None) -> dict:
     rule = _EQA_QUAL_FALLBACK_RULES.get(base) or _EQA_QUAL_FALLBACK_RULES.get(key)
     if rule:
         rule = dict(rule)
+    # 单位不匹配的项目：直接返回兜底规则，不查系统参考范围
+    if base in _EQA_QUAL_FORCE_FALLBACK and rule:
+        return rule
     if db is not None:
         names = _EQA_QUAL_ALIASES.get(base) or _EQA_QUAL_ALIASES.get(key)
         if names:
