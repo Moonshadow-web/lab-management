@@ -2651,8 +2651,13 @@ function buildPrintHtml() {
           if (orig) sub = `原 ${escapeHtml(orig)} ${escapeHtml(it.conv.from)}`
         } else if (it.qualitative) {
           main = r.values[it.key] || ''
-          const pn = computePN(r.values[it.key], it.reverse)
-          if (pn) sub = `判定：${pn === 'P' ? '阳性' : '阴性'}`
+          // ⚠️ 必须用 it.qualRule（按项目参考范围），不能再用 it.reverse（旧逻辑）
+          const pn = computePN(r.values[it.key], it.qualRule)
+          if (pn) {
+            const t = pn === 'P' ? '阳性' : (pn === 'N' ? '阴性' : '可疑')
+            const cls = pn === 'P' ? 'pn-p' : (pn === 'N' ? 'pn-n' : 'pn-q')
+            sub = `<span class="pn ${cls}">${t}</span>`
+          }
         } else {
           main = r.values[it.key] || ''
         }
@@ -2684,6 +2689,11 @@ function buildPrintHtml() {
   th,td{border:1px solid #000;padding:4px 3px;text-align:center;word-break:break-all}
   th{background:#f0f0f0;font-size:10.5px}
   .orig{font-size:9.5px;color:#666;margin-top:1px}
+  /* 定性结果：去掉「判定」二字，直接加粗着色，打印后一眼可辨 */
+  .pn{font-weight:800;font-size:12.5px;letter-spacing:1px;margin-top:1px;display:inline-block}
+  .pn-p{color:#c00000}
+  .pn-n{color:#0a7d0a}
+  .pn-q{color:#b26a00}
   .meta{display:flex;flex-wrap:wrap;gap:18px;font-size:12px;margin:10px 0}
   /* 签字区——一行排开，年月日留足手写空位 */
   .sign{margin-top:28px;display:flex;align-items:flex-end;font-size:14px;white-space:nowrap}
@@ -2822,8 +2832,8 @@ async function exportExcel() {
             if (orig) sub = `原 ${orig} ${it.conv.from}`
           } else if (it.qualitative) {
             main = row.values[it.key] || ''
-            const pn = computePN(row.values[it.key], it.reverse)
-            if (pn) sub = pn === 'P' ? '阳性' : '阴性'
+            const pn = computePN(row.values[it.key], it.qualRule)
+            if (pn) sub = pn === 'P' ? '阳性' : (pn === 'N' ? '阴性' : '可疑')
           } else {
             main = row.values[it.key] || ''
           }
