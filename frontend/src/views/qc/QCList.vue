@@ -2654,7 +2654,8 @@ function buildPrintHtml() {
           // ⚠️ 必须用 it.qualRule（按项目参考范围），不能再用 it.reverse（旧逻辑）
           const pn = computePN(r.values[it.key], it.qualRule)
           if (pn) {
-            const t = pn === 'P' ? '阳性' : (pn === 'N' ? '阴性' : '可疑')
+            // 黑白打印靠字母区分：阳性 P / 阴性 N / 可疑 ?
+            const t = pn === 'P' ? '阳性 P' : (pn === 'N' ? '阴性 N' : '可疑 ?')
             const cls = pn === 'P' ? 'pn-p' : (pn === 'N' ? 'pn-n' : 'pn-q')
             sub = `<span class="pn ${cls}">${t}</span>`
           }
@@ -2833,7 +2834,7 @@ async function exportExcel() {
           } else if (it.qualitative) {
             main = row.values[it.key] || ''
             const pn = computePN(row.values[it.key], it.qualRule)
-            if (pn) sub = pn === 'P' ? '阳性' : (pn === 'N' ? '阴性' : '可疑')
+            if (pn) sub = pn === 'P' ? '阳性 P' : (pn === 'N' ? '阴性 N' : '可疑 ?')
           } else {
             main = row.values[it.key] || ''
           }
