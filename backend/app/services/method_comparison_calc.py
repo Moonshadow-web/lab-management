@@ -414,7 +414,7 @@ def compute_method_comparison(data: dict) -> dict:
         can_replace = bool(ba["consistent"] and bias_anchor_ok)
         acceptable = can_replace
         replace_reason = (
-            f"Bland-Altman {'一致' if ba['consistent'] else '不一致'}（{ba['p_text']}）；"
+            f"Bland-Altman {'一致' if ba['consistent'] else '不一致'}，{ba['p_text']}；"
             f"{anchor_label} {_num_g(anchor)} 处总偏差 {bias_anchor_pb:+.2f}%"
             f" {'≤' if bias_anchor_ok else '>'} 1/2 TEa（{tea_half:g}%）"
             + (f"；比例偏移 {prop_pct:+.2f}%" if prop_pct is not None else "")
