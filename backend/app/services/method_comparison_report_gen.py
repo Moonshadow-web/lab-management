@@ -509,7 +509,7 @@ def build_summary_report(recs: list) -> bytes:
                 rs.get("ba_p") or "—",
                 "是" if rs.get("ba_consistent") else "否",
                 _num(rs.get("ba_max_abs_within"), 3),
-                "能" if rs.get("can_replace") else "否",
+                ("能" if rs.get("can_replace") is True else "否" if rs.get("can_replace") is False else "待定"),
             ])
         _table(doc, header, rows, size=8)
 
@@ -638,7 +638,7 @@ def build_qualitative_summary_table(doc, recs: list):
             f"{_num(rs.get('total_rate'), 1)}%" if rs.get("total_rate") is not None else "—",
             _num(rs.get("kappa"), 3),
             "是" if rs.get("acceptable") else "否",
-            "能" if rs.get("can_replace") else "否",
+            ("能" if rs.get("can_replace") is True else "否" if rs.get("can_replace") is False else "待定"),
         ])
     _table(doc, header, rows, size=8)
 

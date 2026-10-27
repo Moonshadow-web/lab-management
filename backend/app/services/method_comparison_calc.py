@@ -92,6 +92,17 @@ def t_pvalue(t, df):
     return max(0.0, min(1.0, 2.0 * (1.0 - t_cdf(abs(t), df))))
 
 
+def _num_g(v):
+    """参照点数值的简洁显示。"""
+    if v is None:
+        return "—"
+    try:
+        f = float(v)
+    except Exception:
+        return str(v)
+    return f"{f:g}"
+
+
 def _fmt_p(p):
     """P 值显示：带等号，极小值用 <。"""
     if p < 0.0001:
@@ -336,6 +347,33 @@ def compute_method_comparison(data: dict) -> dict:
     pr = pearson(xs, ys)
     ba = bland_altman(xs, ys)
 
+    # 参照点：优先新方法参考区间上限 → 旧方法上限 → 实测中位数（并标注口径）
+    def _fnum(v):
+        try:
+            return float(str(v).strip())
+        except Exception:
+            return None
+
+    anchor, anchor_label = None, ""
+    for key, lab in (("test_range_high", "参考值上限（新方法）"),
+                     ("ref_range_high", "参考值上限（现行方法）")):
+        v = _fnum(data.get(key))
+        if v and v > 0:
+            anchor, anchor_label = v, lab
+            break
+    if anchor is None:
+        anchor = median(xs)
+        anchor_label = "实测值中位数"
+
+    def _bias_at(model, c):
+        """在浓度 c 处的总偏差百分比 = (截距 + 斜率*c - c)/c*100。"""
+        if not c:
+            return None
+        return (model["intercept"] + model["slope"] * c - c) / c * 100
+
+    bias_anchor_pb = _bias_at(pb, anchor)
+    bias_anchor_deming = _bias_at(deming, anchor)
+
     # 偏移判定
     def _prop_bias(model):
         """比例偏移：存在时给出偏移百分比，不存在时不带数值。"""
@@ -364,13 +402,32 @@ def compute_method_comparison(data: dict) -> dict:
     deming_prop, deming_sys = _prop_bias(deming), _sys_bias(deming, base_mean)
     pb_prop, pb_sys = _prop_bias(pb), _sys_bias(pb, base_mean)
 
-    # 判定口径与参考报告一致：以 Bland-Altman 一致性作为「能否接受 / 能否直接替换」的主依据；
-    # 比例偏移是否落在 1/2 TEa 内单列为辅助指标（不改变主判定）。
-    within_half_tea = None
-    if tea_half is not None and pb_prop.get("pct") is not None:
-        within_half_tea = abs(pb_prop["pct"]) <= tea_half
-    acceptable = bool(ba["consistent"])
-    can_replace = bool(ba["consistent"])
+    # 判定分两层：
+    # ① 统计层：是否存在比例/系统偏移（95%CI 判定，只看"有没有"）
+    # ② 临床层：偏移"幅度"是否在 1/2 TEa 内（决定能否直接替代）
+    # 缺 TEa 时无法做临床层判定 → can_replace 置 None（待定），不轻易下"能替代"的结论。
+    prop_pct = pb_prop.get("pct")
+    sys_pct = pb_sys.get("pct")
+    bias_anchor_ok = None
+    if tea_half is not None and bias_anchor_pb is not None:
+        bias_anchor_ok = abs(bias_anchor_pb) <= tea_half
+        can_replace = bool(ba["consistent"] and bias_anchor_ok)
+        acceptable = can_replace
+        replace_reason = (
+            f"Bland-Altman {'一致' if ba['consistent'] else '不一致'}（{ba['p_text']}）；"
+            f"{anchor_label} {_num_g(anchor)} 处总偏差 {bias_anchor_pb:+.2f}%"
+            f" {'≤' if bias_anchor_ok else '>'} 1/2 TEa（{tea_half:g}%）"
+            + (f"；比例偏移 {prop_pct:+.2f}%" if prop_pct is not None else "")
+        )
+    else:
+        can_replace = None
+        acceptable = None
+        miss = "未设置允许总误差（TEa）" if tea_half is None else "缺少可用的参照点"
+        replace_reason = (f"{miss}，无法评价偏移幅度的临床可接受性；"
+                          f"统计层面 Bland-Altman {'一致' if ba['consistent'] else '不一致'}"
+                          + (f"，比例偏移 {prop_pct:+.2f}%" if prop_pct is not None else "")
+                          + (f"，系统偏移 {sys_pct:+.2f}%" if sys_pct is not None else "")
+                          + "。建议补充后重新判定。")
 
     # 结论文本（对齐参考报告三段式）
     project = data.get("project_name") or "该项目"
@@ -393,15 +450,18 @@ def compute_method_comparison(data: dict) -> dict:
         f"（Bland-Altman，{ba['p_text']}）。"
     )
 
-    if can_replace:
-        concl.append(f"两种方法对{project}的检测在临床上可直接替代使用。")
+    if can_replace is None:
+        concl.append(f"两种方法对{project}的检测能否直接替代尚不能判定：未设置允许总误差（TEa），"
+                     f"无法评价偏移幅度的临床可接受性（{replace_reason}）。")
+    elif can_replace:
+        concl.append(f"两种方法对{project}的检测在临床上可直接替代使用（{replace_reason}）。")
     else:
         tail = "如必须替代，则需告知两种方法检测方法间的结果偏移程度"
         rl, rh = data.get("ref_range_low"), data.get("ref_range_high")
         tl, th = data.get("test_range_low"), data.get("test_range_high")
         if all([rl, rh, tl, th]):
             tail += f"，且涉及参考值变更（{test_name} {tl}-{th}；{ref_name} {rl}-{rh}）"
-        concl.append(f"两种方法对{project}的检测在临床上不可直接替代使用。{tail}。")
+        concl.append(f"两种方法对{project}的检测在临床上不可直接替代使用（{replace_reason}）。{tail}。")
 
     per_sample = []
     for p in pairs:
@@ -428,7 +488,13 @@ def compute_method_comparison(data: dict) -> dict:
         "pb_prop": pb_prop, "pb_sys": pb_sys,
         "acceptable": acceptable,
         "can_replace": can_replace,
-        "within_half_tea": within_half_tea,
+        "tea_half": tea_half,
+        "anchor_value": anchor,
+        "anchor_label": anchor_label,
+        "bias_at_anchor_pct": round(bias_anchor_pb, 2) if bias_anchor_pb is not None else None,
+        "bias_at_anchor_deming_pct": round(bias_anchor_deming, 2) if bias_anchor_deming is not None else None,
+        "bias_at_anchor_ok": bias_anchor_ok,
+        "replace_reason": replace_reason,
         "conclusion_lines": concl,
         "per_sample": per_sample,
     }
@@ -468,7 +534,13 @@ def compute_method_comparison(data: dict) -> dict:
         "bias_pct": ba["bias_pct"],
         "acceptable": acceptable,
         "can_replace": can_replace,
-        "within_half_tea": within_half_tea,
+        "tea_half": tea_half,
+        "anchor_value": anchor,
+        "anchor_label": anchor_label,
+        "bias_at_anchor_pct": round(bias_anchor_pb, 2) if bias_anchor_pb is not None else None,
+        "bias_at_anchor_deming_pct": round(bias_anchor_deming, 2) if bias_anchor_deming is not None else None,
+        "bias_at_anchor_ok": bias_anchor_ok,
+        "replace_reason": replace_reason,
         "conclusion": "\n".join(concl),
         "conclusion_lines": concl,
     }

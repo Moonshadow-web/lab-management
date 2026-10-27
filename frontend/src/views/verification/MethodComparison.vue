@@ -21,7 +21,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="batch_name" label="批次" min-width="120" show-overflow-tooltip />
-      <el-table-column label="方法A（现行）" min-width="140" show-overflow-tooltip>
+      <el-table-column label="方法A（旧）" min-width="140" show-overflow-tooltip>
         <template #default="{ row }">{{ row.ref_instrument || '—' }}</template>
       </el-table-column>
       <el-table-column label="方法B（新）" min-width="140" show-overflow-tooltip>
@@ -54,8 +54,8 @@
       </el-table-column>
       <el-table-column label="能否直接替换" width="110" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.result_summary?.valid" :type="row.result_summary?.can_replace ? 'success' : 'warning'" size="small">
-            {{ row.result_summary?.can_replace ? '能' : '否' }}
+          <el-tag v-if="row.result_summary?.valid" :type="row.result_summary?.can_replace === true ? 'success' : (row.result_summary?.can_replace === false ? 'danger' : 'info')" size="small">
+            {{ row.result_summary?.can_replace === true ? '能' : (row.result_summary?.can_replace === false ? '否' : '待定') }}
           </el-tag>
           <span v-else>—</span>
         </template>
@@ -117,7 +117,7 @@
               <el-col :span="6"><el-form-item label="审核人"><el-input v-model="form.reviewer" /></el-form-item></el-col>
             </el-row>
 
-            <el-divider content-position="left">方法A（现行 / 参照）</el-divider>
+            <el-divider content-position="left">方法A（旧 / 参照）</el-divider>
             <el-row :gutter="12">
               <el-col :span="6"><el-form-item label="仪器"><el-input v-model="form.ref_instrument" placeholder="贝克曼DXI800" /></el-form-item></el-col>
               <el-col :span="6"><el-form-item label="厂家"><el-input v-model="form.ref_manufacturer" /></el-form-item></el-col>
@@ -278,7 +278,7 @@
         </el-table-column>
         <el-table-column label="能否直接替换" width="120" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.valid" :type="row.can_replace ? 'success' : 'warning'" size="small">{{ row.can_replace ? '能' : '否' }}</el-tag>
+            <el-tag v-if="row.valid" :type="row.can_replace === true ? 'success' : (row.can_replace === false ? 'danger' : 'info')" size="small">{{ row.can_replace === true ? '能' : (row.can_replace === false ? '否' : '待定') }}</el-tag>
             <span v-else>—</span>
           </template>
         </el-table-column>
@@ -350,7 +350,8 @@ const detailSummaryRows = computed(() => {
       { k: '一致性强度', v: rs.kappa_text || '—' },
       { k: '不一致样本数', v: rs.inconsistent_count ?? '—' },
       { k: '是否可接受', v: rs.acceptable ? '是' : '否' },
-      { k: '能否直接替换', v: rs.can_replace ? '能' : '否' },
+      { k: '判定依据', v: rs.replace_reason || '—' },
+    { k: '能否直接替换', v: rs.can_replace === true ? '能' : (rs.can_replace === false ? '否' : '待定（缺 TEa 或参照点）') },
     ]
   }
   const ci = (arr) => (Array.isArray(arr) && arr[0] != null ? `（${Number(arr[0]).toFixed(4)}，${Number(arr[1]).toFixed(4)}）` : '')
@@ -367,12 +368,16 @@ const detailSummaryRows = computed(() => {
     { k: 'Passing-Bablok 截距（95%CI）', v: `${val(rs.pb_intercept ?? rs.intercept)}${ci(rs.pb_intercept_ci)}` },
     { k: '比例偏移（按 PB 斜率 95%CI 判定）', v: rs.proportional_bias_exists == null ? '—' : (rs.proportional_bias_exists ? `存在，${rs.proportional_bias_pct > 0 ? '+' : ''}${Number(rs.proportional_bias_pct).toFixed(2)}%` : '不存在') },
     { k: '系统偏移（按 PB 截距 95%CI 判定）', v: rs.systematic_bias || '—' },
+    { k: '允许总误差 TEa / 1/2 TEa', v: rs.tea_half != null ? `${(rs.tea_half * 2).toFixed(0)}% / ${rs.tea_half}%` : '未设置' },
+    { k: '参照点', v: rs.anchor_value != null ? `${rs.anchor_label}　${Number(rs.anchor_value).toPrecision(4)}` : '—' },
+    { k: '参照点处总偏差', v: rs.bias_at_anchor_pct != null ? `${rs.bias_at_anchor_pct > 0 ? '+' : ''}${rs.bias_at_anchor_pct}%` : '—' },
     { k: 'Pearson r', v: f(rs.pearson_r, 4) },
     { k: 'Bland-Altman P 值', v: rs.ba_p || '—' },
     { k: 'Bland-Altman 一致', v: rs.ba_consistent ? '是' : '否' },
     { k: '95% 界限内最大差值', v: rs.ba_max_abs_within ?? '—' },
     { k: '平均偏倚（%）', v: rs.bias_pct != null ? `${rs.bias_pct}%` : '—' },
-    { k: '能否直接替换', v: rs.can_replace ? '能' : '否' },
+    { k: '判定依据', v: rs.replace_reason || '—' },
+    { k: '能否直接替换', v: rs.can_replace === true ? '能' : (rs.can_replace === false ? '否' : '待定（缺 TEa 或参照点）') },
   ]
 })
 

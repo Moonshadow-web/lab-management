@@ -58,6 +58,43 @@ def _serialize(rec: MethodComparisonRecord) -> dict:
     return d
 
 
+# 项目名 → 质控库可能写法（库里是 C-肽 / 25-羟维生素D(25-OH-VD) / 总前列腺特异性抗原(TPSA)）
+_PROJECT_TEA_ALIASES = {
+    "C肽": ["C肽", "C-肽", "C 肽"],
+    "25羟维生素D": ["25羟维生素D", "25-羟维生素D", "25-OH-VD", "维生素D", "总 25-OH-VD"],
+    "总PSA": ["总PSA", "TPSA", "总前列腺特异性抗原", "总前列腺特异抗原"],
+    "游离PSA": ["游离PSA", "游离 PSA", "FPSA", "游离前列腺特异性抗原", "游离前列腺特异抗原"],
+    "胰岛素": ["胰岛素", "胰岛素(Ins)", "Ins"],
+    "PCT": ["PCT", "降钙素原", "血清降钙素原"],
+}
+
+
+def _lookup_tea(db: Session, project_name: str) -> str:
+    """按项目名（含别名）从质量要求库取 TEa，WS/T 403-2024 行标优先。"""
+    if not db or not project_name:
+        return ""
+    from sqlalchemy import or_
+    from ...models.quality_requirement import QualityRequirement
+    from ...services.verification_calc import _extract_first_pct
+
+    names = [project_name] + _PROJECT_TEA_ALIASES.get(project_name, [])
+    conds = []
+    for n in names:
+        conds.append(QualityRequirement.item_name == n)
+        conds.append(QualityRequirement.item_name.like(f"%{n}%"))
+    try:
+        rows = db.query(QualityRequirement).filter(or_(*conds)).all()
+    except Exception:
+        return ""
+    for src in ("wst403-2024", "bj-hr-2025", "nccl-2026"):
+        for r in rows:
+            if r.source == src and r.tea:
+                pct = _extract_first_pct(r.tea)
+                if pct is not None:
+                    return f"{pct:g}"
+    return ""
+
+
 def _check_group(rec: MethodComparisonRecord, group: str):
     """组隔离：非本组记录一律 404，避免暴露存在性。
 
@@ -71,6 +108,11 @@ def _check_group(rec: MethodComparisonRecord, group: str):
 
 def _compute(rec: MethodComparisonRecord, persist: bool = True) -> dict:
     """重算并（可选）回写 result_summary / conclusion，返回带 details 的字典。"""
+    # TEa 未填时从质量要求库联动（否则无法判定偏移幅度的临床可接受性）
+    if not (rec.tea or "").strip():
+        tea = _lookup_tea(db, rec.project_name)
+        if tea:
+            rec.tea = tea
     d = _serialize(rec)
     res = compute_comparison(d)
     # 关键：必须回填重算后的 result_summary，否则报告生成器会用到旧结果
@@ -245,6 +287,7 @@ def summary(
             "ba_consistent": rs.get("ba_consistent"),
             "ba_max_abs_within": rs.get("ba_max_abs_within"),
             "can_replace": rs.get("can_replace"),
+            "replace_reason": rs.get("replace_reason"),
             "conclusion": rs.get("conclusion"),
         })
     return {"items": items, "total": len(items)}
