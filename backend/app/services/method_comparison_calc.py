@@ -357,17 +357,13 @@ def compute_method_comparison(data: dict) -> dict:
     deming_prop, deming_sys = _prop_bias(deming), _sys_bias(deming)
     pb_prop, pb_sys = _prop_bias(pb), _sys_bias(pb)
 
-    # 可接受性：平均偏倚（BA）与比例偏移联合判定，阈值 1/2 TEa
-    judged = []
-    if tea_half is not None:
-        if ba.get("bias_pct") is not None:
-            judged.append(abs(ba["bias_pct"]) <= tea_half)
-        if pb_prop.get("pct") is not None:
-            judged.append(abs(pb_prop["pct"]) <= tea_half)
-    acceptable = all(judged) if judged else None
-
-    can_replace = (ba["consistent"] and acceptable is not False) if acceptable is not None \
-        else ba["consistent"]
+    # 判定口径与参考报告一致：以 Bland-Altman 一致性作为「能否接受 / 能否直接替换」的主依据；
+    # 比例偏移是否落在 1/2 TEa 内单列为辅助指标（不改变主判定）。
+    within_half_tea = None
+    if tea_half is not None and pb_prop.get("pct") is not None:
+        within_half_tea = abs(pb_prop["pct"]) <= tea_half
+    acceptable = bool(ba["consistent"])
+    can_replace = bool(ba["consistent"])
 
     # 结论文本（对齐参考报告三段式）
     project = data.get("project_name") or "该项目"
@@ -425,6 +421,7 @@ def compute_method_comparison(data: dict) -> dict:
         "pb_prop": pb_prop, "pb_sys": pb_sys,
         "acceptable": acceptable,
         "can_replace": can_replace,
+        "within_half_tea": within_half_tea,
         "conclusion_lines": concl,
         "per_sample": per_sample,
     }
@@ -451,6 +448,7 @@ def compute_method_comparison(data: dict) -> dict:
         "bias_pct": ba["bias_pct"],
         "acceptable": acceptable,
         "can_replace": can_replace,
+        "within_half_tea": within_half_tea,
         "conclusion": "\n".join(concl),
         "conclusion_lines": concl,
     }
