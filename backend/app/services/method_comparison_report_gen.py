@@ -405,7 +405,7 @@ def build_single_report(rec: dict) -> bytes:
     # 三、Bland-Altman
     _h(doc, "三、Bland-Altman 一致性评价")
     if ba:
-        _para(doc, f"以两种方法的平均值为X轴作Bland-Altman图（图E），P{ba.get('p_text')}，"
+        _para(doc, f"以两种方法的平均值为X轴作Bland-Altman图（图E），{ba.get('p_text')}，"
                    f"表明两种方法{rec.get('project_name') or ''}检测在统计学上"
                    f"{'一致' if ba.get('consistent') else '不一致'}。")
         _figure(doc, charts.get("E"), "图E　Bland-Altman 图")
