@@ -635,3 +635,58 @@ def build_qualitative_summary_table(doc, recs: list):
             "能" if rs.get("can_replace") else "否",
         ])
     _table(doc, header, rows, size=8)
+
+
+# ─────────────────────────── 图表对外接口（详情页用） ───────────────────────────
+def _qual_bar_chart(rs):
+    """定性项目：符合率条形图（含 90% 判定线）。"""
+    if not _PIL_OK:
+        return None
+    img, d = _canvas("Concordance rate (%)")
+    L, R, T, B = 70, 24, 40, 52
+    pw, ph = CHART_W - L - R, CHART_H - T - B
+    items = [("PPA", rs.get("ppa")), ("NPA", rs.get("npa")), ("Total", rs.get("total_rate"))]
+    vals = [v if v is not None else 0 for _, v in items]
+    ymax = 105.0
+
+    def sy(v):
+        return T + ph - v / ymax * ph
+
+    for i in range(1, 5):
+        gv = ymax * i / 5
+        d.line([(L, sy(gv)), (L + pw, sy(gv))], fill=COLOR_GRID)
+        d.text((8, sy(gv) - 5), f"{gv:.0f}", fill=COLOR_AXIS)
+    d.line([(L, T), (L, T + ph)], fill=COLOR_AXIS)
+    d.line([(L, T + ph), (L + pw, T + ph)], fill=COLOR_AXIS)
+    # 90% 判定线
+    d.line([(L, sy(90)), (L + pw, sy(90))], fill=COLOR_ALT, width=2)
+    d.text((L + 4, sy(90) - 13), "90%", fill=COLOR_ALT)
+
+    n = len(items)
+    slot = pw / n
+    bw = slot * 0.42
+    for i, ((label, _), v) in enumerate(zip(items, vals)):
+        cx = L + slot * (i + 0.5)
+        top = sy(v)
+        d.rectangle([cx - bw / 2, top, cx + bw / 2, T + ph], fill=COLOR_MAIN)
+        d.text((cx - 14, top - 16), f"{v:.1f}", fill=COLOR_AXIS)
+        d.text((cx - 12, T + ph + 10), label, fill=COLOR_AXIS)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def build_charts_for(rec: dict) -> dict:
+    """按记录返回 {图key: PNG bytes}；定性返回 U 图，定量返回 A/B/C/E。"""
+    rs = rec.get("result_summary") or {}
+    det = rec.get("details") or {}
+    if not rs.get("valid"):
+        return {}
+    if (rec.get("compare_type") or rs.get("compare_type")) == "qualitative":
+        img = _qual_bar_chart(rs)
+        return {"U": img} if img else {}
+    pairs = det.get("per_sample") or []
+    if not pairs:
+        return {}
+    charts = _charts(pairs, {"pb": det.get("pb") or {}}, det.get("ba") or {})
+    return {k: v for k, v in charts.items() if v}

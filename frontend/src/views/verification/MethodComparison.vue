@@ -226,6 +226,17 @@
           <div v-for="(line, i) in (detail.result_summary?.conclusion_lines || [])" :key="i" class="concl-line">{{ i + 1 }}. {{ line }}</div>
           <div v-if="!detail.result_summary?.conclusion_lines?.length" class="concl-line">尚未计算，请先点「计算」</div>
         </div>
+
+        <div class="charts" v-loading="chartsLoading">
+          <div class="charts-title">图表</div>
+          <div v-if="detailCharts.length" class="chart-grid">
+            <div v-for="c in detailCharts" :key="c.key" class="chart-item">
+              <img :src="'data:image/png;base64,' + c.png" class="chart-img" />
+              <div class="chart-cap">{{ chartCaption(c.key) }}</div>
+            </div>
+          </div>
+          <div v-else-if="!chartsLoading" class="chart-empty">暂无图表（请先点「计算」）</div>
+        </div>
       </template>
     </el-dialog>
 
@@ -275,7 +286,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listMethodComparisons, createMethodComparison, updateMethodComparison, deleteMethodComparison,
-  computeMethodComparison, generateMethodComparison, downloadMethodComparison,
+  computeMethodComparison, generateMethodComparison, downloadMethodComparison, methodComparisonCharts,
   summaryMethodComparisons, downloadMethodComparisonSummary,
 } from '../../api/methodComparison'
 import { useAuthStore } from '../../store/auth'
@@ -296,6 +307,8 @@ const pasteText = ref('')
 
 const detailOpen = ref(false)
 const detail = ref(null)
+const detailCharts = ref([])
+const chartsLoading = ref(false)
 
 const summaryOpen = ref(false)
 const summaryBatch = ref('')
@@ -448,9 +461,30 @@ async function save() {
   }
 }
 
-function showDetail(row) {
+function chartCaption(k) {
+  const map = {
+    A: '图A　差值排序偏差图',
+    B: '图B　百分比差值排序偏差图',
+    C: '图C　Passing-Bablok 回归图',
+    E: '图E　Bland-Altman 一致性图',
+    U: '符合率条形图（PPA 阳性 / NPA 阴性 / Total 总符合率，红线为 90% 判定线）',
+  }
+  return map[k] || k
+}
+
+async function showDetail(row) {
   detail.value = row
   detailOpen.value = true
+  detailCharts.value = []
+  chartsLoading.value = true
+  try {
+    const res = await methodComparisonCharts(row.id)
+    detailCharts.value = res.charts || []
+  } catch (e) {
+    detailCharts.value = []
+  } finally {
+    chartsLoading.value = false
+  }
 }
 
 async function doCompute(row) {
@@ -546,4 +580,11 @@ onMounted(refresh)
 .concl { margin-top: 14px; padding: 12px 14px; background: #f7f9fc; border: 1px solid #e4e7ed; border-radius: 6px; }
 .concl-title { font-weight: 600; margin-bottom: 6px; color: #1a365d; }
 .concl-line { font-size: 13px; line-height: 1.8; color: #303133; }
+.charts { margin-top: 16px; }
+.charts-title { font-weight: 600; margin-bottom: 8px; color: #1a365d; }
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.chart-item { border: 1px solid #e4e7ed; border-radius: 6px; padding: 8px; background: #fff; }
+.chart-img { width: 100%; display: block; }
+.chart-cap { font-size: 12px; color: #606266; text-align: center; margin-top: 6px; }
+.chart-empty { font-size: 13px; color: #909399; padding: 12px 0; }
 </style>

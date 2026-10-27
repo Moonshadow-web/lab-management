@@ -22,6 +22,9 @@ export function generateMethodComparison(id) {
 export function downloadMethodComparison(id) {
   return request.get(`/api/v1/method-comparison/${id}/download`, { responseType: 'blob' })
 }
+export function methodComparisonCharts(id) {
+  return request.get(`/api/v1/method-comparison/${id}/charts`)
+}
 export function summaryMethodComparisons(params) {
   return request.get('/api/v1/method-comparison/summary', { params })
 }

@@ -7,6 +7,7 @@
 注意：静态路由 /summary* 放在独立 summary_router，且必须在 router.py 中先于本模块的
 make_router router 注册，否则会被 /{item_id} 抢先匹配。
 """
+import base64
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -171,6 +172,22 @@ def download_report(
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename=f"{rec.project_name or '项目'}_方法学比对报告.docx",
     )
+
+
+@router.get("/{rid}/charts")
+def charts(
+    rid: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    group: str = Depends(get_current_group),
+):
+    """返回该记录的图表 PNG（base64），供详情页直接展示。"""
+    rec = db.get(MethodComparisonRecord, rid)
+    _check_group(rec, group)
+    d = _compute(rec, persist=False)
+    from ...services.method_comparison_report_gen import build_charts_for
+    imgs = build_charts_for(d)
+    return {"charts": [{"key": k, "png": base64.b64encode(v).decode("ascii")} for k, v in imgs.items()]}
 
 
 # ─────────────────────────── 汇总（静态路由） ───────────────────────────

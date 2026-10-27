@@ -117,9 +117,11 @@ def esd_check(xs, ys, alpha=0.05, max_rounds=3):
         m = len(work)
         if m < 3:
             break
+        # 相对偏差用「两法均值」作分母（对称），避免对调参照/待评方法后离群值集合变化
         rel = []
         for _, a, b in work:
-            rel.append((b - a) / a if a else 0.0)
+            denom = (a + b) / 2.0
+            rel.append((b - a) / denom if denom else 0.0)
         mu = mean(rel)
         sd = stdev(rel) if m > 1 else 0.0
         if sd == 0:
