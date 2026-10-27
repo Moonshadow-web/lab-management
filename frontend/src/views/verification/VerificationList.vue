@@ -10,6 +10,9 @@
       <el-tab-pane label="验证报告归档" name="reports">
         <ProjectVerificationArchive />
       </el-tab-pane>
+      <el-tab-pane label="方法学比对" name="methodComparison">
+        <MethodComparison />
+      </el-tab-pane>
       <el-tab-pane label="测量不确定度评定" name="uncertainty">
         <UncertaintyAssessment />
       </el-tab-pane>
@@ -27,6 +30,7 @@ import UncertaintySummary from './UncertaintySummary.vue'
 import VerificationArchive from './VerificationArchive.vue'
 import VerificationRecords from './VerificationRecords.vue'
 import ProjectVerificationArchive from './ProjectVerificationArchive.vue'
+import MethodComparison from './MethodComparison.vue'
 import { useAuthStore } from '../../store/auth'
 
 const crud = ref(null)

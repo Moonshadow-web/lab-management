@@ -749,6 +749,58 @@ class VerificationReportRead(VerificationReportBase):
     updated_at: datetime | None = None
 
 
+# ---------------- MethodComparisonRecord（方法学比对，EP9-A3） ----------------
+class MethodComparisonBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    group_code: str = "sm"
+    batch_name: str = ""
+    compare_type: str = "quantitative"
+    project_name: str = ""
+    project_method: str = ""
+    unit: str = ""
+    ref_instrument: str = ""
+    ref_manufacturer: str = ""
+    ref_reagent: str = ""
+    ref_reagent_lot: str = ""
+    ref_calibrator: str = ""
+    ref_calibrator_lot: str = ""
+    test_instrument: str = ""
+    test_manufacturer: str = ""
+    test_reagent: str = ""
+    test_reagent_lot: str = ""
+    test_calibrator: str = ""
+    test_calibrator_lot: str = ""
+    sample_count: int = 40
+    sample_source: str = "临床检测剩余血清样本"
+    tea: str = ""
+    scheme: str = "EP9-A3"
+    ref_range_low: str = ""
+    ref_range_high: str = ""
+    test_range_low: str = ""
+    test_range_high: str = ""
+    compare_date: str = ""
+    pairs: list = []
+    result_summary: dict = {}
+    conclusion: str = ""
+    operator: str = ""
+    reviewer: str = ""
+    report_file_path: str = ""
+
+
+class MethodComparisonCreate(MethodComparisonBase):
+    pass
+
+
+class MethodComparisonUpdate(MethodComparisonBase):
+    pass
+
+
+class MethodComparisonRead(MethodComparisonBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 # ---------------- ReportArchive（性能验证报告归档） ----------------
 class ReportArchiveBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
