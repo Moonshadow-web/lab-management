@@ -395,6 +395,12 @@ def build_single_report(rec: dict) -> bytes:
              (det.get("pb_sys") or {}).get("text", "—")],
         ]
         _table(doc, ["", "Deming", "Passing-Bablok"], rows, widths=[3.6, 6.2, 6.2])
+        _para(doc, "判读说明：Deming 与 Passing-Bablok 应同时看——① 两者结论一致时，以该结论为准；"
+                   "② Passing-Bablok 对离群值与分布偏态更稳健，Deming 在已知两法测量误差比例（λ）时更有效，"
+                   "本文按 λ=1 处理；③ 若两者对斜率是否偏离 1 的判断不一致，提示数据存在离群点、"
+                   "精度随浓度变化或样本覆盖不足，应补充样本后复评，不宜直接下结论；"
+                   "④ 斜率 95%CI 不含 1 判为比例偏移，截距 95%CI 不含 0 判为系统偏移，"
+                   "两者均不存在再看 Bland-Altman 一致性。")
 
     # 三、Bland-Altman
     _h(doc, "三、Bland-Altman 一致性评价")
@@ -497,7 +503,7 @@ def build_summary_report(recs: list) -> bytes:
                 i,
                 r.get("project_name") or "",
                 rs.get("systematic_bias") or "—",
-                "存在" if rs.get("proportional_bias_pct") not in (None, 0) else "无",
+                "存在" if rs.get("proportional_bias_exists") else ("无" if rs.get("proportional_bias_exists") is False else "—"),
                 f"{pct:+.2f}%" if pct is not None else "—",
                 "是" if rs.get("acceptable") else ("否" if rs.get("acceptable") is False else "—"),
                 rs.get("ba_p") or "—",

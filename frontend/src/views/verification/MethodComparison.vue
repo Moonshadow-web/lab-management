@@ -221,6 +221,12 @@
           <el-table-column prop="v" label="结果" />
         </el-table>
 
+        <div class="read-note">
+          <b>判读说明：</b>Deming 与 Passing-Bablok 需一起看——两者结论一致时以该结论为准；Passing-Bablok 对离群值与偏态分布更稳健，
+          Deming 在已知两法测量误差比例（λ，本系统按 λ=1）时更有效；若两者对斜率是否偏离 1 判断不一致，说明数据存在离群点、
+          精度随浓度变化或样本覆盖不足，应补样复评。斜率 95%CI 不含 1 → 比例偏移；截距 95%CI 不含 0 → 系统偏移；
+          两者均不存在再看 Bland-Altman 一致性。
+        </div>
         <div class="concl">
           <div class="concl-title">比对结论</div>
           <div v-for="(line, i) in (detail.result_summary?.conclusion_lines || [])" :key="i" class="concl-line">{{ i + 1 }}. {{ line }}</div>
@@ -347,14 +353,20 @@ const detailSummaryRows = computed(() => {
       { k: '能否直接替换', v: rs.can_replace ? '能' : '否' },
     ]
   }
+  const ci = (arr) => (Array.isArray(arr) && arr[0] != null ? `（${Number(arr[0]).toFixed(4)}，${Number(arr[1]).toFixed(4)}）` : '')
+  const val = (v, n = 6) => (v == null ? '—' : Number(v).toFixed(n))
   return [
     { k: '纳入统计样本数', v: rs.n_used },
     { k: '离群值说明', v: rs.outlier_text || '—' },
-    { k: 'Deming 回归', v: '见报告（斜率/截距及 95%CI）' },
-    { k: 'Passing-Bablok 斜率', v: f(rs.slope, 6) },
-    { k: 'Passing-Bablok 截距', v: f(rs.intercept, 6) },
-    { k: '比例偏移', v: rs.proportional_bias_pct != null ? `${rs.proportional_bias_pct.toFixed(2)}%` : '—' },
-    { k: '系统偏移', v: rs.systematic_bias || '—' },
+    { k: 'Deming 回归方程', v: rs.deming_equation || '—' },
+    { k: 'Deming 斜率（95%CI）', v: `${val(rs.deming_slope)}${ci(rs.deming_slope_ci)}` },
+    { k: 'Deming 截距（95%CI）', v: `${val(rs.deming_intercept)}${ci(rs.deming_intercept_ci)}` },
+    { k: 'Deming 比例偏移', v: rs.deming_prop_text || '—' },
+    { k: 'Deming 系统偏移', v: rs.deming_sys_text || '—' },
+    { k: 'Passing-Bablok 斜率（95%CI）', v: `${val(rs.pb_slope ?? rs.slope)}${ci(rs.pb_slope_ci)}` },
+    { k: 'Passing-Bablok 截距（95%CI）', v: `${val(rs.pb_intercept ?? rs.intercept)}${ci(rs.pb_intercept_ci)}` },
+    { k: '比例偏移（按 PB 斜率 95%CI 判定）', v: rs.proportional_bias_exists == null ? '—' : (rs.proportional_bias_exists ? `存在，${rs.proportional_bias_pct > 0 ? '+' : ''}${Number(rs.proportional_bias_pct).toFixed(2)}%` : '不存在') },
+    { k: '系统偏移（按 PB 截距 95%CI 判定）', v: rs.systematic_bias || '—' },
     { k: 'Pearson r', v: f(rs.pearson_r, 4) },
     { k: 'Bland-Altman P 值', v: rs.ba_p || '—' },
     { k: 'Bland-Altman 一致', v: rs.ba_consistent ? '是' : '否' },
@@ -580,6 +592,7 @@ onMounted(refresh)
 .concl { margin-top: 14px; padding: 12px 14px; background: #f7f9fc; border: 1px solid #e4e7ed; border-radius: 6px; }
 .concl-title { font-weight: 600; margin-bottom: 6px; color: #1a365d; }
 .concl-line { font-size: 13px; line-height: 1.8; color: #303133; }
+.read-note { margin-top: 12px; padding: 10px 12px; background: #fdf6ec; border: 1px solid #f5dab1; border-radius: 6px; font-size: 12px; line-height: 1.7; color: #8a6d3b; }
 .charts { margin-top: 16px; }
 .charts-title { font-weight: 600; margin-bottom: 8px; color: #1a365d; }
 .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

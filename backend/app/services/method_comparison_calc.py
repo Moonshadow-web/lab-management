@@ -93,9 +93,10 @@ def t_pvalue(t, df):
 
 
 def _fmt_p(p):
+    """P 值显示：带等号，极小值用 <。"""
     if p < 0.0001:
-        return "<0.0001"
-    return f"{p:.4f}"
+        return "P<0.0001"
+    return f"P={p:.4f}"
 
 
 # ─────────────────────────── 离群值：迭代 Grubbs / ESD ───────────────────────────
@@ -337,27 +338,31 @@ def compute_method_comparison(data: dict) -> dict:
 
     # 偏移判定
     def _prop_bias(model):
+        """比例偏移：存在时给出偏移百分比，不存在时不带数值。"""
         ci = model.get("slope_ci")
         if not ci:
             return {"exists": None, "pct": None, "text": "无法判定"}
         exists = not (ci[0] <= 1.0 <= ci[1])
         pct = (model["slope"] - 1.0) * 100
         if exists:
-            direction = "高" if pct > 0 else "低"
-            return {"exists": True, "pct": round(pct, 2),
-                    "text": f"存在（{direction}约{abs(pct):.0f}%）"}
+            return {"exists": True, "pct": round(pct, 2), "text": f"存在，{pct:+.2f}%"}
         return {"exists": False, "pct": round(pct, 2), "text": "不存在"}
 
-    def _sys_bias(model):
+    def _sys_bias(model, base):
+        """系统偏移：存在时给出相当于均值的百分比，不存在时不带数值。"""
         ci = model.get("intercept_ci")
         if not ci:
-            return {"exists": None, "text": "无法判定"}
+            return {"exists": None, "pct": None, "text": "无法判定"}
         exists = not (ci[0] <= 0.0 <= ci[1])
-        return {"exists": exists,
-                "text": f"存在（{model['intercept']:.4g}）" if exists else "不存在"}
+        pct = (model["intercept"] / base * 100) if base else None
+        if exists:
+            txt = f"存在，{pct:+.2f}%" if pct is not None else "存在"
+            return {"exists": True, "pct": round(pct, 2) if pct is not None else None, "text": txt}
+        return {"exists": False, "pct": None, "text": "不存在"}
 
-    deming_prop, deming_sys = _prop_bias(deming), _sys_bias(deming)
-    pb_prop, pb_sys = _prop_bias(pb), _sys_bias(pb)
+    base_mean = mean(xs) if xs else 0.0
+    deming_prop, deming_sys = _prop_bias(deming), _sys_bias(deming, base_mean)
+    pb_prop, pb_sys = _prop_bias(pb), _sys_bias(pb, base_mean)
 
     # 判定口径与参考报告一致：以 Bland-Altman 一致性作为「能否接受 / 能否直接替换」的主依据；
     # 比例偏移是否落在 1/2 TEa 内单列为辅助指标（不改变主判定）。
@@ -385,7 +390,7 @@ def compute_method_comparison(data: dict) -> dict:
 
     concl.append(
         f"两种方法对{project}的检测在统计学上{'不一致' if not ba['consistent'] else '一致'}"
-        f"（Bland-Altman，P{ba['p_text']}）。"
+        f"（Bland-Altman，{ba['p_text']}）。"
     )
 
     if can_replace:
@@ -441,6 +446,19 @@ def compute_method_comparison(data: dict) -> dict:
         ),
         "slope": pb["slope"],
         "intercept": pb["intercept"],
+        "pb_slope": pb["slope"],
+        "pb_intercept": pb["intercept"],
+        "pb_slope_ci": pb.get("slope_ci"),
+        "pb_intercept_ci": pb.get("intercept_ci"),
+        "deming_slope": deming["slope"],
+        "deming_intercept": deming["intercept"],
+        "deming_equation": deming["equation"],
+        "deming_slope_ci": deming.get("slope_ci"),
+        "deming_intercept_ci": deming.get("intercept_ci"),
+        "deming_prop_text": deming_prop.get("text"),
+        "deming_sys_text": deming_sys.get("text"),
+        "systematic_bias_pct": pb_sys.get("pct"),
+        "proportional_bias_exists": pb_prop.get("exists"),
         "proportional_bias_pct": pb_prop.get("pct"),
         "systematic_bias": pb_sys.get("text"),
         "pearson_r": round(pr["r"], 4) if pr else None,
