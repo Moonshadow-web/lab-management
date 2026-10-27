@@ -106,13 +106,16 @@ def _check_group(rec: MethodComparisonRecord, group: str):
         raise HTTPException(404, "比对记录不存在")
 
 
-def _compute(rec: MethodComparisonRecord, persist: bool = True) -> dict:
+def _compute(rec: MethodComparisonRecord, db: Session = None, persist: bool = True) -> dict:
     """重算并（可选）回写 result_summary / conclusion，返回带 details 的字典。"""
     # TEa 未填时从质量要求库联动（否则无法判定偏移幅度的临床可接受性）
-    if not (rec.tea or "").strip():
-        tea = _lookup_tea(db, rec.project_name)
-        if tea:
-            rec.tea = tea
+    if db is not None and not (rec.tea or "").strip():
+        try:
+            tea = _lookup_tea(db, rec.project_name)
+            if tea:
+                rec.tea = tea
+        except Exception:  # noqa: BLE001 联动失败不应阻断计算
+            pass
     d = _serialize(rec)
     res = compute_comparison(d)
     # 关键：必须回填重算后的 result_summary，否则报告生成器会用到旧结果
@@ -135,7 +138,7 @@ def compute_one(
     """重算统计（离群值/回归/一致性/结论），回写结果。"""
     rec = db.get(MethodComparisonRecord, rid)
     _check_group(rec, group)
-    d = _compute(rec, persist=True)
+    d = _compute(rec, db=db, persist=True)
     db.commit()
     db.refresh(rec)
     rs = d["result_summary"]
@@ -158,7 +161,7 @@ def generate_report(
     """生成单项目 docx 报告并存档（本地 + COS）。"""
     rec = db.get(MethodComparisonRecord, rid)
     _check_group(rec, group)
-    d = _compute(rec, persist=True)
+    d = _compute(rec, db=db, persist=True)
     if not d["result_summary"].get("valid"):
         db.commit()
         raise HTTPException(400, d["result_summary"].get("message") or "比对结果无效，无法生成报告")
@@ -226,7 +229,7 @@ def charts(
     """返回该记录的图表 PNG（base64），供详情页直接展示。"""
     rec = db.get(MethodComparisonRecord, rid)
     _check_group(rec, group)
-    d = _compute(rec, persist=False)
+    d = _compute(rec, db=db, persist=False)
     from ...services.method_comparison_report_gen import build_charts_for
     imgs = build_charts_for(d)
     return {"charts": [{"key": k, "png": base64.b64encode(v).decode("ascii")} for k, v in imgs.items()]}
@@ -307,7 +310,7 @@ def summary_download(
         raise HTTPException(404, "无可汇总的比对记录")
     ctx = []
     for r in recs:
-        d = _compute(r, persist=True)
+        d = _compute(r, db=db, persist=True)
         if d["result_summary"].get("valid"):
             ctx.append(d)
     db.commit()
