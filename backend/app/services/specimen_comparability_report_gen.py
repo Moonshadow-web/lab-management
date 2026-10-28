@@ -158,7 +158,6 @@ def build_specimen_report(rec: dict) -> bytes:
                               flag])
         _table(doc, ["样本号", f"{ta}", f"{tb}", "绝对偏差", "相对偏差", "是否在允许偏倚内"],
                data_rows, widths=[1.8, 3.6, 3.6, 2.6, 2.6, 3.4], size=8.5)
-        _para(doc, "注：本记录由授权签字人审核签字后归档，保存期不少于 2 年（CNAS-CL02:2023 7.3.7.4）。", size=9)
 
     _sign_block(doc, rec)
     buf = io.BytesIO()
