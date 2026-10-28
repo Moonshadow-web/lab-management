@@ -102,10 +102,11 @@
             <el-row :gutter="12">
               <el-col :span="8">
                 <el-form-item label="计划样本数">
-                  <el-select v-model="form.sample_count" style="width:100%" @change="resizeSamples">
-                    <el-option :value="20" label="20 例" />
-                    <el-option :value="40" label="40 例（推荐）" />
-                  </el-select>
+                  <div style="display:flex;gap:6px;align-items:center;width:100%">
+                    <el-input-number v-model="form.sample_count" :min="3" :max="200" style="flex:1" @change="resizeSamples" />
+                    <el-button size="small" @click="setSampleCount(20)">20</el-button>
+                    <el-button size="small" @click="setSampleCount(40)">40</el-button>
+                  </div>
                 </el-form-item>
               </el-col>
               <el-col :span="8"><el-form-item label="允许总误差 TEa"><el-input v-model="form.tea" placeholder="如 10（%）" /></el-form-item></el-col>
@@ -386,6 +387,11 @@ function liveDiff(row) {
   if (!isFinite(a) || !isFinite(b)) return { d: '—', p: '—' }
   const d = b - a
   return { d: d.toFixed(3), p: a ? `${(d / a * 100).toFixed(2)}%` : '—' }
+}
+
+function setSampleCount(n) {
+  form.value.sample_count = n
+  resizeSamples()
 }
 
 function resizeSamples() {

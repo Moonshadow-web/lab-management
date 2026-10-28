@@ -47,6 +47,7 @@ from .cnas_standard import CnasStandard
 from .uncertainty import UncertaintyAssessment
 from .verification_report import VerificationReport, QUALITATIVE_ITEMS, QUANTITATIVE_ITEMS
 from .method_comparison import MethodComparisonRecord
+from .specimen_comparability import SpecimenComparabilityRecord
 from .report_archive import ReportArchive, REPORT_ARCHIVE_SOURCES
 
 __all__ = [
@@ -112,4 +113,5 @@ __all__ = [
     "ReportArchive",
     "REPORT_ARCHIVE_SOURCES",
     "MethodComparisonRecord",
+    "SpecimenComparabilityRecord",
 ]

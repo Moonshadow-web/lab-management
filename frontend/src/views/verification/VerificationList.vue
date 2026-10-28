@@ -13,6 +13,12 @@
       <el-tab-pane label="方法学比对" name="methodComparison">
         <MethodComparison />
       </el-tab-pane>
+      <el-tab-pane label="样本类型可比性" name="specimenComparability">
+        <SpecimenComparability />
+      </el-tab-pane>
+      <el-tab-pane label="样本类型可比性" name="specimenComparability">
+        <SpecimenComparability />
+      </el-tab-pane>
       <el-tab-pane label="测量不确定度评定" name="uncertainty">
         <UncertaintyAssessment />
       </el-tab-pane>
@@ -31,6 +37,7 @@ import VerificationArchive from './VerificationArchive.vue'
 import VerificationRecords from './VerificationRecords.vue'
 import ProjectVerificationArchive from './ProjectVerificationArchive.vue'
 import MethodComparison from './MethodComparison.vue'
+import SpecimenComparability from './SpecimenComparability.vue'
 import { useAuthStore } from '../../store/auth'
 
 const crud = ref(null)

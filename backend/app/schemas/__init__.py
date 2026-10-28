@@ -801,6 +801,50 @@ class MethodComparisonRead(MethodComparisonBase):
     updated_at: datetime | None = None
 
 
+# ---------------- SpecimenComparabilityRecord（样本类型可比性验证） ----------------
+class SpecimenComparabilityBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    group_code: str = "sm"
+    batch_name: str = ""
+    verify_type: str = "serum_vs_plasma"
+    project_name: str = ""
+    project_method: str = ""
+    unit: str = ""
+    specimen_a: str = "血清"
+    specimen_b: str = "血浆-肝素锂"
+    tube_a: str = ""
+    tube_b: str = ""
+    centrifuge: str = ""
+    storage: str = ""
+    instrument: str = ""
+    sample_count: int = 20
+    sample_source: str = "同一患者同次采集的配对标本"
+    tea: str = ""
+    ref_range_low: str = ""
+    ref_range_high: str = ""
+    verify_date: str = ""
+    pairs: list = []
+    result_summary: dict = {}
+    conclusion: str = ""
+    operator: str = ""
+    reviewer: str = ""
+    report_file_path: str = ""
+
+
+class SpecimenComparabilityCreate(SpecimenComparabilityBase):
+    pass
+
+
+class SpecimenComparabilityUpdate(SpecimenComparabilityBase):
+    pass
+
+
+class SpecimenComparabilityRead(SpecimenComparabilityBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 # ---------------- ReportArchive（性能验证报告归档） ----------------
 class ReportArchiveBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)

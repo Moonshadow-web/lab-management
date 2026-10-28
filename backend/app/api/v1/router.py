@@ -32,6 +32,7 @@ from . import (
     users,
     verification,
     method_comparison,
+    specimen_comparability,
     uncertainty,
     verification_reports,
     report_archives,
@@ -59,6 +60,8 @@ api_router.include_router(training.router)
 api_router.include_router(verification.router)
 api_router.include_router(method_comparison.summary_router)  # 必须先于 router，否则 /summary 被 /{item_id} 抢匹配
 api_router.include_router(method_comparison.router)
+api_router.include_router(specimen_comparability.summary_router)  # 同样必须先于 router
+api_router.include_router(specimen_comparability.router)
 api_router.include_router(nonconformity.router)
 api_router.include_router(notifications.router)
 api_router.include_router(reminders.router)
