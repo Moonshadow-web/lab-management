@@ -159,7 +159,7 @@ def generate_report(
     rec.report_file_path = rel
     arch = ReportArchive(
         project_name=rec.project_name,
-        report_type="specimen_comparability",
+        report_type="specimen",  # report_archives.report_type 仅 String(20)
         source_type="generated",
         ref_report_id=rec.id,
         ref_archive_kind="specimen_comparability",
