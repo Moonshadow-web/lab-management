@@ -4,6 +4,8 @@
 """
 import json
 import logging
+import shutil
+import uuid
 
 logger = logging.getLogger(__name__)
 import os
@@ -13,6 +15,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFil
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from ...core.config import UPLOAD_ROOT
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
 from ...models.education import (
@@ -353,6 +356,138 @@ def list_attachments(
         q = q.filter_by(kind=kind)
     items = q.order_by(EducationAttachment.id.desc()).all()
     return {"items": [_ser_attachment(a) for a in items], "total": len(items)}
+
+
+# ---------------------------------------------------------------------------
+# 分片上传（解决网关 20MB 左右请求体上限导致的 413）
+# 流程：init 建会话 → 逐片 POST → complete 合并入库（优先 COS）
+# ---------------------------------------------------------------------------
+_CHUNK_ROOT = UPLOAD_ROOT / "_chunks"
+CHUNK_SIZE = 4 * 1024 * 1024          # 单片 4MB（远低于网关上限）
+CHUNK_MAX_BYTES = 200 * 1024 * 1024   # 单文件上限 200MB
+CHUNK_TTL_HOURS = 24
+
+
+def _chunk_dir(upload_id: str):
+    return _CHUNK_ROOT / upload_id
+
+
+def _cleanup_stale_chunks():
+    """清理超过 TTL 的残留分片（最多扫 200 个目录，避免拖慢初始化）。"""
+    try:
+        if not _CHUNK_ROOT.exists():
+            return
+        now = datetime.now().timestamp()
+        for i, d in enumerate(_CHUNK_ROOT.iterdir()):
+            if i >= 200:
+                break
+            try:
+                if d.is_dir() and (now - d.stat().st_mtime) > CHUNK_TTL_HOURS * 3600:
+                    shutil.rmtree(d, ignore_errors=True)
+            except OSError:
+                continue
+    except Exception:
+        pass
+
+
+@attach_router.post("/chunk/init")
+def chunk_init(payload: dict, user: User = Depends(WRITE)):
+    """初始化分片上传会话。body: owner_type/owner_id/kind/filename/size"""
+    owner_type = (payload.get("owner_type") or "").strip()
+    owner_id = int(payload.get("owner_id") or 0)
+    kind = (payload.get("kind") or "other").strip()
+    filename = (payload.get("filename") or "upload.bin").strip()
+    size = int(payload.get("size") or 0)
+    if not owner_type or not owner_id:
+        raise HTTPException(400, "缺少 owner_type / owner_id")
+    if size and size > CHUNK_MAX_BYTES:
+        raise HTTPException(413, f"文件超过 {CHUNK_MAX_BYTES // 1024 // 1024} MB 上限")
+
+    _cleanup_stale_chunks()
+    upload_id = uuid.uuid4().hex
+    d = _chunk_dir(upload_id)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "meta.json").write_text(json.dumps({
+        "owner_type": owner_type, "owner_id": owner_id, "kind": kind,
+        "filename": filename, "size": size,
+        "uploaded_by": user.username if user else "",
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+    }, ensure_ascii=False), encoding="utf-8")
+    return {"upload_id": upload_id, "chunk_size": CHUNK_SIZE}
+
+
+@attach_router.post("/chunk/{upload_id}/{index}")
+async def chunk_upload(upload_id: str, index: int,
+                       file: UploadFile = File(...), user: User = Depends(WRITE)):
+    """上传单个分片（index 从 0 开始）。"""
+    d = _chunk_dir(upload_id)
+    if not d.is_dir():
+        raise HTTPException(404, "上传会话不存在或已过期，请重新上传")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "分片内容为空")
+    (d / f"{index:05d}.part").write_bytes(content)
+    return {"ok": True, "index": index, "bytes": len(content)}
+
+
+@attach_router.post("/chunk/{upload_id}/complete")
+def chunk_complete(upload_id: str, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    """合并所有分片并落库为附件（优先 COS）。"""
+    d = _chunk_dir(upload_id)
+    if not d.is_dir():
+        raise HTTPException(404, "上传会话不存在或已过期，请重新上传")
+    try:
+        meta = json.loads((d / "meta.json").read_text(encoding="utf-8"))
+    except Exception:
+        raise HTTPException(400, "上传会话元数据损坏，请重新上传")
+
+    parts = sorted(d.glob("*.part"))
+    if not parts:
+        raise HTTPException(400, "没有收到任何分片")
+    total = sum(p.stat().st_size for p in parts)
+    expect = int(meta.get("size") or 0)
+    if expect and total != expect:
+        raise HTTPException(400, f"分片不完整：已收到 {total} 字节，应为 {expect} 字节")
+
+    buf = bytearray()
+    for p in parts:
+        buf += p.read_bytes()
+    content = bytes(buf)
+
+    filename = meta.get("filename") or "upload.bin"
+    ext = os.path.splitext(filename)[1] or ""
+    ft = _classify_ext(ext)
+    safe = f"{meta.get('owner_type')}_{meta.get('owner_id')}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}{ext}"
+
+    cloud_key = None
+    if cos_storage.ready:
+        try:
+            cloud_key = cos_storage.save("education_attachments", filename, content)
+        except Exception as e:
+            logger.warning("分片上传转存 COS 失败，回退数据库: %s", e)
+    if not cloud_key and len(content) > 15 * 1024 * 1024:
+        shutil.rmtree(d, ignore_errors=True)
+        raise HTTPException(413, "对象存储不可用，且文件超过 15MB，无法保存")
+
+    a = EducationAttachment(
+        owner_type=meta.get("owner_type"), owner_id=int(meta.get("owner_id") or 0),
+        kind=meta.get("kind") or "other", file_type=ft,
+        original_name=filename, stored_name=safe, rel_path="",
+        cloud_key=cloud_key, data=None if cloud_key else content,
+        size_bytes=len(content), uploaded_by=(user.username if user else ""),
+    )
+    db.add(a)
+    try:
+        db.commit()
+    except Exception as e:  # noqa: BLE001
+        db.rollback()
+        msg = str(e)
+        if "max_allowed_packet" in msg or "packet bigger" in msg:
+            raise HTTPException(413, "文件过大：超过数据库单包限制，请稍后重试（已走 COS 时不会触发）")
+        raise
+    db.refresh(a)
+    shutil.rmtree(d, ignore_errors=True)
+    return {"items": [_ser_attachment(a)], "total": 1}
 
 
 @attach_router.post("/{owner_type}/{owner_id}", status_code=201)

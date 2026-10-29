@@ -120,3 +120,19 @@ export function generateExamSummary(sessionId) {
 export function generateEvalSummary(sessionId) {
   return request.post(`${P}/training-sessions/${sessionId}/generate-eval-summary`)
 }
+
+// 分片上传（>8MB 大文件，规避网关 20MB 请求体上限）
+export function initChunkUpload(data) {
+  return request.post('/api/v1/education-attachments/chunk/init', data, { timeout: 60000 })
+}
+export function uploadChunk(uploadId, index, blob, filename) {
+  const fd = new FormData()
+  fd.append('file', blob, filename || 'part.bin')
+  return request.post(`/api/v1/education-attachments/chunk/${uploadId}/${index}`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 300000,
+  })
+}
+export function completeChunkUpload(uploadId) {
+  return request.post(`/api/v1/education-attachments/chunk/${uploadId}/complete`, {}, { timeout: 300000 })
+}

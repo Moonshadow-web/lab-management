@@ -11,6 +11,10 @@
       </el-upload>
       <span class="att-hint" v-if="hint">{{ hint }}</span>
     </div>
+    <div v-if="uploading" style="margin:6px 0 10px;">
+      <el-progress :percentage="uploadPct" :status="uploadPct === 100 ? 'success' : ''" />
+      <div style="font-size:12px;color:#909399;margin-top:2px;">正在上传：{{ uploadingName }}（{{ uploadPct }}%）</div>
+    </div>
     <el-table :data="items" border stripe size="small" v-loading="loading">
       <el-table-column prop="original_name" label="文件名" min-width="180" show-overflow-tooltip />
       <el-table-column prop="file_type" label="类型" width="80" align="center" />
@@ -41,7 +45,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
-import { listEduAttachments, uploadEduAttachments, eduAttachmentUrl, deleteEduAttachment } from '../../api/education'
+import { listEduAttachments, uploadEduAttachments, eduAttachmentUrl, deleteEduAttachment, initChunkUpload, uploadChunk, completeChunkUpload } from '../../api/education'
 import AttachmentPreview from '../../components/AttachmentPreview.vue'
 
 const props = defineProps({
@@ -60,6 +64,13 @@ const previewVisible = ref(false)
 const previewFile = ref(null)
 const emit = defineEmits(['uploaded'])
 
+// 大文件分片上传状态
+const uploading = ref(false)
+const uploadPct = ref(0)
+const uploadingName = ref('')
+const CHUNK_SIZE = 4 * 1024 * 1024     // 4MB / 片
+const CHUNK_THRESHOLD = 8 * 1024 * 1024 // >8MB 走分片
+
 async function refresh() {
   if (!props.ownerId) { items.value = []; return }
   loading.value = true
@@ -71,14 +82,53 @@ async function refresh() {
   }
 }
 
+async function uploadInChunks(file) {
+  const init = await initChunkUpload({
+    owner_type: props.ownerType,
+    owner_id: props.ownerId,
+    kind: props.kind,
+    filename: file.name,
+    size: file.size,
+  })
+  const uploadId = init.upload_id
+  const total = Math.ceil(file.size / CHUNK_SIZE)
+  for (let i = 0; i < total; i++) {
+    const start = i * CHUNK_SIZE
+    const blob = file.slice(start, Math.min(file.size, start + CHUNK_SIZE))
+    await uploadChunk(uploadId, i, blob, `${file.name}.part${i}`)
+    uploadPct.value = Math.round(((i + 1) * 100) / total)
+  }
+  return completeChunkUpload(uploadId)
+}
+
 async function onUpload(opt) {
+  const file = opt.file
   try {
-    await uploadEduAttachments(props.ownerType, props.ownerId, props.kind, [opt.file])
-    ElMessage.success('上传成功')
+    if (file.size > 200 * 1024 * 1024) {
+      ElMessage.error('文件超过 200MB 上限')
+      return
+    }
+    if (file.size > CHUNK_THRESHOLD) {
+      uploading.value = true
+      uploadPct.value = 0
+      uploadingName.value = file.name
+      await uploadInChunks(file)
+      uploadPct.value = 100
+      ElMessage.success(`上传成功：${file.name}（${(file.size / 1024 / 1024).toFixed(1)} MB）`)
+    } else {
+      await uploadEduAttachments(props.ownerType, props.ownerId, props.kind, [file])
+      ElMessage.success('上传成功')
+    }
     refresh()
     emit('uploaded')
   } catch (e) {
-    ElMessage.error('上传失败：' + (e.response?.data?.detail || e.message))
+    let msg = e.response?.data?.detail || e.message
+    if (e.response?.status === 413) msg = '文件过大被服务器拒绝（413），请确认后端已更新'
+    ElMessage.error('上传失败：' + msg)
+  } finally {
+    uploading.value = false
+    uploadPct.value = 0
+    uploadingName.value = ''
   }
 }
 
