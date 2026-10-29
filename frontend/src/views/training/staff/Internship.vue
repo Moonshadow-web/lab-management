@@ -7,7 +7,14 @@
       </el-tab-pane>
       <el-tab-pane label="实操考核成绩单（PX-004）" name="score">
         <CrudTable :columns="scoreCols" :fetch="fetchScore" search-placeholder="搜索姓名"
-          :can-write="canWrite" @add="openScore()" @edit="openScore" @delete="onDeleteScore" ref="scoreRef" />
+          :can-write="canWrite" @add="openScore()" @edit="openScore" @delete="onDeleteScore" ref="scoreRef">
+          <template #toolbar-extra>
+            <el-button :icon="Printer" @click="printScore(null, true)">打印空白表</el-button>
+          </template>
+          <template #row-extra="{ row }">
+            <el-button link type="primary" :icon="Printer" @click="printScore(row)">打印</el-button>
+          </template>
+        </CrudTable>
       </el-tab-pane>
       <el-tab-pane label="讲课计划（实习生）" name="lecture">
         <InternLecture />
@@ -73,6 +80,7 @@
       </el-form>
       <template #footer>
         <el-button @click="scoreVisible = false">取消</el-button>
+        <el-button :icon="Printer" @click="printScore(scoreForm)">打印成绩单</el-button>
         <el-button type="primary" @click="saveScore">保存</el-button>
       </template>
     </el-dialog>
@@ -82,6 +90,8 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Printer } from '@element-plus/icons-vue'
+import { printHtml } from '../../../utils/printHtml'
 import CrudTable from '../../../components/CrudTable.vue'
 import InternLecture from './InternLecture.vue'
 import {
@@ -225,4 +235,87 @@ async function onDeleteScore(row) {
   try { await ElMessageBox.confirm('确认删除？', '提示', { type: 'warning' }); await deleteScore(row.id); ElMessage.success('已删除'); scoreRef.value?.refresh() } catch (e) {}
 }
 function fetchScore(params) { return listScore(params) }
+
+function esc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// 打印实操考核成绩单（BG-SM-PX-004）；blank=true 打印空白表供现场填写
+function printScore(row, blank = false) {
+  const data = row || blankScore()
+  const subs = (data.subjects_json && data.subjects_json.length) ? data.subjects_json : SCORE_OUTLINE.map(([subject, score_value]) => ({ subject, score_value, teacher: '', score: '' }))
+  const summary = scoreSummary(data)
+
+  const bodyRows = subs.map((x, i) => `
+    <tr>
+      <td class="num">${i + 1}</td>
+      <td>${esc(x.subject)}</td>
+      <td class="num">${esc(x.score_value)}</td>
+      <td>${esc(blank ? '' : x.teacher)}</td>
+      <td class="num">${esc(blank ? '' : x.score)}</td>
+    </tr>`).join('')
+
+  const html = `
+    <h2 style="text-align:center;margin-bottom:2px;">实习生实操考核成绩单</h2>
+    <div style="text-align:center;font-size:12px;color:#6b7280;margin-bottom:12px;">
+      记录编号：BG-SM-PX-004　　民航总医院检验科
+    </div>
+
+    <table style="margin-bottom:8px;">
+      <tr>
+        <td style="width:10%;background:#f8fafc;">姓　名</td>
+        <td style="width:23%">${esc(blank ? '' : data.intern_name)}</td>
+        <td style="width:10%;background:#f8fafc;">类　型</td>
+        <td style="width:23%">${esc(blank ? '' : data.intern_type)}</td>
+        <td style="width:11%;background:#f8fafc;">考核日期</td>
+        <td>${esc(blank ? '' : data.date)}</td>
+      </tr>
+    </table>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:8%;text-align:center;">序号</th>
+          <th>考核科目</th>
+          <th style="width:10%;text-align:center;">分值</th>
+          <th style="width:16%;">考核教师</th>
+          <th style="width:12%;text-align:center;">考核成绩</th>
+        </tr>
+      </thead>
+      <tbody>${bodyRows}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" style="text-align:right;font-weight:600;">合　计</td>
+          <td class="num" style="font-weight:600;">${summary.full || 100}</td>
+          <td style="text-align:right;font-weight:600;">总成绩</td>
+          <td class="num" style="font-weight:600;">${blank ? '' : summary.total}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <table style="margin-top:10px;">
+      <tr>
+        <td style="width:12%;background:#f8fafc;">总体评价</td>
+        <td style="height:56px;">${esc(blank ? '' : data.overall_comment)}</td>
+      </tr>
+    </table>
+
+    <table style="margin-top:14px;border:0;">
+      <tr>
+        <td style="border:0;width:55%;padding-top:26px;">
+          组长签字：<span style="display:inline-block;width:150px;border-bottom:1px solid #374151;">&nbsp;</span>
+        </td>
+        <td style="border:0;padding-top:26px;">
+          日　期：<span style="display:inline-block;width:120px;border-bottom:1px solid #374151;">${blank ? '&nbsp;' : esc(data.sign_date || '')}</span>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin-top:18px;font-size:11px;color:#6b7280;">
+      注：考核成绩按各科目分值打分，合计满 100 分；考核完成后由带教组长签字确认。
+    </div>`
+
+  printHtml('实习生实操考核成绩单', html)
+}
 </script>
