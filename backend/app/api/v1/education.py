@@ -416,20 +416,6 @@ def chunk_init(payload: dict, user: User = Depends(WRITE)):
     return {"upload_id": upload_id, "chunk_size": CHUNK_SIZE}
 
 
-@attach_router.post("/chunk/{upload_id}/{index}")
-async def chunk_upload(upload_id: str, index: int,
-                       file: UploadFile = File(...), user: User = Depends(WRITE)):
-    """上传单个分片（index 从 0 开始）。"""
-    d = _chunk_dir(upload_id)
-    if not d.is_dir():
-        raise HTTPException(404, "上传会话不存在或已过期，请重新上传")
-    content = await file.read()
-    if not content:
-        raise HTTPException(400, "分片内容为空")
-    (d / f"{index:05d}.part").write_bytes(content)
-    return {"ok": True, "index": index, "bytes": len(content)}
-
-
 @attach_router.post("/chunk/{upload_id}/complete")
 def chunk_complete(upload_id: str, db: Session = Depends(get_db), user: User = Depends(WRITE)):
     """合并所有分片并落库为附件（优先 COS）。"""
@@ -488,6 +474,20 @@ def chunk_complete(upload_id: str, db: Session = Depends(get_db), user: User = D
     db.refresh(a)
     shutil.rmtree(d, ignore_errors=True)
     return {"items": [_ser_attachment(a)], "total": 1}
+
+
+@attach_router.post("/chunk/{upload_id}/{index}")
+async def chunk_upload(upload_id: str, index: int,
+                       file: UploadFile = File(...), user: User = Depends(WRITE)):
+    """上传单个分片（index 从 0 开始）。"""
+    d = _chunk_dir(upload_id)
+    if not d.is_dir():
+        raise HTTPException(404, "上传会话不存在或已过期，请重新上传")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "分片内容为空")
+    (d / f"{index:05d}.part").write_bytes(content)
+    return {"ok": True, "index": index, "bytes": len(content)}
 
 
 @attach_router.post("/{owner_type}/{owner_id}", status_code=201)
