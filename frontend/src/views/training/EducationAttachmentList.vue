@@ -45,7 +45,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
-import { listEduAttachments, uploadEduAttachments, eduAttachmentUrl, deleteEduAttachment, initChunkUpload, uploadChunk, completeChunkUpload } from '../../api/education'
+import { listEduAttachments, uploadEduAttachments, eduAttachmentUrl, deleteEduAttachment, initChunkUpload, uploadChunk, completeChunkUpload, downloadEduAttachment } from '../../api/education'
 import AttachmentPreview from '../../components/AttachmentPreview.vue'
 
 const props = defineProps({
@@ -133,7 +133,16 @@ async function onUpload(opt) {
 }
 
 function preview(row) { previewFile.value = row; previewVisible.value = true }
-function download(row) { window.open(eduAttachmentUrl(row.id, false), '_blank') }
+async function download(row) {
+  const tip = ElMessage({ message: `正在下载：${row.original_name}`, duration: 0, type: 'info' })
+  try {
+    await downloadEduAttachment(row.id, row.original_name)
+    tip.close()
+  } catch (e) {
+    tip.close()
+    ElMessage.error('下载失败：' + (e.response?.data?.detail || e.message))
+  }
+}
 async function remove(row) {
   try {
     await ElMessageBox.confirm('确认删除该附件？', '提示', { type: 'warning' })

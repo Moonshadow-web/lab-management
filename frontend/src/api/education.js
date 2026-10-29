@@ -141,3 +141,19 @@ export function completeChunkUpload(uploadId) {
 export function listCoursewareLibrary(params) {
   return request.get('/api/v1/education/courseware-library', { params })
 }
+
+// 下载附件：走 axios（自动续期 token），再触发本地保存，避免直链 token 过期导致 401
+export async function downloadEduAttachment(id, filename) {
+  const blob = await request.get(`/api/v1/education-attachments/file/${id}?inline=false`, {
+    responseType: 'blob',
+    timeout: 300000,
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || `附件_${id}`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1500)
+}

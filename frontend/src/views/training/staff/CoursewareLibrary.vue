@@ -78,8 +78,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import AttachmentPreview from '../../../components/AttachmentPreview.vue'
-import { listCoursewareLibrary, eduAttachmentUrl } from '../../../api/education'
+import { listCoursewareLibrary, eduAttachmentUrl, downloadEduAttachment } from '../../../api/education'
 
 const TAG_LIST = ['组内培训', '科内培训', '实习讲课']
 
@@ -128,8 +129,15 @@ function preview(row) {
   previewVisible.value = true
 }
 
-function download(row) {
-  window.open(eduAttachmentUrl(row.id, false), '_blank')
+async function download(row) {
+  const tip = ElMessage({ message: `正在下载：${row.original_name}`, duration: 0, type: 'info' })
+  try {
+    await downloadEduAttachment(row.id, row.original_name)
+    tip.close()
+  } catch (e) {
+    tip.close()
+    ElMessage.error('下载失败：' + (e.response?.data?.detail || e.message))
+  }
 }
 
 onMounted(load)
