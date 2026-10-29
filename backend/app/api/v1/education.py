@@ -944,6 +944,60 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
             "detail": detail, "review": review}
 
 # =========================================================================
+# 培训课件库（只读）：汇总组内培训 / 科内培训 / 实习讲课的课件，供全员浏览下载
+# =========================================================================
+COURSEWARE_TAGS = ("组内培训", "科内培训", "实习讲课")
+
+
+@router.get("/courseware-library")
+def courseware_library(tag: str = "", q: str = "", page: int = 1, page_size: int = 100,
+                       db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """列出所有培训课件（kind=courseware），按培训记录聚合，供普通职工预览/下载。"""
+    query = (db.query(EducationAttachment, TrainingSession)
+               .join(TrainingSession, TrainingSession.id == EducationAttachment.owner_id)
+               .filter(EducationAttachment.owner_type == "training_session",
+                       EducationAttachment.kind == "courseware"))
+    if tag:
+        query = query.filter(TrainingSession.tag == tag)
+    else:
+        query = query.filter(TrainingSession.tag.in_(COURSEWARE_TAGS))
+    kw = (q or "").strip()
+    if kw:
+        query = query.filter(EducationAttachment.original_name.contains(kw)
+                             | TrainingSession.name.contains(kw))
+    total = query.count()
+    page = max(1, int(page or 1))
+    page_size = min(300, max(1, int(page_size or 100)))
+    rows = (query.order_by(TrainingSession.train_time.desc(), EducationAttachment.id.desc())
+                 .offset((page - 1) * page_size).limit(page_size).all())
+
+    items = [{
+        "id": a.id,
+        "original_name": a.original_name,
+        "file_type": a.file_type,
+        "size_bytes": a.size_bytes,
+        "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
+        "uploaded_by": a.uploaded_by,
+        "session_id": t.id,
+        "session_name": t.name,
+        "tag": t.tag,
+        "train_time": t.train_time,
+        "teacher": t.teacher,
+    } for a, t in rows]
+
+    # 分类计数（用于筛选标签上的数字）
+    counts = {}
+    for tg in COURSEWARE_TAGS:
+        counts[tg] = (db.query(EducationAttachment)
+                        .join(TrainingSession, TrainingSession.id == EducationAttachment.owner_id)
+                        .filter(EducationAttachment.owner_type == "training_session",
+                                EducationAttachment.kind == "courseware",
+                                TrainingSession.tag == tg)
+                        .count())
+    return {"items": items, "total": total, "counts": counts}
+
+
+# =========================================================================
 # 组内培训：一键生成「考题及成绩汇总」「效果评价汇总」Word 并归档为附件
 # =========================================================================
 def _save_generated_docx(db: Session, sess: TrainingSession, kind: str,

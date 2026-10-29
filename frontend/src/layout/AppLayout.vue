@@ -99,6 +99,7 @@ const OTHER_GROUP_PATHS = new Set([
   // 仪器关联管理（供各组维护自己的总型号↔仪器映射）
   // 注意：本 Set 必须与 router/index.js 的 OTHER_GROUP_ALLOWED 完全一致，
   // 用 outputs/wjx/check_other_group_paths.mjs 自检。
+  '/courseware',
   '/verification', '/quality-requirements',
   '/instrument-families', '/eqa-associations', '/post-instrument-map',
   '/reagent/lot-verification',
@@ -124,6 +125,7 @@ const menus = computed(() => {
     // 到货接收作为独立菜单：试剂配送角色（仅此页有权限）也能看到，且不与试剂管理父菜单耦合
     { path: '/reagent/receivings', title: '到货接收', icon: 'Box', moduleKey: 'reagent-receivings' },
     { path: '/training', title: '人员能力管理', icon: 'Reading', moduleKey: 'training' },
+    { path: '/courseware', title: '培训课件', icon: 'Notebook', moduleKey: 'training' },
     { path: '/verification', title: '性能验证', icon: 'DataAnalysis', moduleKey: 'verification' },
     { path: '/scheduling', title: '排班管理', icon: 'Calendar', moduleKey: 'scheduling' },
     { path: '/iso15189', title: '15189专项', icon: 'Stamp', moduleKey: 'iso15189' },

@@ -136,3 +136,8 @@ export function uploadChunk(uploadId, index, blob, filename) {
 export function completeChunkUpload(uploadId) {
   return request.post(`/api/v1/education-attachments/chunk/${uploadId}/complete`, {}, { timeout: 300000 })
 }
+
+// 培训课件库（全员只读）
+export function listCoursewareLibrary(params) {
+  return request.get('/api/v1/education/courseware-library', { params })
+}

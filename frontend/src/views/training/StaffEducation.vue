@@ -42,6 +42,9 @@
       <el-tab-pane label="实习进修带教" name="internship">
         <Internship />
       </el-tab-pane>
+      <el-tab-pane label="培训课件库" name="courseware">
+        <CoursewareLibrary />
+      </el-tab-pane>
       <el-tab-pane label="继续教育记录" name="records">
         <TrainingList />
       </el-tab-pane>
@@ -63,6 +66,7 @@ import PersonnelComparison from './staff/PersonnelComparison.vue'
 import GroupTraining from './staff/GroupTraining.vue'
 import Internship from './staff/Internship.vue'
 import TrainingList from './TrainingList.vue'
+import CoursewareLibrary from './staff/CoursewareLibrary.vue'
 
 const active = ref('personnel')
 const compTab = ref('assess')

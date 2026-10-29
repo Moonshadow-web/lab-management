@@ -52,6 +52,7 @@ const routes = [
       { path: 'reagent/lot-verification', name: 'reagent-lot-verification', component: () => import('../views/reagent/ReagentLotVerification.vue'), meta: { title: '试剂验收', moduleKey: 'reagents' } },
       { path: 'reagent/associations', name: 'reagent-associations', component: () => import('../views/reagent/ReagentAssociations.vue'), meta: { title: '项目与仪器关联', moduleKey: 'reagents' } },
       { path: 'training', name: 'training', component: () => import('../views/training/StaffEducation.vue'), meta: { title: '人员能力管理', moduleKey: 'training' } },
+      { path: 'courseware', name: 'courseware', component: () => import('../views/training/staff/CoursewareLibrary.vue'), meta: { title: '培训课件', moduleKey: 'training' } },
       { path: 'verification', name: 'verification', component: () => import('../views/verification/VerificationList.vue'), meta: { title: '性能验证', moduleKey: 'verification' } },
       { path: 'scheduling', name: 'scheduling', component: () => import('../views/scheduling/SchedulingList.vue'), meta: { title: '排班管理', moduleKey: 'scheduling' } },
       { path: 'iso15189', name: 'iso15189', component: () => import('../views/iso15189/Iso15189Hub.vue'), meta: { title: '15189专项', moduleKey: 'iso15189' } },
@@ -76,6 +77,7 @@ const OTHER_GROUP_ALLOWED = new Set([
   '/reagent/receivings',
   // 2026-10-02 开放：与 AppLayout.vue 的 OTHER_GROUP_PATHS 保持一致。
   // 两份白名单必须同步——只改菜单会出现"菜单看得到、点进去被守卫弹回工作台"。
+  '/courseware',
   '/verification', '/quality-requirements',
   '/instrument-families', '/eqa-associations', '/post-instrument-map',
 ])
