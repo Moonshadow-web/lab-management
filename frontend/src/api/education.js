@@ -144,7 +144,8 @@ export function listCoursewareLibrary(params) {
 
 // 下载附件：走 axios（自动续期 token），再触发本地保存，避免直链 token 过期导致 401
 export async function downloadEduAttachment(id, filename) {
-  const blob = await request.get(`/api/v1/education-attachments/file/${id}?inline=false`, {
+  // 用 inline=true 让服务端直接回字节流（inline=false 会 302 到 COS，XHR 跨域会被 CORS 拦）
+  const blob = await request.get(`/api/v1/education-attachments/file/${id}?inline=true`, {
     responseType: 'blob',
     timeout: 300000,
   })
