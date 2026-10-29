@@ -5,6 +5,7 @@
     </div>
 
     <el-tabs v-model="active" class="se-tabs">
+      <template v-if="!isStudent">
       <el-tab-pane label="人员档案" name="personnel">
         <PersonnelArchive />
       </el-tab-pane>
@@ -39,21 +40,25 @@
       <el-tab-pane label="组内培训 / 科内培训" name="group">
         <GroupTraining />
       </el-tab-pane>
+      </template>
       <el-tab-pane label="实习进修带教" name="internship">
         <Internship />
       </el-tab-pane>
+      <template v-if="!isStudent">
       <el-tab-pane label="培训课件库" name="courseware">
         <CoursewareLibrary />
       </el-tab-pane>
       <el-tab-pane label="继续教育记录" name="records">
         <TrainingList />
       </el-tab-pane>
+      </template>
     </el-tabs>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useAuthStore } from '../../store/auth'
 import PersonnelArchive from './staff/PersonnelArchive.vue'
 import NewEmployeeTrain from './staff/NewEmployeeTrain.vue'
 import CertAuth from './staff/CertAuth.vue'
@@ -68,7 +73,9 @@ import Internship from './staff/Internship.vue'
 import TrainingList from './TrainingList.vue'
 import CoursewareLibrary from './staff/CoursewareLibrary.vue'
 
-const active = ref('personnel')
+const auth = useAuthStore()
+const isStudent = computed(() => auth.isStudent)
+const active = ref(auth.isStudent ? 'internship' : 'personnel')
 const compTab = ref('assess')
 </script>
 

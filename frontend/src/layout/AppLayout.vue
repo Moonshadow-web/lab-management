@@ -142,6 +142,11 @@ const menus = computed(() => {
     if (m.moduleKeys) return auth.canAccessAnyMenu(m.moduleKeys)
     return auth.canAccessMenu(m.moduleKey)
   })
+  // 学生（实习生）：只看 项目查询 / 文件管理 / 培训课件 / 人员能力管理（仅带教评价）
+  if (auth.isStudent) {
+    const STUDENT_PATHS = new Set(['/dashboard', '/test-items', '/documents', '/courseware', '/training'])
+    return all.filter((m) => STUDENT_PATHS.has(m.path))
+  }
   // 专业组裁剪：非生免组只保留白名单菜单
   if ((auth.groupCode || 'sm') !== 'sm') {
     return visible.filter((m) => OTHER_GROUP_PATHS.has(m.path))

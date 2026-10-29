@@ -148,7 +148,7 @@ mentor_router = make_router(
     InternshipMentor, InternshipMentorRead, InternshipMentorCreate, InternshipMentorUpdate,
     search_fields=["intern_name", "sop_ref"], filter_fields=["intern_type"],
     order_by=[InternshipMentor.id.desc()],
-    prefix="/internship-mentors", write_roles=("admin", "training_manager"),
+    prefix="/internship-mentors", write_roles=("admin", "training_manager", "student"),  # 学生可填写带教评价
     json_fields=["items_json"],
 )
 score_router = make_router(

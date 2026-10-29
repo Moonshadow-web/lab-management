@@ -66,6 +66,8 @@ const routes = [
 ]
 
 // 非生免组允许访问的路径（与侧边菜单白名单一致）；其余一律回工作台
+const STUDENT_ALLOWED = new Set(['/dashboard', '/test-items', '/documents', '/courseware', '/training'])
+
 const OTHER_GROUP_ALLOWED = new Set([
   '/login',   // ⚠️ 必须放行：退出登录时 token 已清空且 groupCode 仍是别组，
               // 若/login 不在白名单会被专业组守卫 next('/dashboard') 弹回，
@@ -94,6 +96,9 @@ router.beforeEach((to, from, next) => {
   } else if (to.path === '/login' && auth.isLoggedIn) {
     // 已登录却访问 /login：带 redirect 则回跳原页面，否则进工作台
     next(to.query.redirect || '/dashboard')
+  } else if (auth.isStudent && !STUDENT_ALLOWED.has(to.path)) {
+    // 学生（实习生）仅开放指定页面
+    next('/test-items')
   } else if ((auth.groupCode || 'sm') !== 'sm' && !OTHER_GROUP_ALLOWED.has(to.path)) {
     // 专业组隔离：非生免组不可直达白名单之外的页面
     next('/dashboard')

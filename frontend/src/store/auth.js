@@ -79,6 +79,11 @@ export const useAuthStore = defineStore('auth', {
       if (!state.user) return false
       return state.user.role === 'technical_support' || (state.user.roles || '').includes('technical_support')
     },
+    // 学生（实习生）：仅开放 项目查询 / 文件管理 / 培训课件 / 带教评价
+    isStudent: (state) => {
+      if (!state.user) return false
+      return state.user.role === 'student' || (state.user.roles || '').split(',').includes('student')
+    },
   },
   actions: {
     async login(username, password, groupCode) {

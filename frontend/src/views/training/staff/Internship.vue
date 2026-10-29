@@ -3,7 +3,7 @@
     <el-tabs v-model="tab">
       <el-tab-pane label="培训大纲及带教评价（PX-003）" name="mentor">
         <CrudTable :columns="mentorCols" :fetch="fetchMentor" search-placeholder="搜索姓名"
-          :can-write="canWrite" @add="openMentor()" @edit="openMentor" @delete="onDeleteMentor" ref="mentorRef" />
+          :can-write="canWriteMentor" @add="openMentor()" @edit="openMentor" @delete="onDeleteMentor" ref="mentorRef" />
       </el-tab-pane>
       <el-tab-pane label="实操考核成绩单（PX-004）" name="score">
         <CrudTable :columns="scoreCols" :fetch="fetchScore" search-placeholder="搜索姓名"
@@ -58,6 +58,12 @@
           <el-table-column label="考核教师" width="120"><template #default="{ row }"><el-input v-model="row.teacher" size="small" /></template></el-table-column>
           <el-table-column label="考核成绩" width="120"><template #default="{ row }"><el-input v-model="row.score" size="small" /></template></el-table-column>
         </el-table>
+        <div style="margin:6px 0 2px;font-size:13px;color:#303133;">
+          合计：<b>{{ scoreSummary(scoreForm).total }}</b> / {{ scoreSummary(scoreForm).full || 100 }} 分
+          <el-tag size="small" :type="scoreSummary(scoreForm).done ? 'success' : 'info'" style="margin-left:10px;">
+            {{ scoreSummary(scoreForm).status }}
+          </el-tag>
+        </div>
         <el-divider content-position="left">总体评价</el-divider>
         <el-form-item label="评语"><el-input v-model="scoreForm.overall_comment" type="textarea" :rows="2" /></el-form-item>
         <el-row :gutter="12">
@@ -74,7 +80,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CrudTable from '../../../components/CrudTable.vue'
 import InternLecture from './InternLecture.vue'
@@ -86,6 +92,8 @@ import { useAuthStore } from '../../../store/auth'
 
 const auth = useAuthStore()
 const canWrite = ref(auth.canWrite('training'))
+// 学生（实习生）可填写带教评价
+const canWriteMentor = computed(() => canWrite.value || auth.isStudent)
 const tab = ref('mentor')
 const mentorRef = ref(null)
 const scoreRef = ref(null)
@@ -96,11 +104,39 @@ const mentorCols = [
   { prop: 'sop_ref', label: '依据SOP', width: 120 },
   { prop: 'remark', label: '备注', minWidth: 160 },
 ]
+// 汇总实操成绩：总分 = 各科目成绩之和；完成状态 = 所有科目都已填成绩
+function scoreSummary(row) {
+  const subs = row.subjects_json || []
+  let total = 0
+  let full = 0
+  let filled = 0
+  subs.forEach((x) => {
+    const v = parseFloat(String(x.score ?? '').replace(/[^\d.]/g, ''))
+    const m = parseFloat(String(x.score_value ?? '').replace(/[^\d.]/g, ''))
+    if (!isNaN(m)) full += m
+    if (!isNaN(v) && String(x.score ?? '').trim() !== '') {
+      total += v
+      filled += 1
+    }
+  })
+  const done = subs.length > 0 && filled === subs.length
+  return {
+    total,
+    full,
+    filled,
+    done,
+    text: `${total} / ${full || 100}`,
+    status: done ? '已完成' : (filled === 0 ? '未开始' : `进行中 ${filled}/${subs.length}`),
+  }
+}
+
 const scoreCols = [
-  { prop: 'intern_name', label: '姓名', width: 120 },
-  { prop: 'intern_type', label: '类型', width: 80 },
-  { prop: 'date', label: '考核日期', width: 130 },
-  { prop: 'group_leader', label: '组长签字', width: 120 },
+  { prop: 'intern_name', label: '姓名', width: 110 },
+  { prop: 'intern_type', label: '类型', width: 70 },
+  { prop: 'date', label: '考核日期', width: 120 },
+  { prop: 'total_score', label: '总成绩', width: 110, align: 'center', formatter: (r) => scoreSummary(r).text },
+  { prop: 'done_status', label: '完成状态', width: 130, align: 'center', formatter: (r) => scoreSummary(r).status },
+  { prop: 'group_leader', label: '组长签字', width: 110 },
 ]
 
 const MENTOR_OUTLINE = [
