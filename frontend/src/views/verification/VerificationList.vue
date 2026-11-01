@@ -16,9 +16,6 @@
       <el-tab-pane label="样本类型可比性" name="specimenComparability">
         <SpecimenComparability />
       </el-tab-pane>
-      <el-tab-pane label="样本类型可比性" name="specimenComparability">
-        <SpecimenComparability />
-      </el-tab-pane>
       <el-tab-pane label="测量不确定度评定" name="uncertainty">
         <UncertaintyAssessment />
       </el-tab-pane>
