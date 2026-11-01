@@ -9,6 +9,7 @@
 统计复用 method_comparison_calc 中已实现的纯标准库算法。
 """
 import math
+import re
 from statistics import mean, stdev
 
 from .method_comparison_calc import (
@@ -35,6 +36,55 @@ SPECIMEN_TYPES = [
 PASS_RATE_REQUIRED = 0.80   # CNAS 7.3.7.4：至少 80% 样本偏差在允许偏倚内
 MIN_SAMPLES = 5             # 定量项目不少于 5 例
 REQUIRED_SAMPLES = 20       # 常规建议 20 例
+
+
+_TEA_NUM = r"(\d+(?:\.\d+)?)"
+
+
+def parse_tea(text):
+    """解析 TEa 文本，支持三种写法：
+
+    1) 单一百分比：`20%` / `±20%` / `20`
+    2) 单一绝对值：`4.5 μg/L`
+    3) 双阈值（WS/T 403 常见）：`4.5 μg/L (≤15 μg/L)；30.0% (>15 μg/L)`
+
+    返回 {"pct": float|None, "abs_val": float|None, "threshold": float|None,
+          "unit": str, "dual": bool, "raw": str}
+    """
+    raw = str(text or "").strip()
+    out = {"pct": None, "abs_val": None, "threshold": None, "unit": "", "dual": False, "raw": raw}
+    if not raw:
+        return out
+    s = (raw.replace("（", "(").replace("）", ")")
+            .replace("≤", "<=").replace("＜", "<").replace("＞", ">")
+            .replace("±", ""))
+    # 双阈值：绝对部分（带 ≤ 阈值）
+    m_abs = re.search(_TEA_NUM + r"\s*([a-zA-Zμµ/%·]+)?\s*\(\s*<=\s*" + _TEA_NUM, s)
+    m_pct = re.search(_TEA_NUM + r"\s*%\s*\(\s*>\s*" + _TEA_NUM, s)
+    if m_abs and m_pct:
+        out.update({
+            "abs_val": float(m_abs.group(1)),
+            "unit": (m_abs.group(2) or "").strip(),
+            "threshold": float(m_abs.group(3)),
+            "pct": float(m_pct.group(1)),
+            "dual": True,
+        })
+        return out
+    # 单一百分比
+    m = re.search(_TEA_NUM + r"\s*%", s)
+    if m:
+        out["pct"] = float(m.group(1))
+        return out
+    # 剩余情况：带单位的按绝对值，否则第一个数字按百分比（用户常直接填 20）
+    m = re.search(_TEA_NUM + r"\s*([a-zA-Zμµ%/·]+)?", s)
+    if m:
+        unit = (m.group(2) or "")
+        if unit and "%" not in unit:
+            out["abs_val"] = float(m.group(1))
+            out["unit"] = unit
+        else:
+            out["pct"] = float(m.group(1))
+    return out
 
 
 def _ci_mean(values):
@@ -64,15 +114,40 @@ def compute_specimen_comparability(data: dict) -> dict:
     rels_pct = [((ys[i] - xs[i]) / xs[i] * 100) if xs[i] else None for i in range(n)]
     valid_rels = [r for r in rels_pct if r is not None]
 
-    tea = _num(data.get("tea"))
-    allow = tea / 2.0 if tea else None
+    rule = parse_tea(data.get("tea"))
+    tea = rule["raw"] or None
+    allow = None          # 单一百分比口径时的允许偏倚（%）
+    allow_text = ""       # 人类可读的允许偏倚描述
+    pass_flags = [None] * n
 
-    # ── CNAS 7.3.7.4 主判据：达到允许偏倚的样本比例 ──
+    # ── CNAS 7.3.7.4 主判据：达到允许偏倚（1/2 TEa）的样本比例 ──
+    if rule["dual"]:
+        a_abs = rule["abs_val"] / 2.0
+        a_pct = rule["pct"] / 2.0
+        u = rule["unit"] or ""
+        allow_text = (f"±{a_abs:g}{u}（≤{rule['threshold']:g}{u}）"
+                      f" / ±{a_pct:g}%（>{rule['threshold']:g}{u}）")
+        for i, pr_ in enumerate(pairs):
+            if pr_["a"] <= rule["threshold"]:
+                pass_flags[i] = abs(diffs[i]) <= a_abs
+            else:
+                r_ = rels_pct[i]
+                pass_flags[i] = (abs(r_) <= a_pct) if r_ is not None else None
+    elif rule["abs_val"] is not None and rule["pct"] is None:
+        a_abs = rule["abs_val"] / 2.0
+        allow_text = f"±{a_abs:g}{rule['unit'] or ''}"
+        for i in range(n):
+            pass_flags[i] = abs(diffs[i]) <= a_abs
+    elif rule["pct"] is not None:
+        allow = rule["pct"] / 2.0
+        allow_text = f"±{allow:g}%"
+        pass_flags = [(abs(r_) <= allow) if r_ is not None else None for r_ in rels_pct]
+
     pass_n = None
     pass_rate = None
     pass_needed = None
-    if allow is not None:
-        pass_n = sum(1 for r in valid_rels if abs(r) <= allow)
+    if allow_text:
+        pass_n = sum(1 for f in pass_flags if f is True)
         pass_rate = pass_n / n if n else None
         pass_needed = math.ceil(PASS_RATE_REQUIRED * n)
 
@@ -102,7 +177,7 @@ def compute_specimen_comparability(data: dict) -> dict:
     type_a = data.get("specimen_a") or "标本A"
     type_b = data.get("specimen_b") or "标本B"
     project = data.get("project_name") or "该项目"
-    if allow is None:
+    if not allow_text:
         verdict = None
         reason = "未设置允许总误差（TEa），无法按 CNAS-CL02 7.3.7.4 判定允许偏倚。建议补充 TEa 后复评。"
     elif n < MIN_SAMPLES:
@@ -113,7 +188,7 @@ def compute_specimen_comparability(data: dict) -> dict:
         verdict = passed
         ratio_txt = f"{pass_n}/{n}"
         reason = (
-            f"{ratio_txt} 例偏差在允许偏倚 ±{allow:g}%（1/2 TEa）内，通过率 {pass_rate*100:.1f}%"
+            f"{ratio_txt} 例偏差在允许偏倚 {allow_text}（1/2 TEa）内，通过率 {pass_rate*100:.1f}%"
             f"（CNAS-CL02 7.3.7.4 要求 ≥80%，需 ≥{pass_needed} 例）"
             + ("，符合要求。" if passed else "，未达要求。")
         )
@@ -149,7 +224,7 @@ def compute_specimen_comparability(data: dict) -> dict:
             "no": p["no"], "a": p["a"], "b": p["b"],
             "diff": round(diffs[i], 6),
             "rel_pct": round(r, 2) if r is not None else None,
-            "pass": (abs(r) <= allow) if (allow is not None and r is not None) else None,
+            "pass": pass_flags[i],
         })
 
     details = {
@@ -157,6 +232,7 @@ def compute_specimen_comparability(data: dict) -> dict:
         "n_used": n,
         "skipped_nos": skipped,
         "allow_bias": allow,
+        "allow_bias_text": allow_text,
         "pass_n": pass_n,
         "pass_needed": pass_needed,
         "pass_rate": pass_rate,
@@ -182,6 +258,7 @@ def compute_specimen_comparability(data: dict) -> dict:
         "n_used": n,
         "tea": tea,
         "allow_bias": allow,
+        "allow_bias_text": allow_text,
         "pass_n": pass_n,
         "pass_needed": pass_needed,
         "pass_rate": round(pass_rate * 100, 2) if pass_rate is not None else None,

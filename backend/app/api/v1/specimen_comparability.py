@@ -76,10 +76,11 @@ def _lookup_tea(db: Session, project_name: str) -> str:
         return ""
     for src in ("wst403-2024", "bj-hr-2025", "nccl-2026"):
         for r in rows:
-            if r.source == src and r.tea:
-                pct = _extract_first_pct(r.tea)
-                if pct is not None:
-                    return f"{pct:g}"
+            if r.source == src and (r.tea or "").strip():
+                # 直接返回原文：可能是 "±25%"，也可能是
+                # "4.5 μg/L (≤15 μg/L)；30.0% (>15 μg/L)" 这类双阈值，
+                # 统一交给 parse_tea 解析，避免丢掉绝对阈值部分。
+                return str(r.tea).strip()
     return ""
 
 
@@ -250,7 +251,8 @@ def summary(
             "specimen_a": r.specimen_a, "specimen_b": r.specimen_b,
             "sample_count": r.sample_count, "verify_date": r.verify_date,
             "operator": r.operator, "reviewer": r.reviewer,
-            "n_used": rs.get("n_used"), "tea": rs.get("tea"), "allow_bias": rs.get("allow_bias"),
+            "n_used": rs.get("n_used"), "tea": rs.get("tea"),
+            "allow_bias": rs.get("allow_bias"), "allow_bias_text": rs.get("allow_bias_text"),
             "pass_n": rs.get("pass_n"), "pass_needed": rs.get("pass_needed"),
             "pass_rate": rs.get("pass_rate"), "mean_bias_pct": rs.get("mean_bias_pct"),
             "verdict": rs.get("verdict"), "reason": rs.get("reason"),

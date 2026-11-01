@@ -30,7 +30,7 @@
       </el-table-column>
       <el-table-column label="允许偏倚" width="95" align="center">
         <template #default="{ row }">
-          {{ row.result_summary?.allow_bias != null ? '±' + row.result_summary.allow_bias + '%' : '—' }}
+          {{ row.result_summary?.allow_bias_text || (row.result_summary?.allow_bias != null ? '±' + row.result_summary.allow_bias + '%' : '—') }}
         </template>
       </el-table-column>
       <el-table-column label="达标率" width="95" align="center">
@@ -181,7 +181,7 @@
           <el-descriptions-item label="计划例数">{{ detail.sample_count }}</el-descriptions-item>
           <el-descriptions-item label="有效例数">{{ detail.result_summary?.n_used ?? '—' }}</el-descriptions-item>
           <el-descriptions-item label="允许偏倚">
-            {{ detail.result_summary?.allow_bias != null ? '±' + detail.result_summary.allow_bias + '%（1/2 TEa）' : '未设置' }}
+            {{ detail.result_summary?.allow_bias_text ? detail.result_summary.allow_bias_text + '（1/2 TEa）' : (detail.result_summary?.allow_bias != null ? '±' + detail.result_summary.allow_bias + '%（1/2 TEa）' : '未设置') }}
           </el-descriptions-item>
           <el-descriptions-item label="检测仪器">{{ detail.instrument || '—' }}</el-descriptions-item>
           <el-descriptions-item label="离心条件">{{ detail.centrifuge || '—' }}</el-descriptions-item>
@@ -236,7 +236,7 @@
           <template #default="{ row }">{{ row.n_used ?? '—' }}</template>
         </el-table-column>
         <el-table-column label="允许偏倚" width="90" align="center">
-          <template #default="{ row }">{{ row.allow_bias != null ? '±' + row.allow_bias + '%' : '—' }}</template>
+          <template #default="{ row }">{{ row.allow_bias_text || (row.allow_bias != null ? '±' + row.allow_bias + '%' : '—') }}</template>
         </el-table-column>
         <el-table-column label="达标例数" width="100" align="center">
           <template #default="{ row }">{{ row.pass_n != null ? row.pass_n + '/' + row.n_used : '—' }}</template>
@@ -325,7 +325,7 @@ const detailRows = computed(() => {
   const ci = (arr) => (Array.isArray(arr) && arr[0] != null ? `（${Number(arr[0]).toFixed(2)}%，${Number(arr[1]).toFixed(2)}%）` : '')
   if (!rs.valid) return [{ k: '状态', v: rs.message || '未计算' }]
   return [
-    { k: '允许偏倚（1/2 TEa）', v: rs.allow_bias != null ? `±${rs.allow_bias}%` : '未设置' },
+    { k: '允许偏倚（1/2 TEa）', v: rs.allow_bias_text || (rs.allow_bias != null ? `±${rs.allow_bias}%` : '未设置') },
     { k: '达标例数 / 要求', v: rs.pass_n != null ? `${rs.pass_n}/${rs.n_used}（需 ≥${rs.pass_needed} 例）` : '—' },
     { k: '达标率', v: rs.pass_rate != null ? `${rs.pass_rate}%` : '—' },
     { k: '平均偏倚（95%CI）', v: rs.mean_bias_pct != null ? `${rs.mean_bias_pct > 0 ? '+' : ''}${rs.mean_bias_pct}%${ci(rs.bias_pct_ci)}` : '—' },
