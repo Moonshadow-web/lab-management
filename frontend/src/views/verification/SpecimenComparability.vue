@@ -80,7 +80,7 @@
           <el-form :model="form" label-width="112px" size="small">
             <el-divider content-position="left">项目与方案</el-divider>
             <el-row :gutter="12">
-              <el-col :span="8"><el-form-item label="项目名称"><el-input v-model="form.project_name" placeholder="如 葡萄糖" /></el-form-item></el-col>
+              <el-col :span="8"><el-form-item label="项目名称"><el-input v-model="form.project_name" placeholder="如 葡萄糖" @change="loadTeaHint" /></el-form-item></el-col>
               <el-col :span="8"><el-form-item label="报告单位"><el-input v-model="form.unit" placeholder="如 mmol/L" /></el-form-item></el-col>
               <el-col :span="8"><el-form-item label="批次（汇总）"><el-input v-model="form.batch_name" placeholder="如 2026.10 标本类型验证" /></el-form-item></el-col>
             </el-row>
@@ -101,7 +101,20 @@
                   <el-input-number v-model="form.sample_count" :min="3" :max="200" style="width:100%" @change="resizeSamples" />
                 </el-form-item>
               </el-col>
-              <el-col :span="8"><el-form-item label="允许总误差 TEa"><el-input v-model="form.tea" placeholder="如 10（%，留空自动取质量库）" /></el-form-item></el-col>
+              <el-col :span="8">
+                <el-form-item label="允许总误差 TEa">
+                  <el-input v-model="form.tea" placeholder="如 10（%），留空自动取质量库" />
+                  <div v-if="teaHint && teaHint.tea" style="font-size:12px;color:#909399;line-height:1.5;margin-top:2px;">
+                    质量库：{{ teaHint.tea }}
+                    <template v-if="teaHint.allow_text">（允许偏倚 {{ teaHint.allow_text }}）</template>
+                    <el-link type="primary" style="margin-left:6px;font-size:12px;" @click="applyTeaHint">使用</el-link>
+                  </div>
+                  <div v-if="teaHint && teaHint.dual && form.tea && !String(form.tea).includes('≤')"
+                       style="font-size:12px;color:#e6a23c;line-height:1.5;margin-top:2px;">
+                    提示：该项目质量库为双阈值口径（低值按绝对值判定），当前手填值按单一百分比判定。
+                  </div>
+                </el-form-item>
+              </el-col>
             </el-row>
             <el-row :gutter="12">
               <el-col :span="6"><el-form-item label="标本类型 A"><el-input v-model="form.specimen_a" /></el-form-item></el-col>
@@ -265,8 +278,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listSpecimenComparisons, createSpecimenComparison, updateSpecimenComparison, deleteSpecimenComparison,
   computeSpecimenComparison, generateSpecimenComparison, downloadSpecimenComparison,
-  specimenCharts, summarySpecimenComparisons,
-} from '../../api/specimenComparability'
+  specimenCharts, summarySpecimenComparisons, teaSuggestion } from '../../api/specimenComparability'
 import { useAuthStore } from '../../store/auth'
 
 const auth = useAuthStore()
@@ -379,6 +391,21 @@ async function refresh() {
   }
 }
 
+const teaHint = ref(null)
+
+async function loadTeaHint() {
+  const name = (form.value.project_name || '').trim()
+  teaHint.value = null
+  if (!name) return
+  try {
+    teaHint.value = await teaSuggestion(name)
+  } catch (e) { teaHint.value = null }
+}
+
+function applyTeaHint() {
+  if (teaHint.value && teaHint.value.tea) form.value.tea = teaHint.value.tea
+}
+
 function openCreate() {
   form.value = blankForm()
   samples.value = []
@@ -386,6 +413,7 @@ function openCreate() {
   pasteText.value = ''
   editTab.value = 'info'
   editOpen.value = true
+  loadTeaHint()
 }
 
 function openEdit(row) {
@@ -396,6 +424,7 @@ function openEdit(row) {
   pasteText.value = ''
   editTab.value = 'info'
   editOpen.value = true
+  loadTeaHint()
 }
 
 function applyPaste() {

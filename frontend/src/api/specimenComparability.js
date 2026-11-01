@@ -28,3 +28,8 @@ export function specimenCharts(id) {
 export function summarySpecimenComparisons(params) {
   return request.get('/api/v1/specimen-comparability/summary', params ? { params } : undefined)
 }
+export function teaSuggestion(projectName) {
+  return request.get('/api/v1/specimen-comparability/tea-suggestion/by-project', {
+    params: { project_name: projectName },
+  })
+}

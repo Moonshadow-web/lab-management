@@ -109,6 +109,17 @@ def _compute(rec: SpecimenComparabilityRecord, db: Session = None, persist: bool
     return d
 
 
+@router.get("/tea-suggestion/by-project")
+def tea_suggestion(project_name: str = "", db: Session = Depends(get_db),
+                   user: User = Depends(get_current_user)):
+    """返回该项目在质量库里的 TEa 原文，以及换算后的允许偏倚（1/2 TEa）。"""
+    from ...services.specimen_comparability_calc import parse_tea, describe_allow
+
+    tea = _lookup_tea(db, project_name) if project_name else ""
+    rule = parse_tea(tea)
+    return {"tea": tea, "allow_text": describe_allow(rule), "dual": bool(rule.get("dual"))}
+
+
 @router.post("/{rid}/compute")
 def compute_one(
     rid: int,

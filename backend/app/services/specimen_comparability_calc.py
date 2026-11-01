@@ -87,6 +87,21 @@ def parse_tea(text):
     return out
 
 
+def describe_allow(rule: dict) -> str:
+    """把 parse_tea 的结果转成"允许偏倚"的人类可读文本（均取 1/2 TEa）。"""
+    if not rule:
+        return ""
+    if rule.get("dual"):
+        u = rule.get("unit") or ""
+        return (f"±{rule['abs_val'] / 2:g}{u}（≤{rule['threshold']:g}{u}）"
+                f" / ±{rule['pct'] / 2:g}%（>{rule['threshold']:g}{u}）")
+    if rule.get("abs_val") is not None and rule.get("pct") is None:
+        return f"±{rule['abs_val'] / 2:g}{rule.get('unit') or ''}"
+    if rule.get("pct") is not None:
+        return f"±{rule['pct'] / 2:g}%"
+    return ""
+
+
 def _ci_mean(values):
     """均值的 95% 置信区间（t 分布）。"""
     n = len(values)
