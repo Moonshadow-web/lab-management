@@ -398,7 +398,7 @@ async function loadTeaHint() {
   teaHint.value = null
   if (!name) return
   try {
-    teaHint.value = await teaSuggestion(name)
+    teaHint.value = await teaSuggestion(name, form.value.unit || '')
   } catch (e) { teaHint.value = null }
 }
 

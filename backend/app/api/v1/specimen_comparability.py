@@ -56,16 +56,23 @@ def _serialize(rec: SpecimenComparabilityRecord) -> dict:
     return d
 
 
-def _lookup_tea(db: Session, project_name: str) -> str:
-    """从质量要求库取 TEa（WS/T 403-2024 优先），支持常见别名。"""
+def _lookup_tea(db: Session, project_name: str, unit: str = "") -> str:
+    """从质量要求库取 TEa（WS/T 403-2024 优先），支持常见别名与单位区分。"""
     if not db or not project_name:
         return ""
     from sqlalchemy import or_
     from ...models.quality_requirement import QualityRequirement
     from .method_comparison import _PROJECT_TEA_ALIASES  # 复用别名表
-    from ...services.verification_calc import _extract_first_pct
 
     names = [project_name] + _PROJECT_TEA_ALIASES.get(project_name, [])
+    # CK-MB 质量法与活性法在 WS/T 403 里是两条不同 TEa，按记录单位选择
+    pn = project_name.replace(" ", "").upper()
+    u = (unit or "").replace(" ", "").lower()
+    if "CK-MB" in pn or "CKMB" in pn or "肌酸激酶" in project_name:
+        if "u/l" in u:
+            names.append("肌酸激酶-MB(U/L)")
+        elif "g/l" in u:          # ug/L、μg/L
+            names.append("肌酸激酶-MB(μg/L)")
     conds = []
     for n in names:
         conds.append(QualityRequirement.item_name == n)
@@ -94,7 +101,7 @@ def _check_group(rec, group: str):
 def _compute(rec: SpecimenComparabilityRecord, db: Session = None, persist: bool = True) -> dict:
     if db is not None and not (rec.tea or "").strip():
         try:
-            tea = _lookup_tea(db, rec.project_name)
+            tea = _lookup_tea(db, rec.project_name, rec.unit or "")
             if tea:
                 rec.tea = tea
         except Exception:
@@ -110,12 +117,12 @@ def _compute(rec: SpecimenComparabilityRecord, db: Session = None, persist: bool
 
 
 @router.get("/tea-suggestion/by-project")
-def tea_suggestion(project_name: str = "", db: Session = Depends(get_db),
+def tea_suggestion(project_name: str = "", unit: str = "", db: Session = Depends(get_db),
                    user: User = Depends(get_current_user)):
     """返回该项目在质量库里的 TEa 原文，以及换算后的允许偏倚（1/2 TEa）。"""
     from ...services.specimen_comparability_calc import parse_tea, describe_allow
 
-    tea = _lookup_tea(db, project_name) if project_name else ""
+    tea = _lookup_tea(db, project_name, unit) if project_name else ""
     rule = parse_tea(tea)
     return {"tea": tea, "allow_text": describe_allow(rule), "dual": bool(rule.get("dual"))}
 
