@@ -26,7 +26,7 @@ from ...models.education import (
     InternshipMentor, InternshipScore,
     AuthSheet,
     PreJobAuth, ExamBank, PostInstrumentMap, PreJobTheoryRecord,
-    EducationAttachment, TrainingQuiz, TrainingQuizRecord, TrainingExamBank,
+    EducationAttachment, TrainingQuiz, TrainingQuizRecord, TrainingExamBank, TrainingQuizEval,
 )
 from ...models.user import User
 from ...core.crud_base import make_router
@@ -1086,6 +1086,31 @@ def delete_training_bank(bid: int, db: Session = Depends(get_db), user: User = D
     return {"ok": True}
 
 
+def _refresh_quiz_stats(db: Session, q: TrainingQuiz):
+    """按测验作答记录刷新所属培训记录的人数/合格率/满意率。"""
+    if not q.session_id:
+        return
+    sess = db.get(TrainingSession, q.session_id)
+    if not sess:
+        return
+    rows = db.query(TrainingQuizRecord).filter(TrainingQuizRecord.quiz_id == q.id).all()
+    best: dict[str, int] = {}
+    for r in rows:
+        n = (r.name or "").strip()
+        if n:
+            best[n] = max(best.get(n, 0), r.pct or 0)
+    if not best:
+        return
+    passed = sum(1 for v in best.values() if v >= (q.pass_score or 60))
+    sess.exam_person_count = len(best)
+    sess.exam_pass_rate = round(passed * 100.0 / len(best), 1)
+    evals = db.query(TrainingQuizEval).filter(TrainingQuizEval.quiz_id == q.id).all()
+    if evals:
+        sat_ok = sum(1 for e in evals if (e.satisfaction or 0) >= 4)
+        sess.eval_satisfy_rate = round(sat_ok * 100.0 / len(evals), 1)
+    db.commit()
+
+
 @router.get("/training-quizzes")
 def list_quizzes(session_id: int | None = None, db: Session = Depends(get_db),
                  user: User = Depends(get_current_user)):
@@ -1178,8 +1203,18 @@ def quiz_records(qid: int, db: Session = Depends(get_db), user: User = Depends(g
     total = len(items)
     passed = sum(1 for i in items if i["passed"])
     avg = round(sum(i["pct"] for i in items) / total, 1) if total else 0
+
+    evals = (db.query(TrainingQuizEval).filter(TrainingQuizEval.quiz_id == qid)
+               .order_by(TrainingQuizEval.id.desc()).all())
+    ev_items = [{"name": e.name, "satisfaction": e.satisfaction, "comment": e.comment,
+                 "created_at": e.created_at.isoformat() if e.created_at else None} for e in evals]
+    sat_ok = sum(1 for e in evals if (e.satisfaction or 0) >= 4)
+    sat_avg = round(sum(e.satisfaction or 0 for e in evals) / len(evals), 2) if evals else 0
     return {"items": items, "total": total, "passed": passed,
-            "pass_rate": round(passed * 100 / total, 1) if total else 0, "avg_pct": avg}
+            "pass_rate": round(passed * 100 / total, 1) if total else 0, "avg_pct": avg,
+            "eval_total": len(evals), "eval_satisfy": sat_ok,
+            "eval_satisfy_rate": round(sat_ok * 100 / len(evals), 1) if evals else 0,
+            "eval_avg": sat_avg, "evals": ev_items}
 
 
 @router.get("/public/quiz/{qid}")
@@ -1213,8 +1248,22 @@ def public_quiz_submit(qid: int, payload: dict, db: Session = Depends(get_db)):
         source=(payload.get("source") or "qr")[:20],
     )
     db.add(r)
+    db.flush()
+
+    # 培训效果评价（可选）
+    ev = payload.get("eval") or {}
+    sat = 0
+    try:
+        sat = int(ev.get("satisfaction") or 0)
+    except (TypeError, ValueError):
+        sat = 0
+    if 1 <= sat <= 5:
+        db.add(TrainingQuizEval(quiz_id=qid, record_id=r.id, name=name,
+                                satisfaction=sat, comment=(ev.get("comment") or "").strip()[:2000]))
+
     db.commit()
     db.refresh(r)
+    _refresh_quiz_stats(db, q)
     return {"ok": True, "record_id": r.id, "name": name, "score": res["score"],
             "full": res["full"], "pct": res["pct"], "passed": res["passed"],
             "pass_score": q.pass_score, "review": res["review"]}
@@ -1309,6 +1358,46 @@ def _save_generated_docx(db: Session, sess: TrainingSession, kind: str,
     db.commit()
     db.refresh(att)
     return att
+
+
+@router.post("/training-sessions/{sid}/generate-quiz-summary")
+def generate_quiz_summary(sid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    """按随堂测验的作答与评价，生成「成绩汇总」「效果评价汇总」两份 docx 并挂到培训附件。"""
+    sess = db.get(TrainingSession, sid)
+    if not sess:
+        raise HTTPException(404, "培训记录不存在")
+    quiz = (db.query(TrainingQuiz).filter(TrainingQuiz.session_id == sid)
+              .order_by(TrainingQuiz.id.desc()).first())
+    if not quiz:
+        raise HTTPException(404, "该培训还没有随堂测验")
+
+    from ...services.training_docx import build_quiz_exam_summary, build_quiz_eval_summary
+
+    records = (db.query(TrainingQuizRecord).filter(TrainingQuizRecord.quiz_id == quiz.id)
+                 .order_by(TrainingQuizRecord.id.asc()).all())
+    evals = (db.query(TrainingQuizEval).filter(TrainingQuizEval.quiz_id == quiz.id)
+               .order_by(TrainingQuizEval.id.asc()).all())
+    theory = json.loads(quiz.theory_json or "{}")
+    base = (sess.name or "培训").strip()
+
+    out = []
+    doc1 = build_quiz_exam_summary(sess, quiz, theory, records)
+    a1 = _save_generated_docx(db, sess, "exam", f"{base}-培训考题及成绩汇总.docx", doc1, user)
+    out.append(_ser_attachment(a1))
+
+    if evals:
+        doc2 = build_quiz_eval_summary(sess, quiz, evals)
+        a2 = _save_generated_docx(db, sess, "effect_eval", f"{base}-培训效果评价汇总.docx", doc2, user)
+        out.append(_ser_attachment(a2))
+
+    _refresh_quiz_stats(db, quiz)
+    db.refresh(sess)
+    return {
+        "ok": True, "attachments": out,
+        "stats": {"exam_person_count": sess.exam_person_count,
+                  "exam_pass_rate": sess.exam_pass_rate,
+                  "eval_satisfy_rate": sess.eval_satisfy_rate},
+    }
 
 
 @router.post("/training-sessions/{sid}/generate-exam-summary")

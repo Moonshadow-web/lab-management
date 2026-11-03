@@ -58,6 +58,18 @@
               合格率 <b>{{ records.pass_rate }}%</b> ·
               平均 <b>{{ records.avg_pct }}</b> 分
             </div>
+            <div class="stat" style="margin-top:4px;color:#606266;">
+              效果评价 <b>{{ records.eval_total || 0 }}</b> 人 ·
+              满意率 <b>{{ records.eval_satisfy_rate || 0 }}%</b> ·
+              平均 <b>{{ records.eval_avg || 0 }}</b> 分
+            </div>
+            <div style="margin-top:8px;">
+              <el-button size="small" type="primary" plain :loading="genLoading" @click="generateSummary">
+                生成成绩 / 评价汇总 Word
+              </el-button>
+              <span style="font-size:12px;color:#909399;margin-left:6px;">自动挂到培训记录附件</span>
+            </div>
+
             <el-table :data="records.items" size="small" border max-height="300" style="margin-top:8px">
               <el-table-column type="index" label="#" width="46" align="center" />
               <el-table-column prop="name" label="姓名" width="110" />
@@ -97,7 +109,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import QRCode from 'qrcode'
 import {
   listTrainingQuizzes, getTrainingQuiz, createTrainingQuiz, updateTrainingQuiz,
-  deleteTrainingQuiz, listQuizRecords,
+  deleteTrainingQuiz, listQuizRecords, generateQuizSummary,
 } from '../../../api/education'
 
 const props = defineProps({
@@ -114,6 +126,7 @@ const qr = ref('')
 const link = ref('')
 const records = ref({ items: [], total: 0, passed: 0, pass_rate: 0, avg_pct: 0 })
 const showEditor = ref(false)
+const genLoading = ref(false)
 
 const form = ref({
   title: '', theoryText: '',
@@ -223,6 +236,20 @@ async function removeQuiz() {
     ElMessage.success('已删除')
     await load()
   } catch (e) { /* cancel */ }
+}
+
+async function generateSummary() {
+  genLoading.value = true
+  try {
+    const res = await generateQuizSummary(props.sessionId)
+    const n = (res.attachments || []).length
+    ElMessage.success(n ? `已生成 ${n} 份汇总 Word，已挂到培训附件` : '已生成汇总')
+    await loadRecords()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '生成失败')
+  } finally {
+    genLoading.value = false
+  }
 }
 
 async function copyLink() {

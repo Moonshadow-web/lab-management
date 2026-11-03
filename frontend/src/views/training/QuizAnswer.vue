@@ -46,6 +46,14 @@
           </div>
         </template>
 
+        <h3 class="sec">四、培训效果评价</h3>
+        <div class="eval-box">
+          <div class="eval-q">本次培训对您掌握该内容的帮助程度：</div>
+          <el-rate v-model="satisfaction" :texts="['很差','较差','一般','满意','非常满意']" show-text />
+          <el-input v-model="comment" type="textarea" :rows="2" maxlength="300" show-word-limit
+            placeholder="意见与建议（选填）" style="margin-top:8px" />
+        </div>
+
         <el-button type="primary" size="large" style="width:100%;margin-top:18px" :loading="saving" @click="submit">
           提交答卷
         </el-button>
@@ -60,6 +68,7 @@
             {{ result.passed ? '合格' : '未合格' }}（合格线 {{ result.pass_score }} 分）
           </div>
           <div class="raw">{{ result.name }}：{{ result.score }} / {{ result.full }} 分</div>
+          <div class="raw" v-if="satisfaction">培训效果评价：{{ satisfaction }} 分（已记录）</div>
         </div>
 
         <h3 class="sec">答题详情</h3>
@@ -100,6 +109,8 @@ const paper = ref({})
 const name = ref('')
 const answers = ref({})
 const result = ref({})
+const satisfaction = ref(0)
+const comment = ref('')
 
 const totalCount = computed(() =>
   (paper.value.single?.length || 0) + (paper.value.multi?.length || 0) + (paper.value.judge?.length || 0))
@@ -139,6 +150,10 @@ function validate() {
     ElMessage.warning(`还有 ${missing.length} 题未作答：${missing.slice(0, 3).join('、')}${missing.length > 3 ? ' 等' : ''}`)
     return false
   }
+  if (!satisfaction.value) {
+    ElMessage.warning('请先完成培训效果评价（选择满意度）')
+    return false
+  }
   return true
 }
 
@@ -149,6 +164,7 @@ async function submit() {
     result.value = await request.post(`/api/v1/education/public/quiz/${quizId}/submit`, {
       name: name.value.trim(),
       answers: answers.value,
+      eval: { satisfaction: satisfaction.value, comment: comment.value.trim() },
       source: 'qr',
     })
     step.value = 'result'
@@ -164,6 +180,8 @@ function restart() {
   step.value = 'answer'
   answers.value = {}
   result.value = {}
+  satisfaction.value = 0
+  comment.value = ''
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -201,6 +219,8 @@ onMounted(load)
 .opt :deep(.el-radio__label),
 .opt :deep(.el-checkbox__label) { font-size: 13.5px; line-height: 1.6; white-space: normal; }
 .tip { text-align: center; color: #909399; font-size: 12px; margin-top: 8px; }
+.eval-box { background: #f7f9fc; border-radius: 8px; padding: 12px; }
+.eval-q { font-size: 14px; color: #303133; margin-bottom: 6px; }
 .result { text-align: center; padding: 10px 0 6px; }
 .score { font-size: 46px; font-weight: 700; color: #2563eb; line-height: 1.1; }
 .score span { font-size: 16px; margin-left: 4px; }

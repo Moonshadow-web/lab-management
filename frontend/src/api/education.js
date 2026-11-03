@@ -195,3 +195,10 @@ export function updateTrainingBank(id, data) {
 export function deleteTrainingBank(id) {
   return request.delete(`/api/v1/education/training-exam-banks/${id}`)
 }
+
+// 按随堂测验生成成绩/评价汇总 Word 并挂到培训附件
+export function generateQuizSummary(sessionId) {
+  return request.post(`/api/v1/education/training-sessions/${sessionId}/generate-quiz-summary`, {})
+}
+
+

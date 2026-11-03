@@ -594,3 +594,17 @@ class TrainingExamBank(Base):
     remark: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TrainingQuizEval(Base):
+    """随堂测验的培训效果评价（答题结束时填写，按人归集）。"""
+
+    __tablename__ = "training_quiz_eval"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    quiz_id: Mapped[int] = mapped_column(index=True, default=0)
+    record_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True, default=None)
+    name: Mapped[str] = mapped_column(String(50), index=True, default="")
+    satisfaction: Mapped[int] = mapped_column(Integer, default=0)   # 1~5
+    comment: Mapped[str] = mapped_column(Text, default="")           # 意见与建议
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

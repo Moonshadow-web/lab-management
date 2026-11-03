@@ -18,7 +18,7 @@
       <el-tab-pane label="岗前培训授权" name="pre_job">
         <PreJobAuth />
       </el-tab-pane>
-      <el-tab-pane label="岗位考核题库" name="exam_bank">
+      <el-tab-pane label="考核题库" name="exam_bank">
         <ExamBank />
       </el-tab-pane>
       <el-tab-pane label="岗前理论考核答题记录" name="prejob_theory">

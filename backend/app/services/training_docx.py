@@ -18,6 +18,7 @@ from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
+from docx.shared import RGBColor
 from docx.shared import Cm, Pt
 
 PASS_LINE = 60          # 理论合格线
@@ -300,6 +301,156 @@ def build_eval_summary(db, sess, PreJobAuth, PreJobTheoryRecord) -> bytes:
         )
     else:
         doc.add_paragraph("暂无人员完成效果评价，建议督促受训人员扫码答题时同步完成评价。")
+    doc.add_paragraph(f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+    buf = BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+# ──────────────────────────────────────────────────────────────
+# 随堂测验（不绑定授权）：成绩汇总 / 效果评价汇总
+# ──────────────────────────────────────────────────────────────
+def _quiz_info_rows(sess) -> list[list[str]]:
+    return [
+        ["培训名称", sess.name or "", "培训类别", sess.tag or ""],
+        ["培训时间", sess.train_time or "", "培训地点", sess.location or ""],
+        ["培训老师", sess.teacher or "", "培训对象", sess.target or ""],
+    ]
+
+
+def _quiz_questions(doc, theory: dict):
+    n = 0
+    for key, label in (("single", "单选题"), ("multi", "多选题"), ("judge", "判断题")):
+        qs = theory.get(key) or []
+        if not qs:
+            continue
+        doc.add_paragraph(f"{label}（{len(qs)} 题）").runs[0].bold = True
+        for q in qs:
+            n += 1
+            doc.add_paragraph(f"{n}. {q.get('q', '')}")
+            opts = q.get("options") or []
+            if opts:
+                doc.add_paragraph("　　" + "　".join(str(o) for o in opts))
+            ans = q.get("answer")
+            p = doc.add_paragraph()
+            r = p.add_run(f"　　标准答案：{ans if ans is not None else '—'}")
+            r.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
+    return n
+
+
+def build_quiz_exam_summary(sess, quiz, theory: dict, records) -> bytes:
+    """生成「培训考题及成绩汇总」docx（随堂测验口径）。"""
+    doc = Document()
+    _set_cn_font(doc)
+    for sec in doc.sections:
+        sec.left_margin = sec.right_margin = Cm(2.0)
+        sec.top_margin = sec.bottom_margin = Cm(2.0)
+
+    _title(doc, f"{sess.name or '培训'} — 培训考题及成绩汇总")
+    _table(doc, _quiz_info_rows(sess), widths=[2.4, 5.4, 2.4, 5.4])
+
+    _h(doc, "一、培训考题（含标准答案）")
+    _quiz_questions(doc, theory or {})
+
+    _h(doc, "二、成绩明细")
+    # 同一姓名多次作答取最高分
+    best = {}
+    for r in records:
+        n = (r.name or "").strip()
+        if not n:
+            continue
+        if n not in best or (r.pct or 0) > (best[n].pct or 0):
+            best[n] = r
+    rows = sorted(best.values(), key=lambda x: (-(x.pct or 0), x.name or ""))
+    data = [["序号", "姓名", "得分", "百分制", "结果", "提交时间"]]
+    for i, r in enumerate(rows, 1):
+        data.append([
+            str(i), r.name, f"{r.score}/{r.full}", f"{r.pct}",
+            "合格" if r.passed else "不合格",
+            r.submit_at.strftime("%Y-%m-%d %H:%M") if r.submit_at else "",
+        ])
+    if len(data) == 1:
+        data.append(["—", "（暂无作答记录）", "", "", "", ""])
+    _table(doc, data, widths=[1.4, 3.0, 2.8, 2.4, 2.4, 4.6])
+
+    _h(doc, "三、统计汇总")
+    n = len(rows)
+    passed = sum(1 for r in rows if r.passed)
+    pass_line = quiz.pass_score or 60
+    rate = round(passed * 100.0 / n, 1) if n else 0
+    avg = round(sum((r.pct or 0) for r in rows) / n, 1) if n else 0
+    _table(doc, [
+        ["参加考核人数", f"{n} 人", "合格人数", f"{passed} 人"],
+        ["合格率", f"{rate}%", "平均分", f"{avg} 分"],
+    ], widths=[3.6, 3.4, 3.6, 3.4], header=False)
+    doc.add_paragraph(f"合格线：{pass_line} 分；同一人多次作答取最高分。")
+
+    _h(doc, "四、结论")
+    if n:
+        concl = (f"本次培训共有 {n} 人参加考核，合格 {passed} 人，合格率 {rate}%，平均 {avg} 分。"
+                 + ("全部通过。" if passed == n else f"{n - passed} 人未达标，建议补考。"))
+    else:
+        concl = "暂无人参加考核。"
+    doc.add_paragraph(concl)
+    doc.add_paragraph(f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+    buf = BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def build_quiz_eval_summary(sess, quiz, evals) -> bytes:
+    """生成「培训效果评价汇总」docx（随堂测验口径）。"""
+    doc = Document()
+    _set_cn_font(doc)
+    for sec in doc.sections:
+        sec.left_margin = sec.right_margin = Cm(2.0)
+        sec.top_margin = sec.bottom_margin = Cm(2.0)
+
+    _title(doc, f"{sess.name or '培训'} — 培训效果评价汇总")
+    _table(doc, _quiz_info_rows(sess), widths=[2.4, 5.4, 2.4, 5.4])
+
+    _h(doc, "一、评价方式")
+    doc.add_paragraph(
+        "受训人员完成扫码答题后，对本次培训的收获程度进行评价"
+        "（5 分制：5 非常满意、4 满意、3 一般、2 较差、1 很差）。"
+        "满意率 = 评分 ≥4 分的人数 / 参评人数。"
+    )
+
+    _h(doc, "二、评价明细")
+    data = [["序号", "姓名", "评分（5 分制）", "评价等级", "意见与建议", "评价时间"]]
+    vals = []
+    for i, e in enumerate(sorted(evals, key=lambda x: -(x.satisfaction or 0)), 1):
+        v = e.satisfaction or 0
+        if v:
+            vals.append(v)
+        grade = {5: "非常满意", 4: "满意", 3: "一般", 2: "较差", 1: "很差"}.get(v, "未评价")
+        data.append([
+            str(i), e.name, str(v) if v else "—", grade,
+            (e.comment or "").replace("\n", " ")[:60] or "—",
+            e.created_at.strftime("%Y-%m-%d %H:%M") if e.created_at else "",
+        ])
+    if len(data) == 1:
+        data.append(["—", "（暂无评价）", "", "", "", ""])
+    _table(doc, data, widths=[1.2, 2.4, 2.8, 2.6, 5.6, 3.6])
+
+    _h(doc, "三、统计汇总")
+    n = len(vals)
+    satisfy = sum(1 for v in vals if v >= 4)
+    avg = round(sum(vals) / n, 2) if n else 0
+    rate = round(satisfy * 100.0 / n, 1) if n else 0
+    _table(doc, [
+        ["参评人数", f"{n} 人", "满意人数（≥4 分）", f"{satisfy} 人"],
+        ["满意率", f"{rate}%", "平均分", f"{avg} 分"],
+    ], widths=[3.4, 3.6, 4.2, 3.4], header=False)
+
+    _h(doc, "四、结论")
+    if n:
+        level = "很好" if rate >= 90 else ("良好" if rate >= 80 else "一般，建议改进培训方式")
+        doc.add_paragraph(f"本次培训共 {n} 人参与效果评价，满意率 {rate}%，平均 {avg} 分，培训效果{level}。")
+    else:
+        doc.add_paragraph("暂无效果评价数据。")
     doc.add_paragraph(f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
     buf = BytesIO()
