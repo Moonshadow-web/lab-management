@@ -532,3 +532,44 @@ class PreJobTheoryRecord(Base):
     source: Mapped[str] = mapped_column(String(20), default="qr")  # qr=扫码 / online=登录在线
     submit_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TrainingQuiz(Base):
+    """培训随堂测验（不绑定授权，扫码即可作答）。
+
+    与岗前授权考核的区别：不关联 PreJobAuth、不限制参与人，输名字就能答题；
+    题目存 theory_json（结构与 ExamBank 一致：single/multi/judge）。
+    """
+
+    __tablename__ = "training_quiz"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(index=True, default=0)  # 关联 training_session.id
+    title: Mapped[str] = mapped_column(String(200), default="")
+    theory_json: Mapped[str] = mapped_column(Text, default="{}")
+    score_single: Mapped[int] = mapped_column(Integer, default=6)   # 单选每题分值
+    score_multi: Mapped[int] = mapped_column(Integer, default=8)    # 多选每题分值
+    score_judge: Mapped[int] = mapped_column(Integer, default=6)    # 判断每题分值
+    pass_score: Mapped[int] = mapped_column(Integer, default=60)    # 合格线（百分制）
+    is_open: Mapped[bool] = mapped_column(Boolean, default=True)    # 是否开放答题
+    remark: Mapped[str] = mapped_column(String(500), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TrainingQuizRecord(Base):
+    """随堂测验作答记录（免登录，按姓名归集）。"""
+
+    __tablename__ = "training_quiz_record"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    quiz_id: Mapped[int] = mapped_column(index=True, default=0)
+    name: Mapped[str] = mapped_column(String(50), index=True, default="")
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    full: Mapped[int] = mapped_column(Integer, default=0)
+    pct: Mapped[int] = mapped_column(Integer, default=0)
+    passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    answers_json: Mapped[str] = mapped_column(Text, default="{}")
+    review_json: Mapped[str] = mapped_column(Text, default="[]")   # 逐题对错，供答题人回看
+    source: Mapped[str] = mapped_column(String(20), default="qr")
+    submit_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

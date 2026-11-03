@@ -158,3 +158,23 @@ export async function downloadEduAttachment(id, filename) {
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
+
+// 培训随堂测验（不绑定授权，扫码即答）
+export function listTrainingQuizzes(params) {
+  return request.get('/api/v1/education/training-quizzes', { params })
+}
+export function createTrainingQuiz(data) {
+  return request.post('/api/v1/education/training-quizzes', data)
+}
+export function getTrainingQuiz(id) {
+  return request.get(`/api/v1/education/training-quizzes/${id}`)
+}
+export function updateTrainingQuiz(id, data) {
+  return request.put(`/api/v1/education/training-quizzes/${id}`, data)
+}
+export function deleteTrainingQuiz(id) {
+  return request.delete(`/api/v1/education/training-quizzes/${id}`)
+}
+export function listQuizRecords(id) {
+  return request.get(`/api/v1/education/training-quizzes/${id}/records`)
+}

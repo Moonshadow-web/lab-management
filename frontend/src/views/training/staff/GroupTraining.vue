@@ -58,7 +58,11 @@
           :extra-params="{ tag }"
           :can-write="canWrite"
           @add="openSession()" @edit="openSession" @delete="onDeleteSession" ref="sessionRef"
-        />
+        >
+          <template #row-extra="{ row }">
+            <el-button link type="success" @click="openQuiz(row)">扫码答题</el-button>
+          </template>
+        </CrudTable>
       </el-collapse-item>
     </el-collapse>
 
@@ -130,6 +134,8 @@
         <el-button type="primary" @click="saveSession">保存</el-button>
       </template>
     </el-dialog>
+
+    <QuizDialog v-model:visible="quizVisible" :session-id="quizSessionId" :session-name="quizSessionName" />
   </div>
 </template>
 
@@ -138,6 +144,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import CrudTable from '../../../components/CrudTable.vue'
+import QuizDialog from './QuizDialog.vue'
 import SignInSheet from '../SignInSheet.vue'
 import EducationAttachmentList from '../EducationAttachmentList.vue'
 import { generateExamSummary, generateEvalSummary } from '../../../api/education'
@@ -166,6 +173,16 @@ const planColumns = [
   { prop: 'approved_date', label: '批准日期', width: 106, formatter: (r) => r.approved_date || '—' },
   { prop: 'remark', label: '备注', minWidth: 140 },
 ]
+const quizVisible = ref(false)
+const quizSessionId = ref(null)
+const quizSessionName = ref('')
+
+function openQuiz(row) {
+  quizSessionId.value = row.id
+  quizSessionName.value = row.name
+  quizVisible.value = true
+}
+
 const sessionColumns = [
   { prop: 'name', label: '培训名称', minWidth: 200 },
   { prop: 'teacher', label: '培训老师', width: 110 },

@@ -26,7 +26,7 @@ from ...models.education import (
     InternshipMentor, InternshipScore,
     AuthSheet,
     PreJobAuth, ExamBank, PostInstrumentMap, PreJobTheoryRecord,
-    EducationAttachment,
+    EducationAttachment, TrainingQuiz, TrainingQuizRecord,
 )
 from ...models.user import User
 from ...core.crud_base import make_router
@@ -942,6 +942,201 @@ def public_exam_submit(pid: int, payload: dict, db: Session = Depends(get_db)):
 
     return {"ok": True, "score": total, "full": full, "pct": avg_pct,
             "detail": detail, "review": review}
+
+# =========================================================================
+# 培训随堂测验（不绑定授权，扫码即答，不限参与人）
+# =========================================================================
+def _quiz_paper(q: TrainingQuiz) -> dict:
+    """生成不含答案的试卷。"""
+    T = json.loads(q.theory_json or "{}")
+    return {
+        "id": q.id,
+        "session_id": q.session_id,
+        "title": q.title,
+        "pass_score": q.pass_score,
+        "is_open": bool(q.is_open),
+        "single": [{"q": t.get("q", ""), "options": t.get("options") or []} for t in (T.get("single") or [])],
+        "multi": [{"q": t.get("q", ""), "options": t.get("options") or []} for t in (T.get("multi") or [])],
+        "judge": [{"q": t.get("q", "")} for t in (T.get("judge") or [])],
+        "score_single": q.score_single, "score_multi": q.score_multi, "score_judge": q.score_judge,
+    }
+
+
+def _quiz_grade(q: TrainingQuiz, answers: dict) -> dict:
+    """判分并生成逐题批改。单选按首字母、多选按集合全等、判断按字符串。"""
+    T = json.loads(q.theory_json or "{}")
+    a = answers or {}
+    score = 0
+    review = []
+
+    for i, t in enumerate(T.get("single") or []):
+        picked = str(a.get("s%d" % i) or "").strip()[:1]
+        correct = _ans_str(t.get("answer"))[:1]
+        ok = bool(picked) and picked == correct
+        if ok:
+            score += q.score_single
+        opts = t.get("options") or []
+        review.append({"type": "single", "no": i + 1, "q": t.get("q", ""), "options": opts,
+                       "picked": picked, "answer": correct, "ok": ok, "points": q.score_single})
+
+    for i, t in enumerate(T.get("multi") or []):
+        got = "".join(sorted(a.get("m%d" % i) or []))
+        correct = "".join(sorted(_ans_str(t.get("answer"))))
+        ok = bool(got) and got == correct
+        if ok:
+            score += q.score_multi
+        review.append({"type": "multi", "no": i + 1, "q": t.get("q", ""), "options": t.get("options") or [],
+                       "picked": got, "answer": correct, "ok": ok, "points": q.score_multi})
+
+    for i, t in enumerate(T.get("judge") or []):
+        picked = str(a.get("j%d" % i) or "").strip()
+        correct = _ans_str(t.get("answer"))
+        ok = bool(picked) and picked == correct
+        if ok:
+            score += q.score_judge
+        review.append({"type": "judge", "no": i + 1, "q": t.get("q", ""), "options": [],
+                       "picked": picked, "answer": correct, "ok": ok, "points": q.score_judge})
+
+    full = (len(T.get("single") or []) * q.score_single
+            + len(T.get("multi") or []) * q.score_multi
+            + len(T.get("judge") or []) * q.score_judge)
+    pct = round(score * 100 / full) if full else 0
+    return {"score": score, "full": full, "pct": pct, "passed": pct >= (q.pass_score or 60), "review": review}
+
+
+@router.get("/training-quizzes")
+def list_quizzes(session_id: int | None = None, db: Session = Depends(get_db),
+                 user: User = Depends(get_current_user)):
+    q = db.query(TrainingQuiz)
+    if session_id:
+        q = q.filter(TrainingQuiz.session_id == session_id)
+    rows = q.order_by(TrainingQuiz.id.desc()).all()
+    out = []
+    for x in rows:
+        cnt = db.query(TrainingQuizRecord).filter(TrainingQuizRecord.quiz_id == x.id).count()
+        out.append({"id": x.id, "session_id": x.session_id, "title": x.title,
+                    "is_open": bool(x.is_open), "pass_score": x.pass_score,
+                    "question_count": sum(len(v or []) for v in json.loads(x.theory_json or "{}").values()),
+                    "record_count": cnt, "remark": x.remark,
+                    "created_at": x.created_at.isoformat() if x.created_at else None})
+    return {"items": out, "total": len(out)}
+
+
+@router.post("/training-quizzes", status_code=201)
+def create_quiz(payload: dict, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    q = TrainingQuiz(
+        session_id=int(payload.get("session_id") or 0),
+        title=(payload.get("title") or "").strip(),
+        theory_json=json.dumps(payload.get("theory_json") or {}, ensure_ascii=False),
+        score_single=int(payload.get("score_single") or 6),
+        score_multi=int(payload.get("score_multi") or 8),
+        score_judge=int(payload.get("score_judge") or 6),
+        pass_score=int(payload.get("pass_score") or 60),
+        is_open=bool(payload.get("is_open", True)),
+        remark=(payload.get("remark") or "").strip(),
+    )
+    db.add(q)
+    db.commit()
+    db.refresh(q)
+    return {"id": q.id, "title": q.title, "session_id": q.session_id}
+
+
+@router.get("/training-quizzes/{qid}")
+def get_quiz(qid: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    q = db.get(TrainingQuiz, qid)
+    if not q:
+        raise HTTPException(404, "测验不存在")
+    return {
+        "id": q.id, "session_id": q.session_id, "title": q.title,
+        "theory_json": json.loads(q.theory_json or "{}"),
+        "score_single": q.score_single, "score_multi": q.score_multi,
+        "score_judge": q.score_judge, "pass_score": q.pass_score,
+        "is_open": bool(q.is_open), "remark": q.remark,
+    }
+
+
+@router.put("/training-quizzes/{qid}")
+def update_quiz(qid: int, payload: dict, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    q = db.get(TrainingQuiz, qid)
+    if not q:
+        raise HTTPException(404, "测验不存在")
+    if "title" in payload:
+        q.title = (payload.get("title") or "").strip()
+    if "theory_json" in payload:
+        q.theory_json = json.dumps(payload.get("theory_json") or {}, ensure_ascii=False)
+    for k in ("score_single", "score_multi", "score_judge", "pass_score"):
+        if k in payload and payload[k] is not None:
+            setattr(q, k, int(payload[k]))
+    if "is_open" in payload:
+        q.is_open = bool(payload["is_open"])
+    if "remark" in payload:
+        q.remark = (payload.get("remark") or "").strip()
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/training-quizzes/{qid}")
+def delete_quiz(qid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    q = db.get(TrainingQuiz, qid)
+    if not q:
+        raise HTTPException(404, "测验不存在")
+    db.query(TrainingQuizRecord).filter(TrainingQuizRecord.quiz_id == qid).delete()
+    db.delete(q)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/training-quizzes/{qid}/records")
+def quiz_records(qid: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    rows = (db.query(TrainingQuizRecord).filter(TrainingQuizRecord.quiz_id == qid)
+              .order_by(TrainingQuizRecord.submit_at.desc()).all())
+    items = [{"id": r.id, "name": r.name, "score": r.score, "full": r.full, "pct": r.pct,
+              "passed": bool(r.passed), "submit_at": r.submit_at.isoformat() if r.submit_at else None}
+             for r in rows]
+    total = len(items)
+    passed = sum(1 for i in items if i["passed"])
+    avg = round(sum(i["pct"] for i in items) / total, 1) if total else 0
+    return {"items": items, "total": total, "passed": passed,
+            "pass_rate": round(passed * 100 / total, 1) if total else 0, "avg_pct": avg}
+
+
+@router.get("/public/quiz/{qid}")
+def public_quiz_paper(qid: int, db: Session = Depends(get_db)):
+    """免登录取卷（不含答案）。"""
+    q = db.get(TrainingQuiz, qid)
+    if not q:
+        raise HTTPException(404, "测验不存在")
+    if not q.is_open:
+        raise HTTPException(403, "该测验已关闭")
+    return _quiz_paper(q)
+
+
+@router.post("/public/quiz/{qid}/submit")
+def public_quiz_submit(qid: int, payload: dict, db: Session = Depends(get_db)):
+    """免登录交卷：按姓名记录，服务端判分，返回逐题对错。"""
+    q = db.get(TrainingQuiz, qid)
+    if not q:
+        raise HTTPException(404, "测验不存在")
+    if not q.is_open:
+        raise HTTPException(403, "该测验已关闭")
+    name = (payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "请填写姓名")
+    res = _quiz_grade(q, payload.get("answers") or {})
+    r = TrainingQuizRecord(
+        quiz_id=qid, name=name, score=res["score"], full=res["full"], pct=res["pct"],
+        passed=res["passed"],
+        answers_json=json.dumps(payload.get("answers") or {}, ensure_ascii=False),
+        review_json=json.dumps(res["review"], ensure_ascii=False),
+        source=(payload.get("source") or "qr")[:20],
+    )
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return {"ok": True, "record_id": r.id, "name": name, "score": res["score"],
+            "full": res["full"], "pct": res["pct"], "passed": res["passed"],
+            "pass_score": q.pass_score, "review": res["review"]}
+
 
 # =========================================================================
 # 培训课件库（只读）：汇总组内培训 / 科内培训 / 实习讲课的课件，供全员浏览下载

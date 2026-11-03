@@ -23,6 +23,12 @@ const routes = [
     meta: { title: '理论考核答题', public: true },
   },
   {
+    path: '/quiz/:id',
+    name: 'quiz-answer',
+    component: () => import('../views/training/QuizAnswer.vue'),
+    meta: { title: '培训随堂测验', public: true },
+  },
+  {
     // 工程师扫码免登录填写维修记录（需带 token 参数）
     path: '/repair-fill',
     name: 'repair-fill',
