@@ -573,3 +573,24 @@ class TrainingQuizRecord(Base):
     review_json: Mapped[str] = mapped_column(Text, default="[]")   # 逐题对错，供答题人回看
     source: Mapped[str] = mapped_column(String(20), default="qr")
     submit_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TrainingExamBank(Base):
+    """培训考核题库（按培训主题归档，供随堂测验复用/组卷）。
+
+    与岗位题库（ExamBank）并列：岗位题库按岗位，本表按培训主题。
+    theory_json 结构同 ExamBank；complete=False 表示历史题缺选项，仅存题干与参考答案。
+    """
+
+    __tablename__ = "training_exam_bank"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    topic: Mapped[str] = mapped_column(String(300), index=True, default="")   # 培训主题
+    category: Mapped[str] = mapped_column(String(50), default="组内培训")      # 组内培训/科内培训/实习讲课/专项
+    theory_json: Mapped[str] = mapped_column(Text, default="{}")
+    complete: Mapped[bool] = mapped_column(Boolean, default=True)            # 题目是否完整（含选项）
+    source: Mapped[str] = mapped_column(String(200), default="")             # 来源，如"2026-11-04 D-二聚体培训试题.docx"
+    session_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True, default=None)
+    remark: Mapped[str] = mapped_column(String(500), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

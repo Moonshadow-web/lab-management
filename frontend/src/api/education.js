@@ -178,3 +178,20 @@ export function deleteTrainingQuiz(id) {
 export function listQuizRecords(id) {
   return request.get(`/api/v1/education/training-quizzes/${id}/records`)
 }
+
+// 培训考核题库
+export function listTrainingBanks(params) {
+  return request.get('/api/v1/education/training-exam-banks', { params })
+}
+export function getTrainingBank(id) {
+  return request.get(`/api/v1/education/training-exam-banks/${id}`)
+}
+export function createTrainingBank(data) {
+  return request.post('/api/v1/education/training-exam-banks', data)
+}
+export function updateTrainingBank(id, data) {
+  return request.put(`/api/v1/education/training-exam-banks/${id}`, data)
+}
+export function deleteTrainingBank(id) {
+  return request.delete(`/api/v1/education/training-exam-banks/${id}`)
+}

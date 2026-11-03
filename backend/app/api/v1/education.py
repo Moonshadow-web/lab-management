@@ -26,7 +26,7 @@ from ...models.education import (
     InternshipMentor, InternshipScore,
     AuthSheet,
     PreJobAuth, ExamBank, PostInstrumentMap, PreJobTheoryRecord,
-    EducationAttachment, TrainingQuiz, TrainingQuizRecord,
+    EducationAttachment, TrainingQuiz, TrainingQuizRecord, TrainingExamBank,
 )
 from ...models.user import User
 from ...core.crud_base import make_router
@@ -1002,6 +1002,88 @@ def _quiz_grade(q: TrainingQuiz, answers: dict) -> dict:
             + len(T.get("judge") or []) * q.score_judge)
     pct = round(score * 100 / full) if full else 0
     return {"score": score, "full": full, "pct": pct, "passed": pct >= (q.pass_score or 60), "review": review}
+
+
+@router.get("/training-exam-banks")
+def list_training_banks(category: str = "", q: str = "", db: Session = Depends(get_db),
+                        user: User = Depends(get_current_user)):
+    query = db.query(TrainingExamBank)
+    if category:
+        query = query.filter(TrainingExamBank.category == category)
+    kw = (q or "").strip()
+    if kw:
+        query = query.filter(TrainingExamBank.topic.contains(kw))
+    rows = query.order_by(TrainingExamBank.updated_at.desc()).all()
+    items = []
+    for x in rows:
+        T = json.loads(x.theory_json or "{}")
+        items.append({
+            "id": x.id, "topic": x.topic, "category": x.category,
+            "count": sum(len(v or []) for v in T.values()),
+            "single": len(T.get("single") or []), "multi": len(T.get("multi") or []),
+            "judge": len(T.get("judge") or []),
+            "complete": bool(x.complete), "source": x.source, "session_id": x.session_id,
+            "remark": x.remark,
+            "updated_at": x.updated_at.isoformat() if x.updated_at else None,
+        })
+    return {"items": items, "total": len(items)}
+
+
+@router.get("/training-exam-banks/{bid}")
+def get_training_bank(bid: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    x = db.get(TrainingExamBank, bid)
+    if not x:
+        raise HTTPException(404, "题库不存在")
+    return {"id": x.id, "topic": x.topic, "category": x.category,
+            "theory_json": json.loads(x.theory_json or "{}"),
+            "complete": bool(x.complete), "source": x.source,
+            "session_id": x.session_id, "remark": x.remark}
+
+
+@router.post("/training-exam-banks", status_code=201)
+def create_training_bank(payload: dict, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    x = TrainingExamBank(
+        topic=(payload.get("topic") or "").strip(),
+        category=(payload.get("category") or "组内培训").strip(),
+        theory_json=json.dumps(payload.get("theory_json") or {}, ensure_ascii=False),
+        complete=bool(payload.get("complete", True)),
+        source=(payload.get("source") or "").strip(),
+        session_id=payload.get("session_id"),
+        remark=(payload.get("remark") or "").strip(),
+    )
+    db.add(x)
+    db.commit()
+    db.refresh(x)
+    return {"id": x.id, "topic": x.topic}
+
+
+@router.put("/training-exam-banks/{bid}")
+def update_training_bank(bid: int, payload: dict, db: Session = Depends(get_db),
+                         user: User = Depends(WRITE)):
+    x = db.get(TrainingExamBank, bid)
+    if not x:
+        raise HTTPException(404, "题库不存在")
+    for k in ("topic", "category", "source", "remark"):
+        if k in payload:
+            setattr(x, k, (payload.get(k) or "").strip())
+    if "theory_json" in payload:
+        x.theory_json = json.dumps(payload.get("theory_json") or {}, ensure_ascii=False)
+    if "complete" in payload:
+        x.complete = bool(payload["complete"])
+    if "session_id" in payload:
+        x.session_id = payload["session_id"]
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/training-exam-banks/{bid}")
+def delete_training_bank(bid: int, db: Session = Depends(get_db), user: User = Depends(WRITE)):
+    x = db.get(TrainingExamBank, bid)
+    if not x:
+        raise HTTPException(404, "题库不存在")
+    db.delete(x)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/training-quizzes")

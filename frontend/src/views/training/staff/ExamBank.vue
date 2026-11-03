@@ -1,5 +1,7 @@
 <template>
   <div class="exam-bank">
+    <el-tabs v-model="bankTab">
+      <el-tab-pane label="岗位考核题库" name="post">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
       <span style="color:#666;font-size:13px;">岗位考核方式与题库（岗前培训授权表单自动引用）</span>
       <el-button type="primary" :disabled="!canWrite" @click="openForm()">新增岗位题库</el-button>
@@ -85,6 +87,11 @@
         <el-button type="primary" @click="save">保存</el-button>
       </template>
     </el-dialog>
+      </el-tab-pane>
+      <el-tab-pane label="培训考核题库" name="training">
+        <TrainingExamBank />
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
@@ -94,8 +101,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { GL070_POSITIONS as META } from './gl070Meta'
 import { listExamBank, createExamBank, updateExamBank, deleteExamBank } from '../../../api/education'
 import { useAuthStore } from '../../../store/auth'
+import TrainingExamBank from './TrainingExamBank.vue'
 
 const auth = useAuthStore()
+const bankTab = ref('post')
 const canWrite = ref(auth.canWrite('training'))
 const ALL_METHODS = ['口头问答', '实操考核', '理论考核']
 const list = ref([])
