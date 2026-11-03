@@ -214,10 +214,26 @@ onMounted(load)
 .sec { font-size: 14.5px; margin: 20px 0 8px; border-left: 4px solid #2563eb; padding-left: 8px; }
 .qbox { padding: 10px 0; border-bottom: 1px dashed #ebeef5; }
 .qtext { font-size: 14px; line-height: 1.7; color: #303133; }
-.opts { display: flex; flex-direction: column; align-items: flex-start; margin-top: 6px; }
-.opt { height: 30px; margin-right: 0 !important; font-size: 13.5px; }
+.opts { display: flex; flex-direction: column; align-items: stretch; margin-top: 6px; gap: 2px; }
+.opt {
+  height: auto !important;
+  margin-right: 0 !important;
+  padding: 3px 0;
+  display: flex;
+  align-items: flex-start;
+  white-space: normal;
+}
+.opt :deep(.el-radio__input),
+.opt :deep(.el-checkbox__input) { margin-top: 3px; flex-shrink: 0; }
 .opt :deep(.el-radio__label),
-.opt :deep(.el-checkbox__label) { font-size: 13.5px; line-height: 1.6; white-space: normal; }
+.opt :deep(.el-checkbox__label) {
+  font-size: 13.5px;
+  line-height: 1.6;
+  white-space: normal;
+  word-break: break-word;
+  padding-left: 6px;
+}
+.opt :deep(.el-checkbox) { display: flex; align-items: flex-start; height: auto; white-space: normal; }
 .tip { text-align: center; color: #909399; font-size: 12px; margin-top: 8px; }
 .eval-box { background: #f7f9fc; border-radius: 8px; padding: 12px; }
 .eval-q { font-size: 14px; color: #303133; margin-bottom: 6px; }
