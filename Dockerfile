@@ -26,10 +26,11 @@ COPY backend/ ./
 COPY frontend/dist ./frontend/dist
 
 # 初始数据备份（首次启动复制到持久卷，不覆盖已有数据）
+# ⚠️ 只备份 app.db（2MB）。uploads(89MB)/eqa_reports(21MB) 不再随镜像分发 ——
+# 线上 CFS 持久卷已有这些文件；把它们打进镜像会撑大推送层，导致 TCR 推送超时
+# （2026-11-09 连续 5 次 build_failed 的主因之一）。entrypoint 的恢复逻辑对不存在的
+# /app/backup/uploads、/app/backup/eqa_reports 会自动跳过（有 2>/dev/null || true 保护）。
 COPY data/app.db /app/backup/app.db
-COPY data/uploads /app/backup/uploads
-# EQA 质评报告 PDF 备份（首次/空目录时恢复到持久卷，避免线上预览 404）
-COPY data/eqa_reports /app/backup/eqa_reports
 
 # 数据目录（CloudBase Run 挂载持久卷到此路径 /app/data）
 # 注意：绝不能在构建期在 /app/data 下预建目录（如 /app/data/uploads），
