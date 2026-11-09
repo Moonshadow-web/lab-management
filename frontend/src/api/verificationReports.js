@@ -20,3 +20,8 @@ export function generateVerificationReport(id) {
 export function downloadVerificationReport(id) {
   return request.get(`/api/v1/verification-reports/${id}/download`, { responseType: 'blob' })
 }
+
+// 项目查询 ↔ 性能验证联动：按检验项目名/别名/标本匹配验证记录
+export function matchVerificationByTestItem(data) {
+  return request.post('/api/v1/verification-reports/match-by-test-item', data)
+}

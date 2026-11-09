@@ -183,6 +183,104 @@ def _auto_fill_result_summary(data: dict, db: Session = None) -> dict:
     return data
 
 
+# ═══ 项目查询 ↔ 性能验证记录 联动匹配 ═══
+# 验证报告的项目名常带「测定试剂盒/检测试剂盒」后缀，检验项目名常带标本前缀
+# （尿α1微球蛋白 vs α1微球蛋白测定试剂盒），需归一化后再配，
+# 且**标本类型必须兼容**（尿免疫球蛋白G ≠ 血清免疫球蛋白G）。
+
+_REAGENT_SUFFIXES = ("测定试剂盒", "检测试剂盒", "试剂盒", "测定", "检测", "试剂")
+
+
+def _strip_reagent_suffix(s: str) -> str:
+    """去掉试剂盒产品后缀（可能叠加，如「…测定试剂盒」）。"""
+    t = (s or "").strip()
+    changed = True
+    while changed:
+        changed = False
+        for w in _REAGENT_SUFFIXES:
+            if t.endswith(w) and len(t) > len(w):
+                t = t[: -len(w)].strip(" -_·、")
+                changed = True
+    return t
+
+
+def _specimen_compatible(word: str, specimen: str) -> bool:
+    """标本词是否与被匹配项目的标本类型兼容（「尿」↔「尿液」）。"""
+    if not word:
+        return True
+    if not specimen:
+        return True
+    return word in specimen or specimen in word
+
+
+def _match_test_item_to_report(test_name: str, test_aliases: str, test_specimen: str,
+                               vr_name: str) -> bool:
+    """判断某检验项目是否对应某条验证记录（严格模式，宁缺勿错）。"""
+    a = _norm_project_name(_strip_reagent_suffix(test_name))
+    b = _norm_project_name(_strip_reagent_suffix(vr_name))
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    # 别名精确命中（如 项目「血清锂」别名 Li ↔ 验证报告「锂（Li）」）
+    for al in re.split(r"[,，、/;；\s]+", test_aliases or ""):
+        an = _norm_project_name(_strip_reagent_suffix(al))
+        if an and len(an) >= 2 and an == b:
+            return True
+    # 标本前缀剥离后相等，且标本类型兼容
+    # 注：不复用 _strip_specimen —— 它要求剥离后至少剩 2 字，「血清锂→锂」这类单字项目会被漏掉
+    def _strip_spec_local(core: str):
+        for w in _SPECIMEN_PREFIXES:
+            if core.startswith(w) and len(core) > len(w):
+                return core[len(w):], w
+        return core, ""
+
+    a2, sa = _strip_spec_local(a)
+    b2, sb = _strip_spec_local(b)
+    if a2 and a2 == b2:
+        w = sa or sb
+        if not w:
+            return True
+        if _specimen_compatible(w, test_specimen or ""):
+            return True
+        return False
+    return False
+
+
+@router.post("/match-by-test-item")
+def match_by_test_item(
+    body: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """按检验项目（名称/别名/标本）匹配性能验证记录，返回结论汇总。
+
+    用于「项目查询」卡片上的「性能验证」按钮。匹配规则：
+      ① 去「测定试剂盒」等产品后缀后归一化，精确相等
+      ② 项目别名与验证报告名精确匹配
+      ③ 剥离标本前缀后相等，且标本类型兼容（尿 ≠ 血清）
+    多条记录（不同年份/复验）按 id 倒序返回。
+    """
+    name = (body.get("name") or "").strip()
+    aliases = (body.get("aliases") or "").strip()
+    specimen = (body.get("specimen") or "").strip()
+    if not name:
+        return {"items": [], "total": 0}
+
+    group = get_current_group(request)
+    q = db.query(VerificationReport)
+    if group:
+        q = q.filter(VerificationReport.group_code == group)
+    rows = q.order_by(VerificationReport.id.desc()).all()
+
+    hits = []
+    for r in rows:
+        if _match_test_item_to_report(name, aliases, specimen, r.project_name or ""):
+            hits.append(_serialize_report(r))
+    return {"items": hits, "total": len(hits)}
+
+
 @router.post("/{report_id}/generate")
 def generate_report(
     report_id: int,

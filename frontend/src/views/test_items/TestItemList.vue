@@ -143,6 +143,9 @@
             <el-tag v-if="eqaOrgs(row).length" type="success" effect="dark" class="eqa-badge" title="该项目参加室间质评">
               <el-icon class="eqa-ico"><Medal /></el-icon>室间质评（{{ eqaOrgs(row).join('/') }}）
             </el-tag>
+            <el-button text type="success" :icon="TrendCharts" @click="openVerification(row)" title="查看该项目的性能验证结论汇总">
+              性能验证
+            </el-button>
             <el-button v-if="rowManuals(row).length" text type="primary" :icon="Document" @click="openManuals(row)" title="查看项目说明书（按品牌）">
               项目说明书<span v-if="rowManuals(row).length > 1">（{{ rowManuals(row).length }}）</span>
             </el-button>
@@ -321,6 +324,52 @@
         <el-button type="primary" @click="closeManualDialog">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 性能验证结论汇总（与性能验证记录联动） -->
+    <el-dialog v-model="verifDialog" :title="`性能验证 — ${verifTarget?.name || ''}`"
+               width="860px" top="6vh" append-to-body>
+      <div v-if="verifLoading" style="text-align:center;padding:40px;color:#909399">
+        <el-icon class="is-loading"><Loading /></el-icon> 查询中…
+      </div>
+      <el-empty v-else-if="!verifItems.length"
+                :description="`「${verifTarget?.name || ''}」暂无对应的性能验证记录`" />
+      <div v-else>
+        <el-alert type="success" :closable="false" show-icon style="margin-bottom:12px"
+          :title="`共匹配到 ${verifItems.length} 份性能验证报告`" />
+        <el-card v-for="v in verifItems" :key="v.id" shadow="never" class="verif-card">
+          <template #header>
+            <div class="verif-head">
+              <b>{{ v.project_name }}</b>
+              <span class="verif-head-meta">
+                {{ v.instrument_model || '—' }}
+                <template v-if="v.instrument_no"> · {{ v.instrument_no }}</template>
+                <template v-if="v.verify_date"> · {{ v.verify_date }}</template>
+              </span>
+            </div>
+          </template>
+          <div class="verif-sub">
+            <span>试剂：{{ v.reagent || '—' }}</span>
+            <span>单位：{{ v.unit || '—' }}</span>
+            <span>操作：{{ v.operator || '—' }}</span>
+            <span>审核：{{ v.reviewer || '—' }}</span>
+          </div>
+          <el-table :data="verifRows(v)" size="small" border class="verif-table">
+            <el-table-column prop="label" label="验证项目" width="160" />
+            <el-table-column prop="result" label="结果" min-width="260" show-overflow-tooltip />
+            <el-table-column label="结论" width="110" align="center">
+              <template #default="{ row }">
+                <el-tag v-if="row.conclusion" size="small"
+                        :type="row.conclusion.includes('符合') ? 'success' : 'danger'">{{ row.conclusion }}</el-tag>
+                <span v-else style="color:#c0c4cc">—</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </div>
+      <template #footer>
+        <el-button @click="verifDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -328,13 +377,64 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Edit, Delete, Warning, Upload, Download, ArrowDown, ArrowRight, Link, Medal, Document, Loading } from '@element-plus/icons-vue'
+import { Search, Plus, Edit, Delete, Warning, Upload, Download, ArrowDown, ArrowRight, Link, Medal, Document, Loading, TrendCharts } from '@element-plus/icons-vue'
 import EditDialog from '../../components/EditDialog.vue'
 import { listTestItems, createTestItem, updateTestItem, deleteTestItem, importTestItems, exportTestItems, getTestItemStats } from '../../api/testItems'
 import { getInstrumentFamilyMap } from '../../api/instruments'
 import { listEqaAssociations } from '../../api/eqa'
 import { listProjectManuals, fetchDocumentBlob, downloadBlob } from '../../api/documents'
 import { useAuthStore } from '../../store/auth'
+import { matchVerificationByTestItem } from '../../api/verificationReports'
+
+// ---- 性能验证结论汇总（与性能验证记录联动）----
+const verifDialog = ref(false)
+const verifLoading = ref(false)
+const verifTarget = ref(null)
+const verifItems = ref([])
+
+// result_summary 的 key → 中文标签
+const VERIF_LABELS = {
+  precision1: '精密度（批内）',
+  precision2: '精密度（室内）',
+  precision3: '评价结论',
+  trueness1: '正确度',
+  trueness2: '正确度（第二水平）',
+  linearity: '线性范围',
+  reportable1: '可报告范围（低限）',
+  reportable2: '可报告范围（高限）',
+  reference: '参考区间',
+  specificity: '分析特异性',
+  comparison: '比对',
+}
+
+function verifRows(v) {
+  const rs = v.result_summary || {}
+  return Object.keys(rs).map((k) => ({
+    key: k,
+    label: VERIF_LABELS[k] || k,
+    result: (rs[k] && rs[k].result) || '—',
+    conclusion: (rs[k] && rs[k].conclusion) || '',
+  }))
+}
+
+async function openVerification(row) {
+  verifTarget.value = row
+  verifItems.value = []
+  verifDialog.value = true
+  verifLoading.value = true
+  try {
+    const res = await matchVerificationByTestItem({
+      name: row.name || '',
+      aliases: row.aliases || '',
+      specimen: row.specimen || '',
+    })
+    verifItems.value = (res && res.items) || []
+  } catch (e) {
+    ElMessage.error('查询性能验证失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    verifLoading.value = false
+  }
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -919,6 +1019,13 @@ async function onImportFile(e) {
   border-radius: 10px;
   border-left: 4px solid #409eff;
 }
+
+.verif-card { margin-bottom: 12px; }
+.verif-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.verif-head-meta { color: #909399; font-size: 12px; }
+.verif-sub { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: #606266; margin-bottom: 8px; }
+.verif-table { margin-top: 2px; }
+.verif-table :deep(.el-table__cell) { padding: 4px 0; }
 
 .item-card :deep(.el-card__body) {
   padding: 18px 20px;
