@@ -6,20 +6,18 @@
 FROM python:3.13-slim
 WORKDIR /app
 
-# 系统依赖（gcc/python3-dev 用于编译 crcmod C 扩展）
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libxml2 libxslt1.1 gcc python3-dev \
-    fonts-wqy-zenhei \
-    && rm -rf /var/lib/apt/lists/*
-
-# Python 依赖
+# 系统依赖 + Python 依赖 + 清理编译工具 —— 必须在**同一个 RUN** 内完成。
+# 原因：Docker 层不可变，若 apt install 与 apt remove 分属不同层，
+# gcc/python3-dev（约 300~400MB）会永久留在镜像层里，导致推送 TCR 超时
+# （线上 946/947/948 连续 build_failed，报 net/http: timeout awaiting response headers）。
 COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 清理编译工具（减小镜像体积）
-# 注意：标记 fonts-wqy-wenhei 为 manual，避免 autoremove 连带删掉中文字体
-RUN apt-mark manual fonts-wqy-zenhei \
-    && apt-get remove -y gcc python3-dev && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libxml2 libxslt1.1 gcc python3-dev fonts-wqy-zenhei \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apt-mark manual fonts-wqy-zenhei \
+    && apt-get purge -y --auto-remove gcc python3-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /root/.cache/pip /tmp/*
 
 # 后端代码
 COPY backend/ ./
