@@ -18,6 +18,10 @@ backend/data/
 .idea
 .workbuddy
 outputs
+output/
+五小成果视频_20260825/
+mobile_shots/
+softcopyright/
 _tmp_*
 *.xlsx
 *.pdf

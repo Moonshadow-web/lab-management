@@ -16,6 +16,10 @@ backend_*.log
 _deploy_check/
 .workbuddy/
 outputs/
+output/
+五小成果视频_20260825/
+mobile_shots/
+softcopyright/
 docx_unpacked/
 proj_unpacked/
 _tmp_*.py
