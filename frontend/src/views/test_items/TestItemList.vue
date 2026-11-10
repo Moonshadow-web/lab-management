@@ -358,12 +358,15 @@
             <el-table-column prop="result" label="结果" min-width="260" show-overflow-tooltip />
             <el-table-column label="结论" width="110" align="center">
               <template #default="{ row }">
-                <el-tag v-if="row.conclusion" size="small"
-                        :type="row.conclusion.includes('符合') ? 'success' : 'danger'">{{ row.conclusion }}</el-tag>
+                <el-tag v-if="row.isOk" size="small" type="success">符合要求</el-tag>
+                <el-tag v-else-if="row.isBad" size="small" type="danger">{{ row.conclusion }}</el-tag>
                 <span v-else style="color:#c0c4cc">—</span>
               </template>
             </el-table-column>
           </el-table>
+          <div v-if="verifRows(v).some(r => r.isNa)" class="verif-hint">
+            注：标「—」的项目为源报告未填写单项结论（如「/」或留空），该记录结论请以「评价结论」为准。
+          </div>
         </el-card>
       </div>
       <template #footer>
@@ -397,6 +400,8 @@ const VERIF_LABELS = {
   precision1: '精密度（批内）',
   precision2: '精密度（室内）',
   precision3: '评价结论',
+  precision4: '评价结论（重复）',
+  precision5: '评价结论（补充）',
   trueness1: '正确度',
   trueness2: '正确度（第二水平）',
   linearity: '线性范围',
@@ -405,16 +410,35 @@ const VERIF_LABELS = {
   reference: '参考区间',
   specificity: '分析特异性',
   comparison: '比对',
+  dilution: '稀释',
 }
+
+// 无实质结论的写法（源报告常用 / — 表示该项不适用或未填）
+const NA_CONCLUSIONS = ['/', '—', '-', '／', '不适用', 'N/A', 'na']
 
 function verifRows(v) {
   const rs = v.result_summary || {}
-  return Object.keys(rs).map((k) => ({
-    key: k,
-    label: VERIF_LABELS[k] || k,
-    result: (rs[k] && rs[k].result) || '—',
-    conclusion: (rs[k] && rs[k].conclusion) || '',
-  }))
+  const rows = []
+  const seen = new Set()
+  Object.keys(rs).forEach((k) => {
+    const result = (rs[k] && rs[k].result) || '—'
+    const raw = String((rs[k] && rs[k].conclusion) || '').trim()
+    // 去掉重复行：源报告「评价结论」有时会在多个 key 里重复同一段话
+    const sig = `${result}||${raw}`
+    if (seen.has(sig)) return
+    seen.add(sig)
+    const isNa = !raw || NA_CONCLUSIONS.includes(raw)
+    rows.push({
+      key: k,
+      label: VERIF_LABELS[k] || k,
+      result,
+      conclusion: raw,
+      isNa,
+      isOk: !isNa && raw.includes('符合'),
+      isBad: !isNa && !raw.includes('符合'),
+    })
+  })
+  return rows
 }
 
 async function openVerification(row) {
@@ -1024,6 +1048,7 @@ async function onImportFile(e) {
 .verif-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .verif-head-meta { color: #909399; font-size: 12px; }
 .verif-sub { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: #606266; margin-bottom: 8px; }
+.verif-hint { margin-top: 6px; font-size: 12px; color: #909399; line-height: 1.5; }
 .verif-table { margin-top: 2px; }
 .verif-table :deep(.el-table__cell) { padding: 4px 0; }
 
