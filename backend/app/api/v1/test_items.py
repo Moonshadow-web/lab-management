@@ -170,7 +170,7 @@ async def test_items_stats(
     }
 
 
-@router.get("/cnas-flags")
+@router.post("/cnas-flags")   # 用 POST：GET 会被 make_router 的 GET /{item_id} 抢先匹配（422 int_parsing）
 def cnas_flags(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """返回 {项目名: 是否申请 CNAS 认可}，供「项目查询」卡片打「申请认可」标签。
 

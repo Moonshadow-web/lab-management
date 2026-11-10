@@ -29,5 +29,5 @@ export function exportTestItems(params) {
 
 // 项目是否申请 CNAS 认可（来源：认可能力范围表）
 export function getCnasFlags() {
-  return request.get('/api/v1/test-items/cnas-flags')
+  return request.post('/api/v1/test-items/cnas-flags')
 }
