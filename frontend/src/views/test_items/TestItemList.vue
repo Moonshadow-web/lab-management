@@ -140,6 +140,9 @@
             <el-tag v-if="row.category" :type="categoryType(row.category)" effect="plain" class="category-tag">
               <span v-html="highlight(row.category)"></span>
             </el-tag>
+            <el-tag v-if="cnasFlags[row.name]" type="danger" effect="dark" class="eqa-badge" title="该项目已列入 CNAS 认可能力范围">
+              申请认可
+            </el-tag>
             <el-tag v-if="eqaOrgs(row).length" type="success" effect="dark" class="eqa-badge" title="该项目参加室间质评">
               <el-icon class="eqa-ico"><Medal /></el-icon>室间质评（{{ eqaOrgs(row).join('/') }}）
             </el-tag>
@@ -340,6 +343,7 @@
           <template #header>
             <div class="verif-head">
               <b>{{ v.project_name }}</b>
+              <el-tag v-if="v.is_target" type="danger" effect="dark" size="small" style="margin-left:8px">靶机</el-tag>
               <span class="verif-head-meta">
                 {{ v.instrument_model || '—' }}
                 <template v-if="v.instrument_no"> · {{ v.instrument_no }}</template>
@@ -382,7 +386,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Edit, Delete, Warning, Upload, Download, ArrowDown, ArrowRight, Link, Medal, Document, Loading, TrendCharts } from '@element-plus/icons-vue'
 import EditDialog from '../../components/EditDialog.vue'
-import { listTestItems, createTestItem, updateTestItem, deleteTestItem, importTestItems, exportTestItems, getTestItemStats } from '../../api/testItems'
+import { listTestItems, createTestItem, updateTestItem, deleteTestItem, importTestItems, exportTestItems, getTestItemStats, getCnasFlags } from '../../api/testItems'
 import { getInstrumentFamilyMap } from '../../api/instruments'
 import { listEqaAssociations } from '../../api/eqa'
 import { listProjectManuals, fetchDocumentBlob, downloadBlob } from '../../api/documents'
@@ -390,6 +394,8 @@ import { useAuthStore } from '../../store/auth'
 import { matchVerificationByTestItem } from '../../api/verificationReports'
 
 // ---- 性能验证结论汇总（与性能验证记录联动）----
+const cnasFlags = ref({})   // { 项目名: 是否申请CNAS认可 }
+
 const verifDialog = ref(false)
 const verifLoading = ref(false)
 const verifTarget = ref(null)
@@ -554,6 +560,8 @@ const emptyForm = () => ({
 const form = reactive(emptyForm())
 
 onMounted(async () => {
+  // 加载「申请认可」标记（一次性全量，本地按项目名匹配）
+  getCnasFlags().then((d) => { cnasFlags.value = d || {} }).catch(() => {})
   // 加载说明书选项供编辑时关联
   try {
     const manuals = await listProjectManuals()

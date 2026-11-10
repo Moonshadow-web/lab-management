@@ -277,7 +277,12 @@ def match_by_test_item(
     hits = []
     for r in rows:
         if _match_test_item_to_report(name, aliases, specimen, r.project_name or ""):
-            hits.append(_serialize_report(r))
+            d = _serialize_report(r)
+            # 靶机 = 科室主力机（_TARGET_MODELS / _TARGET_NOS），前端用红色标注并置顶
+            d["is_target"] = _is_target(r.instrument_model, r.instrument_no)
+            hits.append(d)
+    # 排序：靶机优先，其余按 id 倒序（新记录在前）
+    hits.sort(key=lambda x: (0 if x.get("is_target") else 1, -(x.get("id") or 0)))
     return {"items": hits, "total": len(hits)}
 
 

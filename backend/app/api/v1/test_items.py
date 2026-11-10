@@ -170,6 +170,20 @@ async def test_items_stats(
     }
 
 
+@router.get("/cnas-flags")
+def cnas_flags(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """返回 {项目名: 是否申请 CNAS 认可}，供「项目查询」卡片打「申请认可」标签。
+
+    认可项目来源：iso15189 的「认可能力范围」表（accredited_scopes），
+    匹配逻辑复用 verification_reports._is_cnas（含标本类型/修饰词校验）。
+    """
+    from .verification_reports import _load_cnas_map, _is_cnas
+    acc_map = _load_cnas_map(db)
+    acc_names = set(acc_map.keys())
+    rows = db.query(TestItem.name).all()
+    return {n: _is_cnas(n, acc_names, acc_map) for (n,) in rows if n}
+
+
 @router.get("/export")
 async def export_test_items(
     q: str = "",
