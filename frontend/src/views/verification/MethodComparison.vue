@@ -369,7 +369,10 @@ const detailSummaryRows = computed(() => {
     { k: 'Passing-Bablok 截距（95%CI）', v: `${val(rs.pb_intercept ?? rs.intercept)}${ci(rs.pb_intercept_ci)}` },
     { k: '比例偏移（按 PB 斜率 95%CI 判定）', v: rs.proportional_bias_exists == null ? '—' : (rs.proportional_bias_exists ? `存在，${rs.proportional_bias_pct > 0 ? '+' : ''}${Number(rs.proportional_bias_pct).toFixed(2)}%` : '不存在') },
     { k: '系统偏移（按 PB 截距 95%CI 判定）', v: rs.systematic_bias || '—' },
-    { k: '允许总误差 TEa / 1/2 TEa', v: rs.tea_half != null ? `${(rs.tea_half * 2).toFixed(0)}% / ${rs.tea_half}%` : '未设置' },
+    { k: '允许总误差 TEa / 1/2 TEa',
+      v: rs.tea_half != null
+        ? `${rs.tea_full_text || ((rs.tea_half * 2).toFixed(0) + '%')} / ${rs.tea_half_text || (rs.tea_half + '%')}`
+        : '未设置' },
     { k: '参照点', v: rs.anchor_value != null ? `${rs.anchor_label}　${Number(rs.anchor_value).toPrecision(4)}` : '—' },
     { k: '参照点处总偏差', v: rs.bias_at_anchor_pct != null ? `${rs.bias_at_anchor_pct > 0 ? '+' : ''}${rs.bias_at_anchor_pct}%` : '—' },
     { k: 'Pearson r', v: f(rs.pearson_r, 4) },
