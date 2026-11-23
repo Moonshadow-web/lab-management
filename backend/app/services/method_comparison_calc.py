@@ -411,13 +411,16 @@ def compute_method_comparison(data: dict) -> dict:
     bias_anchor_ok = None
     if tea_half is not None and bias_anchor_pb is not None:
         bias_anchor_ok = abs(bias_anchor_pb) <= tea_half
-        can_replace = bool(ba["consistent"] and bias_anchor_ok)
+        # ⚠️ 临床可替代性**只看偏倚幅度是否 ≤ 1/2 TEa**（WS/T 403 / EP9 口径）。
+        # 不再把 Bland-Altman 的 P 值当硬门槛 —— 大样本下微小差异也会 P<0.05，
+        # 但偏倚远小于 1/2 TEa 时临床上完全可接受（用户 2026-11-23 明确要求）。
+        can_replace = bool(bias_anchor_ok)
         acceptable = can_replace
         replace_reason = (
-            f"Bland-Altman {'一致' if ba['consistent'] else '不一致'}，{ba['p_text']}；"
             f"{anchor_label} {_num_g(anchor)} 处总偏差 {bias_anchor_pb:+.2f}%"
             f" {'≤' if bias_anchor_ok else '>'} 1/2 TEa（{tea_half:g}%）"
             + (f"；比例偏移 {prop_pct:+.2f}%" if prop_pct is not None else "")
+            + (f"；Bland-Altman {'一致' if ba['consistent'] else '不一致'}（{ba['p_text']}，仅作统计参考）")
         )
     else:
         can_replace = None
@@ -447,7 +450,7 @@ def compute_method_comparison(data: dict) -> dict:
 
     concl.append(
         f"两种方法对{project}的检测在统计学上{'不一致' if not ba['consistent'] else '一致'}"
-        f"（Bland-Altman，{ba['p_text']}）。"
+        f"（Bland-Altman，{ba['p_text']}；该结果仅反映统计差异，临床可接受性以偏倚是否 ≤ 1/2 TEa 为准）。"
     )
 
     if can_replace is None:
