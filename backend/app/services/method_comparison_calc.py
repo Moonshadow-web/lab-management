@@ -628,6 +628,17 @@ def compute_method_comparison(data: dict) -> dict:
         "acceptable": acceptable,
         "can_replace": can_replace,
         "tea_half": tea_half,
+        "tea_raw": str(tea_raw or ""),
+        "tea_kind": tea_info["kind"],
+        "tea_half_text": (
+            ("%.4g%%" % tea_half) if (tea_info["kind"] == "pct" and tea_half is not None)
+            else (("%.4g %s" % (tea_half, tea_info["unit"])) if tea_half is not None else "")
+        ),
+        "tea_full_text": (
+            (("%.4g%%" % tea_info["value"]) if tea_info["kind"] == "pct"
+             else ("%.4g %s" % (tea_info["value"], tea_info["unit"])))
+            if tea_info["kind"] else ""
+        ),
         "anchor_value": anchor,
         "anchor_label": anchor_label,
         "bias_at_anchor_pct": round(bias_anchor_pb, 2) if bias_anchor_pb is not None else None,
