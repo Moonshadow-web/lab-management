@@ -282,6 +282,60 @@ def bland_altman(xs, ys):
 
 
 # ─────────────────────────── 主入口 ───────────────────────────
+def parse_tea(raw, anchor):
+    """解析允许总误差（TEa），支持**分段写法**。
+
+    质量要求库里大量项目是分段口径，例如：
+      "4.5 μg/L (≤15 μg/L)；30.0% (>15 μg/L)"        肌肉酶类
+      "0.2 mmol/L (≤3.3 mmol/L)；6.0% (>3.3 mmol/L)" 电解质
+      "±25%" / "25" / "靶值 ±30%"                      单一百分比
+
+    返回 {kind, value, half, unit, desc}：
+      kind='pct' → 按相对偏差(%)比较，half = value/2（%）
+      kind='abs' → 按绝对偏差(与 TEa 同单位)比较，half = value/2
+    无法解析返回 kind=None（旧行为：不下"能替代"结论）。
+    """
+    import re as _re
+    s = str(raw or "").strip()
+    if not s:
+        return {"kind": None, "value": None, "half": None, "unit": "", "desc": ""}
+
+    # 分段：以 ；/; 切分，每段形如 "数值 单位 (≤阈值 单位)" 或 "30.0% (>15 μg/L)"
+    segs = [x for x in _re.split(r"[；;]", s) if x.strip()]
+    if len(segs) >= 2 and anchor is not None:
+        parsed = []
+        for seg in segs:
+            m = _re.search(
+                r"([0-9]+(?:\.[0-9]+)?)\s*(%|[a-zA-Zμµ]+(?:/[a-zA-Z]+)?)?\s*"
+                r"[\(（]\s*([<>≤≥]=?)\s*([0-9]+(?:\.[0-9]+)?)", seg)
+            if not m:
+                continue
+            val = float(m.group(1))
+            is_pct = (m.group(2) == "%")
+            unit = "" if is_pct else (m.group(2) or "")
+            op, thr = m.group(3), float(m.group(4))
+            parsed.append((op, thr, val, is_pct, unit))
+        for op, thr, val, is_pct, unit in parsed:
+            hit = (op in ("≤", "<=") and anchor <= thr) or (op in (">", "≥") and anchor > thr)
+            if hit:
+                return {
+                    "kind": "pct" if is_pct else "abs",
+                    "value": val, "half": val / 2.0,
+                    "unit": unit,
+                    "desc": ("%.4g%%" % val) if is_pct else ("%.4g %s" % (val, unit)),
+                }
+
+    # 单一写法：优先取百分数
+    m = _re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", s)
+    if m:
+        val = float(m.group(1))
+        return {"kind": "pct", "value": val, "half": val / 2.0, "unit": "%", "desc": "%.4g%%" % val}
+    v = _num(s)
+    if v:
+        return {"kind": "pct", "value": v, "half": v / 2.0, "unit": "%", "desc": "%.4g%%" % v}
+    return {"kind": None, "value": None, "half": None, "unit": "", "desc": ""}
+
+
 def _num(v):
     """把录入值转成 float；空 / 非数字返回 None。"""
     if v is None:
@@ -337,8 +391,9 @@ def compute_method_comparison(data: dict) -> dict:
             "details": {"esd": esd},
         }
 
-    tea = _num(data.get("tea"))
-    tea_half = tea / 2.0 if tea else None
+    tea_raw = data.get("tea")
+    tea = _num(tea_raw)
+    tea_half = tea / 2.0 if tea else None   # 兼容旧字段；分段口径在 anchor 确定后重算
 
     ci_deming = _bootstrap_ci(deming_xy, xs, ys)
     ci_pb = _bootstrap_ci(pb_xy, xs, ys)
@@ -409,23 +464,42 @@ def compute_method_comparison(data: dict) -> dict:
     prop_pct = pb_prop.get("pct")
     sys_pct = pb_sys.get("pct")
     bias_anchor_ok = None
-    if tea_half is not None and bias_anchor_pb is not None:
+    # TEa 解析（支持分段口径，如 "4.5 μg/L (≤15 μg/L)；30.0% (>15 μg/L)"）
+    # 按锚点所在区间取对应口径：绝对量按「与 TEa 同单位」比较，百分比按相对偏差比较。
+    tea_info = parse_tea(tea_raw, anchor)
+    tea_half = tea_info["half"]
+    bias_abs = ((pb["intercept"] + pb["slope"] * anchor) - anchor) if anchor else None
+
+    if tea_info["kind"] == "pct" and tea_half is not None and bias_anchor_pb is not None:
         bias_anchor_ok = abs(bias_anchor_pb) <= tea_half
+        half_txt = "%.4g%%" % tea_half
+        bias_txt = "%+.2f%%" % bias_anchor_pb
+        judge_ok = bias_anchor_ok
+    elif tea_info["kind"] == "abs" and tea_half is not None and bias_abs is not None:
+        bias_anchor_ok = abs(bias_abs) <= tea_half
+        half_txt = "%.4g %s" % (tea_half, tea_info["unit"])
+        bias_txt = "%+.4g %s（%+.2f%%）" % (bias_abs, tea_info["unit"], bias_anchor_pb or 0.0)
+        judge_ok = bias_anchor_ok
+    else:
+        judge_ok = None
+
+    if judge_ok is not None:
         # ⚠️ 临床可替代性**只看偏倚幅度是否 ≤ 1/2 TEa**（WS/T 403 / EP9 口径）。
-        # 不再把 Bland-Altman 的 P 值当硬门槛 —— 大样本下微小差异也会 P<0.05，
-        # 但偏倚远小于 1/2 TEa 时临床上完全可接受（用户 2026-11-23 明确要求）。
-        can_replace = bool(bias_anchor_ok)
+        # 不把 Bland-Altman 的 P 值当硬门槛 —— 大样本下微小差异也会 P<0.05。
+        can_replace = bool(judge_ok)
         acceptable = can_replace
         replace_reason = (
-            f"{anchor_label} {_num_g(anchor)} 处总偏差 {bias_anchor_pb:+.2f}%"
-            f" {'≤' if bias_anchor_ok else '>'} 1/2 TEa（{tea_half:g}%）"
+            f"{anchor_label} {_num_g(anchor)} 处总偏差 {bias_txt}"
+            f" {'≤' if bias_anchor_ok else '>'} 1/2 TEa（{half_txt}）"
+            + (f"；TEa 口径 {str(tea_raw).strip()}" if str(tea_raw or "").strip() else "")
             + (f"；比例偏移 {prop_pct:+.2f}%" if prop_pct is not None else "")
             + (f"；Bland-Altman {'一致' if ba['consistent'] else '不一致'}（{ba['p_text']}，仅作统计参考）")
         )
     else:
         can_replace = None
         acceptable = None
-        miss = "未设置允许总误差（TEa）" if tea_half is None else "缺少可用的参照点"
+        miss = ("未设置允许总误差（TEa）" if not str(tea_raw or "").strip()
+                else ("TEa 无法解析" if tea_info["kind"] is None else "缺少可用的参照点"))
         replace_reason = (f"{miss}，无法评价偏移幅度的临床可接受性；"
                           f"统计层面 Bland-Altman {'一致' if ba['consistent'] else '不一致'}"
                           + (f"，比例偏移 {prop_pct:+.2f}%" if prop_pct is not None else "")
@@ -481,6 +555,12 @@ def compute_method_comparison(data: dict) -> dict:
         "test_instrument": test_name,
         "unit": data.get("unit") or "",
         "tea": tea,
+        "tea_raw": str(tea_raw or ""),
+        "tea_kind": tea_info["kind"],
+        "tea_half_text": (
+            ("%.4g%%" % tea_half) if (tea_info["kind"] == "pct" and tea_half is not None)
+            else (("%.4g %s" % (tea_half, tea_info["unit"])) if tea_half is not None else "")
+        ),
         "sample_count_planned": data.get("sample_count"),
         "n_input": len(pairs_all),
         "n_used": n,
